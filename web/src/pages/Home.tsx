@@ -1,8 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Me } from '@yugioh/shared';
-import { api } from '../api.ts';
 import { Duels } from './Duels.tsx';
-import { Invites } from './Invites.tsx';
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -13,12 +10,12 @@ export function Home({ me }: { me: Me }) {
       return (
         <section>
           <h1>Welcome</h1>
-          <p>This site is invite-only. Log in to request an account, or open an invite link from a player.</p>
+          <p>This site is invite-only. Log in to request an account, or open a challenge link from a player to play as a guest.</p>
           <a className="button" href="/auth/login">Log in or sign up</a>
         </section>
       );
     case 'guest':
-      return <Guest invitedBy={me.invite.invitedBy} expiresAt={me.invite.expiresAt} />;
+      return <Guest name={me.guest.name} />;
     case 'user': {
       const { user } = me;
       if (user.status === 'pending')
@@ -39,25 +36,21 @@ export function Home({ me }: { me: Me }) {
         <section>
           <h1>Hi {user.name ?? user.email}</h1>
           <Duels canChallenge />
-          <Invites />
         </section>
       );
     }
   }
 }
 
-function Guest({ invitedBy, expiresAt }: { invitedBy: string; expiresAt: string }) {
-  const queryClient = useQueryClient();
-  const leave = useMutation({
-    mutationFn: () => api('/guest/leave', { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['me'] }),
-  });
+function Guest({ name }: { name: string }) {
   return (
     <section>
-      <h1>You're {invitedBy}'s guest</h1>
-      <p>Your invite lasts until {formatDate(expiresAt)}.</p>
+      <h1>Hi {name}</h1>
+      <p>
+        You're playing as a guest. You can play any challenge someone sends you a link to, but you can't create
+        challenges. Your guest access ends a day after your last duel finishes. Log in to keep your duels on an account.
+      </p>
       <Duels canChallenge={false} />
-      <button onClick={() => leave.mutate()} disabled={leave.isPending}>Leave guest access</button>
     </section>
   );
 }

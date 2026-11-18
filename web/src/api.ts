@@ -32,3 +32,6 @@ export function errorText(error: unknown): string {
   const body = error instanceof ApiError ? (error.body as { error?: string } | null) : null;
   return body?.error ?? 'Something went wrong. Try again.';
 }
+
+/** Logging in brings the visitor back to the page they were on, such as a challenge link. */
+export const loginHref = (returnTo: string) => `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;

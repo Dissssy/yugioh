@@ -1,21 +1,22 @@
 import type { Response } from 'express';
 import type { Me } from '@yugioh/shared';
 
-/** Who is making a request, with the server-only details of a guest's invite. */
-export type Viewer =
-  | Exclude<Me, { kind: 'guest' }>
-  | (Extract<Me, { kind: 'guest' }> & { guestToken: string; invitedById: number });
+/** Who is making a request, with the guest's ID for the server. */
+export type Viewer = Exclude<Me, { kind: 'guest' }> | (Extract<Me, { kind: 'guest' }> & { guestId: number });
 
 export const viewerOf = (res: Response) => res.locals.viewer as Viewer;
 
+export const userKey = (id: number) => `user:${id}`;
+export const guestKey = (id: number) => `guest:${id}`;
+
 /** Approved accounts and guests can play; everyone else can't. */
 export function playerKey(viewer: Viewer): string | null {
-  if (viewer.kind === 'user') return viewer.user.status === 'approved' ? `user:${viewer.user.id}` : null;
-  if (viewer.kind === 'guest') return `guest:${viewer.guestToken}`;
+  if (viewer.kind === 'user') return viewer.user.status === 'approved' ? userKey(viewer.user.id) : null;
+  if (viewer.kind === 'guest') return guestKey(viewer.guestId);
   return null;
 }
 
 export function displayName(viewer: Viewer): string {
   if (viewer.kind === 'user') return viewer.user.name ?? viewer.user.email ?? 'Player';
-  return viewer.kind === 'guest' ? `${viewer.invite.invitedBy}'s guest` : 'Visitor';
+  return viewer.kind === 'guest' ? viewer.guest.name : 'Visitor';
 }

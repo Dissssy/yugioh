@@ -1,4 +1,5 @@
 // HTTP API for decks and duels. Players send intents with POST and receive their view as Server-Sent Events.
+// A challenge link is also the way in for people without an account: joining it signed out creates a guest.
 
 import { Router, type Response } from 'express';
 import { eq } from 'drizzle-orm';
@@ -8,8 +9,9 @@ import type { DeckDetail, DeckSummary } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db } from './db/client.ts';
 import { decks } from './db/schema.ts';
-import type { Duels } from './duels.ts';
-import { displayName, playerKey, viewerOf, type Viewer } from './viewer.ts';
+import type { Duels, SeatClaim } from './duels.ts';
+import { createGuest } from './guests.ts';
+import { displayName, guestKey, playerKey, viewerOf, type Viewer } from './viewer.ts';
 
 const id = z.string();
 const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
@@ -26,14 +28,22 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
 ]);
 
 const deckChoice = z.object({ deckId: z.number().int() });
+/** Signed-out visitors also give the name they play under as a guest. */
+const joinBody = deckChoice.extend({ guestName: z.string().trim().min(1).max(30).optional() });
+
+/** Sets and clears the cookie that holds a guest's token. */
+export interface GuestCookie {
+  set(res: Response, token: string): void;
+  clear(res: Response): void;
+}
 
 /** How often an idle event stream sends a comment, so proxies don't close it. */
 const KEEPALIVE_MS = 25_000;
 
-export function duelRoutes(db: Db, duels: Duels) {
+export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
   const router = Router();
 
-  /** Playing needs an approved account or a guest invite. */
+  /** Playing needs an approved account or a guest identity. */
   const player = (res: Response): { viewer: Viewer; key: string } | null => {
     const viewer = viewerOf(res);
     const key = playerKey(viewer);
@@ -44,17 +54,16 @@ export function duelRoutes(db: Db, duels: Duels) {
     return { viewer, key };
   };
 
-  /** Guests may only play their inviter; approved users may play anyone's challenge. */
-  const mayJoin = (viewer: Viewer, createdBy: number) => viewer.kind === 'user' || (viewer.kind === 'guest' && viewer.invitedById === createdBy);
+  /** Players can take an empty seat, and so can signed-out visitors, who become guests by doing so. */
+  const mayJoin = (viewer: Viewer) => viewer.kind === 'anonymous' || playerKey(viewer) !== null;
 
+  // Decks are public: a visitor opening a challenge link picks one before deciding to play as a guest.
   router.get('/decks', async (_req, res) => {
-    if (!player(res)) return;
     const rows = await db.select().from(decks).orderBy(decks.id);
     res.json(rows.map((d): DeckSummary => ({ id: d.id, name: d.name, mainCount: d.main.length, extraCount: d.extra.length })));
   });
 
   router.get('/decks/:id', async (req, res) => {
-    if (!player(res)) return;
     const deckId = z.coerce.number().int().safeParse(req.params.id);
     const deck = deckId.success ? await db.query.decks.findFirst({ where: eq(decks.id, deckId.data) }) : undefined;
     if (!deck) return void res.status(404).json({ error: 'not_found' });
@@ -70,9 +79,8 @@ export function duelRoutes(db: Db, duels: Duels) {
   router.get('/duels', async (_req, res) => {
     const p = player(res);
     if (!p) return;
-    const challenger = p.viewer.kind === 'guest' ? p.viewer.invitedById : null;
-    const rows = await duels.list(p.key, challenger);
-    res.json(await Promise.all(rows.map((row) => duels.summarize(row, p.key, mayJoin(p.viewer, row.createdBy)))));
+    const rows = await duels.list(p.key);
+    res.json(await Promise.all(rows.map((row) => duels.summarize(row, p.key, true))));
   });
 
   router.post('/duels', async (req, res) => {
@@ -86,27 +94,42 @@ export function duelRoutes(db: Db, duels: Duels) {
     res.status(201).json(await duels.summarize((await duels.find(duelId))!, p.key, false));
   });
 
+  // Anyone holding the link may look at a duel; the random ID is what keeps it private.
   router.get('/duels/:id', async (req, res) => {
-    const p = player(res);
-    if (!p) return;
+    const viewer = viewerOf(res);
     const row = await duels.find(req.params.id);
     if (!row) return void res.status(404).json({ error: 'not_found' });
-    res.json(await duels.summarize(row, p.key, mayJoin(p.viewer, row.createdBy)));
+    res.json(await duels.summarize(row, playerKey(viewer), mayJoin(viewer)));
   });
 
   router.post('/duels/:id/join', async (req, res) => {
-    const p = player(res);
-    if (!p) return;
-    const body = deckChoice.safeParse(req.body);
+    const viewer = viewerOf(res);
+    const body = joinBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    let claim: SeatClaim;
+    const created: { guestToken?: string } = {};
+    if (viewer.kind === 'anonymous') {
+      const name = body.data.guestName;
+      if (!name) return void res.status(401).json({ error: 'player_required' });
+      claim = async (tx) => {
+        const guest = await createGuest(tx, name);
+        created.guestToken = guest.token;
+        return { key: guestKey(guest.id), name: guest.name };
+      };
+    } else {
+      const p = player(res);
+      if (!p) return;
+      claim = async () => ({ key: p.key, name: displayName(p.viewer) });
+    }
     const row = await duels.find(req.params.id);
-    if (!row || !mayJoin(p.viewer, row.createdBy)) return void res.status(404).json({ error: 'not_found' });
+    if (!row) return void res.status(404).json({ error: 'not_found' });
     if (!(await db.query.decks.findFirst({ where: eq(decks.id, body.data.deckId) })))
       return void res.status(404).json({ error: 'deck_not_found' });
     const { createdBy } = await duels.summarize(row, null, false);
-    const joined = await duels.join(row.id, p.key, body.data.deckId, [createdBy, displayName(p.viewer)]);
-    if (!joined) return void res.status(409).json({ error: 'seat_taken' });
-    res.json(await duels.summarize((await duels.find(row.id))!, p.key, false));
+    if (!(await duels.join(row.id, body.data.deckId, createdBy, claim))) return void res.status(409).json({ error: 'seat_taken' });
+    if (created.guestToken) guestCookie.set(res, created.guestToken);
+    const started = (await duels.find(row.id))!;
+    res.json(await duels.summarize(started, started.seat1, false));
   });
 
   // The seat's view of the duel, sent now and after every change.

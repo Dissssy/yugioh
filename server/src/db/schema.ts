@@ -12,15 +12,15 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** A link an approved user hands to someone without an account so they can play. */
-export const invites = pgTable('invites', {
-  token: text('token').primaryKey(),
-  createdBy: integer('created_by')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+/**
+ * Someone without an account who accepted a challenge link. The signed `guest` cookie holds the token.
+ * A guest lasts while they sit in a duel that is going or finished recently; see guests.ts.
+ */
+export const guests = pgTable('guests', {
+  id: serial('id').primaryKey(),
+  token: text('token').notNull().unique(),
+  name: text('name').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  redeemedAt: timestamp('redeemed_at', { withTimezone: true }),
 });
 
 /** Every card from YGOPRODeck. The game reads cards from here and never calls the API live. */
@@ -62,7 +62,7 @@ export const decks = pgTable('decks', {
 
 export const matchStatus = pgEnum('match_status', ['waiting', 'active', 'finished']);
 
-/** A duel between two seats. Seat keys are `user:<id>` or `guest:<invite token>`. */
+/** A duel between two seats. Seat keys are `user:<id>` or `guest:<id>`; only accounts create duels. */
 export const matches = pgTable('matches', {
   id: text('id').primaryKey(),
   createdBy: integer('created_by')
@@ -70,6 +70,7 @@ export const matches = pgTable('matches', {
     .references(() => users.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   status: matchStatus('status').notNull().default('waiting'),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
   seat0: text('seat0').notNull(),
   seat1: text('seat1'),
   deck0: integer('deck0')

@@ -13,26 +13,11 @@ export interface User {
   createdAt: string;
 }
 
-/** Who is making the request. A guest is an anonymous visitor who redeemed an invite. */
+/** Who is making the request. A guest is someone without an account who accepted a challenge link. */
 export type Me =
   | { kind: 'anonymous' }
-  | { kind: 'guest'; invite: InvitePreview }
+  | { kind: 'guest'; guest: { name: string } }
   | { kind: 'user'; user: User };
-
-export interface Invite {
-  token: string;
-  createdAt: string;
-  expiresAt: string;
-  redeemedAt: string | null;
-}
-
-export interface InvitePreview {
-  invitedBy: string;
-  expiresAt: string;
-}
-
-/** Why an invite link can't be used. */
-export type InviteProblem = 'not_found' | 'expired' | 'used';
 
 /** A decklist to pick from. */
 export interface DeckSummary {
@@ -44,7 +29,10 @@ export interface DeckSummary {
 
 export type DuelStatus = 'waiting' | 'active' | 'finished';
 
-/** A duel as listed in the lobby: who is in it and whether the viewer can take the empty seat. */
+/**
+ * A duel as listed in the lobby: who is in it and whether the viewer can take the empty seat.
+ * Anyone with the link can read it; a signed-out visitor can join as a guest.
+ */
 export interface DuelSummary {
   id: string;
   status: DuelStatus;

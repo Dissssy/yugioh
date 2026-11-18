@@ -38,7 +38,7 @@ Not yet: card effects. Effect monsters fight as plain bodies with their printed 
 ## How a duel runs
 
 1. An approved user picks a deck and creates a challenge, which opens `/duel/:id`. They send that link to their opponent.
-2. An approved user opens the link and picks a deck. Someone without an account first opens one of the challenger's invite links; the challenge then shows on their home page. A guest can only accept challenges from the person who invited them.
+2. The opponent opens the link and picks a deck. An approved user or a guest accepts directly; a signed-out visitor either logs in or plays as a guest under a name they pick (see [accounts.md](accounts.md)).
 3. Accepting deals the opening hands and starts the duel. Who goes first is a coin toss.
 4. Each browser listens on `GET /api/duels/:id/stream` (Server-Sent Events) and gets its own view on connect and after every change. Moves go to `POST /api/duels/:id/intents`; a refused move answers 422 with the reason.
 
