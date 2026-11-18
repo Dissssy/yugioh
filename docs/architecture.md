@@ -259,6 +259,7 @@ Decided 2026-11-18.
 ## Still open
 
 - A rulings source (see Card data). YGOPRODeck's terms were checked on 2026-11-18.
+- The duel screen's look and feel: see [duel-ui.md](duel-ui.md) and its open questions.
 
 ## Deferred: draft mode
 
