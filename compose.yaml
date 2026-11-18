@@ -1,4 +1,6 @@
-# Production: the app image built by CI, plus Postgres. Settings come from .env next to this file (see .env.example).
+# Production on the home server: the app image built by CI, using the host's shared Postgres 18 (compose project
+# /git/postgres, service `db` on the external `postgres` network). Settings come from .env next to this file (see
+# .env.example); the database login (PG* vars + DATABASE_URL) comes from the file written by /git/postgres/accounts.sh.
 # Update with: docker compose pull && docker compose up -d
 name: yugioh
 
@@ -7,34 +9,21 @@ services:
     image: ghcr.io/dissssy/yugioh:latest
     restart: unless-stopped
     init: true
-    env_file: .env
+    env_file:
+      - .env
+      - /srv/secrets/postgres/yugioh.env
     environment:
       PORT: 3000
-      DATABASE_URL: postgres://yugioh:${POSTGRES_PASSWORD}@postgres:5432/yugioh
       CARD_IMAGE_DIR: /data/card-images
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3020:3000"
     volumes:
       - card-images:/data/card-images
-    depends_on:
-      postgres:
-        condition: service_healthy
+    networks: [default, postgres]
 
+networks:
   postgres:
-    image: postgres:16
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: yugioh
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: yugioh
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U yugioh -d yugioh"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+    external: true
 
 volumes:
-  pgdata:
   card-images:
