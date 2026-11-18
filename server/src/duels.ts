@@ -177,7 +177,7 @@ export class Duels {
     const duel = await this.load(id);
     const listener = { seat, send };
     duel.listeners.add(listener);
-    send({ type: 'sync', view: viewFor(duel.state, seat), log: logFor(duel.state, duel.events, seat) });
+    send({ type: 'sync', view: viewFor(duel.state, seat), log: logFor(duel.events, seat) });
     return () => duel.listeners.delete(listener);
   }
 

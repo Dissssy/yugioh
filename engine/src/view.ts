@@ -1,6 +1,7 @@
 // What each player is allowed to see. Hidden cards are sent without an ID or card data, so nothing leaks to the browser.
 
 import { legalActions } from './rules.ts';
+import { evolve, locate, replay } from './state.ts';
 import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, LogEntry, LogEvent, Phase, PlayerView, Seat } from './types.ts';
 
 export function viewFor(state: DuelState, seat: Seat): PlayerView {
@@ -44,22 +45,22 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
 }
 
 /** The whole duel log as one player sees it. */
-export function logFor(state: DuelState, events: readonly DuelEvent[], seat: Seat): LogEntry[] {
-  let turn = 0;
+export function logFor(events: readonly DuelEvent[], seat: Seat): LogEntry[] {
+  let state = replay(events.slice(0, 1));
   return events.flatMap((event, seq) => {
-    if (event.type === 'turnStarted') turn = event.turn;
-    const entry = entryFor(state, event, seq, turn, seat);
+    if (seq > 0) state = evolve(state, event);
+    const entry = entryFor(state, event, seq, state.turn, seat);
     return entry ? [entry] : [];
   });
 }
 
-/** One event as a log entry for one player, or null for events players never see. Card data is fixed for a duel, so any state of it names cards correctly. */
+/** One event as a log entry for one player, or null for events players never see. `state` is the state right after the event. */
 export function entryFor(state: DuelState, event: DuelEvent, seq: number, turn: number, seat: Seat): LogEntry | null {
-  const visible = visibleEvent(event, seat);
+  const visible = visibleEvent(state, event, seat);
   return visible && { seq, turn, event: visible, text: describe(state, visible) };
 }
 
-function visibleEvent(event: DuelEvent, seat: Seat): LogEvent | null {
+function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat): LogEvent | null {
   switch (event.type) {
     case 'duelStarted':
     case 'intent':
@@ -67,6 +68,10 @@ function visibleEvent(event: DuelEvent, seat: Seat): LogEvent | null {
     case 'monsterSet':
     case 'spellTrapSet':
       return event.player === seat ? event : { ...event, card: null };
+    case 'attackDeclared': {
+      const at = event.target === null ? null : locate(state, event.target);
+      return { ...event, targetZone: at?.zone === 'monsters' ? at.index : null };
+    }
     default:
       return event;
   }

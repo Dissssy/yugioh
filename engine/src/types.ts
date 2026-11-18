@@ -134,8 +134,10 @@ export interface PlayerView {
 
 /** An event as one player may see it: a card Set by the opponent has no ID. Intents and the duel's start are never shown. */
 export type LogEvent =
-  | Exclude<DuelEvent, { type: 'duelStarted' | 'intent' | 'monsterSet' | 'spellTrapSet' }>
-  | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number };
+  | Exclude<DuelEvent, { type: 'duelStarted' | 'intent' | 'monsterSet' | 'spellTrapSet' | 'attackDeclared' }>
+  | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number }
+  /** `targetZone` locates a face-down target, which the attacker's view shows without an ID until it flips. */
+  | (Extract<DuelEvent, { type: 'attackDeclared' }> & { targetZone: number | null });
 
 /** One entry of a player's duel log. Every visible event gets one; `text` is null for events the log doesn't spell out. */
 export interface LogEntry {

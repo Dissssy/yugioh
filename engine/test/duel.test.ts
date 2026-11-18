@@ -143,7 +143,7 @@ describe('summoning', () => {
     t.play(0, { type: 'setSpellTrap', card: 'a0' });
     t.play(0, { type: 'setMonster', card: 'a1', tributes: [] });
     const theirs = viewFor(t.state, 1);
-    const theirLog = logFor(t.state, t.events, 1);
+    const theirLog = logFor(t.events, 1);
     expect(theirs.players[0].spellTraps[0]).toEqual({ card: { hidden: true }, position: 'attack', faceUp: false });
     expect(theirs.players[0].monsters[0]).toEqual({ card: { hidden: true }, position: 'defense', faceUp: false });
     expect(theirs.players[0].hand.every((c) => 'hidden' in c)).toBe(true);
@@ -152,7 +152,7 @@ describe('summoning', () => {
     expect(JSON.stringify(theirLog)).not.toContain('a1');
     expect(theirLog.map((e) => e.text)).toContain('Yusei Set a Spell or Trap');
     expect(theirLog.find((e) => e.event.type === 'monsterSet')?.event).toEqual({ type: 'monsterSet', player: 0, card: null, zone: 0 });
-    expect(logFor(t.state, t.events, 0).find((e) => e.event.type === 'monsterSet')?.event).toMatchObject({ card: 'a1' });
+    expect(logFor(t.events, 0).find((e) => e.event.type === 'monsterSet')?.event).toMatchObject({ card: 'a1' });
     const mine = viewFor(t.state, 0);
     expect(mine.players[0].monsters[0]?.card).toMatchObject({ id: 'a1' });
   });
@@ -223,7 +223,9 @@ describe('battle', () => {
     expect(t.state.players[1].monsters[0]).toMatchObject({ faceUp: true, position: 'defense' });
     expect(t.state.players[0].lp).toBe(7700);
     expect(t.state.players[1].lp).toBe(8000);
-    expect(logFor(t.state, t.events, 0).map((e) => e.text)).toContain('Axe Raider attacked Spirit of the Harp');
+    const log = logFor(t.events, 0);
+    expect(log.map((e) => e.text)).toContain('Axe Raider attacked Spirit of the Harp');
+    expect(log.find((e) => e.event.type === 'attackDeclared')?.event).toMatchObject({ targetZone: 0 });
   });
 
   it("can't change position after attacking", () => {
@@ -262,7 +264,7 @@ describe('winning', () => {
     t.play(1, { type: 'endTurn', discard: [] });
     t.play(0, { type: 'endTurn', discard: [] }); // Yuma can't draw
     expect(t.state.result).toEqual({ winner: 0, reason: 'deckOut' });
-    expect(logFor(t.state, t.events, 1).at(-1)?.text).toBe("Yusei won: Yuma couldn't draw");
+    expect(logFor(t.events, 1).at(-1)?.text).toBe("Yusei won: Yuma couldn't draw");
   });
 
   it('discards down to six at the end of the turn', () => {
