@@ -6,3 +6,4 @@ export function connect(databaseUrl: string) {
 }
 
 export type Db = ReturnType<typeof connect>;
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];

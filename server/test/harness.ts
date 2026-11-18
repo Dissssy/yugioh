@@ -1,6 +1,9 @@
 // Runs the real app against a test database and a mock OpenID provider standing in for Auth0.
 import type { AddressInfo } from 'node:net';
 import { createServer } from 'node:http';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
 import { OAuth2Server } from 'oauth2-mock-server';
 import { createApp } from '../src/app.ts';
@@ -13,6 +16,9 @@ export const ADMIN_EMAIL = 'admin@example.com';
 export interface Harness {
   db: Db;
   baseUrl: string;
+  /** A stand-in for the YGOPRODeck API, serving the cards of the two starter decks. */
+  ygoprodeck: string;
+  imageDir: string;
   /** The identity the mock provider puts in the next ID token it issues. */
   setIdentity(claims: LoginClaims): void;
   close(): Promise<void>;
@@ -31,22 +37,48 @@ export async function startHarness(): Promise<Harness> {
     Object.assign(token.payload, identity);
   });
 
+  const ygoprodeck = await startFakeYgoprodeck();
+  const imageDir = await mkdtemp(join(tmpdir(), 'card-images-'));
+
   // The app needs its own public URL up front, so bind a port first and attach the app after.
   const server = createServer();
   await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
   const baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
-  server.on('request', createApp(fakeConfig(baseUrl, oidc.issuer.url!), db));
+  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir }, db));
 
   return {
     db,
     baseUrl,
+    ygoprodeck: ygoprodeck.url,
+    imageDir,
     setIdentity: (claims) => void (identity = claims),
     async close() {
+      server.closeAllConnections();
       await new Promise((r) => server.close(r));
+      await new Promise((r) => ygoprodeck.server.close(r));
       await oidc.stop();
       await db.$client.end();
+      await rm(imageDir, { recursive: true, force: true });
     },
   };
+}
+
+/** Serves the database version, the fixture cards and a placeholder for every image. */
+async function startFakeYgoprodeck() {
+  const cards = await readFile(new URL('./fixtures/cardinfo.json', import.meta.url), 'utf8');
+  let base = '';
+  const server = createServer((req, res) => {
+    const path = new URL(req.url!, 'http://x').pathname;
+    if (path === '/checkDBVer.php') return void res.end(JSON.stringify([{ database_version: '1.0', last_update: '' }]));
+    // Point image URLs at this server.
+    if (path === '/cardinfo.php') return void res.end(cards.replaceAll('https://images.ygoprodeck.com', base));
+    if (path.startsWith('/images/')) return void res.end('jpg');
+    res.statusCode = 404;
+    res.end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
+  base = `http://localhost:${(server.address() as AddressInfo).port}`;
+  return { server, url: base };
 }
 
 function fakeConfig(baseUrl: string, issuer: string) {

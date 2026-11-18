@@ -8,9 +8,11 @@
     "typecheck": "tsc -p .",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file-if-exists=../.env src/db/migrate.ts"
+    "db:migrate": "node --env-file-if-exists=../.env src/db/migrate.ts",
+    "cards:import": "node --env-file-if-exists=../.env src/cards.ts"
   },
   "dependencies": {
+    "@yugioh/engine": "*",
     "@yugioh/shared": "*",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.4",

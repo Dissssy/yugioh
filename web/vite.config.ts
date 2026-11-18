@@ -6,5 +6,5 @@ const api = 'http://localhost:3000';
 
 export default defineConfig({
   plugins: [react()],
-  server: { proxy: { '/api': api, '/auth': api } },
+  server: { proxy: { '/api': api, '/auth': api, '/card-images': api } },
 });
