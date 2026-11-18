@@ -210,19 +210,34 @@ The engine is a library with one entry point: given the event log and a new play
 
 Each layer ends with something two people can play in a browser, and each adds one capability on top of a working game. The server-authoritative event log is there from layer 1, because retrofitting it later would mean rewriting the engine.
 
-1. **Vanilla duel over a link.** Card import (data only), event-sourced engine with phases, draw, Normal Summon/Set, tributes, battle, LP and win by LP 0 or deck-out. Server with WebSockets, a challenge link, a plain board UI. Two hardcoded decks of Normal Monsters. No LLM yet.
+1. **Vanilla duel over a link.** Card import (data only), event-sourced engine with phases, draw, Normal Summon/Set, tributes, battle, LP and win by LP 0 or deck-out. Server with WebSockets, a challenge link, a plain board UI. Two decks built from the Normal Monsters in the two starter decks. No LLM yet.
    - Playable when: two browsers can finish a duel.
-2. **Simple spells via the judge.** Effect sheets for a small pool (first premade deck's spells), `check_activation` and `resolve_chain_link` with the op tool loop and validation, `ask_player`. Opponent can't respond yet. A first eval suite of about 20 hand-written cases. A bare Contest button that runs the appeal and shows the explanation (no rollback yet).
-   - Playable when: a deck with draw and search spells works end to end.
-3. **Chains and responses.** Spell speeds, chain stack, priority passing, response windows with the timing floor and per-card defaults, traps and quick-play spells, OPT tracking. Effect sheets for the whole premade pool.
+2. **Effects via the judge, no responses yet.** Effect sheets for the starter decks' main-deck cards, `check_activation` and `resolve_chain_link` with the op tool loop and validation, `ask_player`. Covers Special Summons from hand and GY, banishing, targeting cards in the GY, and conditions that check what is on the field. Opponent can't respond yet. A first eval suite of about 20 hand-written cases. A bare Contest button that runs the appeal and shows the explanation (no rollback yet).
+   - Playable when: the starter decks' spells and ignition effects work end to end.
+3. **Synchro and Xyz summoning.** Extra Deck zone, Tuner and non-Tuner level sums, Xyz materials of the same Level, overlay units (`attach` / `detach`), materials read from effect sheets, summoning to a Main Monster Zone. Both procedures are generic rules, so they are code, not judge calls.
+   - Playable when: each starter deck can make its Synchro and Xyz plays.
+4. **Chains and responses.** Spell speeds, chain stack, priority passing, response windows with the timing floor and per-card defaults, traps and quick-play spells, OPT tracking.
    - Playable when: a trap can respond to a summon and a counter-trap can respond to that.
-4. **Triggers and lingering effects.** Event list after each resolution, trigger detection by the judge, mandatory vs optional triggers, SEGOC ordering, stat modifiers and restrictions with expiry.
-   - Playable when: the premade decks play out their normal lines without manual fixes.
-5. **Rollback and rulings memory.** Overturn plus two-player rollback consent, hidden-info check on explanations, candidate/verified rulings, retrieval into prompts, admin review page, every verified ruling added to the eval suite.
-6. **Extra Deck mechanics.** Fusion, Synchro, Xyz, Link, Pendulum procedures in code, materials from sheets. (Can move earlier if the premade decks need them.)
-7. **Product.** Accounts with admin approval, invites from approved users, custom banlists, deck builder with banlist validation and `.ydk` import, more premade decks, match history. Widening the card pool happens here, gated by eval results per archetype.
+5. **Triggers and lingering effects.** Event list after each resolution, trigger detection by the judge, mandatory vs optional triggers, SEGOC ordering, stat modifiers and restrictions with expiry. Synchro decks lean on "when this card is Summoned" triggers, so this layer matters early for them.
+   - Playable when: both starter decks play out their normal lines without manual fixes.
+6. **Rollback and rulings memory.** Overturn plus two-player rollback consent, hidden-info check on explanations, candidate/verified rulings, retrieval into prompts, admin review page, every verified ruling added to the eval suite.
+7. **Remaining Extra Deck mechanics.** Fusion, Link (and the Extra Monster Zone rules that come with it) and Pendulum, each added when a premade deck needs it.
+8. **Product.** Custom banlists, deck builder with banlist validation and `.ydk` import, more premade decks, match history. Widening the card pool happens here, gated by eval results per archetype. Accounts, Auth0 login, admin approval and invites are being built separately and ahead of the engine, since they don't depend on it.
 
 The riskiest assumption, that Haiku can resolve real card text through ops reliably, is tested in layer 2, before most of the investment.
+
+## Starting decks
+
+The first card pool is two starter decks, used as the premade decks, unchanged:
+
+| Deck | Teaches | Mechanics the engine must cover |
+| --- | --- | --- |
+| Yu-Gi-Oh! 5D's Starter Deck 2008 | Synchro Summoning | Tuners and level sums, Special Summons, banishing, targeting cards in the GY, effects that check what is on the field |
+| Starter Deck: Dawn of the Xyz | Xyz Summoning | Xyz materials of the same Level, overlay units, detaching as a cost |
+
+What this changes in the build order: Synchro and Xyz move up to layer 3, right after the judge works, while Fusion, Link and Pendulum wait until a deck needs them. Neither deck needs Link Monsters, so under the current rules every Extra Deck monster they use can go to a Main Monster Zone.
+
+The exact decklists are imported from the card database by set (YGOPRODeck can filter cards by set name; to verify when the importer is written), so no list is typed by hand. The cards keep their current official text, which may differ from the 2008 printing.
 
 ## Decisions
 
@@ -231,6 +246,7 @@ Decided 2026-11-18.
 | Topic | Decision |
 | --- | --- |
 | Card pool | Start with one or two premade decks; widen only as trust in the engine grows |
+| Starting decks | 5D's 2008 Starter Deck (Synchro) and Starter Deck: Dawn of the Xyz (Xyz) |
 | Formats and banlists | Banlists are user-customizable data, enforced by code at deck save and match join |
 | Response windows | Fixed minimum window plus jitter to hide timing; per-card default responses |
 | Rollback | Both players must agree; one or two sentence explanation that reveals no hidden info |
@@ -241,7 +257,6 @@ Decided 2026-11-18.
 
 ## Still open
 
-- Which one or two decks to start with (they decide which mechanics layer 2 to 4 must cover, and whether Extra Deck work moves earlier).
 - YGOPRODeck usage terms and a rulings source (see Card data).
 
 ## Deferred: draft mode
