@@ -1,3 +1,6 @@
+# Local development: Postgres only, with the yugioh and yugioh_test databases. Run the app itself with `npm run dev`.
+name: yugioh-dev
+
 services:
   postgres:
     image: postgres:16

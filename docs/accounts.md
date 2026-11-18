@@ -23,7 +23,7 @@ Invite links are single-use and last 7 days. The first browser that uses a link 
 
 ## Running locally
 
-1. `docker compose up -d` starts Postgres with a `yugioh` and a `yugioh_test` database.
+1. `docker compose -f compose.dev.yaml up -d` starts Postgres with a `yugioh` and a `yugioh_test` database.
 2. `cp .env.example .env` and fill it in (Auth0 below). For local work set `BASE_URL=http://localhost:5173`.
 3. `npm install`, then `npm run dev`. Open http://localhost:5173. Migrations run when the server starts.
 4. `npm test` runs the server tests against `yugioh_test`, with a mock OpenID provider standing in for Auth0, so they need no Auth0 tenant.
@@ -41,4 +41,4 @@ After changing `server/src/db/schema.ts`, run `npm run db:generate` and commit t
 
 ## Production
 
-Set `BASE_URL=https://yugioh.p51.nl`, a fresh `SESSION_SECRET`, and the production `DATABASE_URL`. Run `npm ci && npm run build && npm start` behind a reverse proxy that terminates HTTPS. Changing `SESSION_SECRET` logs everyone out.
+See [deploy.md](deploy.md). Changing `SESSION_SECRET` logs everyone out.
