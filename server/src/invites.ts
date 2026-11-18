@@ -47,7 +47,7 @@ export async function revokeInvite(db: Db, userId: number, token: string): Promi
 }
 
 export type InviteLookup =
-  | { ok: true; preview: InvitePreview; redeemed: boolean }
+  | { ok: true; preview: InvitePreview; redeemed: boolean; createdBy: number }
   | { ok: false; problem: InviteProblem };
 
 export async function lookupInvite(db: Db, token: string): Promise<InviteLookup> {
@@ -67,6 +67,7 @@ export async function lookupInvite(db: Db, token: string): Promise<InviteLookup>
       expiresAt: row.invite.expiresAt.toISOString(),
     },
     redeemed: row.invite.redeemedAt !== null,
+    createdBy: row.invite.createdBy,
   };
 }
 

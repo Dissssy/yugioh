@@ -1,6 +1,8 @@
 import { Link, Route, Routes } from 'react-router';
 import { useMe } from './api.ts';
 import { Admin } from './pages/Admin.tsx';
+import { DeckPage } from './pages/DeckPage.tsx';
+import { DuelPage } from './pages/DuelPage.tsx';
 import { Home } from './pages/Home.tsx';
 import { Join } from './pages/Join.tsx';
 
@@ -31,6 +33,8 @@ export function App() {
             <Route path="/" element={<Home me={me.data} />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/join/:token" element={<Join me={me.data} />} />
+            <Route path="/duel/:id" element={<DuelPage me={me.data} />} />
+            <Route path="/decks/:id" element={<DeckPage />} />
             <Route path="*" element={<p>Page not found.</p>} />
           </Routes>
         )}

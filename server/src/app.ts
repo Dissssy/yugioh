@@ -10,11 +10,12 @@ import { findUserBySub, listUsers, setStatus, syncUser, toUser, type LoginClaims
 import type { Config } from './config.ts';
 import type { Db } from './db/client.ts';
 import { createInvite, listInvites, lookupInvite, markRedeemed, revokeInvite } from './invites.ts';
+import { duelRoutes } from './duelRoutes.ts';
+import { Duels } from './duels.ts';
+import { viewerOf, type Viewer } from './viewer.ts';
 
 const GUEST_COOKIE = 'guest';
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
-
-type Viewer = Me & { guestToken?: string };
 
 export function createApp(config: Config, db: Db) {
   const app = express();
@@ -56,12 +57,12 @@ export function createApp(config: Config, db: Db) {
     const token: unknown = req.signedCookies[GUEST_COOKIE];
     if (typeof token === 'string') {
       const found = await lookupInvite(db, token);
-      if (found.ok) return { kind: 'guest', invite: found.preview, guestToken: token };
+      if (found.ok) return { kind: 'guest', invite: found.preview, guestToken: token, invitedById: found.createdBy };
     }
     return { kind: 'anonymous' };
   }
 
-  const viewer = (res: Response) => res.locals.viewer as Viewer;
+  const viewer = viewerOf;
 
   function requireApproved(_req: Request, res: Response, next: NextFunction) {
     const v = viewer(res);
@@ -78,8 +79,9 @@ export function createApp(config: Config, db: Db) {
   const userId = (res: Response) => (viewer(res) as Extract<Me, { kind: 'user' }>).user.id;
 
   app.get('/api/me', (_req, res) => {
-    const { guestToken: _, ...me } = viewer(res);
-    res.json(me satisfies Me);
+    const v = viewer(res);
+    const me: Me = v.kind === 'guest' ? { kind: 'guest', invite: v.invite } : v;
+    res.json(me);
   });
 
   app.get('/api/admin/users', requireAdmin, async (_req, res) => {
@@ -144,7 +146,11 @@ export function createApp(config: Config, db: Db) {
     res.clearCookie(GUEST_COOKIE).status(204).end();
   });
 
+  app.use('/api', duelRoutes(db, new Duels(db)));
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'not_found' }));
+
+  // Card images, downloaded by the card sync. They never change, so browsers may cache them for long.
+  app.use('/card-images', express.static(config.CARD_IMAGE_DIR, { maxAge: '30d', fallthrough: false }));
 
   // In production the server also serves the built web app.
   if (existsSync(webDist)) {

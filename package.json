@@ -2,15 +2,23 @@
   "name": "yugioh",
   "private": true,
   "type": "module",
-  "workspaces": ["shared", "server", "web"],
+  "workspaces": [
+    "shared",
+    "engine",
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w web & wait",
     "build": "npm run build -w web",
     "start": "npm run start -w server",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm test -w server",
+    "test": "npm test --workspaces --if-present",
     "db:generate": "npm run db:generate -w server",
-    "db:migrate": "npm run db:migrate -w server"
+    "db:migrate": "npm run db:migrate -w server",
+    "cards:import": "npm run cards:import -w server --"
   },
-  "engines": { "node": ">=22.18" }
+  "engines": {
+    "node": ">=22.18"
+  }
 }

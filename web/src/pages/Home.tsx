@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Me } from '@yugioh/shared';
 import { api } from '../api.ts';
+import { Duels } from './Duels.tsx';
 import { Invites } from './Invites.tsx';
 
 export const formatDate = (iso: string) =>
@@ -37,6 +38,7 @@ export function Home({ me }: { me: Me }) {
       return (
         <section>
           <h1>Hi {user.name ?? user.email}</h1>
+          <Duels canChallenge />
           <Invites />
         </section>
       );
@@ -53,7 +55,8 @@ function Guest({ invitedBy, expiresAt }: { invitedBy: string; expiresAt: string 
   return (
     <section>
       <h1>You're {invitedBy}'s guest</h1>
-      <p>Your invite lasts until {formatDate(expiresAt)}. Duels are coming soon.</p>
+      <p>Your invite lasts until {formatDate(expiresAt)}.</p>
+      <Duels canChallenge={false} />
       <button onClick={() => leave.mutate()} disabled={leave.isPending}>Leave guest access</button>
     </section>
   );
