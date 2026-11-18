@@ -8,14 +8,16 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { and, desc, eq, or } from 'drizzle-orm';
 import {
   decide,
+  entryFor,
   evolve,
+  logFor,
   replay,
   startDuel,
   viewFor,
   type DuelEvent,
   type DuelState,
+  type DuelUpdate,
   type Intent,
-  type PlayerView,
   type Seat,
 } from '@yugioh/engine';
 import type { DuelSummary } from '@yugioh/shared';
@@ -32,7 +34,7 @@ interface LiveDuel {
   id: string;
   events: DuelEvent[];
   state: DuelState;
-  listeners: Set<{ seat: Seat; send: (view: PlayerView) => void }>;
+  listeners: Set<{ seat: Seat; send: (update: DuelUpdate) => void }>;
   /** Intents for one duel are handled one at a time, in arrival order. */
   queue: Promise<unknown>;
 }
@@ -160,26 +162,41 @@ export class Duels {
           await tx.update(matches).set({ status: 'finished', finishedAt: new Date() }).where(eq(matches.id, id));
         }
       });
+      const before = duel.state;
       duel.events.push(...decision.events);
       duel.state = decision.events.reduce(evolve, duel.state);
-      this.broadcast(duel);
+      this.broadcast(before, decision.events, first, duel);
       return { ok: true };
     });
     duel.queue = run.catch(() => undefined);
     return run;
   }
 
-  /** Sends the seat its view now and after every change. Returns the unsubscribe function. */
-  async watch(id: string, seat: Seat, send: (view: PlayerView) => void): Promise<() => void> {
+  /** Sends the seat the whole duel now, and the steps of every change after. Returns the unsubscribe function. */
+  async watch(id: string, seat: Seat, send: (update: DuelUpdate) => void): Promise<() => void> {
     const duel = await this.load(id);
     const listener = { seat, send };
     duel.listeners.add(listener);
-    send(viewFor(duel.state, duel.events, seat));
+    send({ type: 'sync', view: viewFor(duel.state, seat), log: logFor(duel.state, duel.events, seat) });
     return () => duel.listeners.delete(listener);
   }
 
-  private broadcast(duel: LiveDuel) {
-    const views = [viewFor(duel.state, duel.events, 0), viewFor(duel.state, duel.events, 1)] as const;
-    for (const l of duel.listeners) l.send(views[l.seat]);
+  /**
+   * Sends each seat one step per visible new event: the log entry and the board right after it, so the client
+   * can animate events in order. Only the last step offers actions, since nobody may act mid-sequence.
+   */
+  private broadcast(before: DuelState, events: DuelEvent[], first: number, duel: LiveDuel) {
+    const updateFor = (seat: Seat): DuelUpdate => {
+      let state = before;
+      const steps = events.flatMap((event, i) => {
+        state = evolve(state, event);
+        const entry = entryFor(state, event, first + i, state.turn, seat);
+        return entry ? [{ entry, view: viewFor(state, seat) }] : [];
+      });
+      for (const step of steps.slice(0, -1)) step.view.actions = [];
+      return { type: 'steps', steps };
+    };
+    const updates = [updateFor(0), updateFor(1)] as const;
+    for (const l of duel.listeners) l.send(updates[l.seat]);
   }
 }

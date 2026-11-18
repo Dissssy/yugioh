@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Intent, PlayerView } from '@yugioh/engine';
+import type { DuelUpdate, Intent, PlayerView } from '@yugioh/engine';
 import type { DeckDetail, DeckSummary, DuelSummary, Me, User } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { guests } from '../src/db/schema.ts';
@@ -23,7 +23,7 @@ async function login(claims: Parameters<Harness['setIdentity']>[0], browser = ne
 const me = (b: Browser) => b.json<Me>(`${h.baseUrl}/api/me`).then((r) => r.body);
 const guestCount = async () => (await h.db.select().from(guests)).length;
 
-/** Reads a Server-Sent Events stream one view at a time. */
+/** Reads a Server-Sent Events stream one update at a time. */
 class Stream {
   private buffer = '';
   private reader: ReadableStreamDefaultReader<Uint8Array>;
@@ -31,13 +31,18 @@ class Stream {
   constructor(res: Response) {
     this.reader = res.body!.getReader();
   }
+  /** The board after the next update. */
   async next(): Promise<PlayerView> {
+    const update = await this.update();
+    return update.type === 'sync' ? update.view : update.steps.at(-1)!.view;
+  }
+  async update(): Promise<DuelUpdate> {
     for (;;) {
       const end = this.buffer.indexOf('\n\n');
       if (end >= 0) {
         const message = this.buffer.slice(0, end);
         this.buffer = this.buffer.slice(end + 2);
-        if (message.startsWith('data: ')) return JSON.parse(message.slice(6)) as PlayerView;
+        if (message.startsWith('data: ')) return JSON.parse(message.slice(6)) as DuelUpdate;
         continue;
       }
       const { value, done } = await this.reader.read();
@@ -131,8 +136,10 @@ describe('a challenge link played by a guest', () => {
   it('streams each player their own view and applies intents', async () => {
     const mine = new Stream(await admin.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
     const theirs = new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
-    let a = await mine.next();
-    let b = await theirs.next();
+    const sync = await mine.update();
+    expect(sync.type).toBe('sync');
+    let a = (sync as Extract<DuelUpdate, { type: 'sync' }>).view;
+    const b = await theirs.next();
     expect(a.you).toBe(0);
     expect(b.you).toBe(1);
     expect(a.players[0].name).toBe('Ethan');
@@ -156,14 +163,24 @@ describe('a challenge link played by a guest', () => {
     expect(set).toBeDefined();
     expect((await send(first, { type: 'setMonster', card: (set as { card: string }).card, tributes: [] })).status).toBe(204);
     view = await firstStream.next();
-    const other = await secondStream.next();
+    const otherUpdate = await secondStream.update();
+    if (otherUpdate.type !== 'steps') throw new Error('expected steps');
+    const other = otherUpdate.steps.at(-1)!.view;
     expect(view.players[view.you].monsters[0]).toMatchObject({ faceUp: false, card: { id: (set as { card: string }).card } });
     expect(other.players[view.you].monsters[0]).toEqual({ card: { hidden: true }, position: 'defense', faceUp: false });
-    expect(other.log.at(-1)).toMatch(/Set a monster$/);
+    expect(otherUpdate.steps.map((s) => s.entry.text)).toEqual([expect.stringMatching(/Set a monster$/)]);
+    expect(JSON.stringify(otherUpdate)).not.toContain((set as { card: string }).card);
 
+    // Ending the turn is several events; each is a step, and only the last offers actions.
     expect((await send(first, { type: 'endTurn', discard: [] })).status).toBe(204);
-    a = await mine.next();
-    b = await theirs.next();
+    await firstStream.update();
+    const turnSteps = await secondStream.update();
+    if (turnSteps.type !== 'steps') throw new Error('expected steps');
+    expect(turnSteps.steps.map((s) => s.entry.event.type)).toContain('turnStarted');
+    expect(turnSteps.steps.slice(0, -1).every((s) => s.view.actions.length === 0)).toBe(true);
+    expect(turnSteps.steps.at(-1)!.view.actions.length).toBeGreaterThan(0);
+
+    a = turnSteps.steps.at(-1)!.view;
     expect(a.turn).toBe(2);
     expect(a.turnPlayer).toBe(view.you === 0 ? 1 : 0);
 

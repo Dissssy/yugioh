@@ -1,11 +1,9 @@
 // What each player is allowed to see. Hidden cards are sent without an ID or card data, so nothing leaks to the browser.
 
 import { legalActions } from './rules.ts';
-import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Phase, PlayerView, Seat } from './types.ts';
+import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, LogEntry, LogEvent, Phase, PlayerView, Seat } from './types.ts';
 
-const LOG_LENGTH = 40;
-
-export function viewFor(state: DuelState, events: readonly DuelEvent[], seat: Seat): PlayerView {
+export function viewFor(state: DuelState, seat: Seat): PlayerView {
   const shown = (id: string): CardView => ({ id, card: state.cards[state.instances[id]!.code]! });
   const hidden: CardView = { hidden: true };
   const field = (owner: Seat) => (c: FieldCard | null): FieldCardView | null =>
@@ -14,9 +12,13 @@ export function viewFor(state: DuelState, events: readonly DuelEvent[], seat: Se
       position: c.position,
       faceUp: c.faceUp,
     };
+  const deckList = [
+    ...new Set(Object.values(state.instances).filter((i) => i.owner === seat).map((i) => i.code)),
+  ].sort((a, b) => a - b);
 
   return {
     you: seat,
+    deckList,
     turn: state.turn,
     turnPlayer: state.turnPlayer,
     phase: state.phase,
@@ -38,8 +40,36 @@ export function viewFor(state: DuelState, events: readonly DuelEvent[], seat: Se
       };
     }) as PlayerView['players'],
     actions: legalActions(state, seat),
-    log: events.flatMap((e) => describe(state, e)).slice(-LOG_LENGTH),
   };
+}
+
+/** The whole duel log as one player sees it. */
+export function logFor(state: DuelState, events: readonly DuelEvent[], seat: Seat): LogEntry[] {
+  let turn = 0;
+  return events.flatMap((event, seq) => {
+    if (event.type === 'turnStarted') turn = event.turn;
+    const entry = entryFor(state, event, seq, turn, seat);
+    return entry ? [entry] : [];
+  });
+}
+
+/** One event as a log entry for one player, or null for events players never see. Card data is fixed for a duel, so any state of it names cards correctly. */
+export function entryFor(state: DuelState, event: DuelEvent, seq: number, turn: number, seat: Seat): LogEntry | null {
+  const visible = visibleEvent(event, seat);
+  return visible && { seq, turn, event: visible, text: describe(state, visible) };
+}
+
+function visibleEvent(event: DuelEvent, seat: Seat): LogEvent | null {
+  switch (event.type) {
+    case 'duelStarted':
+    case 'intent':
+      return null;
+    case 'monsterSet':
+    case 'spellTrapSet':
+      return event.player === seat ? event : { ...event, card: null };
+    default:
+      return event;
+  }
 }
 
 const phaseNames: Record<Phase, string> = {
@@ -52,48 +82,46 @@ const phaseNames: Record<Phase, string> = {
 };
 
 /** One line for the duel log, written so it reveals nothing hidden from either player. */
-function describe(state: DuelState, event: DuelEvent): string[] {
+function describe(state: DuelState, event: LogEvent): string | null {
   const who = (seat: Seat) => state.players[seat].name;
   const name = (id: string) => state.cards[state.instances[id]!.code]!.name;
   const names = (ids: string[]) => ids.map(name).join(', ');
   switch (event.type) {
     case 'turnStarted':
-      return [`Turn ${event.turn}: ${who(event.player)}`];
+      return `Turn ${event.turn}: ${who(event.player)}`;
     case 'phaseChanged':
-      return event.phase === 'battle' || event.phase === 'main2' ? [phaseNames[event.phase]] : [];
+      return event.phase === 'battle' || event.phase === 'main2' ? phaseNames[event.phase] : null;
     case 'drew':
-      return [`${who(event.player)} drew ${event.count === 1 ? 'a card' : `${event.count} cards`}`];
+      return `${who(event.player)} drew ${event.count === 1 ? 'a card' : `${event.count} cards`}`;
     case 'tributed':
-      return [`${who(event.player)} tributed ${names(event.cards)}`];
+      return `${who(event.player)} tributed ${names(event.cards)}`;
     case 'normalSummoned':
-      return [`${who(event.player)} Normal Summoned ${name(event.card)}`];
+      return `${who(event.player)} Normal Summoned ${name(event.card)}`;
     case 'monsterSet':
-      return [`${who(event.player)} Set a monster`];
+      return `${who(event.player)} Set a monster`;
     case 'spellTrapSet':
-      return [`${who(event.player)} Set a Spell or Trap`];
+      return `${who(event.player)} Set a Spell or Trap`;
     case 'flipSummoned':
-      return [`${who(event.player)} Flip Summoned ${name(event.card)}`];
+      return `${who(event.player)} Flip Summoned ${name(event.card)}`;
     case 'positionChanged':
-      return [`${who(event.player)} changed ${name(event.card)} to ${event.position} position`];
+      return `${who(event.player)} changed ${name(event.card)} to ${event.position} position`;
     case 'attackDeclared':
       // A face-down target is flipped by the very next event, so naming it here reveals nothing early.
-      return [`${name(event.attacker)} attacked ${event.target ? name(event.target) : 'directly'}`];
+      return `${name(event.attacker)} attacked ${event.target ? name(event.target) : 'directly'}`;
     case 'battleDamage':
-      return [`${who(event.player)} took ${event.amount} damage`];
+      return `${who(event.player)} took ${event.amount} damage`;
     case 'destroyedByBattle':
-      return [`${names(event.cards)} destroyed by battle`];
+      return `${names(event.cards)} destroyed by battle`;
     case 'discarded':
-      return [`${who(event.player)} discarded ${names(event.cards)}`];
+      return `${who(event.player)} discarded ${names(event.cards)}`;
     case 'duelEnded': {
       const { winner, reason } = event.result;
-      if (winner === null) return ['The duel ended in a draw'];
+      if (winner === null) return 'The duel ended in a draw';
       const loser = who(winner === 0 ? 1 : 0);
       const why = { lp: `${loser}'s LP reached 0`, deckOut: `${loser} couldn't draw`, surrender: `${loser} surrendered` }[reason];
-      return [`${who(winner)} won: ${why}`];
+      return `${who(winner)} won: ${why}`;
     }
-    case 'duelStarted':
-    case 'intent':
     case 'flippedByAttack':
-      return [];
+      return null;
   }
 }

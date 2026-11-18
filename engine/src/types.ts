@@ -118,9 +118,11 @@ export interface StartingPlayer {
   extra: string[];
 }
 
-/** The duel as one player sees it. Hidden cards carry no ID and no card data. */
+/** The board as one player sees it. Hidden cards carry no ID and no card data. */
 export interface PlayerView {
   you: Seat;
+  /** Every distinct card in the viewer's own Deck and Extra Deck, so the client can load their images up front. */
+  deckList: number[];
   turn: number;
   turnPlayer: Seat;
   phase: Phase;
@@ -128,8 +130,29 @@ export interface PlayerView {
   result: DuelResult | null;
   players: [PlayerSideView, PlayerSideView];
   actions: LegalAction[];
-  log: string[];
 }
+
+/** An event as one player may see it: a card Set by the opponent has no ID. Intents and the duel's start are never shown. */
+export type LogEvent =
+  | Exclude<DuelEvent, { type: 'duelStarted' | 'intent' | 'monsterSet' | 'spellTrapSet' }>
+  | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number };
+
+/** One entry of a player's duel log. Every visible event gets one; `text` is null for events the log doesn't spell out. */
+export interface LogEntry {
+  /** Position of the event in the duel's event list. */
+  seq: number;
+  turn: number;
+  event: LogEvent;
+  text: string | null;
+}
+
+/**
+ * What the server pushes to a player. `sync` is the whole picture, sent on connect. `steps` follows each change,
+ * with the board after every event so the client can animate them one by one.
+ */
+export type DuelUpdate =
+  | { type: 'sync'; view: PlayerView; log: LogEntry[] }
+  | { type: 'steps'; steps: { entry: LogEntry; view: PlayerView }[] };
 
 export type CardView = { id: string; card: CardData } | { hidden: true };
 

@@ -1,4 +1,4 @@
-// HTTP API for decks and duels. Players send intents with POST and receive their view as Server-Sent Events.
+// HTTP API for decks and duels. Players send intents with POST and receive their view and its changes as Server-Sent Events.
 // A challenge link is also the way in for people without an account: joining it signed out creates a guest.
 
 import { Router, type Response } from 'express';
@@ -145,7 +145,7 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
       'cache-control': 'no-cache',
       'x-accel-buffering': 'no', // keeps nginx from buffering the stream
     });
-    const stop = await duels.watch(row.id, seat, (view) => res.write(`data: ${JSON.stringify(view)}\n\n`));
+    const stop = await duels.watch(row.id, seat, (update) => res.write(`data: ${JSON.stringify(update)}\n\n`));
     const keepalive = setInterval(() => res.write(': keepalive\n\n'), KEEPALIVE_MS);
     req.on('close', () => {
       clearInterval(keepalive);
