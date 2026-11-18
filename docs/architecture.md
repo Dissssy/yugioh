@@ -180,7 +180,7 @@ Pull the whole YGOPRODeck database once into our own database and serve everythi
 
 - **Source:** YGOPRODeck API v7 (`cardinfo.php`) returns every card with ID, name, type, text, ATK/DEF, level/rank/link, attribute, race, archetype, and banlist status in one response.
 - **Refresh:** a scheduled job checks the API's database-version endpoint and re-imports when it changes. Text changes trigger effect-sheet recompilation (via the text hash).
-- **Images:** download once and serve from our own storage or CDN. YGOPRODeck is believed to ask clients to cache data locally, rate-limit the API (around 20 requests a second) and not hotlink images. **Not yet verified**: confirm against their API guide before writing the importer.
+- **Images:** download once and serve from our own storage or CDN. YGOPRODeck's API guide (checked 2026-11-18) asks clients to store data locally, stay under 20 requests a second (or be blocked for an hour), and download and re-host images instead of hotlinking them. The importer follows all three.
 - **Rulings source:** YGOPRODeck has card text, not rulings. Official rulings would have to come from elsewhere (for example the Yugipedia or ygoresources rulings databases). Their terms need checking before importing anything; until then rulings come only from contests and manual entry.
 
 ## The product around the engine
@@ -200,7 +200,7 @@ The engine is a library with one entry point: given the event log and a new play
 
 **Access:** private and invite-only; the owner pays for model calls. New accounts wait for admin approval. Anonymous users can play with a premade deck only through an invite from an approved user; otherwise they are read-only. Building decks needs an approved account. Each match has a cap on judge and appeal calls.
 
-**Multiplayer sync:** server-authoritative over WebSockets. Clients send intents only; the server appends events and sends each player their own filtered view. Because the log is the source of truth, a reconnecting client just asks for the log since its last event. Shuffles use a server-side seeded RNG stored in the log, so replays are exact.
+**Multiplayer sync:** server-authoritative. Clients send intents with a plain POST; the server appends events and pushes each player their own filtered view over Server-Sent Events. (Layer 1 chose SSE over WebSockets: traffic is one intent up and one view down, SSE rides the same cookie login as the rest of the API, and the browser reconnects by itself.) Because the log is the source of truth, a reconnecting client just gets the current view again. Shuffles use the server's secure RNG and the shuffled order is stored in the log, so replays are exact.
 
 **Stack:** TypeScript on both ends, so the state, intent and op types are shared. Zod schemas for ops serve three jobs at once: the tool definitions sent to Claude, runtime validation, and client types. Postgres for cards, decks and the event log. The official Anthropic TypeScript SDK for Claude calls.
 
@@ -210,8 +210,9 @@ The engine is a library with one entry point: given the event log and a new play
 
 Each layer ends with something two people can play in a browser, and each adds one capability on top of a working game. The server-authoritative event log is there from layer 1, because retrofitting it later would mean rewriting the engine.
 
-1. **Vanilla duel over a link.** Card import (data only), event-sourced engine with phases, draw, Normal Summon/Set, tributes, battle, LP and win by LP 0 or deck-out. Server with WebSockets, a challenge link, a plain board UI. Two decks built from the Normal Monsters in the two starter decks. No LLM yet.
+1. **Vanilla duel over a link.** Card import (data only), event-sourced engine with phases, draw, Normal Summon/Set, tributes, battle, LP and win by LP 0 or deck-out. Server with live updates, a challenge link, a plain board UI. No LLM yet.
    - Playable when: two browsers can finish a duel.
+   - Built 2026-11-18 (see [duels.md](duels.md)). It plays the two starter decks unchanged rather than Normal-Monster-only decks, which would be too small: effect monsters fight as plain bodies and Spells and Traps can only be Set until layer 2.
 2. **Effects via the judge, no responses yet.** Effect sheets for the starter decks' main-deck cards, `check_activation` and `resolve_chain_link` with the op tool loop and validation, `ask_player`. Covers Special Summons from hand and GY, banishing, targeting cards in the GY, and conditions that check what is on the field. Opponent can't respond yet. A first eval suite of about 20 hand-written cases. A bare Contest button that runs the appeal and shows the explanation (no rollback yet).
    - Playable when: the starter decks' spells and ignition effects work end to end.
 3. **Synchro and Xyz summoning.** Extra Deck zone, Tuner and non-Tuner level sums, Xyz materials of the same Level, overlay units (`attach` / `detach`), materials read from effect sheets, summoning to a Main Monster Zone. Both procedures are generic rules, so they are code, not judge calls.
@@ -257,7 +258,7 @@ Decided 2026-11-18.
 
 ## Still open
 
-- YGOPRODeck usage terms and a rulings source (see Card data).
+- A rulings source (see Card data). YGOPRODeck's terms were checked on 2026-11-18.
 
 ## Deferred: draft mode
 

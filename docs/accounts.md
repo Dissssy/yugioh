@@ -12,11 +12,11 @@ As of 2026-11-18. This is the website shell that sits outside the duel engine: l
 | Approved account | Everything, including creating invite links. |
 | Admin | Approves or rejects accounts. The account whose **verified** email equals `ADMIN_EMAIL` is the admin and is always approved. |
 
-Invite links are single-use and last 7 days. The first browser that uses a link becomes the guest; anyone else who opens it is told it was used. An invite stops working if its creator is rejected. When duels exist, an invite becomes the challenge link that starts a match against its creator.
+Invite links are single-use and last 7 days. The first browser that uses a link becomes the guest; anyone else who opens it is told it was used. An invite stops working if its creator is rejected. A guest sees their inviter's open challenges on their home page and can accept them (see [duels.md](duels.md)).
 
 ## How it works
 
-- **Login:** [express-openid-connect](https://github.com/auth0/express-openid-connect), Auth0's library for server-rendered apps. The session is an encrypted cookie on the site's own domain, so the API and later the WebSocket connection authenticate with the same cookie and the browser never handles tokens.
+- **Login:** [express-openid-connect](https://github.com/auth0/express-openid-connect), Auth0's library for server-rendered apps. The session is an encrypted cookie on the site's own domain, so the API and the duel event streams authenticate with the same cookie and the browser never handles tokens.
 - **Accounts:** on each login the server creates or refreshes the `users` row keyed by Auth0's `sub`. New rows start `pending`.
 - **Guests:** a signed `guest` cookie holds the invite token. It is checked against the database on every request, so revoking the invite ends the guest's access at once.
 - **Layout:** npm workspaces. `server/` (Express 5, Drizzle ORM, Postgres), `web/` (React, Vite, React Router, TanStack Query), `shared/` (types used by both). The server runs TypeScript directly with Node's built-in type stripping, so it has no build step. In production it also serves the built web app from `web/dist`.

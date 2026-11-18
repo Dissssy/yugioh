@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { Me } from '@yugioh/shared';
+import type { DeckSummary, DuelSummary, Me } from '@yugioh/shared';
 
 export class ApiError extends Error {
   status: number;
@@ -23,3 +23,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') });
+
+export const useDecks = () => useQuery({ queryKey: ['decks'], queryFn: () => api<DeckSummary[]>('/decks') });
+export const useDuels = () => useQuery({ queryKey: ['duels'], queryFn: () => api<DuelSummary[]>('/duels') });
+
+/** The error message the server gave, or a generic one. */
+export function errorText(error: unknown): string {
+  const body = error instanceof ApiError ? (error.body as { error?: string } | null) : null;
+  return body?.error ?? 'Something went wrong. Try again.';
+}
