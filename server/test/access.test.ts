@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Invite, InvitePreview, Me, User } from '@yugioh/shared';
+import type { Me, User } from '@yugioh/shared';
 import { ADMIN_EMAIL, Browser, startHarness, type Harness } from './harness.ts';
 
 let h: Harness;
@@ -25,7 +25,7 @@ describe('accounts and approval', () => {
   it('treats visitors as anonymous and keeps private endpoints closed', async () => {
     const visitor = new Browser();
     expect(await me(visitor)).toEqual({ kind: 'anonymous' });
-    expect((await visitor.json(`${h.baseUrl}/api/invites`)).status).toBe(401);
+    expect((await visitor.json(`${h.baseUrl}/api/duels`)).status).toBe(401);
     expect((await visitor.json(`${h.baseUrl}/api/admin/users`)).status).toBe(403);
   });
 
@@ -41,7 +41,7 @@ describe('accounts and approval', () => {
     player = await login({ sub: 'player', email: 'p@example.com', email_verified: true, name: 'Yugi' });
     const before = await me(player);
     expect(before).toMatchObject({ kind: 'user', user: { status: 'pending' } });
-    expect((await player.json(`${h.baseUrl}/api/invites`, { method: 'POST' })).status).toBe(403);
+    expect((await player.json(`${h.baseUrl}/api/duels`, { method: 'POST', body: '{"deckId":1}' })).status).toBe(403);
     expect((await player.json(`${h.baseUrl}/api/admin/users`)).status).toBe(403);
 
     const { body: users } = await admin.json<User[]>(`${h.baseUrl}/api/admin/users`);
@@ -73,51 +73,14 @@ describe('accounts and approval', () => {
     expect(await me(b)).toEqual({ kind: 'anonymous' });
   });
 
-  describe('invites', () => {
-    let invite: Invite;
-
-    it('lets an approved user create an invite that a visitor uses once', async () => {
-      invite = (await player.json<Invite>(`${h.baseUrl}/api/invites`, { method: 'POST' })).body;
-      const guest = new Browser();
-      const preview = await guest.json<InvitePreview>(`${h.baseUrl}/api/join/${invite.token}`);
-      expect(preview.body.invitedBy).toBe('Yugi');
-
-      const joined = await guest.json<Me>(`${h.baseUrl}/api/join/${invite.token}`, { method: 'POST' });
-      expect(joined.body).toMatchObject({ kind: 'guest', invite: { invitedBy: 'Yugi' } });
-      expect(await me(guest)).toMatchObject({ kind: 'guest' });
-      // Using it again from the same browser is fine.
-      expect((await guest.json(`${h.baseUrl}/api/join/${invite.token}`, { method: 'POST' })).status).toBe(200);
-      // Guests are not accounts.
-      expect((await guest.json(`${h.baseUrl}/api/invites`)).status).toBe(401);
-
-      const other = new Browser();
-      const second = await other.json<{ problem: string }>(`${h.baseUrl}/api/join/${invite.token}`, { method: 'POST' });
-      expect(second).toEqual({ status: 404, body: { problem: 'used' } });
-
-      const { body: mine } = await player.json<Invite[]>(`${h.baseUrl}/api/invites`);
-      expect(mine[0]?.redeemedAt).not.toBeNull();
-
-      // Revoking ends the guest's access.
-      expect((await player.fetch(`${h.baseUrl}/api/invites/${invite.token}`, { method: 'DELETE' })).status).toBe(204);
-      expect(await me(guest)).toEqual({ kind: 'anonymous' });
-    });
-
-    it('stops working when the inviter loses approval', async () => {
-      const fresh = (await player.json<Invite>(`${h.baseUrl}/api/invites`, { method: 'POST' })).body;
-      const { body: users } = await admin.json<User[]>(`${h.baseUrl}/api/admin/users`);
-      const yugi = users.find((u) => u.name === 'Yugi')!;
-      await admin.json(`${h.baseUrl}/api/admin/users/${yugi.id}/status`, {
-        method: 'POST',
-        body: JSON.stringify({ status: 'rejected' }),
-      });
-      const res = await new Browser().json(`${h.baseUrl}/api/join/${fresh.token}`, { method: 'POST' });
-      expect(res).toEqual({ status: 404, body: { problem: 'not_found' } });
-    });
-
-    it('refuses signed-in users and unknown links', async () => {
-      const own = (await admin.json<Invite>(`${h.baseUrl}/api/invites`, { method: 'POST' })).body;
-      expect((await admin.json(`${h.baseUrl}/api/join/${own.token}`, { method: 'POST' })).status).toBe(409);
-      expect((await new Browser().json(`${h.baseUrl}/api/join/nope`)).body).toEqual({ problem: 'not_found' });
-    });
+  it('sends the visitor back to the page they logged in from, but only on this site', async () => {
+    const b = new Browser();
+    h.setIdentity({ sub: 'player', email: 'p@example.com', email_verified: true, name: 'Yugi' });
+    const back = await b.fetch(`${h.baseUrl}/auth/login?returnTo=${encodeURIComponent('/duel/abc')}`);
+    expect(new URL(back.url).pathname).toBe('/duel/abc');
+    const offsite = await new Browser().fetch(`${h.baseUrl}/auth/login?returnTo=${encodeURIComponent('//evil.example/x')}`);
+    expect(new URL(offsite.url).host).toBe(new URL(h.baseUrl).host);
+    expect(new URL(offsite.url).pathname).toBe('/');
   });
+
 });

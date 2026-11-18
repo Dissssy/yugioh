@@ -196,9 +196,9 @@ The engine is a library with one entry point: given the event log and a new play
 | Lobby and challenge links | Create a match, get a link, opponent opens it and picks a deck | Starts a match with two decklists and a seed |
 | Match server | Hosts running matches, holds the event log, runs the judge, pushes updates | Calls the engine; server is the only authority |
 | Client | Board UI, log with Contest buttons, prompts for choices | Sends intents, receives a per-player view (opponent's hand hidden) |
-| Accounts | Sign-in, admin approval, invites, saved decks, match history | Not needed by the engine at all |
+| Accounts | Sign-in, admin approval, guests, saved decks, match history | Not needed by the engine at all |
 
-**Access:** private and invite-only; the owner pays for model calls. New accounts wait for admin approval. Anonymous users can play with a premade deck only through an invite from an approved user; otherwise they are read-only. Building decks needs an approved account. Each match has a cap on judge and appeal calls.
+**Access:** private and invite-only; the owner pays for model calls. New accounts wait for admin approval. Anonymous users can play with a premade deck only as a guest, by accepting a challenge link from an approved user; otherwise they are read-only. Building decks needs an approved account. Each match has a cap on judge and appeal calls.
 
 **Multiplayer sync:** server-authoritative. Clients send intents with a plain POST; the server appends events and pushes each player their own filtered view over Server-Sent Events. (Layer 1 chose SSE over WebSockets: traffic is one intent up and one view down, SSE rides the same cookie login as the rest of the API, and the browser reconnects by itself.) Because the log is the source of truth, a reconnecting client just gets the current view again. Shuffles use the server's secure RNG and the shuffled order is stored in the log, so replays are exact.
 
@@ -223,7 +223,7 @@ Each layer ends with something two people can play in a browser, and each adds o
    - Playable when: both starter decks play out their normal lines without manual fixes.
 6. **Rollback and rulings memory.** Overturn plus two-player rollback consent, hidden-info check on explanations, candidate/verified rulings, retrieval into prompts, admin review page, every verified ruling added to the eval suite.
 7. **Remaining Extra Deck mechanics.** Fusion, Link (and the Extra Monster Zone rules that come with it) and Pendulum, each added when a premade deck needs it.
-8. **Product.** Custom banlists, deck builder with banlist validation and `.ydk` import, more premade decks, match history. Widening the card pool happens here, gated by eval results per archetype. Accounts, Auth0 login, admin approval and invites are being built separately and ahead of the engine, since they don't depend on it.
+8. **Product.** Custom banlists, deck builder with banlist validation and `.ydk` import, more premade decks, match history. Widening the card pool happens here, gated by eval results per archetype. Accounts, Auth0 login, admin approval and guests are being built separately and ahead of the engine, since they don't depend on it.
 
 The riskiest assumption, that Haiku can resolve real card text through ops reliably, is tested in layer 2, before most of the investment.
 
@@ -252,7 +252,7 @@ Decided 2026-11-18.
 | Response windows | Fixed minimum window plus jitter to hide timing; per-card default responses |
 | Rollback | Both players must agree; one or two sentence explanation that reveals no hidden info |
 | Stack | TypeScript end to end; React + Vite + Motion + dnd-kit on the frontend |
-| Accounts | Anonymous play with premade decks via invite; account needed to build decks |
+| Accounts | Anonymous play with premade decks as a guest through a challenge link; account needed to build decks |
 | Access and cost | Owner pays; invite-only; new accounts need admin approval |
 | Docs | Plans live as Markdown under `docs/` |
 

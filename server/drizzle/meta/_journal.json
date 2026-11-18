@@ -15,6 +15,13 @@
       "when": 1795036098546,
       "tag": "0001_cards_decks_matches",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795044239687,
+      "tag": "0002_guests",
+      "breakpoints": true
     }
   ]
 }

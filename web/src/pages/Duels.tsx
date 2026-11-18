@@ -7,7 +7,7 @@ import { formatDate } from './Home.tsx';
 
 const statusText: Record<DuelStatus, string> = { waiting: 'Waiting for an opponent', active: 'In progress', finished: 'Finished' };
 
-/** The viewer's duels and open challenges; accounts can also start a new challenge. */
+/** The viewer's duels; accounts can also start a new challenge. */
 export function Duels({ canChallenge }: { canChallenge: boolean }) {
   const duels = useDuels();
   return (
@@ -15,7 +15,7 @@ export function Duels({ canChallenge }: { canChallenge: boolean }) {
       <h2>Duels</h2>
       {canChallenge && <NewChallenge />}
       {duels.data && duels.data.length === 0 && (
-        <p className="muted">{canChallenge ? 'No duels yet.' : 'No challenges yet. Ask the person who invited you to create one.'}</p>
+        <p className="muted">No duels yet.</p>
       )}
       {duels.data && duels.data.length > 0 && (
         <ul className="list">
@@ -34,7 +34,6 @@ export function Duels({ canChallenge }: { canChallenge: boolean }) {
 }
 
 function describe(d: DuelSummary) {
-  if (d.yourSeat === null) return `${d.createdBy} challenges you with ${d.decks[0]}`;
   return d.decks[1] ? `${d.decks[0]} vs ${d.decks[1]}` : `Your challenge with ${d.decks[0]}`;
 }
 

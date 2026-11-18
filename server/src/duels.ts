@@ -5,7 +5,7 @@
 // must run as a single server process.
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { and, desc, eq, or, sql } from 'drizzle-orm';
+import { and, desc, eq, or } from 'drizzle-orm';
 import {
   decide,
   evolve,
@@ -20,14 +20,16 @@ import {
 } from '@yugioh/engine';
 import type { DuelSummary } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
-import type { Db } from './db/client.ts';
+import type { Db, Tx } from './db/client.ts';
 import { decks, matchEvents, matches, users } from './db/schema.ts';
 
 type MatchRow = typeof matches.$inferSelect;
 
+/** Who takes the empty seat. Called inside the join transaction, so a guest created here is rolled back with it. */
+export type SeatClaim = (tx: Tx) => Promise<{ key: string; name: string }>;
+
 interface LiveDuel {
   id: string;
-  seats: [string, string];
   events: DuelEvent[];
   state: DuelState;
   listeners: Set<{ seat: Seat; send: (view: PlayerView) => void }>;
@@ -58,11 +60,10 @@ export class Duels {
     return this.db.query.matches.findFirst({ where: eq(matches.id, id) });
   }
 
-  /** Duels the player sits in, plus open challenges from `challengerId` (a guest's inviter). */
-  async list(seatKey: string, challengerId: number | null): Promise<MatchRow[]> {
-    const open = challengerId === null ? sql`false` : and(eq(matches.status, 'waiting'), eq(matches.createdBy, challengerId));
+  /** Duels the player sits in. */
+  async list(seatKey: string): Promise<MatchRow[]> {
     return this.db.query.matches.findMany({
-      where: or(eq(matches.seat0, seatKey), eq(matches.seat1, seatKey), open),
+      where: or(eq(matches.seat0, seatKey), eq(matches.seat1, seatKey)),
       orderBy: [desc(matches.createdAt)],
       limit: 30,
     });
@@ -78,18 +79,29 @@ export class Duels {
       createdAt: row.createdAt.toISOString(),
       createdBy: creator?.name ?? creator?.email ?? 'a player',
       decks: [(await deckName(row.deck0)) ?? '', await deckName(row.deck1)],
-      yourSeat: seatKey === row.seat0 ? 0 : seatKey === row.seat1 ? 1 : null,
+      yourSeat: seatKey === null ? null : seatKey === row.seat0 ? 0 : seatKey === row.seat1 ? 1 : null,
       canJoin: canJoin && row.status === 'waiting' && seatKey !== row.seat0,
     };
   }
 
-  /** Takes the empty seat and deals the opening hands. Returns false if the seat was already taken. */
-  async join(id: string, seatKey: string, deckId: number, names: [string, string]): Promise<boolean> {
-    const started = await this.db.transaction(async (tx) => {
+  /**
+   * Takes the empty seat and deals the opening hands. Returns false, having changed nothing, if the
+   * seat was already taken or the claimant is the challenger.
+   */
+  async join(id: string, deckId: number, challengerName: string, claim: SeatClaim): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const [waiting] = await tx
+        .select()
+        .from(matches)
+        .where(and(eq(matches.id, id), eq(matches.status, 'waiting')))
+        .for('update');
+      if (!waiting) return false;
+      const player = await claim(tx);
+      if (player.key === waiting.seat0) return false;
       const [row] = await tx
         .update(matches)
-        .set({ seat1: seatKey, deck1: deckId, status: 'active' })
-        .where(and(eq(matches.id, id), eq(matches.status, 'waiting'), sql`${matches.seat0} <> ${seatKey}`))
+        .set({ seat1: player.key, deck1: deckId, status: 'active' })
+        .where(eq(matches.id, id))
         .returning();
       if (!row) return false;
       const [deck0, deck1] = await Promise.all(
@@ -100,8 +112,8 @@ export class Duels {
       const events = startDuel(
         {
           players: [
-            { name: names[0], main: deck0.main, extra: deck0.extra },
-            { name: names[1], main: deck1.main, extra: deck1.extra },
+            { name: challengerName, main: deck0.main, extra: deck0.extra },
+            { name: player.name, main: deck1.main, extra: deck1.extra },
           ],
           cards,
         },
@@ -110,7 +122,6 @@ export class Duels {
       await tx.insert(matchEvents).values(events.map((event, seq) => ({ matchId: id, seq, event })));
       return true;
     });
-    return started;
   }
 
   private load(id: string): Promise<LiveDuel> {
@@ -118,10 +129,10 @@ export class Duels {
     if (!duel) {
       duel = (async () => {
         const row = await this.find(id);
-        if (!row?.seat1) throw new Error(`Duel ${id} has not started`);
+        if (!row || row.status === 'waiting') throw new Error(`Duel ${id} has not started`);
         const rows = await this.db.select().from(matchEvents).where(eq(matchEvents.matchId, id)).orderBy(matchEvents.seq);
         const events = rows.map((r) => r.event as DuelEvent);
-        return { id, seats: [row.seat0, row.seat1], events, state: replay(events), listeners: new Set(), queue: Promise.resolve() };
+        return { id, events, state: replay(events), listeners: new Set(), queue: Promise.resolve() };
       })();
       duel.catch(() => this.live.delete(id));
       this.live.set(id, duel);
@@ -129,25 +140,24 @@ export class Duels {
     return duel;
   }
 
-  /** Which seat a player holds in a started duel, if any. */
+  /** Which seat a player holds, if any. Read from the database each time, since seats can change hands (see adoptGuest). */
   async seatOf(id: string, seatKey: string): Promise<Seat | null> {
-    const duel = await this.load(id);
-    const seat = duel.seats.indexOf(seatKey);
-    return seat === 0 || seat === 1 ? seat : null;
+    const row = await this.find(id);
+    return row?.seat0 === seatKey ? 0 : row?.seat1 === seatKey ? 1 : null;
   }
 
   async act(id: string, seatKey: string, intent: Intent): Promise<ActResult> {
     const duel = await this.load(id);
     const run = duel.queue.then(async (): Promise<ActResult> => {
-      const seat = duel.seats.indexOf(seatKey);
-      if (seat !== 0 && seat !== 1) return { ok: false, status: 403, error: "You're not playing in this duel." };
+      const seat = await this.seatOf(id, seatKey);
+      if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
       const decision = decide(duel.state, seat, intent);
       if (!decision.ok) return { ok: false, status: 422, error: decision.error };
       const first = duel.events.length;
       await this.db.transaction(async (tx) => {
         await tx.insert(matchEvents).values(decision.events.map((event, i) => ({ matchId: id, seq: first + i, event })));
         if (decision.events.some((e) => e.type === 'duelEnded')) {
-          await tx.update(matches).set({ status: 'finished' }).where(eq(matches.id, id));
+          await tx.update(matches).set({ status: 'finished', finishedAt: new Date() }).where(eq(matches.id, id));
         }
       });
       duel.events.push(...decision.events);

@@ -9,12 +9,14 @@ import type { Me } from '@yugioh/shared';
 import { findUserBySub, listUsers, setStatus, syncUser, toUser, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db/client.ts';
-import { createInvite, listInvites, lookupInvite, markRedeemed, revokeInvite } from './invites.ts';
-import { duelRoutes } from './duelRoutes.ts';
+import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels } from './duels.ts';
-import { viewerOf, type Viewer } from './viewer.ts';
+import { adoptGuest, findGuestByToken } from './guests.ts';
+import { userKey, viewerOf, type Viewer } from './viewer.ts';
 
 const GUEST_COOKIE = 'guest';
+/** The guest cookie outlives any reasonable duel; the guest row, not the cookie, decides access. */
+const GUEST_COOKIE_MS = 365 * 24 * 60 * 60 * 1000;
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
 export function createApp(config: Config, db: Db) {
@@ -32,43 +34,51 @@ export function createApp(config: Config, db: Db) {
       clientSecret: config.AUTH0_CLIENT_SECRET,
       secret: config.SESSION_SECRET,
       authorizationParams: { response_type: 'code', scope: 'openid profile email' },
-      routes: { login: '/auth/login', logout: '/auth/logout', callback: '/auth/callback', postLogoutRedirect: '/' },
+      routes: { login: false, logout: '/auth/logout', callback: '/auth/callback', postLogoutRedirect: '/' },
       afterCallback: async (_req, _res, session) => {
         await syncUser(db, decodeJwt(session.id_token) as unknown as LoginClaims, config.ADMIN_EMAIL);
         return session;
       },
     }),
   );
+  // Login returns to the page that sent the visitor, such as a challenge link. Only paths on this site.
+  app.get('/auth/login', (req, res) => {
+    const to = req.query.returnTo;
+    const returnTo = typeof to === 'string' && /^\/(?![/\\])/.test(to) ? to : '/';
+    res.oidc.login({ returnTo });
+  });
   app.use(cookieParser(config.SESSION_SECRET));
   app.use(express.json());
 
-  // Works out who is asking: a signed-in account, a guest holding an invite, or nobody.
+  const guestCookie: GuestCookie = {
+    set: (res, token) =>
+      void res.cookie(GUEST_COOKIE, token, { signed: true, httpOnly: true, sameSite: 'lax', secure, maxAge: GUEST_COOKIE_MS }),
+    clear: (res) => void res.clearCookie(GUEST_COOKIE),
+  };
+
+  // Works out who is asking: a signed-in account, a guest, or nobody.
   app.use('/api', async (req, res, next) => {
-    res.locals.viewer = await resolveViewer(req);
+    res.locals.viewer = await resolveViewer(req, res);
     next();
   });
 
-  async function resolveViewer(req: Request): Promise<Viewer> {
+  async function resolveViewer(req: Request, res: Response): Promise<Viewer> {
+    const token: unknown = req.signedCookies[GUEST_COOKIE];
+    const guest = typeof token === 'string' ? await findGuestByToken(db, token) : undefined;
+    if (token !== undefined && !guest) guestCookie.clear(res);
+
     if (req.oidc.isAuthenticated()) {
       const claims = req.oidc.idTokenClaims as unknown as LoginClaims;
-      const row = (await findUserBySub(db, claims.sub)) ?? (await syncUser(db, claims, config.ADMIN_EMAIL));
-      return { kind: 'user', user: toUser(row) };
+      const user = toUser((await findUserBySub(db, claims.sub)) ?? (await syncUser(db, claims, config.ADMIN_EMAIL)));
+      // A guest who signs in to an approved account keeps playing their duels as that account.
+      if (guest && user.status === 'approved' && (await adoptGuest(db, guest.id, userKey(user.id)))) guestCookie.clear(res);
+      return { kind: 'user', user };
     }
-    const token: unknown = req.signedCookies[GUEST_COOKIE];
-    if (typeof token === 'string') {
-      const found = await lookupInvite(db, token);
-      if (found.ok) return { kind: 'guest', invite: found.preview, guestToken: token, invitedById: found.createdBy };
-    }
+    if (guest) return { kind: 'guest', guest: { name: guest.name }, guestId: guest.id };
     return { kind: 'anonymous' };
   }
 
   const viewer = viewerOf;
-
-  function requireApproved(_req: Request, res: Response, next: NextFunction) {
-    const v = viewer(res);
-    if (v.kind === 'user' && v.user.status === 'approved') return next();
-    res.status(v.kind === 'user' ? 403 : 401).json({ error: 'approved_account_required' });
-  }
 
   function requireAdmin(_req: Request, res: Response, next: NextFunction) {
     const v = viewer(res);
@@ -76,11 +86,9 @@ export function createApp(config: Config, db: Db) {
     res.status(403).json({ error: 'admin_required' });
   }
 
-  const userId = (res: Response) => (viewer(res) as Extract<Me, { kind: 'user' }>).user.id;
-
   app.get('/api/me', (_req, res) => {
     const v = viewer(res);
-    const me: Me = v.kind === 'guest' ? { kind: 'guest', invite: v.invite } : v;
+    const me: Me = v.kind === 'guest' ? { kind: 'guest', guest: v.guest } : v;
     res.json(me);
   });
 
@@ -98,55 +106,7 @@ export function createApp(config: Config, db: Db) {
     res.json(user);
   });
 
-  app.get('/api/invites', requireApproved, async (_req, res) => {
-    res.json(await listInvites(db, userId(res)));
-  });
-
-  app.post('/api/invites', requireApproved, async (_req, res) => {
-    res.status(201).json(await createInvite(db, userId(res)));
-  });
-
-  app.delete('/api/invites/:token', requireApproved, async (req, res) => {
-    const removed = await revokeInvite(db, userId(res), String(req.params.token));
-    res.status(removed ? 204 : 404).end();
-  });
-
-  // Public: what an invite link shows before it is used.
-  app.get('/api/join/:token', async (req, res) => {
-    const found = await lookupInvite(db, req.params.token);
-    if (!found.ok) return void res.status(404).json({ problem: found.problem });
-    const v = viewer(res);
-    const mine = v.kind === 'guest' && v.guestToken === req.params.token;
-    if (found.redeemed && !mine) return void res.status(404).json({ problem: 'used' });
-    res.json(found.preview);
-  });
-
-  // Uses an invite: the visitor becomes a guest until the invite expires or is revoked.
-  app.post('/api/join/:token', async (req, res) => {
-    const v = viewer(res);
-    if (v.kind === 'user') return void res.status(409).json({ error: 'signed_in' });
-    const token = req.params.token;
-    if (v.kind !== 'guest' || v.guestToken !== token) {
-      const found = await lookupInvite(db, token);
-      if (!found.ok) return void res.status(404).json({ problem: found.problem });
-      if (!(await markRedeemed(db, token))) return void res.status(404).json({ problem: 'used' });
-      res.cookie(GUEST_COOKIE, token, {
-        signed: true,
-        httpOnly: true,
-        sameSite: 'lax',
-        secure,
-        expires: new Date(found.preview.expiresAt),
-      });
-      return void res.json({ kind: 'guest', invite: found.preview } satisfies Me);
-    }
-    res.json({ kind: 'guest', invite: v.invite } satisfies Me);
-  });
-
-  app.post('/api/guest/leave', (_req, res) => {
-    res.clearCookie(GUEST_COOKIE).status(204).end();
-  });
-
-  app.use('/api', duelRoutes(db, new Duels(db)));
+  app.use('/api', duelRoutes(db, new Duels(db), guestCookie));
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'not_found' }));
 
   // Card images, downloaded by the card sync. They never change, so browsers may cache them for long.
