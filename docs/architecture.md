@@ -243,3 +243,7 @@ Decided 2026-11-18.
 
 - Which one or two decks to start with (they decide which mechanics layer 2 to 4 must cover, and whether Extra Deck work moves earlier).
 - YGOPRODeck usage terms and a rulings source (see Card data).
+
+## Deferred: draft mode
+
+Requested by several players, mechanics undecided, not scheduled until well after layer 7. A draft series would be run like a campaign or tournament, and players build decks only from the cards they drafted. It sits entirely outside the engine: the deck builder checks a deck against the player's drafted pool the same way it checks a banlist, and the engine still just receives two decklists.
