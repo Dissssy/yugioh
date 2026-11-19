@@ -17,7 +17,7 @@ export async function duelCosts(db: Db): Promise<{ total: number; byDuel: Map<st
       type,
       // Only the token counts, not the transcripts around them.
       model: sql<string | null>`${matchEvents.event}->'record'->>'model'`,
-      usage: sql<ModelUsage[]>`coalesce(${matchEvents.event}->'record'->'usage', ${matchEvents.event}->'appeal'->'usage')`,
+      usage: sql<ModelUsage[] | null>`coalesce(${matchEvents.event}->'record'->'usage', ${matchEvents.event}->'appeal'->'usage')`,
     })
     .from(matchEvents)
     .where(inArray(type, ['judged', 'appealed']));
@@ -31,6 +31,7 @@ export async function duelCosts(db: Db): Promise<{ total: number; byDuel: Map<st
     byDuel.set(r.id, duel);
     if (r.type === 'judged') duel.judgeCalls++;
     else duel.appeals++;
+    if (!r.usage) throw new Error(`Duel ${r.id} has a ${r.type} event without token counts, logged before costs were tracked. Delete that duel.`);
     const cost = costOf(r.usage);
     duel.cost += cost;
     total += cost;

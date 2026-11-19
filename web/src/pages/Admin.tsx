@@ -18,6 +18,15 @@ export function Admin() {
   );
 }
 
+/** A section that couldn't load says so, with the server's reason, instead of vanishing. */
+function Failed({ what, error }: { what: string; error: Error }) {
+  return (
+    <Notice title={`Couldn't load the ${what}`} tone="error">
+      {errorText(error)}
+    </Notice>
+  );
+}
+
 /** Dollars, with more decimals for the small amounts one duel costs. */
 const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`;
 
@@ -27,6 +36,7 @@ const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`;
  */
 function RecentDuels() {
   const duels = useQuery({ queryKey: ['admin', 'duels'], queryFn: () => api<AdminDuels>('/admin/duels') });
+  if (duels.isError) return <Failed what="duels" error={duels.error} />;
   if (!duels.data) return null;
   return (
     <section className="box admin">
@@ -69,6 +79,7 @@ function RecentDuels() {
  */
 function Rulings() {
   const cards = useQuery({ queryKey: ['admin', 'rulings'], queryFn: () => api<RulingCard[]>('/admin/rulings') });
+  if (cards.isError) return <Failed what="rulings" error={cards.error} />;
   if (!cards.data) return null;
   return (
     <section className="box admin">
