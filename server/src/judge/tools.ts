@@ -81,8 +81,8 @@ export const finish = z.object({
 export type AskPlayer = z.infer<typeof askPlayer>;
 export type Finish = z.infer<typeof finish>;
 
-/** Keeps only the JSON Schema keywords strict tool use accepts. */
-function strictSchema(schema: z.ZodType): Anthropic.Tool.InputSchema {
+/** Keeps only the JSON Schema keywords strict tool use and structured outputs accept. */
+export function strictSchema(schema: z.ZodType): Anthropic.Tool.InputSchema {
   const json = z.toJSONSchema(schema) as Record<string, unknown>;
   const clean = (node: unknown): unknown => {
     if (Array.isArray(node)) return node.map(clean);

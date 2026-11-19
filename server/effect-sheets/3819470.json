@@ -2,7 +2,7 @@
   "code": 3819470,
   "textHash": "389b60b4fd72b976066881f5639b37c5c5e2231d9148ed945b69e19aa964848b",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
@@ -12,7 +12,9 @@
       "window": "When a Trap Card is activated",
       "cost": "Pay 1000 LP",
       "effect": "Negate the activation, and if you do, destroy it.",
-      "targets": null
+      "targets": null,
+      "respondsTo": "activation",
+      "script": null
     }
   ],
   "materials": null

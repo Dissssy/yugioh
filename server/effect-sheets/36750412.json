@@ -2,17 +2,19 @@
   "code": 36750412,
   "textHash": "938e399c67ca6490b3abb3802dea5a9e48a974c61d7944969373983fc25e6f06",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
       "opt": "none",
-      "window": "If this card inflicts battle damage to your opponent",
+      "window": "When this card inflicts battle damage to your opponent",
       "cost": "",
       "effect": "It gains 200 ATK.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": null
     }
   ],
   "materials": null

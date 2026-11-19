@@ -2,27 +2,31 @@
   "code": 98143165,
   "textHash": "50bc9fcc51309b85de31c10db7bf8c5a1b6ea4d827250f3ce7982c6ae34871cf",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "Your Main Phase",
+      "window": "Your Main Phase, targeting 1 face-up monster on the field to equip this card to",
       "cost": "",
-      "effect": "Equip this card to that target.",
-      "targets": "1 face-up monster on the field"
+      "effect": "Equip this card to the targeted face-up monster.",
+      "targets": "1 face-up monster on the field",
+      "respondsTo": null,
+      "script": null
     },
     {
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "",
+      "window": "While this card is equipped to a monster",
       "cost": "",
       "effect": "The equipped monster gains 500 ATK, and its Level is increased by 1.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": null
     }
   ],
   "materials": null

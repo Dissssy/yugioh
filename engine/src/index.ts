@@ -1,5 +1,6 @@
 export * from './types.ts';
-export { evolve, replay, other, locate, statsOf, type Location } from './state.ts';
+export { evolve, replay, other, levelOf, locate, statsOf, type Location } from './state.ts';
 export { cardOf, decide, legalActions, startDuel, tributesFor, type Decision, type DuelSetup } from './rules.ts';
 export { applyOp, type OpContext, type OpResult } from './ops.ts';
 export { entryFor, logFor, reviewLog, viewFor, visibleTo } from './view.ts';
+export { cardsFitting, chooseFrom, describeFilter, feasibleOptions, fits, scriptOf, scriptProblem } from './script.ts';

@@ -1,6 +1,6 @@
 // What the judge reads: a fixed rules reference (cached), then per request the board and the effect at hand.
 
-import { cardOf, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Seat } from '@yugioh/engine';
+import { cardOf, levelOf, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Seat } from '@yugioh/engine';
 
 export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs every generic rule: turns, phases, summons, battle, damage, LP, zones, once-per-turn counting. Your only job is to apply one card effect at a time exactly as its text says, using tools. Every tool call is checked by code against the board; a refused call comes back as an error that you can correct.
 
@@ -50,7 +50,12 @@ const zoneName = { monsters: 'Monster Zone', spellTraps: 'Spell & Trap Zone' } a
 
 /** "Effect Monster, EARTH Warrior, Level 4" or "Quick-Play Spell Card". */
 function kindOf(c: CardData): string {
-  return c.kind === 'monster' ? `${c.type}, ${c.attribute ?? ''} ${c.race}, Level ${c.level ?? '-'}` : `${c.race} ${c.type}`;
+  return c.kind === 'monster' ? `${c.type}, ${c.attribute ?? ''} ${c.race}, ${rankOrLevel(c)}` : `${c.race} ${c.type}`;
+}
+
+/** "Level 4", or "Rank 4" for an Xyz Monster, which has no Level. */
+function rankOrLevel(c: CardData): string {
+  return levelOf(c) === null && c.level !== null ? `Rank ${c.level}` : `Level ${c.level ?? '-'}`;
 }
 
 /** The board as text, with every card's ID, name and current stats. The model sees hidden cards too. */
@@ -86,10 +91,10 @@ export function describeState(state: DuelState, activating: string | null = null
     lines.push('', 'Active stat changes:');
     for (const m of state.modifiers) lines.push(`  ${label(m.card)}: ATK ${m.atk}, DEF ${m.def}, Level ${m.levelSet ?? `+${m.levelDelta}`}, until ${m.until}`);
   }
-  lines.push('', 'Cards in this duel (name: type; attribute/type; Level; ATK/DEF):');
+  lines.push('', 'Cards in this duel (name: type; attribute/type; Level or Rank; ATK/DEF):');
   for (const code of [...new Set(Object.values(state.instances).map((i) => i.code))].sort((a, b) => a - b)) {
     const c = state.cards[code]!;
-    const stats = c.kind === 'monster' ? `; ${c.attribute ?? ''} ${c.race}; Level ${c.level ?? '-'}; ${c.atk ?? '?'}/${c.def ?? '?'}` : `; ${c.race}`;
+    const stats = c.kind === 'monster' ? `; ${c.attribute ?? ''} ${c.race}; ${rankOrLevel(c)}; ${c.atk ?? '?'}/${c.def ?? '?'}` : `; ${c.race}`;
     lines.push(`  ${c.name}: ${c.type}${stats}`);
   }
   return lines.join('\n');

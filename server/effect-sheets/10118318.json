@@ -2,17 +2,65 @@
   "code": 10118318,
   "textHash": "5694ddfbc33576db21e8507adcef372febb0f283a834dae8214e4d5212911753",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
       "opt": "none",
-      "window": "Either player's turn, if you have not conducted your Battle Phase this turn, while your Deck has a Level 2 or lower Warrior monster and you have a free Monster Zone",
+      "window": "Any time you could activate a Normal Trap, provided you have not conducted your Battle Phase this turn",
       "cost": "",
-      "effect": "Special Summon 1 Level 2 or lower Warrior monster from your Deck. You cannot conduct your Battle Phase the turn you activate this card.",
-      "targets": null
+      "effect": "Special Summon 1 Level 2 or lower Warrior-Type monster from your Deck. You cannot conduct your Battle Phase the turn you activate this card.",
+      "targets": null,
+      "respondsTo": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "before_battle_phase"
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "place": "deck",
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [
+                      "Warrior"
+                    ],
+                    "attributes": [],
+                    "faceUp": null,
+                    "position": null,
+                    "level": {
+                      "min": null,
+                      "max": 2
+                    },
+                    "atk": null,
+                    "def": null
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null
+                },
+                "position": "choice"
+              }
+            ]
+          }
+        ],
+        "unapplied": "You cannot conduct your Battle Phase the turn you activate this card."
+      }
     }
   ],
   "materials": null

@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
-import { decide, evolve, legalActions, replay, type CardData, type DuelEvent, type DuelState, type EffectSheet, type Seat } from '@yugioh/engine';
+import { decide, evolve, fits, legalActions, replay, scriptProblem, type CardData, type CardFilter, type DuelEvent, type DuelState, type EffectSheet, type Script, type Seat } from '@yugioh/engine';
+import { rule } from '../src/judge/script.ts';
 import { judge, type JudgeDeps, type ModelCall, type Question } from '../src/judge/judge.ts';
 import { listSheetCodes, loadSheets, textHash } from '../src/sheets.ts';
 import { buildBoard, CASES, runCase } from '../src/judge/evals.ts';
@@ -31,7 +32,7 @@ const sheets: Record<number, EffectSheet> = {
     verified: true,
     model: 'test',
     materials: null,
-    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY' }],
+    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', respondsTo: null, script: null }],
   },
 };
 
@@ -259,23 +260,103 @@ async function fixtureCards() {
   );
 }
 
+const anyCard = (side: CardFilter['side'], place: CardFilter['place'], kinds: CardFilter['kinds'] = []): CardFilter => ({
+  side,
+  place,
+  kinds,
+  types: [],
+  races: [],
+  attributes: [],
+  faceUp: null,
+  position: null,
+  level: null,
+  atk: null,
+  def: null,
+});
+/** Monster Reincarnation as a script: discard 1 card, then target 1 monster in your GY; add it to your hand. */
+const reincarnation: Script = {
+  conditions: [],
+  cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 1, rank: null }, to: 'graveyard' }],
+  targets: { filter: anyCard('you', 'graveyard', ['monster']), min: 1, max: 1 },
+  options: [{ label: '', steps: [{ do: 'move', cards: { from: 'targets' }, to: 'hand' }] }],
+  unapplied: null,
+};
+const withScript = (state: DuelState): DuelState => ({
+  ...state,
+  sheets: { 3: { ...sheets[3]!, effects: [{ ...sheets[3]!.effects[0]!, script: reincarnation }] } },
+});
+
+describe('a scripted effect', () => {
+  it('pays the cost, has the player pick targets that fit before it, and resolves, with no model', async () => {
+    const state = withScript(board());
+    expect(scriptProblem(state, 0, 'a0', 0)).toBeNull();
+    const d = decide(state, 0, { type: 'activate', card: 'a0', effect: 0, zone: 0 });
+    if (!d.ok) throw new Error(d.error);
+    const scratch = d.events.slice(1).reduce(evolve, state);
+    const link = scratch.chain.at(-1)!;
+    const answers = [['a2'], ['a9']];
+    const questions: Question[] = [];
+    const ask = async (q: Question) => (questions.push(q), answers.shift()!);
+    const checked = await rule({ stage: 'activation', state: scratch, link }, { model: null, ask, random: () => 0.5 });
+    expect(checked.record).toMatchObject({ model: 'script', legal: true, error: null, usage: [], summary: 'Monster Reincarnation is activated, targeting Dark Blade.' });
+    // The discarded Axe Raider isn't offered as a target: it wasn't in the GY before the cost was paid.
+    expect(questions.map((q) => q.cards.map((c) => c.id))).toEqual([['a1', 'a2', 'a3', 'a4'], ['a9']]);
+    const paid = checked.events.reduce(evolve, scratch);
+    const resolved = await rule({ stage: 'resolution', state: paid, link: paid.chain.at(-1)! }, { model: null, ask, random: () => 0.5 });
+    expect(resolved.record).toMatchObject({ legal: true, error: null, summary: "Dark Blade went to its owner's hand." });
+    const after = resolved.events.reduce(evolve, paid);
+    expect(after.players[0].hand).toContain('a9');
+    expect(after.players[0].graveyard).toEqual(['a2']);
+  });
+
+  it('is not offered, and refused with a reason, when only the cost would supply its target', () => {
+    // No monster in the GY: discarding an Axe Raider would put one there, but legality is judged before the cost.
+    const state = withScript(evolve(board(), { type: 'moved', card: 'a9', owner: 0, from: 'graveyard', to: 'banished' }));
+    expect(legalActions(state, 0).some((a) => a.type === 'activate' && a.card === 'a0')).toBe(false);
+    const d = decide(state, 0, { type: 'activate', card: 'a0', effect: 0, zone: 0 });
+    expect(d).toEqual({ ok: false, error: 'There is no monster in your GY to target besides the cards paid as its cost.' });
+  });
+
+  it("matches a face-down card only on what its zone shows", () => {
+    const state = evolve(board(), { type: 'monsterSet', player: 1, card: 'b0', zone: 0 });
+    const filter = (f: Partial<CardFilter>) => ({ ...anyCard('opponent', 'monsters'), ...f });
+    expect(fits(state, 'b0', filter({ kinds: ['monster'] }), 0)).toBe(true);
+    expect(fits(state, 'b0', filter({ races: ['Warrior'] }), 0)).toBe(false);
+    expect(fits(state, 'b0', filter({ faceUp: true }), 0)).toBe(false);
+    expect(fits(state, 'b0', filter({ side: 'you' }), 0)).toBe(false);
+  });
+});
+
 describe('the eval suite', () => {
-  it('builds every case on a board where code accepts the activation', async () => {
+  it('runs every scripted case offline, and builds every other case on a board where code accepts the activation', async () => {
     const data = await fixtureCards();
     const sheets = await loadSheets(data);
+    let scripted = 0;
     for (const c of CASES) {
       const state = buildBoard(c, data, sheets);
+      const code = Object.values(data).find((d) => d.name === c.activate)!.code;
+      const effect = sheets[code]!.effects[c.effect ?? 0]!;
+      if (effect.script || effect.respondsTo) {
+        // Code rules on these exactly, without a model.
+        const result = await runCase(c, state, null);
+        expect(result.passed, `${c.name}: ${result.detail}`).toBe(true);
+        scripted++;
+        continue;
+      }
       const actions = legalActions(state, c.seat ?? 0);
       const offered = actions.some((a) => a.type === 'activate' && a.effect === (c.effect ?? 0) && state.cards[state.instances[a.card]!.code]!.name === c.activate);
       expect(offered, c.name).toBe(true);
     }
     expect(CASES.length).toBeGreaterThanOrEqual(20);
+    expect(scripted).toBeGreaterThanOrEqual(20);
   });
 
   it('scores a case from the judge calls and the board after', async () => {
     const data = await fixtureCards();
     const sheets = await loadSheets(data);
     const rush = CASES.find((c) => c.name === 'rush recklessly gives 700 ATK')!;
+    // Without its script, so the judge rules on it.
+    for (const sheet of Object.values(sheets)) sheet.effects = sheet.effects.map((e) => ({ ...e, script: null }));
     const state = buildBoard(rush, data, sheets);
     const monster = state.players[0].monsters[0]!.id;
     const { model } = scripted([

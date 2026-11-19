@@ -2,17 +2,48 @@
   "code": 8842266,
   "textHash": "cea93772199e4140ac6b7abf988fc8ab21667b9a306b8430b1676518a04b4c13",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
       "opt": "none",
-      "window": "Either player's turn (layer 2: your own Main or Battle Phase)",
+      "window": "Any time you could activate a Quick-Play Spell",
       "cost": "",
-      "effect": "Activate 1 of these effects: Gain 1200 LP; or inflict 800 damage to your opponent.",
-      "targets": null
+      "effect": "Activate 1 of these effects; ● Gain 1200 LP. ● Inflict 800 damage to your opponent.",
+      "targets": null,
+      "respondsTo": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "Gain 1200 LP.",
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "you",
+                "amount": 1200,
+                "kind": "gain"
+              }
+            ]
+          },
+          {
+            "label": "Inflict 800 damage to your opponent.",
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": 800,
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      }
     }
   ],
   "materials": null

@@ -5,6 +5,7 @@ import {
   MONSTER_ZONES,
   SPELL_TRAP_ZONES,
   STARTING_LP,
+  type CardData,
   type DuelEvent,
   type DuelState,
   type FieldCard,
@@ -215,12 +216,15 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
   });
 }
 
+/** A card's printed Level. An Xyz Monster's number is its Rank, not a Level, so it has none. */
+export const levelOf = (card: CardData): number | null => (/\bXYZ\b/i.test(card.type) ? null : card.level);
+
 /** A face-up monster's ATK, DEF and Level after modifiers. Level modifiers apply in order; a set Level overrides earlier ones. */
 export function statsOf(state: DuelState, id: string): { atk: number; def: number; level: number | null } {
   const card = state.cards[state.instances[id]!.code]!;
   let atk = card.atk ?? 0;
   let def = card.def ?? 0;
-  let level = card.level;
+  let level = levelOf(card);
   for (const m of state.modifiers) {
     if (m.card !== id) continue;
     atk += m.atk;

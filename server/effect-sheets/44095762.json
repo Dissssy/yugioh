@@ -2,7 +2,7 @@
   "code": 44095762,
   "textHash": "f7c34952d5586fff92c201469a9bba322921888c172a5ae85afbf4b03b0c456b",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
@@ -12,7 +12,40 @@
       "window": "When an opponent's monster declares an attack",
       "cost": "",
       "effect": "Destroy all your opponent's Attack Position monsters.",
-      "targets": null
+      "targets": null,
+      "respondsTo": "attack",
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "opponent",
+                    "place": "monsters",
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "faceUp": null,
+                    "position": "attack",
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      }
     }
   ],
   "materials": null

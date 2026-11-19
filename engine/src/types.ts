@@ -40,6 +40,82 @@ export interface SheetEffect {
   effect: string;
   /** What it targets, or null if it doesn't target. */
   targets: string | null;
+  /**
+   * The event it is activated in response to ("When an opponent's monster declares an attack"), or null. Nothing can
+   * be responded to until chains arrive (layer 4), so such an effect is never offered.
+   */
+  respondsTo: 'attack' | 'summon' | 'activation' | null;
+  /** The effect as data that code runs exactly, with no judge, or null when the judge applies it (see docs/effects.md). */
+  script: Script | null;
+}
+
+/**
+ * A structured effect. Code checks its activation exactly (conditions, cost, targets, and that the effect can do what
+ * it must), so an activation it refuses is never offered, and resolves it as fixed steps.
+ */
+export interface Script {
+  /** Board conditions the activation needs, beyond what its cost, targets and steps need. */
+  conditions: Condition[];
+  /** Paid on activation, in order. */
+  cost: Step[];
+  /** Chosen by the activating player on activation, after the cost; null if the effect doesn't target. */
+  targets: { filter: CardFilter; min: number; max: number } | null;
+  /** What the effect does. One option, or several when the text says "activate 1 of these effects" (picked on activation by `label`). */
+  options: { label: string; steps: Step[] }[];
+  /** Any part of the text the steps can't express yet (a lingering restriction), said in the summary; else null. */
+  unapplied: string | null;
+}
+
+export type Condition =
+  /** At least `min` cards fit `filter`. */
+  | { if: 'count'; filter: CardFilter; min: number }
+  /** The activating player hasn't conducted their Battle Phase this turn. */
+  | { if: 'before_battle_phase' };
+
+/** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
+export type Step =
+  | { do: 'destroy'; cards: Selection }
+  | { do: 'move'; cards: Selection; to: Destination }
+  /** `choice`: the activating player picks Attack or Defense Position. */
+  | { do: 'special_summon'; cards: Selection; position: Position | 'choice' }
+  | { do: 'modify_stats'; cards: Selection; atk: number; def: number; levelDelta: number; levelSet: number | null; until: Until }
+  | { do: 'change_lp'; player: 'you' | 'opponent'; amount: number; kind: 'cost' | 'damage' | 'gain' }
+  | { do: 'draw'; player: 'you' | 'opponent'; count: number }
+  | { do: 'extra_normal_summon' };
+
+/**
+ * Which cards a step affects. `choose` asks the activating player for `min` to `max` cards that fit (from those tied
+ * for the lowest or highest stat, if `rank` is set). `all` takes every card that fits. The card being activated is
+ * never chosen, targeted or counted, except as `self`.
+ */
+export type Selection =
+  | { from: 'self' }
+  | { from: 'targets' }
+  | { from: 'choose'; filter: CardFilter; min: number; max: number; rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null }
+  | { from: 'all'; filter: CardFilter };
+
+/** Cards that fit a description such as "1 face-up Warrior monster your opponent controls". Empty lists and nulls don't restrict. */
+export interface CardFilter {
+  /** Whose: the controller of a card on the field, or the player whose hand, Deck, GY or banished pile it is in. */
+  side: 'you' | 'opponent' | 'either';
+  place: 'field' | 'monsters' | 'spellTraps' | 'hand' | 'deck' | 'graveyard' | 'banished';
+  kinds: ('monster' | 'spell' | 'trap')[];
+  /** Words that must all be in the card's type line, such as "Synchro", "Tuner", "Normal" ("non-Effect"), "Effect". */
+  types: string[];
+  /** Any of these monster types ("Warrior") or Spell/Trap properties ("Quick-Play"). */
+  races: string[];
+  attributes: string[];
+  faceUp: boolean | null;
+  position: Position | null;
+  /** Current values for a face-up monster, printed ones elsewhere. A card without the stat never fits a range on it. */
+  level: Range | null;
+  atk: Range | null;
+  def: Range | null;
+}
+
+export interface Range {
+  min: number | null;
+  max: number | null;
 }
 
 export interface EffectSheet {

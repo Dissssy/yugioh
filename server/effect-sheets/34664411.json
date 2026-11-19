@@ -2,37 +2,43 @@
   "code": 34664411,
   "textHash": "89e952fe17580e265e5e94a5019a014233aad28465a63158b5590ffb8457cf79",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "Your Main Phase",
+      "window": "Your Main Phase, targeting a face-up monster on the field",
       "cost": "",
-      "effect": "Equip this card to that target.",
-      "targets": "1 face-up monster on the field"
+      "effect": "Equip this card to 1 face-up monster on the field.",
+      "targets": "1 face-up monster on the field",
+      "respondsTo": null,
+      "script": null
     },
     {
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "",
+      "window": "While this card is equipped to a monster",
       "cost": "",
       "effect": "The equipped monster gains 500 ATK.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": null
     },
     {
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
       "opt": "none",
-      "window": "If this face-up card you control is destroyed by your opponent's card effect and sent to your GY",
+      "window": "If this face-up card you control is destroyed by your opponent's card effect and sent to your Graveyard",
       "cost": "",
       "effect": "Draw 1 card.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": null
     }
   ],
   "materials": null

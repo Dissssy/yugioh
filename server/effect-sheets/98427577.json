@@ -2,7 +2,7 @@
   "code": 98427577,
   "textHash": "a8ac0357aca17f8278440b591067e6c5dffc390c13e4c93d558bd2fcdd44c911",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
@@ -12,7 +12,9 @@
       "window": "When an opponent's monster declares an attack",
       "cost": "",
       "effect": "Negate the attack, also, after that, Set this card face-down instead of sending it to the GY.",
-      "targets": "The attacking monster"
+      "targets": "the attacking monster",
+      "respondsTo": "attack",
+      "script": null
     }
   ],
   "materials": null

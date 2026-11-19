@@ -2,17 +2,19 @@
   "code": 78794994,
   "textHash": "2a1b9ea3aaa22e22bb7218aed2d587090c427dd621225ea065dd83471dc7f327",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "Your Main Phase",
-      "cost": "Send 1 Normal Monster you control to the GY",
-      "effect": "Special Summon that target, and if you do, equip this card to it.",
-      "targets": "1 monster in either player's GY"
+      "window": "Your Main Phase, while you control a Normal Monster and there is a monster in either player's Graveyard",
+      "cost": "Send 1 Normal Monster you control to the Graveyard",
+      "effect": "Special Summon the targeted monster, and if you do, equip this card to it.",
+      "targets": "1 monster in either player's Graveyard",
+      "respondsTo": null,
+      "script": null
     },
     {
       "kind": "trigger",
@@ -22,7 +24,9 @@
       "window": "When this card leaves the field",
       "cost": "",
       "effect": "Destroy the equipped monster.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": null
     }
   ],
   "materials": null

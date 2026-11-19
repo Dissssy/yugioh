@@ -2,17 +2,19 @@
   "code": 95956346,
   "textHash": "757ea41a0c5754ebc44f0fbae7f549ad59e083ae9f941598400a2c4002a58887",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "When this card is destroyed by battle and sent to the GY",
+      "window": "When this card is destroyed by battle and sent to the Graveyard",
       "cost": "",
       "effect": "Special Summon 1 LIGHT monster with 1500 or less ATK from your Deck, in face-up Attack Position.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": null
     }
   ],
   "materials": null

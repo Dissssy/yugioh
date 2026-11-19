@@ -9,6 +9,7 @@ import { and, desc, eq, or } from 'drizzle-orm';
 import {
   cardOf,
   decide,
+  scriptOf,
   entryFor,
   evolve,
   logFor,
@@ -29,7 +30,8 @@ import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
 import { decks, matchEvents, matches, users } from './db/schema.ts';
 import { appeal } from './judge/appeal.ts';
-import { judge, type ModelCall, type Question } from './judge/judge.ts';
+import type { ModelCall, Question } from './judge/judge.ts';
+import { rule, SCRIPT } from './judge/script.ts';
 import { loadSheets } from './sheets.ts';
 
 type MatchRow = typeof matches.$inferSelect;
@@ -215,9 +217,12 @@ export class Duels {
           await this.commit(duel, decision.events);
           return answer({ ok: true });
         }
-        if (!this.ai.judge) return answer({ ok: false, status: 503, error: "Card effects need the judge, and it isn't set up on this server." });
-        if (judgeCallsMade(duel.events) + 2 > this.ai.judgeCalls) {
-          return answer({ ok: false, status: 429, error: 'This duel has used all its judge calls.' });
+        // A scripted effect needs no model, so neither the API key nor the duel's judge calls.
+        if (!scriptOf(duel.state, intent.card, intent.effect)) {
+          if (!this.ai.judge) return answer({ ok: false, status: 503, error: "This card's effect needs the judge, and it isn't set up on this server." });
+          if (judgeCallsMade(duel.events) + 2 > this.ai.judgeCalls) {
+            return answer({ ok: false, status: 429, error: 'This duel has used all its judge calls.' });
+          }
         }
         answer({ ok: true });
         await this.activate(duel, decision.events);
@@ -250,10 +255,10 @@ export class Duels {
     duel.judging = { stage, link, question: null };
     this.broadcastJudging(duel);
     try {
-      return await judge(
+      return await rule(
         { stage, state, link, appealRuling },
         {
-          model: this.ai.judge!,
+          model: this.ai.judge,
           random: this.random,
           ask: (question) =>
             new Promise<string[]>((answer) => {
@@ -378,7 +383,7 @@ export class Duels {
   }
 }
 
-const judgeCallsMade = (events: DuelEvent[]) => events.filter((e) => e.type === 'judged').length;
+const judgeCallsMade = (events: DuelEvent[]) => events.filter((e) => e.type === 'judged' && e.record.model !== SCRIPT).length;
 
 /** The judge's progress as one seat may see it. */
 function judgingFor(duel: LiveDuel, seat: Seat): JudgingView | null {

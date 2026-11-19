@@ -2,17 +2,19 @@
   "code": 97017120,
   "textHash": "2ee1a3b8b6eded69f089f7317188ca03648e8686af9781eed9ac193f4dda075e",
   "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "When this card is destroyed by battle and sent to the GY",
+      "window": "When this card is destroyed by battle and sent to the Graveyard",
       "cost": "",
       "effect": "Special Summon 1 EARTH monster with 1500 or less ATK from your Deck, in Attack Position.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": null
     }
   ],
   "materials": null

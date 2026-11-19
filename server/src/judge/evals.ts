@@ -31,7 +31,8 @@ import { toCardData } from '../cards.ts';
 import type { Db } from '../db/client.ts';
 import { cards } from '../db/schema.ts';
 import { loadSheets } from '../sheets.ts';
-import { judge, PROMPT_VERSION, type ModelCall, type Question } from './judge.ts';
+import { PROMPT_VERSION, type ModelCall, type Question } from './judge.ts';
+import { rule } from './script.ts';
 import { costOf, usageOf } from './pricing.ts';
 
 /** One side of a board, by card name. Field monsters are face-up in Attack Position unless listed under `setMonsters`. */
@@ -276,9 +277,9 @@ export const CASES: EvalCase[] = [
     name: 'reinforce truth summons a level 2 warrior from the deck',
     board: [{ set: ['Reinforce Truth'], deck: ['Speed Warrior', 'Sonic Chick', 'Exiled Force'] }, {}],
     activate: 'Reinforce Truth',
-    picks: [['Speed Warrior']],
+    picks: [['Speed Warrior'], ['Defense']],
     legal: true,
-    check: (b) => all(expectAt(b, 'Speed Warrior', '0:monsters'), expectAt(b, 'Reinforce Truth', '0:gy')),
+    check: (b) => all(expectAt(b, 'Speed Warrior', '0:monsters'), b.monster('Speed Warrior')?.position === 'defense' ? null : 'not in Defense Position', expectAt(b, 'Reinforce Truth', '0:gy')),
   },
   {
     name: 'backup soldier needs 5 monsters in the GY',
@@ -446,6 +447,19 @@ export const CASES: EvalCase[] = [
 
 
   {
+    name: 'harmonic waves cannot target a monster with no level',
+    board: [{ hand: ['Harmonic Waves'] }, { monsters: ['Number 39: Utopia'] }],
+    activate: 'Harmonic Waves',
+    legal: false,
+  },
+  {
+    name: 'raigeki break can destroy a set card',
+    board: [{ set: ['Raigeki Break'], hand: ['Twister'] }, { set: ['Trap Hole'] }],
+    activate: 'Raigeki Break',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Trap Hole', '1:gy'), expectAt(b, 'Twister', '0:gy')),
+  },
+  {
     name: 'speed warrior doubles ATK only in the battle phase',
     board: [{ monsters: ['Speed Warrior'] }, {}],
     activate: 'Speed Warrior',
@@ -528,14 +542,18 @@ export interface EvalResult {
   records: JudgeRecord[];
 }
 
-/** Runs one case: the activation check, then (if legal) the resolution, answering questions from `picks`. */
-export async function runCase(c: EvalCase, state: DuelState, model: ModelCall): Promise<EvalResult> {
+/**
+ * Runs one case: the activation check, then (if legal) the resolution, answering questions from `picks`. A scripted
+ * effect runs without the model, so `model` may be null for cases whose effects all have scripts.
+ */
+export async function runCase(c: EvalCase, state: DuelState, model: ModelCall | null): Promise<EvalResult> {
   const seat = c.seat ?? 0;
   const p = state.players[seat];
   const id = [...p.hand, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((m) => (m ? [m.id] : []))].find((x) => cardOf(state, x).name === c.activate)!;
   const zone = p.hand.includes(id) ? p.spellTraps.indexOf(null) : null;
   const intent = decide(state, seat, { type: 'activate', card: id, effect: c.effect ?? 0, zone });
-  if (!intent.ok) return { name: c.name, passed: false, detail: `code refused the activation: ${intent.error}`, records: [] };
+  // Code refuses an activation that the effect's script or respondsTo rules out, with no judge call.
+  if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   const picks = [...(c.picks ?? [])];
   const unmatched: string[] = [];
   // A pick names a card, or a phrase found in one of the judge's choices (its wording varies between runs).
@@ -550,7 +568,7 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall): 
   };
   const deps = { model, ask, random: Math.random };
   let scratch = intent.events.slice(1).reduce(evolve, state);
-  const checked = await judge({ stage: 'activation', state: scratch, link: scratch.chain.at(-1)! }, deps);
+  const checked = await rule({ stage: 'activation', state: scratch, link: scratch.chain.at(-1)! }, deps);
   const records = [checked.record];
   const result = (passed: boolean, detail: string): EvalResult => ({ name: c.name, passed, detail, records });
   if (checked.record.error) return result(false, `judge failed: ${checked.record.error}`);
@@ -558,7 +576,7 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall): 
   if (checked.record.legal !== c.legal) return result(false, `ruled ${checked.record.legal ? 'legal' : 'illegal'}: ${checked.record.summary}`);
   if (!c.legal) return result(true, checked.record.summary);
   scratch = checked.events.reduce(evolve, scratch);
-  const resolved = await judge({ stage: 'resolution', state: scratch, link: scratch.chain.at(-1)! }, deps);
+  const resolved = await rule({ stage: 'resolution', state: scratch, link: scratch.chain.at(-1)! }, deps);
   records.push(resolved.record);
   if (resolved.record.error) return result(false, `judge failed resolving: ${resolved.record.error}`);
   const after = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, scratch);
