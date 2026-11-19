@@ -80,7 +80,12 @@ main:has(.duel) { max-width: none; padding: 0; }
 
 /* Cards on the table */
 .duel .card { width: var(--card-w); height: var(--card-h); border-radius: 5px; box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); }
-.fx { border-radius: 5px; transform-style: preserve-3d; }
+/*
+ * No transform-style: preserve-3d here. Flips get their depth from the zone's perspective, and a preserve-3d element
+ * that also gets a filter (the brightness flashes) can leave a rotated card (the opponent's, turned to face them)
+ * blank in Firefox until something flattens it.
+ */
+.fx { border-radius: 5px; }
 .slot { position: relative; border-radius: 6px; cursor: pointer; transition: filter 0.15s; }
 .slot:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .slot.playable .fx { box-shadow: 0 0 0 2px var(--glow), 0 0 10px 1px var(--glow); }
