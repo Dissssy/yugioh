@@ -125,6 +125,7 @@ const continuous = z.union([
   z.object({ apply: z.literal('restrict'), to: affected, others: z.boolean(), cannot: z.array(z.enum(RESTRICTIONS)), by: cardFilter.nullable(), while: z.array(condition) }),
   z.object({ apply: z.literal('self_destruct'), opponentTurns: z.number().int().min(1) }),
   z.object({ apply: z.literal('tie'), destroyLinked: z.boolean(), defenseBreaks: z.boolean() }),
+  z.object({ apply: z.literal('replace_destruction'), detach: z.number().int().min(1) }),
 ]) satisfies z.ZodType<Continuous>;
 
 const when = z.object({
@@ -323,6 +324,7 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 {"apply": "restrict", "to", "others", "cannot", "by", "while"}: the monsters in "to" can't do what "cannot" lists: "attack" (declare an attack), "change_position", "be_attacked" (be targeted for an attack), "be_destroyed_by_battle". others true leaves this card itself out ("except this one"). by: for be_destroyed_by_battle, a filter the monster it battles must fit ("with a monster that has 1900 or more ATK": atk {"min": 1900, "max": null}), else null. "Your opponent's monsters cannot declare an attack": to {"side": "opponent", "place": "monsters", ...}, cannot ["attack"]. "Your opponent cannot target Warrior monsters for attacks, except this one": to {"side": "you", "place": "monsters", "faceUp": true, "races": ["Warrior"], ...}, others true, cannot ["be_attacked"].
 
 {"apply": "tie", "destroyLinked", "defenseBreaks"}: for an Equip Spell or Continuous Trap linked to a monster (see the link step). Code always destroys a linked card when its monster leaves the field, so "When that monster is destroyed, destroy this card" needs only this entry with both false. destroyLinked true for "When this card leaves the field, destroy that monster"; defenseBreaks true for "If the target is changed to Defense Position, destroy it and this card". Write these as kind "continuous" even when worded "When ...".
+{"apply": "replace_destruction", "detach"}: "If this face-up card would be destroyed, you can detach 1 Xyz Material from this card instead" (detach 1). Code asks its controller each time it would be destroyed, by battle or by an effect.
 
 {"apply": "self_destruct", "opponentTurns": n}: "this card remains on the field, but destroy it during the End Phase of your opponent's nth turn" (a Normal Spell/Trap with this stays on the field after it resolves).
 

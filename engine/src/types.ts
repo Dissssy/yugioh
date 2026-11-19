@@ -206,7 +206,12 @@ export type Continuous =
   | { apply: 'stats'; to: Affected; atk: number; def: number; per: CardFilter | 'materials' | null; levelDelta: number; levelSet: number | null; while: Condition[] }
   | { apply: 'restrict'; to: Affected; others: boolean; cannot: Restriction[]; by: CardFilter | null; while: Condition[] }
   | { apply: 'self_destruct'; opponentTurns: number }
-  | { apply: 'tie'; destroyLinked: boolean; defenseBreaks: boolean };
+  | { apply: 'tie'; destroyLinked: boolean; defenseBreaks: boolean }
+  /**
+   * "If this face-up card would be destroyed, you can detach `detach` Xyz Material(s) from it instead": its controller
+   * is asked each time, in battle and against effects, while it has enough.
+   */
+  | { apply: 'replace_destruction'; detach: number };
 
 export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle'] as const;
 /** What a restricted monster can't do: declare an attack, change its battle position, be targeted for an attack, or be destroyed by battle. */
@@ -365,7 +370,9 @@ export type DuelStep =
   | { at: 'triggers'; cause: Happening | null; then: Then; handled: string[]; passed: Seat[] }
   | { at: 'respond'; cause: Happening | null; then: Then; priority: Seat; actor: Seat; passed: boolean }
   | { at: 'resolve'; then: Then }
-  | { at: 'continue'; then: Then };
+  | { at: 'continue'; then: Then }
+  /** `card` would be destroyed by battle; `player`, its controller, decides whether to detach materials instead. */
+  | { at: 'replace'; card: string; player: Seat; then: Then };
 
 /** A card on the field. */
 export interface FieldCard {
@@ -429,7 +436,8 @@ export interface DuelState {
   /** Chain links resolved so far in the duel, the `group` of new happenings. */
   resolvedLinks: number;
   /** The attack being made, from its declaration until damage is done. */
-  attack: { attacker: string; target: string | null } | null;
+  /** `replaced`: for each monster that would be destroyed in this battle, the materials detached instead (empty: none). */
+  attack: { attacker: string; target: string | null; replaced: Record<string, string[]> } | null;
   /** Effects used this turn, for once-per-turn clauses. */
   usedThisTurn: { card: string; code: number; effect: number }[];
   /**
@@ -477,6 +485,8 @@ export type Intent =
   | { type: 'activate'; card: string; effect: number; zone: number | null }
   /** Declines to respond, or to activate optional triggers. */
   | { type: 'pass' }
+  /** Answers a `replace` step: the materials to detach instead of the destruction, or none to let it be destroyed. */
+  | { type: 'replace'; materials: string[] }
   | { type: 'rps'; hand: Hand }
   /** The rock-paper-scissors winner goes first, or lets the opponent go first. */
   | { type: 'chooseOrder'; goFirst: boolean }
@@ -628,6 +638,8 @@ export type DuelEvent =
   | { type: 'countersChanged'; card: string; counter: Counter; delta: number }
   /** The attack moves into its Damage Step. */
   | { type: 'damageStepStarted' }
+  | { type: 'replacementOffered'; card: string; player: Seat; then: Then }
+  | { type: 'replacementChosen'; card: string; materials: string[] }
   | { type: 'normalSummonGranted'; player: Seat }
   /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
   | { type: 'linkResolved' }
@@ -661,7 +673,8 @@ export interface PlayerView {
    * Who the duel waits on while triggers go on the chain or a response window is open, or null. `cause` says what the
    * window answers ("Axe Raider's attack"). The other player sees the same, whether or not the player can respond.
    */
-  waiting: { player: Seat; for: 'respond' | 'triggers'; cause: string | null } | null;
+  /** For `replace`, `cause` names the monster that would be destroyed. */
+  waiting: { player: Seat; for: 'respond' | 'triggers' | 'replace'; cause: string | null } | null;
   /** Deciding who goes first, before turn 1; null once the duel is under way. */
   start: StartView | null;
   actions: LegalAction[];
@@ -808,6 +821,8 @@ export type LegalAction =
   | { type: 'activate'; card: string; effect: number; zones: number[] | null; text: string }
   /** Pass in a response window, or decline your optional triggers. */
   | { type: 'pass' }
+  /** Detach `count` of `materials` from `card` instead of its destruction, or not. */
+  | { type: 'replace'; card: string; materials: string[]; count: number }
   | { type: 'rps' }
   | { type: 'chooseOrder' }
   | { type: 'surrender' };

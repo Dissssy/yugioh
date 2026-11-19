@@ -14,7 +14,10 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "replace_destruction",
+        "detach": 1
+      },
       "status": "unverified"
     },
     {

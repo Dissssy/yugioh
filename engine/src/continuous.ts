@@ -51,6 +51,18 @@ function affects(state: DuelState, f: InForce, id: string): boolean {
   return fits(state, id, to, f.seat);
 }
 
+/**
+ * How many Xyz Materials this face-up monster can detach instead of being destroyed, if a replacement of its own
+ * applies and it has enough; else null.
+ */
+export function replacement(state: DuelState, id: string): number | null {
+  const at = locate(state, id);
+  if (at?.zone !== 'monsters') return null;
+  const m = state.players[at.seat].monsters[at.index]!;
+  const r = continuousOnField(state).find((f) => f.source === id && f.effect.apply === 'replace_destruction');
+  return r?.effect.apply === 'replace_destruction' && m.materials.length >= r.effect.detach ? r.effect.detach : null;
+}
+
 /** The stat changes in force on a face-up monster. */
 function statsOn(state: DuelState, id: string): InForce<Stats>[] {
   const at = locate(state, id);

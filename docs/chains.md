@@ -11,6 +11,7 @@ Built 2026-11-19 (layers 4 and 5 of [architecture.md](architecture.md), without 
 - `respond`: a response window. `priority` is the player who may act, `actor` the one whose action opened it, and `passed` is true after one pass. Two passes in a row resolve the chain, or close the window when the chain is empty.
 - `resolve`: the chain resolves from the last link down. After each link, its happenings are checked for triggers again.
 - `continue`: what the window was holding up (`then`): back to `open`, an attack's Damage Step and then its damage calculation, or the end of the turn.
+- `replace`: a monster would be destroyed by battle and can detach materials instead (Gachi Gachi Gantetsu); its controller answers with the `replace` intent, then damage calculation goes on.
 
 Everything that happens in a duel that a trigger could answer is pushed onto `state.happened` as a `Happening` (summoned, attack declared, attacked, destroyed by battle or by a card effect, the start of the Damage Step, battle damage, a phase starting). Each one carries the number of links resolved so far, so an optional "When ... you can" trigger misses the timing if it wasn't the last thing to happen.
 

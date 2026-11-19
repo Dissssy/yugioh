@@ -313,7 +313,10 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'countersChanged':
       return `${name(event.card)} ${event.delta > 0 ? 'gets' : 'loses'} ${Math.abs(event.delta)} ${event.counter === 'spell' ? 'Spell Counter' : 'counter'}${Math.abs(event.delta) === 1 ? '' : 's'}`;
     case 'damageStepStarted':
+    case 'replacementOffered':
       return null;
+    case 'replacementChosen':
+      return event.materials.length ? `${name(event.card)} detaches ${names(event.materials)} instead of being destroyed` : null;
     case 'linked':
       return `${name(event.card)} ${state.cards[state.instances[event.card]!.code]!.race === 'Equip' ? 'equipped to' : 'tied to'} ${name(event.to)}`;
     case 'forbidden':

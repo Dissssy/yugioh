@@ -665,6 +665,22 @@ export const CASES: EvalCase[] = [
     check: (b) => all(expectAt(b, 'Lucky Iron Axe', '0:gy'), expectAt(b, 'Dark Blade', '0:hand')),
   },
   {
+    name: 'gachi gachi gantetsu can detach a material instead of being destroyed',
+    board: [{ set: ['Raigeki Break'], hand: ['Twister'] }, { xyz: [['Gachi Gachi Gantetsu', 'Speed Warrior', 'Tenshin']] }],
+    activate: 'Raigeki Break',
+    picks: [['Twister'], ['Gachi Gachi Gantetsu'], ['Detach instead'], ['Tenshin']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Gachi Gachi Gantetsu', '1:monsters'), expectAt(b, 'Tenshin', '1:gy'), expectAt(b, 'Speed Warrior', '1:materials')),
+  },
+  {
+    name: 'gachi gachi gantetsu can still be destroyed',
+    board: [{ set: ['Raigeki Break'], hand: ['Twister'] }, { xyz: [['Gachi Gachi Gantetsu', 'Speed Warrior', 'Tenshin']] }],
+    activate: 'Raigeki Break',
+    picks: [['Twister'], ['Gachi Gachi Gantetsu'], ['Let it be destroyed']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Gachi Gachi Gantetsu', '1:gy'), expectAt(b, 'Tenshin', '1:gy')),
+  },
+  {
     name: 'xyz effect needs an xyz summon',
     board: [{ set: ['Xyz Effect'] }, { monsters: ['Axe Raider'] }],
     activate: 'Xyz Effect',

@@ -123,7 +123,7 @@ describe('the judge loop', () => {
     expect(after.chain[0]!.targets).toEqual(['a9']);
     // Haiku with reasoning off, strict tools (up to the API's 20), the rules reference cached.
     expect(sent[0]).toMatchObject({ model: 'claude-haiku-5-5', thinking: { type: 'disabled' }, output_config: { effort: 'high' }, tool_choice: { type: 'any' } });
-    const strict = sent[0]!.tools!.filter((t) => 'strict' in t && t.strict).map((t) => t.name);
+    const strict = sent[0]!.tools!.filter((t) => 'strict' in t && t.strict).map((t) => ('name' in t ? t.name : ''));
     expect(strict).toEqual(expect.arrayContaining(['move', 'special_summon', 'ask_player', 'finish']));
     expect(strict.length).toBeLessThanOrEqual(20);
   });

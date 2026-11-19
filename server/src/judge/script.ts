@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import {
   applyOp,
   battling,
+  replacement,
   cardOf,
   chooseFrom,
   cardsFitting,
@@ -81,8 +82,8 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     events.push(...applied.events);
     ops.push(op);
   };
-  const ask = async (q: Omit<AskPlayer, 'player'>): Promise<string[]> => {
-    const question = checkQuestion(state, { player: seat, ...q });
+  const ask = async (q: Omit<AskPlayer, 'player'>, player = seat): Promise<string[]> => {
+    const question = checkQuestion(state, { player, ...q });
     if ('error' in question) throw new Refused(`A question was refused: ${question.error}`);
     const picks = await deps.ask(question);
     transcript.push({ question: q.prompt, cards: q.cards, choices: q.choices, picks });
@@ -127,8 +128,26 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       case 'destroy': {
         const cards = (await select(step.cards, 'destroy')).filter((id) => ['monsters', 'spellTraps'].includes(locate(state, id)!.zone));
         if (!cards.length) return null;
-        apply({ op: 'destroy', cards });
-        return `${list(cards.map((id) => shown(id, before)))} ${cards.length === 1 ? 'was' : 'were'} destroyed.`;
+        // A monster that can detach materials instead (Gachi Gachi Gantetsu): its controller decides.
+        const kept: string[] = [];
+        for (const id of cards) {
+          const count = replacement(state, id);
+          if (count === null) continue;
+          const owner = locate(state, id)!.seat;
+          const label = cardOf(state, id).name;
+          const [answer] = await ask({ prompt: `${label} would be destroyed. Detach ${count} Xyz Material${count === 1 ? '' : 's'} instead?`, cards: [], choices: ['Detach instead', 'Let it be destroyed'], min: 1, max: 1 }, owner);
+          if (answer !== 'Detach instead') continue;
+          const attached = materialsOf(state, id);
+          const picked =
+            attached.length === count ? attached : await ask({ prompt: `${label}: choose ${count} Xyz Material${count === 1 ? '' : 's'} to detach.`, cards: attached, choices: [], min: count, max: count }, owner);
+          for (const m of picked) apply({ op: 'detach', card: m });
+          kept.push(id);
+        }
+        const lost = cards.filter((id) => !kept.includes(id));
+        if (lost.length) apply({ op: 'destroy', cards: lost });
+        const said = kept.map((id) => `${shown(id, before)} detached Xyz Material instead of being destroyed.`);
+        if (lost.length) said.unshift(`${list(lost.map((id) => shown(id, before)))} ${lost.length === 1 ? 'was' : 'were'} destroyed.`);
+        return said.join(' ');
       }
       case 'move': {
         const fromHand = step.cards.from === 'choose' && step.cards.filter.place === 'hand' && step.to === 'graveyard';

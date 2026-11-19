@@ -202,6 +202,8 @@ export function Board({ duelId }: { duelId: string }) {
       case 'pass':
       case 'surrender':
         return send.mutate({ type: action.type });
+      case 'replace':
+        return send.mutate({ type: 'replace', materials: action.materials.slice(0, action.count) });
     }
   }
 
@@ -443,6 +445,32 @@ export function Board({ duelId }: { duelId: string }) {
    */
   const waiting = view.waiting;
   const pass = has('pass');
+  const replace = has('replace');
+  const replacing = replace && myMonsters.find((m) => m && idOf(m.card) === replace.card);
+  const materialName = (id: string) => {
+    const c = replacing?.materials.find((m) => idOf(m) === id);
+    return (c && dataOf(c)?.name) ?? 'a material';
+  };
+  /** A monster that would be destroyed and can detach materials instead: one button per material it could detach. */
+  const replaceNote = replace && (
+    <span className="choice-prompt" role="group">
+      <span className="choice-text">
+        {(replacing && dataOf(replacing.card)?.name) ?? 'Your monster'} would be destroyed. Detach instead?
+      </span>
+      {replace.count === 1 ? (
+        [...new Map(replace.materials.map((m) => [materialName(m), m])).entries()].map(([name, m]) => (
+          <button key={m} className="primary" onClick={() => send.mutate({ type: 'replace', materials: [m] })}>
+            Detach {name}
+          </button>
+        ))
+      ) : (
+        <button className="primary" onClick={() => start(replace)}>
+          Detach {replace.count}
+        </button>
+      )}
+      <button onClick={() => send.mutate({ type: 'replace', materials: [] })}>Let it be destroyed</button>
+    </span>
+  );
   const topLink = view.chain.at(-1);
   const respondNote =
     waiting &&
@@ -546,7 +574,7 @@ export function Board({ duelId }: { duelId: string }) {
                       }}
                       extraZones={[<ExtraMonsterZone key="left" side="left" mine={myField} foe={foeField} />, <ExtraMonsterZone key="right" side="right" mine={myField} foe={foeField} />]}
                       chain={chainNote || null}
-                      prompt={prompt || choiceBar || judgeNote || respondNote || null}
+                      prompt={prompt || choiceBar || judgeNote || replaceNote || respondNote || null}
                       endTurn={endTurn && !choosing ? () => start(endTurn) : null}
                     />
                     <Field {...myField} />
@@ -714,6 +742,8 @@ function actionLabel(a: LegalAction, view: PlayerView): string {
     }
     case 'attack':
       return a.direct ? 'Attack directly' : 'Attack';
+    case 'replace':
+      return 'Detach instead of being destroyed';
     case 'activate': {
       // A card with one effect to activate just says so; with several, each names its own.
       const several = view.actions.filter((o) => o.type === 'activate' && o.card === a.card).length > 1;

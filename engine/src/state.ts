@@ -237,7 +237,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       }
       case 'attackDeclared':
         onField(s, event.attacker).attackedTurn = s.turn;
-        s.attack = { attacker: event.attacker, target: event.target };
+        s.attack = { attacker: event.attacker, target: event.target, replaced: {} };
         s.happened.push({ event: 'attack_declared', card: event.attacker, player: event.player, target: event.target, group });
         if (event.target) s.happened.push({ event: 'attacked', card: event.target, player: other(event.player), attacker: event.attacker, group });
         return;
@@ -328,6 +328,16 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'countersChanged': {
         const counters = onField(s, event.card).counters;
         counters[event.counter] = (counters[event.counter] ?? 0) + event.delta;
+        return;
+      }
+      case 'replacementOffered':
+        s.step = { at: 'replace', card: event.card, player: event.player, then: event.then };
+        return;
+      case 'replacementChosen': {
+        const step = s.step;
+        if (step.at !== 'replace') throw new Error('Nothing to replace');
+        s.attack!.replaced[event.card] = event.materials;
+        s.step = { at: 'continue', then: step.then };
         return;
       }
       case 'damageStepStarted':

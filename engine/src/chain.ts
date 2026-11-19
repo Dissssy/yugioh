@@ -114,12 +114,15 @@ export function nextStep(state: DuelState): Next | null {
       return state.chain.at(-1)?.negated ? { kind: 'events', events: [{ type: 'linkResolved' }] } : { kind: 'resolve' };
     case 'continue':
       return { kind: 'events', events: continuation(state, step.then) };
+    case 'replace':
+      return { kind: 'wait', player: step.player, autoPass: false, floor: false };
   }
 }
 
 /** Who the duel waits on in a triggers step or a response window, as a player's view shows it. */
-export function waitingFor(state: DuelState, seat: Seat): { player: Seat; for: 'respond' | 'triggers'; cause: string | null } | null {
+export function waitingFor(state: DuelState, seat: Seat): { player: Seat; for: 'respond' | 'triggers' | 'replace'; cause: string | null } | null {
   const step = state.step;
+  if (step.at === 'replace') return { player: step.player, for: 'replace', cause: cardOf(state, step.card).name };
   if (step.at === 'respond') {
     // With a chain building, players respond to its last link.
     const last = state.chain.at(-1);

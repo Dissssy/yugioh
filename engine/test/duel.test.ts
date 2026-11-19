@@ -149,7 +149,14 @@ const sheets: Record<number, EffectSheet> = {
     when: { event: 'destroyed_by_effect', self: true, filter: filter({ side: 'you', faceUp: true }), how: [], from: 'graveyard', canMiss: false, by: 'opponent' },
     ...scripted({ options: [{ label: '', steps: [{ do: 'draw', player: 'you', count: 1 }] }] }),
   }),
-  21: { ...sheet(21, { ...effect('continuous'), continuous: aura({ to: filter({ side: 'you' }), atk: 200, def: 200, per: 'materials' }) }), materials: { summon: 'xyz', level: 2, count: 2 } },
+  21: {
+    ...sheet(
+      21,
+      { ...effect('continuous'), continuous: { apply: 'replace_destruction', detach: 1 } },
+      { ...effect('continuous'), continuous: aura({ to: filter({ side: 'you' }), atk: 200, def: 200, per: 'materials' }) },
+    ),
+    materials: { summon: 'xyz', level: 2, count: 2 },
+  },
   7: { ...sheet(7), materials: { summon: 'synchro', tuner: 'Junk Synchron', nonTuners: { min: 1, max: null } } },
   15: { ...sheet(15), materials: { summon: 'synchro', tuner: null, nonTuners: { min: 1, max: null } } },
   17: {
@@ -482,6 +489,24 @@ describe('Xyz Summons', () => {
     expect(xyz(t, 'ax2')).toMatchObject({ how: 'xyz', options: [{ materials: ['a0', 'a2'] }, { materials: ['a0', 'a3'] }, { materials: ['a2', 'a3'] }] });
     expect(xyz(t, 'ax3')).toBeUndefined();
     expect(xyz(board([13, 16]), 'ax3')).toMatchObject({ options: [{ materials: ['a0', 'a1'] }] });
+  });
+
+  it('asks whether to detach a material instead of a destruction by battle', () => {
+    for (const detach of [true, false]) {
+      const t = board([14, 19], [2]);
+      t.play(0, { type: 'extraSummon', card: 'ax4', materials: ['a0', 'a1'], zone: 0, position: 'attack' }).play(0, { type: 'endTurn', discard: [] });
+      t.play(1, { type: 'enterBattle' }).play(1, { type: 'attack', attacker: 'b0', target: 0 });
+      expect(t.state.step).toMatchObject({ at: 'replace', card: 'ax4', player: 0 });
+      expect(viewFor(t.state, 1).waiting).toEqual({ player: 0, for: 'replace', cause: 'Gachi Gachi Gantetsu' });
+      expect(t.refuse(0, { type: 'replace', materials: ['a0', 'a1'] })).toMatch(/exactly 1/);
+      t.play(0, { type: 'replace', materials: detach ? ['a1'] : [] });
+      // Damage is worked out before the detach: Gantetsu still had 900 ATK.
+      expect(t.state.players[0].lp).toBe(8000 - 900);
+      if (detach) {
+        expect(t.state.players[0].monsters[0]).toMatchObject({ id: 'ax4', materials: ['a0'] });
+        expect(t.state.players[0].graveyard).toEqual(['a1']);
+      } else expect(t.state.players[0].graveyard).toEqual(['a0', 'a1', 'ax4']);
+    }
   });
 
   it('attaches the materials, which both players see, and sends them to the GY when it leaves the field', () => {

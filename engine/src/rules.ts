@@ -2,7 +2,7 @@
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
 import { scriptOf, scriptProblem } from './script.ts';
-import { continuousOnField, levelNow, restricted, statsOf } from './continuous.ts';
+import { continuousOnField, levelNow, replacement, restricted, statsOf } from './continuous.ts';
 import { evolve, locate, monsterZoneFree, monsterZonesFor, onField, other } from './state.ts';
 import {
   HAND_LIMIT,
@@ -165,6 +165,9 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
     }
   } else if (step.at === 'respond') {
     if (step.priority === seat) actions.push(...usable(state, seat), { type: 'pass' });
+  } else if (step.at === 'replace') {
+    const count = replacement(state, step.card);
+    if (step.player === seat && count !== null) actions.push({ type: 'replace', card: step.card, materials: onField(state, step.card).materials, count });
   } else if (step.at === 'open' && state.turnPlayer === seat) {
     const p = state.players[seat];
     actions.push(...usable(state, seat));
@@ -435,6 +438,15 @@ export function decide(state: DuelState, seat: Seat, intent: Intent): Decision {
       activate(run, seat, intent);
       return { ok: true, events: run.events };
     }
+    if (intent.type === 'replace') {
+      const offer = legalActions(state, seat).find((a) => a.type === 'replace');
+      check(offer, 'Nothing is asking you that now.');
+      const picked = new Set(intent.materials);
+      check(picked.size === intent.materials.length && intent.materials.every((m) => offer.materials.includes(m)), 'Pick materials attached to that monster.');
+      check(picked.size === 0 || picked.size === offer.count, `Detach exactly ${offer.count}, or none.`);
+      run.emit({ type: 'replacementChosen', card: offer.card, materials: intent.materials });
+      return { ok: true, events: run.events };
+    }
     check(state.turnPlayer === seat, "It's not your turn.");
     check(state.step.at === 'open', 'Wait for the chain to resolve.');
     apply(run, seat, intent);
@@ -606,44 +618,44 @@ function damage(run: Run) {
   if (!state.attack) return run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
   const { attacker: attackerId, target } = state.attack;
   if (!stillAttacking(state, attackerId) || (target !== null && !targetStands(state, target))) run.emit({ type: 'attackEnded', replay: false });
+  else if (target === null) run.emit({ type: 'battleDamage', player: foe, amount: statsOf(state, attackerId).atk, by: attackerId });
   else {
-    const atk = statsOf(state, attackerId).atk;
-    if (target === null) run.emit({ type: 'battleDamage', player: foe, amount: atk, by: attackerId });
-    else battle(run, attackerId, atk, target);
-    run.emit({ type: 'attackEnded', replay: false });
+    if (!onField(state, target).faceUp) run.emit({ type: 'flippedByAttack', card: target });
+    const result = battle(run.state, attackerId, target);
+    // A monster that would be destroyed but can detach materials instead waits for its controller to decide.
+    const replaced = run.state.attack!.replaced;
+    const asking = result.destroyed.find((id) => replacement(run.state, id) !== null && !(id in replaced));
+    if (asking) return run.emit({ type: 'replacementOffered', card: asking, player: locate(run.state, asking)!.seat, then: { do: 'damage' } });
+    for (const id of result.destroyed) for (const m of replaced[id] ?? []) run.emit({ type: 'moved', card: m, owner: run.state.instances[m]!.owner, from: 'materials', to: 'graveyard' });
+    const lost = result.destroyed.filter((id) => !replaced[id]?.length);
+    if (lost.length > 0) run.emit({ type: 'destroyedByBattle', cards: lost });
+    if (result.damage) run.emit({ type: 'battleDamage', ...result.damage });
   }
+  if (run.state.attack) run.emit({ type: 'attackEnded', replay: false });
   endIfLpGone(run);
   if (!run.state.result) run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
 }
 
-function battle(run: Run, attackerId: string, atk: number, target: string) {
-  const seat = run.state.turnPlayer;
+/**
+ * Damage calculation between an attacker and a face-up target: the monsters destroyed (not those an effect protects,
+ * Sonic Chick) and the battle damage dealt.
+ */
+function battle(state: DuelState, attackerId: string, target: string): { destroyed: string[]; damage: { player: Seat; amount: number; by: string } | null } {
+  const seat = state.turnPlayer;
   const foe = other(seat);
-  const defender = onField(run.state, target);
-  if (!defender.faceUp) run.emit({ type: 'flippedByAttack', card: target });
-  const stats = statsOf(run.state, target);
-  // A monster an effect protects survives the battle; damage is dealt all the same (Sonic Chick).
-  const destroy = (cards: string[]) => {
-    const state = run.state;
-    const lost = cards.filter((id) => !restricted(state, id, 'be_destroyed_by_battle', id === attackerId ? target : attackerId));
-    if (lost.length > 0) run.emit({ type: 'destroyedByBattle', cards: lost });
-  };
-  if (defender.position === 'attack') {
+  const atk = statsOf(state, attackerId).atk;
+  const stats = statsOf(state, target);
+  const protectedFrom = (id: string) => restricted(state, id, 'be_destroyed_by_battle', id === attackerId ? target : attackerId);
+  const result = (destroyed: string[], damage: { player: Seat; amount: number; by: string } | null) => ({ destroyed: destroyed.filter((id) => !protectedFrom(id)), damage });
+  if (onField(state, target).position === 'attack') {
     const def = stats.atk;
-    if (atk > def) {
-      destroy([target]);
-      run.emit({ type: 'battleDamage', player: foe, amount: atk - def, by: attackerId });
-    } else if (atk < def) {
-      destroy([attackerId]);
-      run.emit({ type: 'battleDamage', player: seat, amount: def - atk, by: target });
-    } else if (atk > 0) {
-      destroy([attackerId, target]);
-    }
-  } else {
-    const def = stats.def;
-    if (atk > def) destroy([target]);
-    else if (atk < def) run.emit({ type: 'battleDamage', player: seat, amount: def - atk, by: target });
+    if (atk > def) return result([target], { player: foe, amount: atk - def, by: attackerId });
+    if (atk < def) return result([attackerId], { player: seat, amount: def - atk, by: target });
+    return result(atk > 0 ? [attackerId, target] : [], null);
   }
+  const def = stats.def;
+  if (atk > def) return result([target], null);
+  return result([], atk < def ? { player: seat, amount: def - atk, by: target } : null);
 }
 
 /**
