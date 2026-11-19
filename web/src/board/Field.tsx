@@ -115,7 +115,20 @@ function Zone({ row, index, card, seat, mine, marks, zoneState, onZone, onCard, 
           onPress={mine ? onCardPress : undefined}
         />
       )}
+      {card && <StatsBadge view={card} />}
     </div>
+  );
+}
+
+/** A face-up monster's ATK and DEF when an effect has changed them, green when raised and red when lowered. */
+function StatsBadge({ view }: { view: FieldCardView }) {
+  const printed = dataOf(view.card);
+  if (!view.stats || !printed || (view.stats.atk === printed.atk && view.stats.def === printed.def)) return null;
+  const tone = (now: number, was: number | null) => (was === null || now === was ? '' : now > was ? 'up' : 'down');
+  return (
+    <span className="stats-badge" aria-label={`ATK ${view.stats.atk}, DEF ${view.stats.def}`}>
+      <span className={tone(view.stats.atk, printed.atk)}>{view.stats.atk}</span> / <span className={tone(view.stats.def, printed.def)}>{view.stats.def}</span>
+    </span>
   );
 }
 

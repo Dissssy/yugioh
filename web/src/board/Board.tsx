@@ -6,13 +6,14 @@ import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState }
 import { Link } from 'react-router';
 import { api, errorText } from '../api.ts';
 import { ActionMenu } from './ActionMenu.tsx';
-import { AimArrow, dropAt, dropCentre, type Point } from './aim.tsx';
+import { Arrows, cardCentre, dropAt, dropCentre, type Point } from './aim.tsx';
 import { dataOf, idOf, imageUrl, preloadImages } from './Card.tsx';
 import { CardTooltipProvider } from './CardTooltip.tsx';
 import { cueMs, playCue } from './cues.ts';
-import { DuelLog } from './DuelLog.tsx';
+import { DuelLog, type Contest } from './DuelLog.tsx';
 import { dropKey, Field, type Row } from './Field.tsx';
 import { FoeHand, OwnHand, type HandDrag } from './Hand.tsx';
+import { JudgePrompt } from './JudgePrompt.tsx';
 import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
 import { LpPlate } from './LpPlate.tsx';
 import { PhaseStrip } from './PhaseStrip.tsx';
@@ -21,13 +22,17 @@ import { systemReducesMotion, useDuelSettings } from './settings.ts';
 import { useDuel } from './useDuel.ts';
 
 type Summon = Extract<LegalAction, { type: 'normalSummon' | 'setMonster' }>;
+type Activate = Extract<LegalAction, { type: 'activate' }>;
+/** Activating a Spell or Trap from the hand, which puts it in a zone the player picks. */
+type ActivateFromHand = Activate & { zones: number[] };
 /** An action that puts a card from the hand into a zone the player picks. */
-type Placeable = Summon | Extract<LegalAction, { type: 'setSpellTrap' }>;
+type Placeable = Summon | Extract<LegalAction, { type: 'setSpellTrap' }> | ActivateFromHand;
 type Attack = Extract<LegalAction, { type: 'attack' }>;
 type PlaceIntent = Extract<Intent, { type: Placeable['type'] }>;
 
-const isPlaceable = (a: LegalAction): a is Placeable => a.type === 'normalSummon' || a.type === 'setMonster' || a.type === 'setSpellTrap';
-const rowOf = (a: Placeable): Row => (a.type === 'setSpellTrap' ? 's' : 'm');
+const isPlaceable = (a: LegalAction): a is Placeable =>
+  a.type === 'normalSummon' || a.type === 'setMonster' || a.type === 'setSpellTrap' || (a.type === 'activate' && a.zones !== null);
+const rowOf = (a: Placeable | PlaceIntent): Row => (a.type === 'setSpellTrap' || a.type === 'activate' ? 's' : 'm');
 
 /** What the player is in the middle of doing on the board. */
 type Mode =
@@ -57,12 +62,16 @@ export function Board({ duelId }: { duelId: string }) {
   const [settings, updateSettings] = useDuelSettings();
   const reduceMotion = settings.reduceMotion || systemReducesMotion();
   const pace = useCallback((event: Parameters<typeof cueMs>[0], waiting: number) => cueMs(event, waiting, settings, reduceMotion), [settings, reduceMotion]);
-  const { shown, connected } = useDuel(duelId, pace);
+  const { shown, connected, judging } = useDuel(duelId, pace);
   const [mode, setMode] = useReducer((_: Mode, next: Mode) => next, idle);
   const [pile, setPile] = useState<{ title: string; cards: CardView[] } | null>(null);
   const [highlight, setHighlight] = useState<string[]>([]);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  /** Lines from each effect waiting to resolve to its targets. */
+  const [targetArrows, setTargetArrows] = useState<{ from: Point; to: Point }[]>([]);
+  /** Rulings this player has contested here, until the server's appeal entry arrives. */
+  const [contested, setContested] = useState<number[]>([]);
   /** Set when an aimed attack ends on the attacker, so the click that follows doesn't open its menu. */
   const swallowClick = useRef(false);
   /** A card sent to a zone, kept over it until the step that moves it arrives. */
@@ -77,6 +86,14 @@ export function Board({ duelId }: { duelId: string }) {
     mutationFn: (intent: Intent) => api(`/duels/${duelId}/intents`, { method: 'POST', body: JSON.stringify(intent) }),
     onSettled: () => setMode(idle),
   });
+  const answer = useMutation({
+    mutationFn: (body: { prompt: string; picks: string[] }) => api(`/duels/${duelId}/answer`, { method: 'POST', body: JSON.stringify(body) }),
+  });
+  const contestRuling = useMutation({
+    mutationFn: (body: { seq: number; note: string }) => api(`/duels/${duelId}/contest`, { method: 'POST', body: JSON.stringify(body) }),
+    onMutate: ({ seq }) => setContested((c) => [...c, seq]),
+    onError: (_, { seq }) => setContested((c) => c.filter((x) => x !== seq)),
+  });
 
   // Extra animations for the step being shown, run before the browser paints it.
   const cue = shown?.cue ?? null;
@@ -87,10 +104,23 @@ export function Board({ duelId }: { duelId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.seq]);
 
-  // Once the sent card has left the hand there is nothing left to hold.
+  // Once the sent card has left the hand there is nothing left to hold; nor if the judge refused to let it go.
   useEffect(() => {
-    if (sent && shown && !shown.view.players[shown.view.you].hand.some((c) => idOf(c) === sent.id)) setSent(null);
+    if (!sent || !shown) return;
+    const refused = shown.cue?.event.type === 'judged' && !shown.cue.event.legal && shown.cue.event.card === sent.id;
+    if (refused || !shown.view.players[shown.view.you].hand.some((c) => idOf(c) === sent.id)) setSent(null);
   }, [shown, sent]);
+
+  // Each effect waiting to resolve points at its targets, measured once the board has laid out.
+  const chain = shown?.view.chain;
+  useLayoutEffect(() => {
+    const arrows = (chain ?? []).flatMap((link) => {
+      const from = idOf(link.card) && cardCentre(idOf(link.card)!);
+      return from ? link.targets.flatMap((t) => (cardCentre(t) ? [{ from, to: cardCentre(t)! }] : [])) : [];
+    });
+    setTargetArrows(arrows);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(chain), look.zone, ready, shown?.cue?.seq]);
 
   // A choice in progress makes no sense on a board that changed under it.
   useEffect(() => {
@@ -102,9 +132,9 @@ export function Board({ duelId }: { duelId: string }) {
   const { view, log } = shown;
   const me = view.you;
   const foe: Seat = me === 0 ? 1 : 0;
-  const busy = cue !== null || send.isPending;
-  // Activating effects needs the targeting and prompt UI of duel UI step 3, so the board doesn't offer it yet.
-  const actions: LegalAction[] = busy ? [] : view.actions.filter((a) => a.type !== 'activate');
+  // Nothing can be done while a step plays, a request is on its way, or the judge is at work.
+  const busy = cue !== null || send.isPending || judging !== null;
+  const actions: LegalAction[] = busy ? [] : view.actions;
   const has = <T extends LegalAction['type']>(type: T) => actions.find((a): a is Extract<LegalAction, { type: T }> => a.type === type);
   const actionsFor = (id: string) => actions.filter((a) => ('card' in a && a.card === id) || (a.type === 'attack' && a.attacker === id));
   const playable = new Set(actions.flatMap((a) => ('card' in a ? [a.card] : a.type === 'attack' ? [a.attacker] : [])));
@@ -132,6 +162,9 @@ export function Board({ duelId }: { duelId: string }) {
       case 'endTurn':
         if (action.discard > 0) return setMode({ kind: 'discard', count: action.discard, chosen: [] });
         return send.mutate({ type: 'endTurn', discard: [] });
+      case 'activate':
+        if (action.zones !== null) return setMode({ kind: 'zone', action: { ...action, zones: action.zones } });
+        return send.mutate({ type: 'activate', card: action.card, effect: action.effect, zone: null });
       case 'flipSummon':
       case 'changePosition':
         return send.mutate({ type: action.type, card: action.card });
@@ -144,13 +177,14 @@ export function Board({ duelId }: { duelId: string }) {
 
   /** Sends a card to its zone, holding it over the zone until the step that moves it arrives. */
   function play(intent: PlaceIntent) {
-    setSent({ id: intent.card, key: dropKey(me, intent.type === 'setSpellTrap' ? 's' : 'm', intent.zone) });
+    setSent({ id: intent.card, key: dropKey(me, rowOf(intent), intent.zone!) });
     send.mutate(intent, { onError: () => setSent(null) });
   }
 
   /** Puts a card in the chosen zone, first asking for tributes if it needs them. */
   function place(action: Placeable, zone: number) {
     if (action.type === 'setSpellTrap') return play({ type: 'setSpellTrap', card: action.card, zone });
+    if (action.type === 'activate') return play({ type: 'activate', card: action.card, effect: action.effect, zone });
     if (action.tributes === 0) return play({ type: action.type, card: action.card, tributes: [], zone });
     // Dropping onto one of your monsters tributes it, so its zone is free for the new one.
     const occupant = myMonsters[zone] ? idOf(myMonsters[zone].card) : null;
@@ -303,6 +337,23 @@ export function Board({ duelId }: { duelId: string }) {
         ? { id: mode.action.card, key: dropKey(me, 'm', mode.zone) }
         : sent && myHand.includes(sent.id) ? sent : null;
 
+  const contest: Contest = {
+    can: (seq) => !contested.includes(seq) && !log.some((e) => e.event.type === 'appealed' && e.event.judged === seq && e.event.by === me),
+    send: (seq, note) => contestRuling.mutate({ seq, note }),
+  };
+
+  /** What the judge is doing, in the phase strip. */
+  const judgeNote = judging && (
+    <span className="judging" role="status">
+      <span className="dot" />
+      {judging.waitingOn === me
+        ? 'The judge is asking you something.'
+        : judging.waitingOn !== null
+          ? `Waiting for ${view.players[judging.waitingOn].name} to answer the judge…`
+          : `The judge is ${judging.stage === 'activation' ? 'checking' : 'resolving'} ${dataOf(judging.card)?.name ?? 'a card'}…`}
+    </span>
+  );
+
   const lpTarget = (): 'open' | 'over' | null => {
     const attack = drag?.kind === 'aim' ? drag.action : null;
     return attack?.direct ? (over === `lp:${foe}` ? 'over' : 'open') : null;
@@ -350,7 +401,7 @@ export function Board({ duelId }: { duelId: string }) {
                       ...(enterMain2 && { main2: () => start(enterMain2) }),
                       ...(endTurn && { end: () => start(endTurn) }),
                     }}
-                    prompt={prompt || null}
+                    prompt={prompt || judgeNote || null}
                     endTurn={endTurn && !choosing ? () => start(endTurn) : null}
                   />
                   <Field
@@ -434,7 +485,8 @@ export function Board({ duelId }: { duelId: string }) {
               )}
               {!connected && <p className="error">Reconnecting…</p>}
               {send.isError && <p className="error">{errorText(send.error)}</p>}
-              <DuelLog log={log} onHighlight={setHighlight} />
+              {contestRuling.isError && <p className="error">{errorText(contestRuling.error)}</p>}
+              <DuelLog log={log} onHighlight={setHighlight} contest={contest} />
             </aside>
 
             {mode.kind === 'menu' && (
@@ -451,7 +503,17 @@ export function Board({ duelId }: { duelId: string }) {
                 onClose={() => setMode(idle)}
               />
             )}
-            {drag?.kind === 'aim' && <AimArrow from={drag.from} to={drag.to} />}
+            {drag?.kind === 'aim' && <Arrows kind="aim" arrows={[drag]} />}
+            {targetArrows.length > 0 && <Arrows kind="target" arrows={targetArrows} />}
+            {judging?.prompt && judging.waitingOn === me && (
+              <JudgePrompt
+                key={judging.prompt.id}
+                prompt={judging.prompt}
+                pending={answer.isPending}
+                error={answer.isError ? errorText(answer.error) : null}
+                onAnswer={(picks) => answer.mutate({ prompt: judging.prompt!.id, picks })}
+              />
+            )}
             {pile && <PileViewer title={pile.title} cards={pile.cards} onClose={() => setPile(null)} />}
           </div>
         </CardTooltipProvider>
@@ -494,6 +556,11 @@ function actionLabel(a: LegalAction, view: PlayerView): string {
     }
     case 'attack':
       return a.direct ? 'Attack directly' : 'Attack';
+    case 'activate': {
+      // A card with one effect to activate just says so; with several, each names its own.
+      const several = view.actions.filter((o) => o.type === 'activate' && o.card === a.card).length > 1;
+      return several ? `Activate: ${a.text.length > 60 ? `${a.text.slice(0, 57)}…` : a.text}` : 'Activate';
+    }
     default:
       return a.type;
   }

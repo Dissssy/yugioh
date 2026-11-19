@@ -23,7 +23,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   destroyedByBattle: 500,
   discarded: 450,
   duelEnded: 300,
-  // Card effects (layer 2). Plain timings until the effect animations land.
+  // Card effects
   judged: 300,
   appealed: 300,
   effectActivated: 600,
@@ -142,17 +142,56 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
     case 'battleDamage':
       shake();
       return;
+    case 'effectActivated': {
+      const el = card(e.card) ?? (e.zone !== null ? slot(e.player, 's', e.zone) : null);
+      // The opponent's card from the hand arrives from their hidden hand; a Set card turns face-up.
+      if (e.zone !== null && e.player !== view.you) flyFrom(slot(e.player, 's', e.zone), hand(e.player));
+      const wasSet = prev?.players[e.player].spellTraps.some((z) => z && idOf(z.card) === e.card && !z.faceUp);
+      if (wasSet && el) void animate(el, { rotateY: [90, 0] }, { duration: s * 0.5, ease: 'easeOut' });
+      if (el) void animate(el, { filter: ['brightness(1)', 'brightness(1.9)', 'brightness(1)'], scale: [1, 1.12, 1] }, { duration: s, delay: s * 0.2 });
+      return;
+    }
+    case 'targeted':
+      for (const id of e.cards) {
+        const el = card(id);
+        if (el) void animate(el, { scale: [1, 1.1, 1], filter: ['brightness(1)', 'brightness(1.6)', 'brightness(1)'] }, { duration: s });
+      }
+      return;
+    case 'specialSummoned': {
+      const el = slot(e.player, 'm', e.zone);
+      if (!el) return;
+      void animate(el, { scale: [1.4, 1], opacity: [0, 1] }, { duration: s * 0.6, ease: 'easeIn' });
+      const zone = el.closest<HTMLElement>('.zone');
+      zone?.classList.remove('summoned');
+      void zone?.offsetWidth; // restart the CSS animation
+      zone?.classList.add('summoned');
+      return;
+    }
+    case 'statsModified':
+      flash(card(e.modifier.card));
+      return;
+    case 'lpChanged':
+      if (e.amount < 0 && e.kind === 'damage') shake();
+      return;
+    case 'moved': {
+      // Cards that stay visible glide by themselves; a card drawn by an effect comes off the Deck like a draw.
+      if (e.from === 'deck' && e.to === 'hand' && e.card) flyFrom(card(e.card), q(`[data-pile="${e.owner}:deck"]`), true);
+      const gy = e.to === 'graveyard' ? q(`[data-pile="${e.owner}:gy"]`) : null;
+      if (gy) flash(gy);
+      return;
+    }
     case 'destroyedByBattle':
+    case 'destroyed':
     case 'tributed':
     case 'discarded': {
-      const seats = new Set<Seat>(e.type === 'destroyedByBattle' ? [0, 1] : [e.player]);
+      const seats = new Set<Seat>(e.type === 'destroyedByBattle' || e.type === 'destroyed' ? [0, 1] : [e.player]);
       for (const seat of seats) {
         const gy = q(`[data-pile="${seat}:gy"]`);
         // A discard from the opponent's hidden hand has nowhere visible to glide from.
         if (e.type === 'discarded' && seat !== view.you) flyFrom(gy, hand(seat));
         if (view.players[seat].graveyard.length !== prev?.players[seat].graveyard.length) flash(gy);
       }
-      if (e.type === 'destroyedByBattle') shake();
+      if (e.type === 'destroyedByBattle' || e.type === 'destroyed') shake();
       return;
     }
     default:

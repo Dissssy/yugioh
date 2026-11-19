@@ -61,9 +61,11 @@ main:has(.duel) { max-width: none; padding: 0; }
 .zone.open.foe.over { background: color-mix(in srgb, var(--danger) 25%, transparent); box-shadow: 0 0 18px 2px var(--danger); }
 .lp-plate.open { border: 2px solid var(--danger); }
 .lp-plate.over { background: color-mix(in srgb, var(--danger) 20%, var(--bg)); box-shadow: 0 0 18px 2px var(--danger); }
-.aim-arrow { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 45; overflow: visible; }
-.aim-arrow path { fill: none; stroke: var(--danger); stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 6px var(--danger)); }
-.aim-arrow marker path { fill: var(--danger); stroke: none; filter: none; }
+.arrows { --arrow: var(--danger); position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 45; overflow: visible; }
+.arrows.target { --arrow: var(--gold); z-index: 15; }
+.arrows path { fill: none; stroke: var(--arrow); stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 6px var(--arrow)); }
+.arrows.target > path { stroke-width: 4; stroke-dasharray: 10 8; animation: march 0.8s linear infinite; }
+.arrows marker path { fill: var(--arrow); stroke: none; filter: none; }
 .duel.dragging { cursor: grabbing; }
 .zone.summoned::after {
   content: '';
@@ -118,6 +120,7 @@ main:has(.duel) { max-width: none; padding: 0; }
 .lp-plate.hit .lp { color: var(--danger); }
 .lp-name { font-size: 0.85em; color: var(--muted); }
 .lp { font-size: 1.4em; font-weight: 700; font-variant-numeric: tabular-nums; transition: color 0.2s; }
+.lp-delta.gain { color: #2f9e44; }
 .lp-delta { position: absolute; right: 12px; top: 6px; font-weight: 800; font-size: 1.3em; color: var(--danger); pointer-events: none; }
 
 /* Phase strip */
@@ -226,6 +229,27 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
 .sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 12px; }
 .sheet-grid .card { width: 100%; height: auto; }
 
+@keyframes march { to { stroke-dashoffset: -18; } }
 @keyframes pulse { 50% { filter: brightness(1.35); } }
 @keyframes ring { 0% { opacity: 1; transform: scale(0.9); } 100% { opacity: 0; transform: scale(1.25); } }
 .panel-top a { white-space: nowrap; }
+
+/* The judge: its progress in the phase strip, its questions in a sheet, its rulings in the log */
+.judging { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.judging .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); animation: pulse 0.9s ease-in-out infinite; }
+.judge-prompt h3 { flex: 1 1 auto; }
+.pick-card { position: relative; padding: 0; border: 3px solid transparent; border-radius: 8px; background: none; cursor: pointer; }
+.pick-card.picked { border-color: var(--accent); box-shadow: 0 0 14px 2px var(--accent); }
+.pick-place { position: absolute; bottom: 8px; left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 0.75em; background: var(--bg); }
+.pick-choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.pick-choices button.picked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.prompt-tab { position: fixed; left: 50%; bottom: 16px; translate: -50% 0; z-index: 35; border-color: var(--gold); box-shadow: 0 0 14px 2px var(--gold); background: var(--bg); }
+.duel-log li.ruling { color: var(--fg); border-left: 3px solid var(--gold); }
+.duel-log li.ruling.refused { border-left-color: var(--danger); }
+.duel-log li.appeal { color: var(--fg); font-style: italic; }
+.contest { display: grid; gap: 4px; margin: 4px 0; }
+.contest textarea { font: inherit; padding: 4px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); resize: vertical; }
+.duel-log li button { font-size: 0.85em; padding: 1px 8px; margin-left: 6px; }
+.stats-badge { position: absolute; bottom: 2px; left: 50%; translate: -50% 0; padding: 0 6px; border-radius: 999px; font-size: 0.7em; font-weight: 700; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--bg) 88%, transparent); pointer-events: none; white-space: nowrap; }
+.stats-badge .up { color: #2f9e44; }
+.stats-badge .down { color: var(--danger); }
