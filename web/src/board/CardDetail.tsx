@@ -1,8 +1,6 @@
 import type { CardData } from '@yugioh/engine';
 import { imageUrl } from './Card.tsx';
 
-const hasEffect = (card: CardData) => card.kind !== 'monster' || !card.type.startsWith('Normal');
-
 /** The full card: big image, stats and text. */
 export function CardDetail({ card }: { card: CardData }) {
   return (
@@ -22,7 +20,6 @@ export function CardDetail({ card }: { card: CardData }) {
         )}
       </div>
       <p className="card-text">{card.text}</p>
-      {hasEffect(card) && <p className="muted small">Card effects can't be used yet. They arrive in the next build step.</p>}
     </div>
   );
 }
