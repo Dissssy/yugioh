@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DuelSummary, Me } from '@yugioh/shared';
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { api, errorText, loginHref, useDecks } from '../api.ts';
 import { Board } from '../board/Board.tsx';
 import { DeckPicker } from './Duels.tsx';
+import { Loading, Notice } from './Notice.tsx';
 
 export function DuelPage({ me }: { me: Me }) {
   const { id = '' } = useParams();
@@ -15,14 +16,28 @@ export function DuelPage({ me }: { me: Me }) {
     refetchInterval: (q) => (q.state.data?.status === 'waiting' ? 3000 : false),
   });
 
-  if (duel.isError) return <p className="error">This duel doesn't exist.</p>;
-  if (!duel.data) return <p>Loading…</p>;
+  if (duel.isError)
+    return (
+      <Notice title="Duel not found" tone="error" action={<Link className="button" to="/">Back home</Link>}>
+        This duel doesn't exist. Check the link you were sent.
+      </Notice>
+    );
+  if (!duel.data) return <Loading />;
   const d = duel.data;
 
   if (d.yourSeat === null) {
-    if (d.status !== 'waiting') return <p>This duel already has two players.</p>;
+    if (d.status !== 'waiting')
+      return (
+        <Notice title="This duel is full" action={<Link className="button" to="/">Back home</Link>}>
+          {d.createdBy}'s challenge already has two players.
+        </Notice>
+      );
     if (d.canJoin) return <Join duel={d} me={me} />;
-    return <p>{d.createdBy} challenges you, but your account needs the admin's approval before you can play.</p>;
+    return (
+      <Notice title={`${d.createdBy} challenges you`}>
+        Your account needs the admin's approval before you can play. Check back once it's approved.
+      </Notice>
+    );
   }
   if (d.status === 'waiting') return <Waiting duel={d} />;
   return <Board duelId={d.id} />;
@@ -30,18 +45,28 @@ export function DuelPage({ me }: { me: Me }) {
 
 function Waiting({ duel }: { duel: DuelSummary }) {
   const link = window.location.href;
+  const [copied, setCopied] = useState(false);
   return (
-    <section>
-      <h1>Waiting for an opponent</h1>
-      <p>
-        You'll play <strong>{duel.decks[0]}</strong>. Send this link to your opponent. They can log in, or play as a guest
-        without an account.
+    <section className="notice box">
+      <p className="waiting-label" role="status">
+        <span className="dot" /> Waiting for an opponent
       </p>
-      <p className="row">
-        <input readOnly value={link} onFocus={(e) => e.target.select()} />
-        <button onClick={() => navigator.clipboard.writeText(link)}>Copy</button>
-      </p>
-      <p className="muted">The duel starts as soon as they pick a deck.</p>
+      <h1>Send this link to your opponent</h1>
+      <div className="notice-body">
+        <p>
+          You'll play <strong>{duel.decks[0]}</strong>. They can log in, or play as a guest without an account.
+        </p>
+        <div className="row">
+          <input readOnly value={link} onFocus={(e) => e.target.select()} />
+          <button
+            className="primary"
+            onClick={() => void navigator.clipboard.writeText(link).then(() => setCopied(true))}
+          >
+            {copied ? 'Copied' : 'Copy link'}
+          </button>
+        </div>
+        <p className="muted small">The duel starts as soon as they pick a deck.</p>
+      </div>
     </section>
   );
 }
@@ -67,25 +92,36 @@ function Join({ duel, me }: { duel: DuelSummary; me: Me }) {
   });
   const ready = chosen !== null && (!asGuest || guestName.trim() !== '');
   return (
-    <section>
+    <section className="notice box join">
       <h1>{duel.createdBy} challenges you</h1>
-      {asGuest && (
+      <div className="notice-body">
         <p>
-          <a className="button" href={loginHref(window.location.pathname)}>Log in</a> to play with your account, or play as a
-          guest without one. A guest can play any challenge they get a link to, until a day after their last duel finishes.
+          They play <strong>{duel.decks[0]}</strong>. Pick the deck you'll play.
         </p>
-      )}
-      <p>They play <strong>{duel.decks[0]}</strong>. Pick your deck:</p>
-      <p className="row">
-        {asGuest && (
-          <input placeholder="Your name" maxLength={30} value={guestName} onChange={(e) => setGuestName(e.target.value)} />
-        )}
         <DeckPicker value={chosen} onChange={setDeckId} />
-        <button onClick={() => chosen !== null && join.mutate(chosen)} disabled={join.isPending || !ready}>
-          {asGuest ? 'Play as guest' : 'Accept and start'}
-        </button>
-      </p>
-      {join.isError && <p className="error">{errorText(join.error)}</p>}
+        {asGuest && (
+          <label className="field">
+            <span className="small muted">Your name</span>
+            <input placeholder="What your opponent sees" maxLength={30} value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+          </label>
+        )}
+        <div className="actions">
+          <button className="primary big" onClick={() => chosen !== null && join.mutate(chosen)} disabled={join.isPending || !ready}>
+            {asGuest ? 'Play as guest' : 'Accept and start'}
+          </button>
+          {asGuest && (
+            <span className="muted small">
+              or <a href={loginHref(window.location.pathname)}>log in</a> to play with your account
+            </span>
+          )}
+        </div>
+        {join.isError && <p className="error">{errorText(join.error)}</p>}
+        {asGuest && (
+          <p className="muted small">
+            A guest can play any challenge they get a link to, until a day after their last duel finishes.
+          </p>
+        )}
+      </div>
     </section>
   );
 }

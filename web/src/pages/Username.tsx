@@ -23,12 +23,15 @@ export function Username({ user }: { user: User }) {
 
   if (draft === null)
     return (
-      <p className="row">
+      <div className="row">
         <span>
-          Your username is <strong>{user.username}</strong>.
+          <span className="muted small">Username</span>
+          <br />
+          <strong>{user.username}</strong>
         </span>
-        <button className="quiet small" onClick={() => setDraft(user.username)}>Change</button>
-      </p>
+        <span className="spacer" />
+        <button className="quiet" onClick={() => setDraft(user.username)}>Change</button>
+      </div>
     );
 
   const error = save.error instanceof ApiError ? (save.error.body as { error?: string } | null)?.error : undefined;
@@ -41,9 +44,9 @@ export function Username({ user }: { user: User }) {
       }}
     >
       <input aria-label="Username" maxLength={32} value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />
-      <button type="submit" disabled={save.isPending || draft.trim() === ''}>Save</button>
+      <button type="submit" className="primary" disabled={save.isPending || draft.trim() === ''}>Save</button>
       <button type="button" className="quiet" onClick={() => (save.reset(), setDraft(null))}>Cancel</button>
-      {save.isError && <span className="error">{(error && problems[error]) ?? 'Something went wrong. Try again.'}</span>}
+      {save.isError && <span className="error small">{(error && problems[error]) ?? 'Something went wrong. Try again.'}</span>}
     </form>
   );
 }

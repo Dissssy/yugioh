@@ -1,5 +1,6 @@
 import type { Me } from '@yugioh/shared';
-import { Duels } from './Duels.tsx';
+import { Duels, NewChallenge } from './Duels.tsx';
+import { Notice } from './Notice.tsx';
 import { Username } from './Username.tsx';
 
 export const formatDate = (iso: string) =>
@@ -8,52 +9,75 @@ export const formatDate = (iso: string) =>
 export function Home({ me }: { me: Me }) {
   switch (me.kind) {
     case 'anonymous':
-      return (
-        <section>
-          <h1>Welcome</h1>
-          <p>This site is invite-only. Log in to request an account, or open a challenge link from a player to play as a guest.</p>
-          <a className="button" href="/auth/login">Log in or sign up</a>
-        </section>
-      );
+      return <Welcome />;
     case 'guest':
-      return <Guest name={me.guest.name} />;
+      return (
+        <Dashboard title={`Hi ${me.guest.name}`}>
+          <section className="box">
+            <h2>Playing as a guest</h2>
+            <p>
+              You can play any challenge someone sends you a link to, but you can't create challenges. Your guest access
+              ends a day after your last duel finishes.
+            </p>
+            <p className="muted small">Log in to keep your duels on an account.</p>
+          </section>
+        </Dashboard>
+      );
     case 'user': {
       const { user } = me;
       if (user.status === 'pending')
         return (
-          <section>
-            <h1>Waiting for approval</h1>
-            <p>Your account has been created and is waiting for the admin to approve it. Check back later.</p>
+          <Notice title="Waiting for approval">
+            <p>Your account is waiting for the admin to approve it. Check back later.</p>
             <Username user={user} />
-          </section>
+          </Notice>
         );
       if (user.status === 'rejected')
         return (
-          <section>
-            <h1>Not approved</h1>
-            <p>Your account hasn't been approved for this site.</p>
-          </section>
+          <Notice title="Not approved" tone="error">
+            Your account hasn't been approved for this site.
+          </Notice>
         );
       return (
-        <section>
-          <h1>Hi {user.username}</h1>
-          <Username user={user} />
-          <Duels canChallenge />
-        </section>
+        <Dashboard title={`Hi ${user.username}`}>
+          <NewChallenge />
+          <section className="box">
+            <h2>Account</h2>
+            <Username user={user} />
+          </section>
+        </Dashboard>
       );
     }
   }
 }
 
-function Guest({ name }: { name: string }) {
+/** Two columns: things to do on the left, the viewer's duels on the right. */
+function Dashboard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
-      <h1>Hi {name}</h1>
-      <p>
-        You're playing as a guest. You can play any challenge someone sends you a link to, but you can't create
-        challenges. Your guest access ends a day after your last duel finishes. Log in to keep your duels on an account.
+    <div className="dashboard">
+      <div className="dashboard-side">
+        <h1>{title}</h1>
+        {children}
+      </div>
+      <Duels />
+    </div>
+  );
+}
+
+function Welcome() {
+  return (
+    <section className="welcome">
+      <div className="fan" aria-hidden>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="card back" style={{ '--i': i - 2 } as React.CSSProperties} />
+        ))}
+      </div>
+      <h1>Yu-Gi-Oh Duels</h1>
+      <p className="lead">Duel your friends online. The rules are handled for you, so you can just play.</p>
+      <a className="button primary big" href="/auth/login">Log in or sign up</a>
+      <p className="muted small">
+        This site is invite-only. New accounts need the admin's approval. Got a challenge link? Open it to play as a guest.
       </p>
-      <Duels canChallenge={false} />
     </section>
   );
 }
