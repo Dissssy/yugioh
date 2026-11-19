@@ -44,6 +44,8 @@ interface LiveDuel {
   listeners: Set<{ seat: Seat; send: (update: DuelUpdate) => void }>;
   /** Changes to one duel happen one at a time, in arrival order: intents, judge calls, appeal verdicts. */
   queue: Promise<unknown>;
+  /** Writes to the log, one at a time. Chat goes straight here, so players can talk while the judge works. */
+  writes: Promise<unknown>;
   /** The judge call in progress, if any. Nothing it does is in `events` until it finishes. */
   judging: Judging | null;
   /** Contests being reviewed, as `seq:seat`, so the same one isn't sent twice. */
@@ -92,6 +94,11 @@ export class Duels {
 
   async find(id: string): Promise<MatchRow | undefined> {
     return this.db.query.matches.findFirst({ where: eq(matches.id, id) });
+  }
+
+  /** The latest duels of everyone, for the admin. */
+  async recent(): Promise<MatchRow[]> {
+    return this.db.query.matches.findMany({ orderBy: [desc(matches.createdAt)], limit: 50 });
   }
 
   /** Duels the player sits in. */
@@ -167,7 +174,7 @@ export class Duels {
         if (!row || row.status === 'waiting') throw new Error(`Duel ${id} has not started`);
         const rows = await this.db.select().from(matchEvents).where(eq(matchEvents.matchId, id)).orderBy(matchEvents.seq);
         const events = rows.map((r) => r.event as DuelEvent);
-        const live: LiveDuel = { id, events, state: replay(events), listeners: new Set(), queue: Promise.resolve(), judging: null, appealing: new Set() };
+        const live: LiveDuel = { id, events, state: replay(events), listeners: new Set(), queue: Promise.resolve(), writes: Promise.resolve(), judging: null, appealing: new Set() };
         // An effect that was activated but not resolved when the server stopped resolves now.
         if (live.state.chain.length > 0) void this.enqueue(live, () => this.resolveChain(live));
         return live;
@@ -304,8 +311,23 @@ export class Duels {
     return { ok: true };
   }
 
-  /** Stores events, applies them, and sends each seat the steps. */
-  private async commit(duel: LiveDuel, events: DuelEvent[]) {
+  /** A player's chat message. It joins the log in order with everything else, even while the judge is working. */
+  async chat(id: string, seatKey: string, text: string): Promise<ActResult> {
+    const duel = await this.load(id);
+    const seat = await this.seatOf(id, seatKey);
+    if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
+    await this.commit(duel, [{ type: 'chatted', player: seat, text }]);
+    return { ok: true };
+  }
+
+  /** Stores events, applies them, and sends each seat the steps. Commits happen one at a time, in call order. */
+  private commit(duel: LiveDuel, events: DuelEvent[]): Promise<void> {
+    const run = duel.writes.then(() => this.write(duel, events));
+    duel.writes = run.catch(() => {});
+    return run;
+  }
+
+  private async write(duel: LiveDuel, events: DuelEvent[]) {
     const first = duel.events.length;
     await this.db.transaction(async (tx) => {
       await tx.insert(matchEvents).values(events.map((event, i) => ({ matchId: duel.id, seq: first + i, event })));

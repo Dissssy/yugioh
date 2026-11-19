@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AccountStatus, AdminUser } from '@yugioh/shared';
+import type { AccountStatus, AdminUser, DuelSummary } from '@yugioh/shared';
 import { api, errorText } from '../api.ts';
 import { formatDate } from './Home.tsx';
 import { Loading, Notice } from './Notice.tsx';
@@ -7,6 +7,49 @@ import { Loading, Notice } from './Notice.tsx';
 const order: Record<AccountStatus, number> = { pending: 0, approved: 1, rejected: 2 };
 
 export function Admin() {
+  return (
+    <>
+      <Accounts />
+      <RecentDuels />
+    </>
+  );
+}
+
+/** Everyone's latest duels, each with its full log for review: every card, intent, ruling, appeal and chat message. */
+function RecentDuels() {
+  const duels = useQuery({ queryKey: ['admin', 'duels'], queryFn: () => api<DuelSummary[]>('/admin/duels') });
+  if (!duels.data) return null;
+  return (
+    <section className="box admin">
+      <div className="page-head">
+        <h1>Duels</h1>
+      </div>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Duel</th><th>Created</th><th>Status</th><th>Decks</th><th /></tr>
+          </thead>
+          <tbody>
+            {duels.data.map((duel) => (
+              <tr key={duel.id}>
+                <td><a href={`/duel/${duel.id}`}><code>{duel.id}</code></a></td>
+                <td className="muted">{formatDate(duel.createdAt)}</td>
+                <td><span className="pill">{duel.status}</span></td>
+                <td className="muted">{duel.createdBy}: {duel.decks[0]} vs {duel.decks[1] ?? '…'}</td>
+                <td className="cell-actions">
+                  <a href={`/api/admin/duels/${duel.id}/report`} target="_blank" rel="noreferrer">Full log</a>{' '}
+                  <a href={`/api/admin/duels/${duel.id}/report?format=json`} target="_blank" rel="noreferrer">JSON</a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function Accounts() {
   const queryClient = useQueryClient();
   const users = useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<AdminUser[]>('/admin/users') });
   const setStatus = useMutation({

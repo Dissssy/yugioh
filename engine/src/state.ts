@@ -57,6 +57,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'intent':
       case 'judged':
       case 'appealed':
+      case 'chatted':
         return;
       case 'turnStarted':
         s.turn = event.turn;

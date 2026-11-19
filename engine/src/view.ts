@@ -62,6 +62,67 @@ export function entryFor(state: DuelState, event: DuelEvent, seq: number, turn: 
   return visible && { seq, turn, event: visible, text: describe(state, visible) };
 }
 
+/**
+ * The whole duel with nothing hidden, one line per event, for reviewing it afterwards. Only for admins: it names
+ * every hidden card. Cards are written `Name [instance ID]` so a line can be matched with intents and rulings.
+ */
+export function reviewLog(events: readonly DuelEvent[]): { seq: number; turn: number; text: string }[] {
+  let state = replay(events.slice(0, 1));
+  return events.map((event, seq) => {
+    if (seq > 0) state = evolve(state, event);
+    return { seq, turn: state.turn, text: reviewText(state, event) };
+  });
+}
+
+function reviewText(state: DuelState, event: DuelEvent): string {
+  const who = (seat: Seat) => state.players[seat].name;
+  const label = (id: string) => {
+    const instance = state.instances[id];
+    return instance ? `${state.cards[instance.code]!.name} [${id}]` : id;
+  };
+  /** JSON with every card ID labelled. */
+  const labelled = (value: unknown) => JSON.stringify(value, (_key, v: unknown) => (typeof v === 'string' && state.instances[v] ? label(v) : v));
+  switch (event.type) {
+    case 'duelStarted':
+      return `Duel started: ${event.players[0].name} (seat 0) vs ${event.players[1].name} (seat 1); ${event.players[event.first].name} goes first`;
+    case 'intent':
+      return `${who(event.player)} asked for ${labelled(event.intent)}`;
+    case 'deckShuffled':
+      return `${who(event.player)}'s Deck was shuffled`;
+    case 'monsterSet':
+    case 'spellTrapSet':
+      return `${who(event.player)} Set ${label(event.card)} in zone ${event.zone}`;
+    case 'moved':
+      return `${label(event.card)} moved from ${who(event.owner)}'s ${event.from} to ${event.to}`;
+    case 'phaseChanged':
+      return phaseNames[event.phase];
+    case 'flippedByAttack':
+      return `${label(event.card)} was flipped face-up by the attack`;
+    case 'linkResolved':
+      return 'The chain link resolved';
+    case 'attackDeclared':
+      return `${label(event.attacker)} attacked ${event.target ? label(event.target) : 'directly'}`;
+    case 'judged': {
+      const r = event.record;
+      const outcome = r.stage === 'activation' ? (r.legal ? 'allowed' : 'REFUSED') : 'resolved';
+      return [
+        `Judge (${r.stage}, ${r.model}) on ${who(r.player)}'s ${label(r.card)}, effect ${r.effect}: ${outcome}. ${r.summary}`,
+        r.error && `Error: ${r.error}`,
+        r.ops.length > 0 && `Ops: ${labelled(r.ops)}`,
+      ]
+        .filter(Boolean)
+        .join(' | ');
+    }
+    case 'appealed': {
+      const a = event.appeal;
+      const note = a.note ? ` with the note "${a.note}"` : '';
+      return `Appeal (${a.model}) by ${who(a.by)} of ruling #${a.judged}${note}: ${a.verdict}. ${a.explanation} | Correct ruling: ${a.ruling}`;
+    }
+    default:
+      return describe(state, event)!;
+  }
+}
+
 /** Places both players can see into. */
 const PUBLIC: Place[] = ['monsters', 'spellTraps', 'graveyard', 'banished'];
 
@@ -199,6 +260,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
     }
     case 'normalSummonGranted':
       return `${who(event.player)} may Normal Summon again this turn`;
+    case 'chatted':
+      return `${who(event.player)}: ${event.text}`;
     case 'flippedByAttack':
     case 'linkResolved':
       return null;
