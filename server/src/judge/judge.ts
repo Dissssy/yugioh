@@ -83,7 +83,7 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
   const ops: Op[] = [];
   const usage: ModelUsage[] = [];
   const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: stage === 'activation' ? activationRequest(scratch, link, call.appealRuling ?? null) : resolutionRequest(scratch, link) },
+    { role: 'user', content: stage === 'activation' ? activationRequest(scratch, link, call.appealRuling ?? null) : resolutionRequest(scratch, link, call.appealRuling ?? null) },
   ];
   const record = (fields: Pick<JudgeRecord, 'legal' | 'summary' | 'error'>): JudgeRecord => ({
     stage,

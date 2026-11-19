@@ -34,7 +34,8 @@
               "atk": null,
               "def": null
             },
-            "min": 1
+            "min": 1,
+            "max": null
           }
         ],
         "cost": [],
@@ -73,6 +74,7 @@
         ],
         "unapplied": null
       },
+      "continuous": null,
       "status": "unverified"
     }
   ],

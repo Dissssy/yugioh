@@ -21,9 +21,11 @@
           "special"
         ],
         "from": "field",
-        "canMiss": false
+        "canMiss": false,
+        "by": null
       },
       "script": null,
+      "continuous": null,
       "status": "unverified"
     }
   ],

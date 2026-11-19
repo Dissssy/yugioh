@@ -70,6 +70,7 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     normalSummons: 0,
     normalSummonLimit: 1,
     modifiers: [],
+    forbidden: [],
     chain: [],
     step: { at: 'rps', picks: [null, null], last: null },
     happened: [],
@@ -77,6 +78,8 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     attack: null,
     usedThisTurn: [],
     rulings: [],
+    rollback: null,
+    binding: null,
     result: null,
   };
 }
@@ -114,12 +117,32 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       }
       case 'judged': {
         const r = event.record;
+        // The resolution a rollback bound is ruled again.
+        if (r.stage === 'resolution' && s.binding?.card === r.card && s.binding.effect === r.effect) s.binding = null;
         // A failed call isn't a ruling, so the player may try again. A legal activation changes the board anyway.
         if (r.stage === 'activation' && !r.legal && r.error === null) {
           s.rulings.push({ player: r.player, card: r.card, effect: r.effect, legal: false, summary: r.summary });
         }
         // A trigger that couldn't be activated, for whatever reason, is set aside for this sequence.
         if (r.stage === 'activation' && !r.legal && s.step.at === 'triggers') s.step.handled.push(`${r.card}:${r.effect}`);
+        return;
+      }
+      case 'rollbackOffered':
+        s.rollback = { ...event.offer, accepted: [] };
+        return;
+      case 'rollbackAnswered':
+        if (!s.rollback) throw new Error('No rollback offered');
+        if (event.accept) s.rollback.accepted.push(event.player);
+        else s.rollback = null;
+        return;
+      case 'rolledBack': {
+        const offer = s.rollback;
+        if (!offer) throw new Error('No rollback offered');
+        Object.assign(s, structuredClone(event.board), { rollback: null });
+        const d = offer.decision;
+        // A wrongly allowed activation is refused from now on; a resolution is ruled again, bound to the appeal.
+        if (d.stage === 'activation') s.rulings.push({ player: d.player, card: d.card, effect: d.effect, legal: false, summary: offer.ruling });
+        else s.binding = { player: d.player, card: d.card, effect: d.effect, ruling: offer.ruling };
         return;
       }
       case 'appealed': {
@@ -141,6 +164,8 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
     switch (event.type) {
       case 'checkpoint':
         s.step = { at: 'triggers', cause: event.cause, then: event.then, handled: [], passed: [] };
+        // A phase starting is something triggers can wait for too ("During the End Phase").
+        if (event.cause?.event === 'phase') s.happened.push(event.cause);
         return;
       case 'triggersDone': {
         const step = s.step;
@@ -163,6 +188,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.normalSummonLimit = 1;
         s.usedThisTurn = [];
         s.modifiers = s.modifiers.filter((m) => m.until !== 'end_of_turn');
+        s.forbidden = [];
         return;
       case 'phaseChanged':
         s.phase = event.phase;
@@ -177,13 +203,22 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         p.hand.push(...p.deck.splice(0, event.count));
         return;
       }
-      case 'destroyedByBattle':
-        for (const id of event.cards) {
+      case 'destroyedByBattle': {
+        // Each monster destroyed was destroyed by the other one in the battle.
+        const destroyers = event.cards.map((id) => {
+          const by = s.attack && (id === s.attack.attacker ? s.attack.target : s.attack.attacker);
+          const at = by ? locate(s, by) : null;
+          return by && at ? { by, seat: at.seat } : null;
+        });
+        event.cards.forEach((id, i) => {
           const player = locate(s, id)!.seat;
           sendToGraveyard(s, id);
           s.happened.push({ event: 'destroyed_by_battle', card: id, player, group });
-        }
+          const d = destroyers[i];
+          if (d) s.happened.push({ event: 'battle_destroying', card: d.by, player: d.seat, target: id, group });
+        });
         return;
+      }
       case 'tributed':
       case 'discarded':
         for (const id of event.cards) sendToGraveyard(s, id);
@@ -215,11 +250,16 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const card = onField(s, event.card);
         card.position = event.position;
         card.positionChangedTurn = s.turn;
+        // Limit Reverse: its monster changed to Defense Position takes both cards with it.
+        if (event.position === 'defense') {
+          const breaking = tiedTo(s, event.card).filter((c) => tie(s, c.id)?.defenseBreaks);
+          if (breaking.length > 0) for (const id of [event.card, ...breaking.map((c) => c.id)]) if (locate(s, id)) sendToGraveyard(s, id);
+        }
         return;
       }
       case 'attackDeclared':
         onField(s, event.attacker).attackedTurn = s.turn;
-        s.attack = { attacker: event.attacker, target: event.target };
+        s.attack = { attacker: event.attacker, target: event.target, replaced: {} };
         s.happened.push({ event: 'attack_declared', card: event.attacker, player: event.player, target: event.target, group });
         if (event.target) s.happened.push({ event: 'attacked', card: event.target, player: other(event.player), attacker: event.attacker, group });
         return;
@@ -243,12 +283,12 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const p = s.players[event.player];
         if (event.zone !== null) {
           take(p.hand, event.card);
-          p.spellTraps[event.zone] = { ...fieldCard(event.card, s.turn, true), position: 'attack' };
+          p.spellTraps[event.zone] = { ...fieldCard(event.card, s.turn, true), position: 'attack', activatedTurn: s.turn };
         } else {
           const at = locate(s, event.card);
-          if (at?.zone === 'spellTraps') onField(s, event.card).faceUp = true;
+          if (at?.zone === 'spellTraps') Object.assign(onField(s, event.card), { faceUp: true, activatedTurn: s.turn });
         }
-        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause });
+        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause, negated: false, setAgain: false });
         s.usedThisTurn.push({ card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         const step = s.step;
         // A trigger joins the chain with the others; any other activation hands the opponent priority.
@@ -288,8 +328,42 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         summoned(s, event.card, event.player, 'special', group);
         return;
       }
+      case 'extraSummoned': {
+        // Synchro Materials go to the GY; Xyz Materials go under the Xyz Monster.
+        if (event.how === 'synchro') for (const id of event.materials) sendToGraveyard(s, id);
+        else for (const id of event.materials) removeFromPlay(s, id);
+        take(s.players[event.player].extra, event.card);
+        const materials = event.how === 'xyz' ? [...event.materials] : [];
+        s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position, materials };
+        summoned(s, event.card, event.player, event.how, group);
+        return;
+      }
       case 'destroyed':
-        for (const id of event.cards) sendToGraveyard(s, id);
+        for (const id of event.cards) {
+          const at = locate(s, id);
+          if (!at || (at.zone !== 'monsters' && at.zone !== 'spellTraps')) continue;
+          const faceUp = s.players[at.seat][at.zone][at.index]!.faceUp;
+          sendToGraveyard(s, id);
+          s.happened.push({ event: 'destroyed_by_effect', card: id, player: at.seat, by: event.by, faceUp, group });
+        }
+        return;
+      case 'countersChanged': {
+        const counters = onField(s, event.card).counters;
+        counters[event.counter] = (counters[event.counter] ?? 0) + event.delta;
+        return;
+      }
+      case 'replacementOffered':
+        s.step = { at: 'replace', card: event.card, player: event.player, then: event.then };
+        return;
+      case 'replacementChosen': {
+        const step = s.step;
+        if (step.at !== 'replace') throw new Error('Nothing to replace');
+        s.attack!.replaced[event.card] = event.materials;
+        s.step = { at: 'continue', then: step.then };
+        return;
+      }
+      case 'damageStepStarted':
+        s.happened.push({ event: 'damage_step_start', card: s.attack!.attacker, player: s.turnPlayer, target: s.attack!.target, group });
         return;
       case 'lpChanged': {
         const p = s.players[event.player];
@@ -298,6 +372,21 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       }
       case 'statsModified':
         s.modifiers.push(event.modifier);
+        return;
+      case 'forbidden':
+        s.forbidden.push({ player: event.player, what: event.what, turn: s.turn });
+        return;
+      case 'linked':
+        onField(s, event.card).linked = event.to;
+        return;
+      case 'activationNegated':
+        s.chain[event.link]!.negated = true;
+        return;
+      case 'effectsNegated':
+        onField(s, event.card).effectsNegated = true;
+        return;
+      case 'setAgain':
+        s.chain.at(-1)!.setAgain = true;
         return;
       case 'normalSummonGranted':
         s.normalSummonLimit++;
@@ -308,7 +397,15 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const at = locate(s, link.card);
         const card = s.cards[s.instances[link.card]!.code]!;
         const leaves = card.kind === 'spell' ? ['Normal', 'Quick-Play', 'Ritual'] : card.kind === 'trap' ? ['Normal', 'Counter'] : [];
-        if (at?.zone === 'spellTraps' && leaves.includes(card.race)) sendToGraveyard(s, link.card);
+        // A Normal Spell/Trap that says it remains on the field (Swords of Revealing Light) stays. An Equip Spell, or a
+        // Continuous Trap that works through its monster, that didn't get one has nothing to do there.
+        const effects = s.sheets[card.code]?.effects ?? [];
+        const remains = effects.some((e) => e.continuous?.apply === 'self_destruct');
+        const needsLink = card.race === 'Equip' || effects.some((e) => e.continuous?.apply === 'tie' || (e.continuous && 'to' in e.continuous && e.continuous.to === 'linked'));
+        const unlinked = at?.zone === 'spellTraps' && needsLink && !s.players[at.seat].spellTraps[at.index]!.linked;
+        if (at?.zone === 'spellTraps' && link.setAgain && !link.negated) {
+          Object.assign(s.players[at.seat].spellTraps[at.index]!, { faceUp: false, placedTurn: s.turn, activatedTurn: null });
+        } else if (at?.zone === 'spellTraps' && (link.negated || (leaves.includes(card.race) && !remains) || unlinked)) sendToGraveyard(s, link.card);
         s.resolvedLinks++;
         // Once the whole chain has resolved, triggers from what happened during it go on a new one.
         if (s.chain.length === 0 && s.step.at === 'resolve') s.step = { at: 'triggers', cause: null, then: s.step.then, handled: [], passed: [] };
@@ -316,6 +413,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       }
       case 'duelEnded':
         s.result = event.result;
+        s.rollback = null;
         return;
     }
   });
@@ -329,29 +427,14 @@ function summoned(s: DuelState, id: string, player: Seat, how: SummonKind, group
   s.happened.push({ event: 'summoned', card: id, player, how, group } satisfies Happening);
 }
 
+/** Whether a Summon is one of those wanted (empty for any). Synchro and Xyz Summons are Special Summons too. */
+export const summonMatches = (how: SummonKind, wanted: SummonKind[]) =>
+  wanted.length === 0 || wanted.includes(how) || (wanted.includes('special') && (how === 'synchro' || how === 'xyz'));
+
+export const summonName: Record<SummonKind, string> = { normal: 'Normal', flip: 'Flip', special: 'Special', synchro: 'Synchro', xyz: 'Xyz' };
+
 /** A card's printed Level. An Xyz Monster's number is its Rank, not a Level, so it has none. */
 export const levelOf = (card: CardData): number | null => (/\bXYZ\b/i.test(card.type) ? null : card.level);
-
-/** A face-up monster's ATK, DEF and Level after modifiers. Level modifiers apply in order; a set Level overrides earlier ones. */
-export function statsOf(state: DuelState, id: string): { atk: number; def: number; level: number | null } {
-  const card = state.cards[state.instances[id]!.code]!;
-  // "Becomes" sets the base (the latest wins); every gain and loss is added on top, whenever it was applied.
-  let atk = card.atk ?? 0;
-  let def = card.def ?? 0;
-  let atkDelta = 0;
-  let defDelta = 0;
-  let level = levelOf(card);
-  for (const m of state.modifiers) {
-    if (m.card !== id) continue;
-    if (m.atkSet !== null) atk = m.atkSet;
-    if (m.defSet !== null) def = m.defSet;
-    atkDelta += m.atk;
-    defDelta += m.def;
-    if (m.levelSet !== null) level = m.levelSet;
-    if (level !== null) level = Math.max(1, level + m.levelDelta);
-  }
-  return { atk: Math.max(0, atk + atkDelta), def: Math.max(0, def + defDelta), level };
-}
 
 function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
   return {
@@ -362,6 +445,11 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     positionChangedTurn: null,
     attackedTurn: null,
     summoned: null,
+    materials: [],
+    activatedTurn: null,
+    linked: null,
+    effectsNegated: false,
+    counters: {},
   };
 }
 
@@ -371,9 +459,9 @@ function take(pile: string[], id: string) {
   pile.splice(i, 1);
 }
 
-/** Where a card instance is right now. */
+/** Where a card instance is right now. An Xyz Material's `index` is the Monster Zone of the monster it is attached to. */
 export type Location =
-  | { seat: Seat; zone: 'monsters' | 'spellTraps'; index: number }
+  | { seat: Seat; zone: 'monsters' | 'spellTraps' | 'materials'; index: number }
   | { seat: Seat; zone: 'deck' | 'hand' | 'graveyard' | 'banished' | 'extra' };
 
 export function locate(state: DuelState, id: string): Location | null {
@@ -383,6 +471,8 @@ export function locate(state: DuelState, id: string): Location | null {
       const index = p[zone].findIndex((c) => c?.id === id);
       if (index >= 0) return { seat, zone, index };
     }
+    const under = p.monsters.findIndex((c) => c?.materials.includes(id));
+    if (under >= 0) return { seat, zone: 'materials', index: under };
     for (const zone of ['hand', 'deck', 'graveyard', 'banished', 'extra'] as const) {
       if (p[zone].includes(id)) return { seat, zone };
     }
@@ -396,15 +486,36 @@ export function onField(state: DuelState, id: string): FieldCard {
   return state.players[at.seat][at.zone][at.index]!;
 }
 
-/** Takes a card out of wherever it is. A card leaving the field loses its modifiers. */
+/**
+ * Takes a card out of wherever it is. A card leaving the field loses its modifiers, and its Xyz Materials go to their
+ * owners' GYs.
+ */
 function removeFromPlay(state: DuelState, id: string) {
   const at = locate(state, id);
   if (!at) throw new Error(`Unknown card ${id}`);
   const p = state.players[at.seat];
   if (at.zone === 'monsters' || at.zone === 'spellTraps') {
+    const card = p[at.zone][at.index]!;
     p[at.zone][at.index] = null;
     state.modifiers = state.modifiers.filter((m) => m.card !== id);
-  } else take(p[at.zone], id);
+    for (const m of card.materials) state.players[state.instances[m]!.owner].graveyard.push(m);
+    // Cards linked to a monster go when it goes; a card that takes its monster with it (Birthright) does so.
+    for (const c of tiedTo(state, id)) sendToGraveyard(state, c.id);
+    if (card.linked && tie(state, id)?.destroyLinked && locate(state, card.linked)?.zone === 'monsters') sendToGraveyard(state, card.linked);
+  } else if (at.zone === 'materials') take(p.monsters[at.index]!.materials, id);
+  else take(p[at.zone], id);
+}
+
+/** The Spells and Traps on the field linked to this monster. */
+function tiedTo(state: DuelState, id: string): FieldCard[] {
+  return state.players.flatMap((p) => p.spellTraps.filter((c): c is FieldCard => c?.linked === id));
+}
+
+/** A card's `tie` continuous effect, if it has one. */
+function tie(state: DuelState, id: string) {
+  const effects = state.sheets[state.instances[id]!.code]?.effects ?? [];
+  for (const e of effects) if (e.continuous?.apply === 'tie' && e.status !== 'flagged') return e.continuous;
+  return null;
 }
 
 /** Cards always go to their owner's Graveyard. */

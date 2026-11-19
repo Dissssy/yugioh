@@ -4,7 +4,7 @@
 
 import { cardOf, continuation, legalActions, onceOk, ruledIllegal } from './rules.ts';
 import { fits, scriptProblem } from './script.ts';
-import { locate } from './state.ts';
+import { locate, summonMatches, summonName } from './state.ts';
 import type { DuelEvent, DuelState, Happening, Seat, When } from './types.ts';
 
 /** Whether an event is the one an effect of `card` (controlled by `seat`) waits for. */
@@ -13,8 +13,17 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
   if (when.event === 'attacked' && h.event === 'attack_declared' && h.target) {
     return whenMatches(state, when, { event: 'attacked', card: h.target, player: h.player === 0 ? 1 : 0, attacker: h.card, group: h.group }, card, seat);
   }
-  if (h.event === 'phase' || when.event !== h.event) return false;
-  if (h.event === 'summoned' && when.how.length > 0 && !when.how.includes(h.how)) return false;
+  if (h.event === 'phase') return when.event === 'end_phase' && h.phase === 'end';
+  if (when.event !== h.event) return false;
+  // A destroyed card is checked as it was on the field: whose it was, and whether it was face-up.
+  if (h.event === 'destroyed_by_effect') {
+    const mine = h.player === seat;
+    const f = when.filter;
+    if (when.by && (h.by === seat) !== (when.by === 'you')) return false;
+    if (when.self && h.card !== card) return false;
+    return !f || ((f.side === 'either' || mine === (f.side === 'you')) && (f.faceUp === null || f.faceUp === h.faceUp));
+  }
+  if (h.event === 'summoned' && !summonMatches(h.how, when.how)) return false;
   if (when.self && h.card !== card) return false;
   return !when.filter || fits(state, h.card, when.filter, seat);
 }
@@ -48,7 +57,9 @@ export function pendingTriggers(state: DuelState): PendingTrigger[] {
       const when = effect.when;
       if (effect.kind !== 'trigger' || !when || when.event === 'activated') return;
       if (step.handled.includes(`${id}:${index}`) || (!effect.mandatory && step.passed.includes(at.seat))) return;
-      const place = at.zone === 'monsters' || at.zone === 'spellTraps' ? when.from === 'field' && state.players[at.seat][at.zone][at.index]!.faceUp : at.zone === when.from;
+      // A monster whose effects are negated triggers nothing.
+      const onField = at.zone === 'monsters' || at.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
+      const place = onField ? when.from === 'field' && onField.faceUp && !onField.effectsNegated : at.zone === when.from;
       if (!place || !onceOk(state, id, sheet.code, index, effect.opt) || ruledIllegal(state, at.seat, id, index)) return;
       const cause = state.happened.find((h) => (!when.canMiss || h.group >= last) && whenMatches(state, when, h, id, at.seat));
       if (!cause || scriptProblem(state, at.seat, id, index, cause)) return;
@@ -99,16 +110,24 @@ export function nextStep(state: DuelState): Next | null {
       return { kind: 'wait', player: step.priority, autoPass: !canAct, floor: step.priority !== step.actor };
     }
     case 'resolve':
-      return { kind: 'resolve' };
+      // A negated activation resolves doing nothing, so code finishes it.
+      return state.chain.at(-1)?.negated ? { kind: 'events', events: [{ type: 'linkResolved' }] } : { kind: 'resolve' };
     case 'continue':
       return { kind: 'events', events: continuation(state, step.then) };
+    case 'replace':
+      return { kind: 'wait', player: step.player, autoPass: false, floor: false };
   }
 }
 
 /** Who the duel waits on in a triggers step or a response window, as a player's view shows it. */
-export function waitingFor(state: DuelState, seat: Seat): { player: Seat; for: 'respond' | 'triggers'; cause: string | null } | null {
+export function waitingFor(state: DuelState, seat: Seat): { player: Seat; for: 'respond' | 'triggers' | 'replace'; cause: string | null } | null {
   const step = state.step;
-  if (step.at === 'respond') return { player: step.priority, for: 'respond', cause: describeCause(state, step.cause) };
+  if (step.at === 'replace') return { player: step.player, for: 'replace', cause: cardOf(state, step.card).name };
+  if (step.at === 'respond') {
+    // With a chain building, players respond to its last link.
+    const last = state.chain.at(-1);
+    return { player: step.priority, for: 'respond', cause: last ? `the activation of ${cardOf(state, last.card).name}` : describeCause(state, step.cause) };
+  }
   if (step.at !== 'triggers') return null;
   const first = pendingTriggers(state)[0];
   if (!first || first.mandatory) return null;
@@ -122,7 +141,7 @@ export function describeCause(state: DuelState, cause: Happening | null): string
   const name = (id: string) => cardOf(state, id).name;
   switch (cause.event) {
     case 'summoned':
-      return `the ${cause.how === 'normal' ? 'Normal' : cause.how === 'flip' ? 'Flip' : 'Special'} Summon of ${name(cause.card)}`;
+      return `the ${summonName[cause.how]} Summon of ${name(cause.card)}`;
     case 'attack_declared':
       return `${name(cause.card)}'s attack${cause.target ? ` on ${locate(state, cause.target)?.zone === 'monsters' && !isFaceDown(state, cause.target) ? name(cause.target) : 'a face-down monster'}` : ' directly'}`;
     case 'phase':
@@ -131,8 +150,16 @@ export function describeCause(state: DuelState, cause: Happening | null): string
       return `the attack on ${isFaceDown(state, cause.card) ? 'a face-down monster' : name(cause.card)}`;
     case 'destroyed_by_battle':
       return `the destruction of ${name(cause.card)}`;
+    case 'battle_destroying':
+      return `${name(cause.card)} destroying ${name(cause.target)} by battle`;
     case 'battle_damage':
       return `the battle damage ${name(cause.card)} inflicted`;
+    case 'activated':
+      return `the activation of ${name(cause.card)}`;
+    case 'destroyed_by_effect':
+      return `the destruction of ${name(cause.card)}`;
+    case 'damage_step_start':
+      return `the start of the Damage Step`;
   }
 }
 

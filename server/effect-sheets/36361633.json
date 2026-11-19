@@ -13,7 +13,25 @@
       "effect": "Your opponent cannot declare an attack this turn.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "forbid",
+                "player": "opponent",
+                "what": "declare_attack"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
       "status": "unverified"
     }
   ],

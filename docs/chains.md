@@ -10,9 +10,10 @@ Built 2026-11-19 (layers 4 and 5 of [architecture.md](architecture.md), without 
 - `triggers`: something happened (`cause`) and trigger effects are being collected. `handled` lists the triggers already activated and `passed` the players who declined their optional ones.
 - `respond`: a response window. `priority` is the player who may act, `actor` the one whose action opened it, and `passed` is true after one pass. Two passes in a row resolve the chain, or close the window when the chain is empty.
 - `resolve`: the chain resolves from the last link down. After each link, its happenings are checked for triggers again.
-- `continue`: what the window was holding up (`then`): back to `open`, battle damage after an attack, or the end of the turn.
+- `continue`: what the window was holding up (`then`): back to `open`, an attack's Damage Step and then its damage calculation, or the end of the turn.
+- `replace`: a monster would be destroyed by battle and can detach materials instead (Gachi Gachi Gantetsu); its controller answers with the `replace` intent, then damage calculation goes on.
 
-Everything that happens in a duel that a trigger could answer is pushed onto `state.happened` as a `Happening` (summoned, attack declared, attacked, destroyed by battle, battle damage, phase). Each one carries the number of links resolved so far, so an optional "When ... you can" trigger misses the timing if it wasn't the last thing to happen.
+Everything that happens in a duel that a trigger could answer is pushed onto `state.happened` as a `Happening` (summoned, attack declared, attacked, destroyed by battle or by a card effect, the start of the Damage Step, battle damage, a phase starting). Each one carries the number of links resolved so far, so an optional "When ... you can" trigger misses the timing if it wasn't the last thing to happen.
 
 ## Who drives it
 
@@ -31,11 +32,11 @@ A window opens after a Normal or Flip Summon, an attack declaration, every activ
 
 **The timing floor.** A window where the player has nothing to activate closes by itself after `RESPONSE_FLOOR_MS` (default 1000) plus up to half again at random, so how fast a window closes reveals nothing about a hand or a Set card. A player who does hold a response gets the window until they act or pass. The player whose own action opened the window gets no floor. Tests set the floor to 0.
 
-**Replays.** If the attack target leaves the field before damage, or a monster appears for a direct attack, the attack ends and the attacker may attack again.
+**Replays.** If the attack target leaves the field before the Damage Step, or a monster appears for a direct attack, the attack ends and the attacker may attack again. Once the Damage Step has started (its triggers, such as Zubaba Knight's, go first), a target that leaves just ends the attack.
 
 ## Effect sheets
 
-An effect's `when` (`When` in `engine/src/types.ts`) names the event it answers: `summoned` (with `how` and `from`), `attack_declared`, `attacked`, `destroyed_by_battle`, `battle_damage`, `phase`, or `activated`. `self` limits it to this card, `filter` to cards that fit, and `canMiss` marks "When ... you can" triggers. Script targets with `event: true` pick the card the event is about, without asking (Trap Hole's summoned monster). Scripts gained `set_stats` ("ATK becomes"), `negate_attack`, and the conditions `phase` and `summoned_this_turn`.
+An effect's `when` (`When` in `engine/src/types.ts`) names the event it answers: `summoned` (with `how` and `from`), `attack_declared`, `attacked`, `destroyed_by_battle`, `battle_destroying` (the monster that destroyed it), `battle_damage`, `activated`, `destroyed_by_effect` (with `by`: whose effect), `damage_step_start` or `end_phase`. `self` limits it to this card, `filter` to cards that fit, and `canMiss` marks "When ... you can" triggers. Script targets with `event: true` pick the card the event is about, without asking (Trap Hole's summoned monster). Scripts gained `set_stats` ("ATK becomes"), `negate_attack`, and the conditions `phase` and `summoned_this_turn`.
 
 ## Not yet
 

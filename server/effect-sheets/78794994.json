@@ -13,13 +13,84 @@
       "effect": "Special Summon the targeted monster, and if you do, equip this card to it.",
       "targets": "1 monster in either player's Graveyard",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "place": "monsters",
+                "kinds": [],
+                "types": [
+                  "Normal"
+                ],
+                "races": [],
+                "attributes": [],
+                "faceUp": true,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "place": "graveyard",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "targets"
+                },
+                "position": "choice"
+              },
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
       "status": "unverified"
     },
     {
-      "kind": "trigger",
+      "kind": "continuous",
       "speed": 1,
-      "mandatory": true,
+      "mandatory": false,
       "opt": "none",
       "window": "When this card leaves the field",
       "cost": "",
@@ -27,6 +98,11 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "tie",
+        "destroyLinked": true,
+        "defenseBreaks": false
+      },
       "status": "unverified"
     }
   ],

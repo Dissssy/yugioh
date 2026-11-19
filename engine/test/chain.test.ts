@@ -71,7 +71,7 @@ const filter = (f: Partial<CardFilter>): CardFilter => ({
   def: null,
   ...f,
 });
-const when = (w: Partial<When> & Pick<When, 'event'>): When => ({ self: false, filter: null, how: [], from: 'field', canMiss: false, ...w });
+const when = (w: Partial<When> & Pick<When, 'event'>): When => ({ self: false, filter: null, how: [], from: 'field', canMiss: false, by: null, ...w });
 const script = (s: Partial<Script>): Script => ({ conditions: [], cost: [], targets: null, options: [{ label: '', steps: [] }], unapplied: null, ...s });
 const effect = (e: Partial<SheetEffect> & Pick<SheetEffect, 'kind'>): SheetEffect => ({
   speed: 1,
@@ -83,6 +83,7 @@ const effect = (e: Partial<SheetEffect> & Pick<SheetEffect, 'kind'>): SheetEffec
   targets: null,
   when: null,
   script: null,
+  continuous: null,
   status: 'unverified',
   ...e,
 });
@@ -163,10 +164,10 @@ const sheets: Record<number, EffectSheet> = {
       }),
     }),
   ),
-  8: sheet(8, effect({ kind: 'trigger', when: when({ event: 'destroyed_by_battle', self: true, from: 'graveyard', canMiss: true }) })),
+  8: sheet(8, effect({ kind: 'trigger', when: when({ event: 'destroyed_by_battle', self: true, from: 'graveyard', canMiss: true, by: null }) })),
   9: sheet(9, effect({ kind: 'activation', speed: 2 })),
   10: sheet(10, effect({ kind: 'activation', speed: 1 })),
-  12: sheet(12, effect({ kind: 'trigger', when: when({ event: 'summoned', self: true, canMiss: true }) })),
+  12: sheet(12, effect({ kind: 'trigger', when: when({ event: 'summoned', self: true, canMiss: true, by: null }) })),
 };
 
 /** Seat 0 goes first with `deck0` (top first, IDs a0, a1, ...), seat 1 with `deck1` (b0, b1, ...). */
@@ -264,7 +265,7 @@ describe('responding to a summon', () => {
     t.play(1, { type: 'activate', card: 'b0', effect: 0, zone: null });
     expect(t.state.chain).toMatchObject([{ card: 'b0', cause: { card: 'a5' } }]);
     // Seat 0 holds nothing and seat 1 has used its card: both pass and the chain resolves.
-    t.resolve({ type: 'targeted', cards: ['a5'] }, { type: 'destroyed', cards: ['a5'] });
+    t.resolve({ type: 'targeted', cards: ['a5'] }, { type: 'destroyed', cards: ['a5'], by: 1 });
     expect(t.state.step).toEqual({ at: 'open' });
     expect(t.state.players[1].graveyard).toEqual(['b0']);
   });
@@ -298,7 +299,7 @@ describe('responding to an attack', () => {
     t.play(0, { type: 'attack', attacker: 'a0', target: 'direct' });
     expect(t.state.step).toMatchObject({ at: 'respond', priority: 1, cause: { event: 'attack_declared', card: 'a0' } });
     t.play(1, { type: 'activate', card: 'b0', effect: 0, zone: null });
-    t.resolve({ type: 'destroyed', cards: ['a0'] });
+    t.resolve({ type: 'destroyed', cards: ['a0'], by: 1 });
     expect(t.state.players[1].lp).toBe(8000);
     expect(t.state.attack).toBeNull();
     expect(t.state.step).toEqual({ at: 'open' });
@@ -316,7 +317,7 @@ describe('responding to an attack', () => {
     t.play(0, { type: 'attack', attacker: 'a0', target: 0 });
     // Mirror Force destroys only Attack Position monsters of the attacker's side; here the effect removes the target instead.
     t.play(1, { type: 'activate', card: 'b0', effect: 0, zone: null });
-    t.resolve({ type: 'destroyed', cards: ['b1'] });
+    t.resolve({ type: 'destroyed', cards: ['b1'], by: 1 });
     expect(t.state.players[1].lp).toBe(8000);
     expect(legalActions(t.state, 0)).toContainEqual({ type: 'attack', attacker: 'a0', targets: [], direct: true });
   });

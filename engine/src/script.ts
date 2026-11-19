@@ -2,8 +2,9 @@
 // Code decides these exactly, so an activation a script rules out is never offered.
 
 import { cardOf } from './rules.ts';
-import { levelOf, locate, monsterZonesFor, statsOf } from './state.ts';
-import type { CardFilter, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
+import { levelNow, statsOf } from './continuous.ts';
+import { levelOf, locate, monsterZonesFor, summonMatches, summonName } from './state.ts';
+import type { CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
 export function scriptOf(state: DuelState, card: string, effect: number): Script | null {
@@ -19,9 +20,11 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   const at = locate(state, id);
   if (!at) return false;
   if (filter.side !== 'either' && (filter.side === 'you') !== (at.seat === seat)) return false;
+  // An Xyz Material is not a card on the field, so no filter's place fits it.
+  if (at.zone === 'materials') return false;
   const onField = at.zone === 'monsters' || at.zone === 'spellTraps';
-  if (filter.place === 'field' ? !onField : filter.place !== at.zone) return false;
-  const field = onField ? state.players[at.seat][at.zone][at.index]! : null;
+  if (filter.place !== 'any' && (filter.place === 'field' ? !onField : filter.place !== at.zone)) return false;
+  const field = at.zone === 'monsters' || at.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
   if (filter.faceUp !== null && (!field || field.faceUp !== filter.faceUp)) return false;
   if (filter.position !== null && (at.zone !== 'monsters' || field!.position !== filter.position)) return false;
   if (field && !field.faceUp) {
@@ -36,8 +39,13 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   if (!filter.types.every((t) => words.includes(t.toLowerCase()))) return false;
   if (filter.races.length && !filter.races.some((r) => r.toLowerCase() === card.race.toLowerCase())) return false;
   if (filter.attributes.length && !filter.attributes.some((a) => a.toUpperCase() === card.attribute)) return false;
-  const stats = at.zone === 'monsters' ? statsOf(state, id) : { atk: card.atk, def: card.def, level: levelOf(card) };
-  return inRange(stats.level, filter.level) && inRange(stats.atk, filter.atk) && inRange(stats.def, filter.def);
+  // Current stats on the field, printed ones elsewhere. ATK and DEF are only worked out when the filter asks, since an
+  // effect that counts monsters by Level (Tenshin) changes ATK itself.
+  const monster = at.zone === 'monsters';
+  if (filter.level && !inRange(monster ? levelNow(state, id) : levelOf(card), filter.level)) return false;
+  if (!filter.atk && !filter.def) return true;
+  const stats = monster ? statsOf(state, id) : { atk: card.atk, def: card.def };
+  return inRange(stats.atk, filter.atk) && inRange(stats.def, filter.def);
 }
 
 /** Every card that fits, except `except` (the card being activated). */
@@ -71,6 +79,7 @@ export function describeFilter(f: CardFilter): string {
     !r ? [] : r.min !== null && r.max !== null ? (r.min === r.max ? [`${name} ${r.min}`] : [`${name} ${r.min} to ${r.max}`]) : r.max !== null ? [`${name} ${r.max} or less`] : r.min !== null ? [`${name} ${r.min} or more`] : [];
   const stats = [...range('Level', f.level), ...range('ATK', f.atk), ...range('DEF', f.def)];
   if (stats.length) words.push(`with ${stats.join(' and ')}`);
+  if (f.place === 'any') return words.join(' ');
   const pile = { hand: 'hand', deck: 'Deck', graveyard: 'GY', banished: 'banished cards' }[f.place as 'hand'];
   const field = { field: 'on the field', monsters: 'in a Monster Zone', spellTraps: 'in a Spell & Trap Zone' }[f.place as 'field'];
   if (field) words.push(f.side === 'you' ? 'you control' : f.side === 'opponent' ? 'your opponent controls' : field);
@@ -83,14 +92,60 @@ const freeMonsterZones = (state: DuelState, seat: Seat) => monsterZonesFor(state
 /** Why a step couldn't do what it must on this board, or null. A `choose` with min 0 ("you can") and steps on targets need nothing here. */
 function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): string | null {
   if (step.do === 'negate_attack') return state.attack ? null : 'No attack is being made.';
+  if (step.do === 'negate_activation') return state.chain.length > 0 ? null : 'There is no activation to negate.';
+  if (step.do === 'detach') return detachFrom(state, step, seat, card).length > 0 ? null : `No ${step.cards.from === 'self' ? 'this card has' : 'monster here has'} ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`;
   if (!('cards' in step)) return null;
   const sel = step.cards;
   if (step.do === 'special_summon' && freeMonsterZones(state, seat) === 0) return 'You have no free Monster Zone to Special Summon into.';
+  if (step.do === 'remove_counters' && selected(state, sel, seat, card).every((id) => (onFieldCard(state, id)?.counters[step.counter] ?? 0) < step.count)) {
+    return `There aren't ${step.count} ${step.counter === 'spell' ? 'Spell Counter' : 'counter'}${step.count === 1 ? '' : 's'} to remove.`;
+  }
+  if (sel.from === 'battling' && battling(state, sel.filter, seat, card).length === 0) return `This card isn't battling a ${describeFilter(sel.filter)}.`;
   if (sel.from === 'all' && cardsFitting(state, sel.filter, seat, card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
   if (sel.from === 'choose' && chooseFrom(state, sel, seat, card).length < sel.min) {
     return sel.min === 1 ? `There is no ${describeFilter(sel.filter)}.` : `There are fewer than ${sel.min} of: ${describeFilter(sel.filter)}.`;
   }
   return null;
+}
+
+/** The monster battling this card, if it fits the filter. */
+export function battling(state: DuelState, filter: CardFilter, seat: Seat, card: string): string[] {
+  const a = state.attack;
+  const other = a?.attacker === card ? a.target : a?.target === card ? a.attacker : null;
+  return other && locate(state, other)?.zone === 'monsters' && fits(state, other, filter, seat) ? [other] : [];
+}
+
+/** The cards a selection that needs no choice picks; for `choose`, every card it could pick. */
+function selected(state: DuelState, sel: Selection, seat: Seat, card: string): string[] {
+  switch (sel.from) {
+    case 'self':
+      return [card];
+    case 'targets':
+      return [];
+    case 'choose':
+      return chooseFrom(state, sel, seat, card);
+    case 'all':
+      return cardsFitting(state, sel.filter, seat, card);
+    case 'battling':
+      return battling(state, sel.filter, seat, card);
+  }
+}
+
+const onFieldCard = (state: DuelState, id: string) => {
+  const at = locate(state, id);
+  return at?.zone === 'monsters' || at?.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
+};
+
+/** The Xyz Monsters a detach step may take its materials from: those its selection allows that have enough. */
+export function detachFrom(state: DuelState, step: Extract<Step, { do: 'detach' }>, seat: Seat, card: string): string[] {
+  const sel = step.cards;
+  return selected(state, sel, seat, card).filter((id) => materialsOf(state, id).length >= step.count);
+}
+
+/** The Xyz Materials attached to a monster on the field (none for any other card). */
+export function materialsOf(state: DuelState, id: string): string[] {
+  const at = locate(state, id);
+  return at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.materials : [];
 }
 
 /** The options of a script whose steps can all do what they must now, by index. */
@@ -107,6 +162,39 @@ export function targetable(state: DuelState, script: Script, seat: Seat, card: s
 
 const phaseNames = { draw: 'Draw Phase', standby: 'Standby Phase', main1: 'Main Phase 1', battle: 'Battle Phase', main2: 'Main Phase 2', end: 'End Phase' };
 
+/** Why a condition doesn't hold for player `seat` and their card `card`, or null if it does. */
+export function conditionProblem(state: DuelState, c: Condition, seat: Seat, card: string): string | null {
+  switch (c.if) {
+    case 'before_battle_phase':
+      return state.turnPlayer === seat && (state.phase === 'battle' || state.phase === 'main2' || state.phase === 'end') ? 'It can only be activated before you conduct your Battle Phase.' : null;
+    case 'count': {
+      const n = cardsFitting(state, c.filter, seat, card).length;
+      if (n < c.min) return `It needs ${c.min === 1 ? 'a' : `at least ${c.min} of:`} ${describeFilter(c.filter)}.`;
+      return c.max !== null && n > c.max ? `It needs ${c.max === 0 ? 'no' : `at most ${c.max} of:`} ${describeFilter(c.filter)}.` : null;
+    }
+    case 'phase':
+      return c.phases.includes(state.phase) ? null : `It can only be activated during the ${c.phases.map((p) => phaseNames[p]).join(' or ')}.`;
+    case 'turn':
+      return (state.turnPlayer === seat) === (c.whose === 'you') ? null : `It only applies during ${c.whose === 'you' ? 'your' : "your opponent's"} turn.`;
+    case 'position': {
+      const at = locate(state, card);
+      const m = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]! : null;
+      return m?.faceUp && m.position === c.position ? null : `It needs this card to be in face-up ${c.position === 'attack' ? 'Attack' : 'Defense'} Position.`;
+    }
+    case 'materials': {
+      const n = materialsOf(state, card).length;
+      if ((c.min === null || n >= c.min) && (c.max === null || n <= c.max)) return null;
+      return c.max === 0 ? 'It needs this card to have no Xyz Material.' : `It needs this card to have ${c.min ?? 0}${c.max === null ? ' or more' : ` to ${c.max}`} Xyz Materials.`;
+    }
+    case 'summoned_this_turn': {
+      const at = locate(state, card);
+      const summoned = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.summoned : null;
+      if (summoned && summoned.turn === state.turn && summonMatches(summoned.how, c.how)) return null;
+      return `It needs this card to have been ${c.how.length ? `${c.how.map((h) => summonName[h]).join(' or ')} ` : ''}Summoned this turn.`;
+    }
+  }
+}
+
 /**
  * Why a scripted activation is illegal on this board, or null if it is legal (or the effect has no script). Judged
  * before the cost is paid: a card the cost will use can't also be one of its targets. `cause` is the event it is
@@ -116,20 +204,8 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
   const script = scriptOf(state, card, effect);
   if (!script) return null;
   for (const c of script.conditions) {
-    if (c.if === 'before_battle_phase' && state.turnPlayer === seat && (state.phase === 'battle' || state.phase === 'main2' || state.phase === 'end')) {
-      return 'It can only be activated before you conduct your Battle Phase.';
-    }
-    if (c.if === 'count' && cardsFitting(state, c.filter, seat, card).length < c.min) {
-      return `It needs ${c.min === 1 ? 'a' : `at least ${c.min} of:`} ${describeFilter(c.filter)}.`;
-    }
-    if (c.if === 'phase' && !c.phases.includes(state.phase)) return `It can only be activated during the ${c.phases.map((p) => phaseNames[p]).join(' or ')}.`;
-    if (c.if === 'summoned_this_turn') {
-      const at = locate(state, card);
-      const summoned = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.summoned : null;
-      if (!summoned || summoned.turn !== state.turn || (c.how.length > 0 && !c.how.includes(summoned.how))) {
-        return `It needs this card to have been ${c.how.length ? `${c.how.map((h) => (h === 'normal' ? 'Normal' : h === 'flip' ? 'Flip' : 'Special')).join(' or ')} ` : ''}Summoned this turn.`;
-      }
-    }
+    const problem = conditionProblem(state, c, seat, card);
+    if (problem) return problem;
   }
   const costCards = new Set<string>();
   let costCount = 0;
@@ -137,7 +213,8 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
     if (step.do === 'change_lp' && step.kind === 'cost' && state.players[seat].lp < step.amount) return `You can't pay ${step.amount} LP.`;
     const problem = stepProblem(state, step, seat, card);
     if (problem) return `The cost can't be paid: ${problem}`;
-    if ('cards' in step && step.cards.from === 'choose') {
+    // A card the cost uses can't also be a target (an Xyz Monster that only loses a material still can).
+    if ('cards' in step && step.cards.from === 'choose' && step.do !== 'detach') {
       for (const id of chooseFrom(state, step.cards, seat, card)) costCards.add(id);
       costCount += step.cards.min;
     }

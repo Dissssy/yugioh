@@ -2,7 +2,8 @@
 // model can act on. Nothing here decides what a card's text means; it only refuses what the board can't allow.
 
 import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
-import { locate, monsterZonesFor, other, statsOf } from './state.ts';
+import { statsOf } from './continuous.ts';
+import { locate, monsterZonesFor, other } from './state.ts';
 import { type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
 
 export type OpResult = { ok: true; events: DuelEvent[] } | { ok: false; error: string };
@@ -76,7 +77,7 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(op.cards.length > 0, 'Name at least one card to destroy.');
       check(new Set(op.cards).size === op.cards.length, 'Each card may be named once.');
       for (const id of op.cards) onField(state, id);
-      run.emit({ type: 'destroyed', cards: op.cards });
+      run.emit({ type: 'destroyed', cards: op.cards, by: ctx.player });
       return;
     }
     case 'change_lp': {
@@ -140,12 +141,70 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(state.attack, 'No attack is being made.');
       run.emit({ type: 'attackEnded', replay: false });
       return;
+    case 'link': {
+      check(ctx.stage === 'resolution', 'A card is equipped or tied to its monster as it resolves.');
+      const source = state.chain.at(-1)?.card;
+      const at = source ? locate(state, source) : null;
+      check(source && at?.zone === 'spellTraps' && state.players[at.seat].spellTraps[at.index]!.faceUp, 'Only a face-up Spell or Trap being resolved can be linked to a monster.');
+      check(onField(state, op.card).at.zone === 'monsters', 'A card can only be linked to a monster.');
+      run.emit({ type: 'linked', card: source, to: op.card });
+      return;
+    }
+    case 'negate_activation': {
+      // The link answered is below the one resolving (or, while activating, below the new one).
+      const below = state.chain.length - 1;
+      let index = -1;
+      for (let i = below - 1; i >= 0; i--) if (state.chain[i]!.card === op.card) { index = i; break; }
+      check(index >= 0, `${cardOf(state, op.card).name} has no activation on the chain below this effect to negate.`);
+      check(!state.chain[index]!.negated, 'That activation is already negated.');
+      run.emit({ type: 'activationNegated', link: index, card: op.card });
+      return;
+    }
+    case 'negate_effects': {
+      const target = onField(state, op.card);
+      check(target.at.zone === 'monsters' && target.card.faceUp, 'Only a face-up monster has its effects negated this way.');
+      run.emit({ type: 'effectsNegated', card: op.card });
+      return;
+    }
+    case 'add_counters': {
+      check(Number.isInteger(op.count) && op.count > 0, 'count must be a positive whole number.');
+      const target = onField(state, op.card);
+      check(target.card.faceUp, 'Counters go on face-up cards.');
+      const now = target.card.counters[op.counter] ?? 0;
+      const delta = Math.min(op.count, (op.max ?? Infinity) - now);
+      check(delta > 0, `${cardOf(state, op.card).name} can't hold more of those counters.`);
+      run.emit({ type: 'countersChanged', card: op.card, counter: op.counter, delta });
+      return;
+    }
+    case 'remove_counters': {
+      check(Number.isInteger(op.count) && op.count > 0, 'count must be a positive whole number.');
+      const target = onField(state, op.card);
+      check((target.card.counters[op.counter] ?? 0) >= op.count, `${cardOf(state, op.card).name} doesn't have ${op.count} of those counters.`);
+      run.emit({ type: 'countersChanged', card: op.card, counter: op.counter, delta: -op.count });
+      return;
+    }
+    case 'set_again': {
+      check(ctx.stage === 'resolution', 'A card is Set again as it resolves.');
+      const source = state.chain.at(-1)?.card;
+      check(source && locate(state, source)?.zone === 'spellTraps', 'Only a Spell or Trap being resolved can be Set again.');
+      run.emit({ type: 'setAgain' });
+      return;
+    }
+    case 'forbid':
+      run.emit({ type: 'forbidden', player: op.player, what: op.what });
+      return;
+    case 'detach': {
+      const at = known(state, op.card);
+      check(at.zone === 'materials', `${cardOf(state, op.card).name} is not an Xyz Material.`);
+      run.emit({ type: 'moved', card: op.card, owner: state.instances[op.card]!.owner, from: 'materials', to: 'graveyard' });
+      return;
+    }
     case 'declare_targets': {
       check(ctx.stage === 'activation', 'Targets are chosen when the effect is activated, not when it resolves.');
       check(new Set(op.cards).size === op.cards.length, 'Each target may be named once.');
       for (const id of op.cards) {
         const at = known(state, id);
-        check(at.zone !== 'deck' && at.zone !== 'hand' && at.zone !== 'extra', 'Only cards on the field, in a GY or banished can be targeted.');
+        check(at.zone !== 'deck' && at.zone !== 'hand' && at.zone !== 'extra' && at.zone !== 'materials', 'Only cards on the field, in a GY or banished can be targeted.');
       }
       run.emit({ type: 'targeted', cards: op.cards });
       return;

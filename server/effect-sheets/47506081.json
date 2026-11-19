@@ -12,10 +12,49 @@
       "cost": "detach 1 Xyz Material from this card",
       "effect": "Inflict 1000 damage to your opponent.",
       "targets": null,
-      "when": null,
-      "script": null,
+      "when": {
+        "event": "battle_destroying",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "from": "field",
+        "canMiss": true,
+        "by": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "detach",
+            "cards": {
+              "from": "self"
+            },
+            "count": 1
+          }
+        ],
+        "targets": null,
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": 1000,
+                "kind": "damage"
+              }
+            ]
+          }
+        ]
+      },
+      "continuous": null,
       "status": "unverified"
     }
   ],
-  "materials": "2 Level 3 monsters"
+  "materials": {
+    "summon": "xyz",
+    "level": 3,
+    "count": 2
+  }
 }

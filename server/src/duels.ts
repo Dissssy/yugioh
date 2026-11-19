@@ -5,6 +5,7 @@
 // must run as a single server process.
 
 import { randomBytes, randomInt } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { and, desc, eq, or } from 'drizzle-orm';
 import {
   cardOf,
@@ -20,6 +21,7 @@ import {
   viewFor,
   visibleTo,
   type ChainLink,
+  type AppealRecord,
   type DuelEvent,
   type DuelState,
   type DuelUpdate,
@@ -204,7 +206,8 @@ export class Duels {
           const now = await loadSheets(this.db, live.state.cards);
           const changed = Object.keys(live.state.cards)
             .map(Number)
-            .filter((code) => JSON.stringify(now[code] ?? null) !== JSON.stringify(live.state.sheets[code] ?? null));
+            // Compared as values: Postgres stores JSON with its keys in its own order, so the text of an unchanged sheet differs.
+            .filter((code) => !isDeepStrictEqual(now[code] ?? null, live.state.sheets[code] ?? null));
           if (changed.length) await this.write(live, changed.map((code) => ({ type: 'sheetUpdated', code, sheet: now[code] ?? null })));
         }
         // Whatever the duel was doing when the server stopped (resolving a chain, waiting out a window) carries on.
@@ -245,6 +248,12 @@ export class Duels {
         if (intent.type !== 'activate') {
           await this.commit(duel, decision.events);
           answer({ ok: true });
+          // Both players accepted the rewind: the board goes back to before the overturned ruling.
+          const offer = duel.state.rollback;
+          if (offer?.accepted.length === 2) {
+            const { instances: _i, cards: _c, sheets: _s, ...board } = replay(duel.events.slice(0, offer.to));
+            await this.commit(duel, [{ type: 'rolledBack', to: offer.to, board }]);
+          }
           return this.advance(duel);
         }
         const blocked = this.judgeBlocked(duel, intent.card, intent.effect);
@@ -296,11 +305,14 @@ export class Duels {
         else await this.activate(duel, [], triggerEvent(next.trigger));
       } else if (next.kind === 'resolve') {
         const link = duel.state.chain.at(-1)!;
+        // After a rollback, the resolution it undid is ruled again as the appeal said.
+        const bound = duel.state.binding;
+        const ruling = bound && bound.card === link.card && bound.effect === link.effect ? bound.ruling : null;
         // An activation reserved its resolution's judge call; only a missing API key (after a restart) stops it.
         const { record, events } =
           !scriptOf(duel.state, link.card, link.effect) && !this.ai.judge
             ? { record: notRuled(duel.state, 'resolution', link.player, link.card, link.effect, "The judge isn't set up on this server."), events: [] }
-            : await this.runJudge(duel, 'resolution', duel.state, link);
+            : await this.runJudge(duel, 'resolution', duel.state, link, ruling);
         await this.commit(duel, [{ type: 'judged', record }, ...events, { type: 'linkResolved' }]);
       } else {
         if (next.autoPass) this.passLater(duel, next.player, next.floor);
@@ -379,6 +391,7 @@ export class Duels {
     const event = duel.events[seq];
     const seen = event?.type === 'judged' && logFor(duel.events.slice(0, seq + 1), seat).at(-1)?.seq === seq;
     if (!seen) return { ok: false, status: 404, error: 'There is no such ruling.' };
+    if (duel.events.some((e, i) => e.type === 'rolledBack' && i > seq && e.to <= seq)) return { ok: false, status: 409, error: 'A rewind undid that ruling.' };
     const key = `${seq}:${seat}`;
     const appeals = duel.events.filter((e) => e.type === 'appealed');
     if (duel.appealing.has(key) || appeals.some((e) => e.appeal.judged === seq && e.appeal.by === seat)) {
@@ -389,7 +402,7 @@ export class Duels {
     const input = { before: replay(duel.events.slice(0, seq)), now: duel.state, record: event.record, judged: seq, by: seat, note };
     void appeal(input, this.ai.appeal)
       .then(async (record) => {
-        await this.enqueue(duel, () => this.commit(duel, [{ type: 'appealed', appeal: record }]));
+        await this.enqueue(duel, () => this.commit(duel, [{ type: 'appealed', appeal: record }, ...this.rollbackOffer(duel, seq, record)]));
         // An overturned scripted ruling means the script is wrong: the judge takes the card over until it is fixed.
         if (record.verdict === 'overturned' && event.record.model === SCRIPT) {
           const code = cardOf(duel.state, event.record.card).code;
@@ -400,6 +413,18 @@ export class Duels {
       .catch((error: unknown) => console.error(`Appeal in duel ${duel.id} failed:`, error))
       .finally(() => duel.appealing.delete(key));
     return { ok: true };
+  }
+
+  /**
+   * An overturned ruling that changed the board (an activation allowed, or a resolution) offers both players a rewind
+   * to just before it: before the activation's intent, or the resolution. Not once the duel is over.
+   */
+  private rollbackOffer(duel: LiveDuel, seq: number, appeal: AppealRecord): DuelEvent[] {
+    const d = appeal.decision;
+    if (appeal.verdict !== 'overturned' || duel.state.result || (d.stage === 'activation' && !d.legal)) return [];
+    const before = duel.events[seq - 1];
+    const to = d.stage === 'activation' && before?.type === 'intent' && before.intent.type === 'activate' ? seq - 1 : seq;
+    return [{ type: 'rollbackOffered', offer: { judged: seq, to, decision: d, ruling: appeal.ruling, explanation: appeal.explanation } }];
   }
 
   /**

@@ -18,6 +18,8 @@ type Bind = (card: CardData | null) => {
   onPointerEnter?: (e: PointerEvent<HTMLElement>) => void;
   onPointerLeave?: () => void;
   onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
+  /** Marks the element as showing this card (its passcode), for zooming in on whatever is under the pointer. */
+  'data-zoom'?: number;
 };
 
 const TooltipContext = createContext<Bind>(() => ({}));
@@ -31,7 +33,7 @@ export const useCardHover = () => useContext(TooltipContext);
  * `pinnedFooter` adds controls under a pinned card's details.
  *
  * Holding Shift zooms instead: the card under the pointer is shown as large as fits beside it, with its text,
- * until Shift is released. Zoom is asked for on purpose, so it works while suppressed too.
+ * until Shift is released. Zoom is asked for on purpose, so it works while suppressed too, aiming an attack included.
  */
 export function CardTooltipProvider({
   suppressed,
@@ -44,8 +46,10 @@ export function CardTooltipProvider({
 }) {
   const [hover, setHover] = useState<Hover | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const pending = useRef<{ card: CardData; el: HTMLElement } | null>(null);
+  /** Every card handed to `bind`, by passcode, so the element under the pointer leads back to its card. */
+  const known = useRef(new Map<number, CardData>());
   const zoomHeld = useRef(false);
+  const pointer = useRef<{ x: number; y: number } | null>(null);
   const [zoom, setZoom] = useState<{ card: CardData; el: HTMLElement } | null>(null);
   const { refs, floatingStyles } = useFloating({
     elements: { reference: hover?.el ?? null },
@@ -57,26 +61,16 @@ export function CardTooltipProvider({
   const bind = useCallback<Bind>(
     (card) => {
       if (!card) return {};
-      const track = {
-        onPointerEnter: (e: PointerEvent<HTMLElement>) => {
-          pending.current = { card, el: e.currentTarget };
-          if (zoomHeld.current) setZoom(pending.current);
-        },
-        onPointerLeave: () => {
-          pending.current = null;
-          setZoom(null);
-        },
-      };
-      if (suppressed) return track;
+      known.current.set(card.code, card);
+      if (suppressed) return { 'data-zoom': card.code };
       return {
+        'data-zoom': card.code,
         onPointerEnter: (e) => {
-          track.onPointerEnter(e);
           const el = e.currentTarget;
           clearTimeout(timer.current);
           timer.current = setTimeout(() => setHover((h) => (h?.pinned ? h : { card, el, pinned: false })), HOVER_DELAY_MS);
         },
         onPointerLeave: () => {
-          track.onPointerLeave();
           clearTimeout(timer.current);
           setHover((h) => (h?.pinned ? h : null));
         },
@@ -98,18 +92,32 @@ export function CardTooltipProvider({
   }, [suppressed]);
 
   useEffect(() => {
+    /**
+     * The card under the pointer, found from where the pointer is rather than from enter and leave events, which some
+     * browsers don't send while a button is held (aiming an attack).
+     */
+    const zoomAtPointer = () => {
+      const at = pointer.current;
+      const el = at && document.elementsFromPoint(at.x, at.y).map((e) => e.closest<HTMLElement>('[data-zoom]')).find((e) => e);
+      const card = el && known.current.get(Number(el.dataset.zoom));
+      setZoom((z) => (card && el ? (z?.el === el && z.card === card ? z : { card, el }) : null));
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setHover(null);
       // Shift while typing (capitals in the chat or a search box) is not a request to zoom.
       if (e.key === 'Shift' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         zoomHeld.current = true;
-        setZoom(pending.current);
+        zoomAtPointer();
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key !== 'Shift') return;
       zoomHeld.current = false;
       setZoom(null);
+    };
+    const onMove = (e: globalThis.PointerEvent) => {
+      pointer.current = { x: e.clientX, y: e.clientY };
+      if (zoomHeld.current) zoomAtPointer();
     };
     // Leaving the window while holding Shift gives no keyup.
     const onBlur = () => {
@@ -124,11 +132,13 @@ export function CardTooltipProvider({
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
     window.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
       window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
     };
   }, [refs]);
 

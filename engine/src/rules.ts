@@ -2,7 +2,8 @@
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
 import { scriptOf, scriptProblem } from './script.ts';
-import { evolve, locate, monsterZoneFree, onField, other, statsOf } from './state.ts';
+import { continuousOnField, levelNow, replacement, restricted, statsOf } from './continuous.ts';
+import { evolve, locate, monsterZoneFree, monsterZonesFor, onField, other } from './state.ts';
 import {
   HAND_LIMIT,
   HANDS,
@@ -15,9 +16,11 @@ import {
   type DuelState,
   type Hand,
   type FieldCard,
+  type Forbidden,
   type Happening,
   type Intent,
   type LegalAction,
+  type Materials,
   type Seat,
   type Then,
 } from './types.ts';
@@ -162,6 +165,11 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
     }
   } else if (step.at === 'respond') {
     if (step.priority === seat) actions.push(...usable(state, seat), { type: 'pass' });
+  }
+  if (state.rollback && !state.rollback.accepted.includes(seat)) actions.push({ type: 'rollback' });
+  if (step.at === 'replace') {
+    const count = replacement(state, step.card);
+    if (step.player === seat && count !== null) actions.push({ type: 'replace', card: step.card, materials: onField(state, step.card).materials, count });
   } else if (step.at === 'open' && state.turnPlayer === seat) {
     const p = state.players[seat];
     actions.push(...usable(state, seat));
@@ -183,16 +191,21 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
           actions.push({ type: 'setSpellTrap', card: id, zones: freeZones(p.spellTraps) });
         }
       }
+      for (const id of p.extra) {
+        const action = extraSummonAction(state, seat, id);
+        if (action) actions.push(action);
+      }
       for (const m of monsters) {
         if (canFlipSummon(state, m)) actions.push({ type: 'flipSummon', card: m.id });
         else if (canChangePosition(state, m)) actions.push({ type: 'changePosition', card: m.id });
       }
     }
-    if (state.phase === 'main1' && state.turn > 1) actions.push({ type: 'enterBattle' });
+    if (state.phase === 'main1' && state.turn > 1 && !forbidden(state, seat, 'battle_phase')) actions.push({ type: 'enterBattle' });
     if (state.phase === 'battle') {
-      const targets = state.players[other(seat)].monsters.flatMap((m, i) => (m ? [i] : []));
+      const targets = attackTargets(state, seat);
+      const direct = state.players[other(seat)].monsters.every((m) => m === null);
       for (const m of ownMonsters(state, seat)) {
-        if (canAttack(state, m)) actions.push({ type: 'attack', attacker: m.id, targets, direct: targets.length === 0 });
+        if (canAttack(state, m) && (direct || targets.length > 0)) actions.push({ type: 'attack', attacker: m.id, targets, direct });
       }
       actions.push({ type: 'enterMain2' });
     }
@@ -203,14 +216,91 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
 }
 
 // ---------------------------------------------------------------------------
+// Summoning from the Extra Deck. Synchro and Xyz Summons are generic rules, so code checks them from the materials on
+// the monster's sheet, with no judge.
+
+type ExtraSummon = Extract<LegalAction, { type: 'extraSummon' }>;
+
+/** A Synchro or Xyz Summon of `id` the player can make now with the monsters they control, or null. */
+function extraSummonAction(state: DuelState, seat: Seat, id: string): ExtraSummon | null {
+  const card = cardOf(state, id);
+  const materials = state.sheets[card.code]?.materials;
+  if (!materials) return null;
+  const sets = materials.summon === 'xyz' ? xyzMaterials(state, seat, materials) : card.level === null ? [] : synchroMaterials(state, seat, materials, card.level);
+  const options = sets.flatMap((set) => {
+    const zones = zonesAfterLeaving(state, seat, set);
+    return zones.length > 0 ? [{ materials: set, zones }] : [];
+  });
+  return options.length > 0 ? { type: 'extraSummon', card: id, how: materials.summon, options } : null;
+}
+
+/** Every set of `count` face-up monsters the player controls whose current Level is the Xyz Monster's. */
+function xyzMaterials(state: DuelState, seat: Seat, materials: Extract<Materials, { summon: 'xyz' }>): string[][] {
+  const fitting = ownMonsters(state, seat).filter((m) => m.faceUp && levelNow(state, m.id) === materials.level).map((m) => m.id);
+  const sets: string[][] = [];
+  const pick = (from: number, chosen: string[]) => {
+    if (chosen.length === materials.count) return void sets.push(chosen);
+    for (let i = from; i < fitting.length; i++) pick(i + 1, [...chosen, fitting[i]!]);
+  };
+  pick(0, []);
+  return sets;
+}
+
+/**
+ * Every set of materials for a Synchro Monster of `level`: one face-up Tuner (the one named, if any) and enough face-up
+ * non-Tuners, whose current Levels add up exactly. Each set lists the Tuner first, then the rest in field order.
+ */
+function synchroMaterials(state: DuelState, seat: Seat, materials: Extract<Materials, { summon: 'synchro' }>, level: number): string[][] {
+  const faceUp = ownMonsters(state, seat).filter((m) => m.faceUp && levelNow(state, m.id) !== null);
+  const isTuner = (id: string) => /\bTuner\b/.test(cardOf(state, id).type);
+  const levelOf = (id: string) => levelNow(state, id)!;
+  const tuners = faceUp.filter((m) => isTuner(m.id) && (materials.tuner === null || cardOf(state, m.id).name === materials.tuner));
+  const others = faceUp.filter((m) => !isTuner(m.id)).map((m) => m.id);
+  const { min, max } = materials.nonTuners;
+  const sets: string[][] = [];
+  for (const tuner of tuners) {
+    const need = level - levelOf(tuner.id);
+    for (let mask = 1; mask < 1 << others.length; mask++) {
+      const picked = others.filter((_, i) => mask & (1 << i));
+      if (picked.length < min || (max !== null && picked.length > max)) continue;
+      if (picked.reduce((sum, id) => sum + levelOf(id), 0) === need) sets.push([tuner.id, ...picked]);
+    }
+  }
+  return sets;
+}
+
+/** The zones a monster from the Extra Deck may go to once these monsters have left the field. */
+function zonesAfterLeaving(state: DuelState, seat: Seat, leaving: string[]): number[] {
+  const players = state.players.map((p) => ({ ...p, monsters: p.monsters.map((m) => (m && leaving.includes(m.id) ? null : m)) })) as DuelState['players'];
+  return monsterZonesFor({ ...state, players }, seat, true);
+}
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id));
+
+function extraSummon(run: Run, seat: Seat, intent: Extract<Intent, { type: 'extraSummon' }>) {
+  const state = run.state;
+  check(isMainPhase(state), 'You can only Summon in a Main Phase.');
+  check(state.players[seat].extra.includes(intent.card), 'That card is not in your Extra Deck.');
+  const action = extraSummonAction(state, seat, intent.card);
+  check(action, `You can't Summon ${cardOf(state, intent.card).name} now.`);
+  check(new Set(intent.materials).size === intent.materials.length, 'Each material must be a different monster.');
+  const option = action.options.find((o) => sameSet(o.materials, intent.materials));
+  check(option, `Those monsters aren't materials for ${cardOf(state, intent.card).name}.`);
+  check(option.zones.includes(intent.zone), 'Choose an empty Monster Zone it can go to.');
+  check(intent.position === 'attack' || intent.position === 'defense', 'Choose Attack or Defense Position.');
+  run.emit({ type: 'extraSummoned', player: seat, card: intent.card, how: action.how, materials: intent.materials, zone: intent.zone, position: intent.position });
+  run.emit({ type: 'checkpoint', cause: run.state.happened.at(-1)!, then: { do: 'open' } });
+}
+
+// ---------------------------------------------------------------------------
 // Activating effects. Code checks what is the same for every card: the timing (the open game or a response window,
 // and the spell speed a window allows), the phase, where the card is, a free zone, once-per-turn use, and the event an
 // effect needs (`when`). A scripted effect's own conditions are checked here too (script.ts); for any other effect
 // they are the judge's call. Triggers go on the chain in their own step (chain.ts).
 
-/** Spell/Trap properties that can be activated. Continuous, Equip and Field cards need continuous effects (a later layer). */
-const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play'];
-const ACTIVATABLE_TRAPS = ['Normal'];
+/** Spell/Trap properties that can be activated. Field Spells come later. */
+const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play', 'Continuous', 'Equip'];
+const ACTIVATABLE_TRAPS = ['Normal', 'Continuous', 'Counter'];
 
 type Activate = Extract<LegalAction, { type: 'activate' }>;
 /** An activation the timing allows, with the event it answers, before its script is checked. */
@@ -237,18 +327,15 @@ function candidates(state: DuelState, seat: Seat, id: string): Candidate[] {
   // In a chain, a response must be at least as fast as the link it answers, and never Spell Speed 1.
   const minSpeed = window ? Math.max(2, ...state.chain.map((l) => speedOf(state, l))) : 1;
   const p = state.players[seat];
-  // A Spell/Trap with a continuous effect stays on the field doing something (Swords of Revealing Light); that needs
-  // continuous effects, which arrive in a later layer.
-  const lingers = card.kind !== 'monster' && sheet.effects.some((e) => e.kind === 'continuous');
   const result: Candidate[] = [];
   sheet.effects.forEach((effect, index) => {
-    if (lingers || effect.speed < minSpeed) return;
+    if (effect.speed < minSpeed) return;
     if (!onceOk(state, id, card.code, index, effect.opt)) return;
     if (ruledIllegal(state, seat, id, index)) return;
-    // An effect that answers an event can only be activated in the window that event opened. Responding to an
-    // activation needs negation (a later layer).
-    const cause = effect.when ? (window?.cause ?? null) : null;
-    if (effect.when && (effect.when.event === 'activated' || !cause || !whenMatches(state, effect.when, cause, id, seat))) return;
+    // An effect that answers an event can only be activated in the window that event opened; one that answers an
+    // activation, in the window the last link on the chain opened.
+    const cause = effect.when?.event === 'activated' ? lastActivation(state) : effect.when ? (window?.cause ?? null) : null;
+    if (effect.when && (!cause || !whenMatches(state, effect.when, cause, id, seat))) return;
     const push = (zones: number[] | null) => result.push({ ...activateAction(state, id, index, zones), cause });
     if (card.kind === 'spell' && effect.kind === 'activation' && ACTIVATABLE_SPELLS.includes(card.race)) {
       const quick = card.race === 'Quick-Play';
@@ -262,13 +349,20 @@ function candidates(state: DuelState, seat: Seat, id: string): Candidate[] {
       if (fast && set && !set.faceUp && set.placedTurn !== state.turn) push(null);
     } else if (card.kind === 'monster' && (effect.kind === 'ignition' || effect.kind === 'quick')) {
       const m = at.zone === 'monsters' ? p.monsters[at.index]! : null;
-      if (!m?.faceUp) return;
+      if (!m?.faceUp || m.effectsNegated) return;
       // An ignition effect needs your open Main Phase, unless its script names other phases (Speed Warrior).
       const phased = scriptOf(state, id, index)?.conditions.some((c) => c.if === 'phase');
       if (effect.kind === 'ignition' ? !window && yourTurn && (main || phased) : fast) push(null);
     }
   });
   return result;
+}
+
+/** The activation a response window answers: the chain's last link, while players may respond to it. */
+function lastActivation(state: DuelState): Happening | null {
+  const last = state.chain.at(-1);
+  if (state.step.at !== 'respond' || !last) return null;
+  return { event: 'activated', card: last.card, player: last.player, link: state.chain.length - 1, group: state.resolvedLinks };
 }
 
 /** A chain link's Spell Speed, from its effect sheet. */
@@ -304,11 +398,20 @@ function canFlipSummon(state: DuelState, m: FieldCard) {
 }
 
 function canChangePosition(state: DuelState, m: FieldCard) {
-  return m.faceUp && notJustPlaced(state, m) && positionUnchanged(state, m) && m.attackedTurn !== state.turn;
+  return m.faceUp && notJustPlaced(state, m) && positionUnchanged(state, m) && m.attackedTurn !== state.turn && !restricted(state, m.id, 'change_position');
 }
 
+/** Whether a resolved effect stopped the player doing this for the rest of the turn. */
+const forbidden = (state: DuelState, seat: Seat, what: Forbidden) => state.forbidden.some((f) => f.player === seat && f.what === what && f.turn === state.turn);
+
 function canAttack(state: DuelState, m: FieldCard) {
-  return m.faceUp && m.position === 'attack' && m.attackedTurn !== state.turn;
+  const seat = locate(state, m.id)!.seat;
+  return m.faceUp && m.position === 'attack' && m.attackedTurn !== state.turn && !restricted(state, m.id, 'attack') && !forbidden(state, seat, 'declare_attack');
+}
+
+/** The opponent's Monster Zones the player's monsters may attack: every monster there that can be targeted for an attack. */
+function attackTargets(state: DuelState, seat: Seat): number[] {
+  return state.players[other(seat)].monsters.flatMap((m, i) => (m && !restricted(state, m.id, 'be_attacked') ? [i] : []));
 }
 
 // ---------------------------------------------------------------------------
@@ -335,6 +438,20 @@ export function decide(state: DuelState, seat: Seat, intent: Intent): Decision {
     check(state.turn > 0, 'The duel starts once rock-paper-scissors decides who goes first.');
     if (intent.type === 'activate') {
       activate(run, seat, intent);
+      return { ok: true, events: run.events };
+    }
+    if (intent.type === 'rollback') {
+      check(state.rollback && !state.rollback.accepted.includes(seat), 'There is no rewind for you to answer.');
+      run.emit({ type: 'rollbackAnswered', player: seat, accept: intent.accept });
+      return { ok: true, events: run.events };
+    }
+    if (intent.type === 'replace') {
+      const offer = legalActions(state, seat).find((a) => a.type === 'replace');
+      check(offer, 'Nothing is asking you that now.');
+      const picked = new Set(intent.materials);
+      check(picked.size === intent.materials.length && intent.materials.every((m) => offer.materials.includes(m)), 'Pick materials attached to that monster.');
+      check(picked.size === 0 || picked.size === offer.count, `Detach exactly ${offer.count}, or none.`);
+      run.emit({ type: 'replacementChosen', card: offer.card, materials: intent.materials });
       return { ok: true, events: run.events };
     }
     check(state.turnPlayer === seat, "It's not your turn.");
@@ -373,6 +490,9 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
       if (intent.type === 'normalSummon') run.emit({ type: 'checkpoint', cause: run.state.happened.at(-1)!, then: { do: 'open' } });
       return;
     }
+    case 'extraSummon':
+      extraSummon(run, seat, intent);
+      return;
     case 'setSpellTrap': {
       check(isMainPhase(state), 'You can only Set cards in a Main Phase.');
       check(p.hand.includes(intent.card), 'That card is not in your hand.');
@@ -399,6 +519,7 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
     }
     case 'enterBattle':
       check(state.phase === 'main1', 'You can only enter the Battle Phase from Main Phase 1.');
+      check(!forbidden(state, seat, 'battle_phase'), "You can't conduct your Battle Phase this turn.");
       check(state.turn > 1, "The player who goes first can't conduct a Battle Phase on the first turn.");
       run.emit({ type: 'phaseChanged', phase: 'battle' });
       // The opponent's chance to act as the Battle Phase starts (Threatening Roar).
@@ -439,10 +560,13 @@ function attack(run: Run, seat: Seat, attackerId: string, target: number | 'dire
   const foeMonsters = state.players[other(seat)].monsters;
   if (target === 'direct') {
     check(foeMonsters.every((m) => m === null), "You can't attack directly while your opponent controls a monster.");
-  } else check(foeMonsters[target], 'There is no monster in that zone.');
+  } else {
+    check(foeMonsters[target], 'There is no monster in that zone.');
+    check(attackTargets(state, seat).includes(target), "That monster can't be targeted for an attack.");
+  }
   run.emit({ type: 'attackDeclared', player: seat, attacker: attacker.id, target: target === 'direct' ? null : foeMonsters[target]!.id });
   // Triggers and responses to the attack come first (Mirror Force); damage follows once they are done (damage below).
-  run.emit({ type: 'checkpoint', cause: run.state.happened.find((h) => h.event === 'attack_declared')!, then: { do: 'damage' } });
+  run.emit({ type: 'checkpoint', cause: run.state.happened.find((h) => h.event === 'attack_declared')!, then: { do: 'damage_step' } });
 }
 
 // ---------------------------------------------------------------------------
@@ -451,62 +575,109 @@ function attack(run: Run, seat: Seat, attackerId: string, target: number | 'dire
 /** The events that come once a sequence is over: the attack's damage, or the end of the turn. */
 export function continuation(state: DuelState, then: Then): DuelEvent[] {
   const run = new Run(state);
-  if (then.do === 'damage') damage(run);
+  if (then.do === 'damage_step') damageStep(run);
+  else if (then.do === 'damage') damage(run);
   else if (then.do === 'endTurn') endTurn(run, then.discard);
   return run.events;
 }
 
+/** The attacking monster, if it is still on its controller's field face-up in Attack Position. */
+function stillAttacking(state: DuelState, id: string): boolean {
+  const at = locate(state, id);
+  const m = at?.zone === 'monsters' && at.seat === state.turnPlayer ? state.players[at.seat].monsters[at.index]! : null;
+  return !!m && m.faceUp && m.position === 'attack';
+}
+
+/** Whether the attack's target is still the opponent's monster. */
+const targetStands = (state: DuelState, target: string) => {
+  const at = locate(state, target);
+  return at?.zone === 'monsters' && at.seat === other(state.turnPlayer);
+};
+
 /**
- * The attack's damage, if it still stands. An attacker that left the field or changed position stops attacking. A
- * target that left, or a direct attack whose defender now has a monster, is a replay: the attack ends and the
- * monster may attack again. Triggers from the battle (Magna Drago) follow.
+ * The attack enters the Damage Step, if it still stands. An attacker that left the field or changed position stops
+ * attacking. A target that left, or a direct attack whose defender now has a monster, is a replay: the attack ends and
+ * the monster may attack again. Triggers at the start of the Damage Step (Zubaba Knight) come before damage.
+ */
+function damageStep(run: Run) {
+  const state = run.state;
+  // An attack an effect negated is already over.
+  if (!state.attack) return run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
+  const { attacker, target } = state.attack;
+  const foeMonsters = state.players[other(state.turnPlayer)].monsters;
+  if (!stillAttacking(state, attacker)) run.emit({ type: 'attackEnded', replay: false });
+  else if (target === null ? foeMonsters.some((m) => m !== null) : !targetStands(state, target)) run.emit({ type: 'attackEnded', replay: true });
+  else {
+    run.emit({ type: 'damageStepStarted' });
+    return run.emit({ type: 'checkpoint', cause: null, then: { do: 'damage' } });
+  }
+  run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
+}
+
+/**
+ * The attack's damage. If the attacker or its target left the field during the Damage Step, the attack just ends.
+ * Triggers from the battle (Magna Drago) follow.
  */
 function damage(run: Run) {
   const state = run.state;
   const seat = state.turnPlayer;
   const foe = other(seat);
-  // An attack an effect negated is already over.
   if (!state.attack) return run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
   const { attacker: attackerId, target } = state.attack;
-  const at = locate(state, attackerId);
-  const attacker = at?.zone === 'monsters' && at.seat === seat ? state.players[seat].monsters[at.index]! : null;
-  const targetAt = target === null ? null : locate(state, target);
-  const foeMonsters = state.players[foe].monsters;
-  if (!attacker || !attacker.faceUp || attacker.position !== 'attack') run.emit({ type: 'attackEnded', replay: false });
-  else if (target === null ? foeMonsters.some((m) => m !== null) : targetAt?.zone !== 'monsters' || targetAt.seat !== foe) {
-    run.emit({ type: 'attackEnded', replay: true });
-  } else {
-    const atk = statsOf(state, attackerId).atk;
-    if (target === null) run.emit({ type: 'battleDamage', player: foe, amount: atk, by: attackerId });
-    else battle(run, attackerId, atk, target);
-    run.emit({ type: 'attackEnded', replay: false });
+  if (!stillAttacking(state, attackerId) || (target !== null && !targetStands(state, target))) run.emit({ type: 'attackEnded', replay: false });
+  else if (target === null) run.emit({ type: 'battleDamage', player: foe, amount: statsOf(state, attackerId).atk, by: attackerId });
+  else {
+    if (!onField(state, target).faceUp) run.emit({ type: 'flippedByAttack', card: target });
+    const result = battle(run.state, attackerId, target);
+    // A monster that would be destroyed but can detach materials instead waits for its controller to decide.
+    const replaced = run.state.attack!.replaced;
+    const asking = result.destroyed.find((id) => replacement(run.state, id) !== null && !(id in replaced));
+    if (asking) return run.emit({ type: 'replacementOffered', card: asking, player: locate(run.state, asking)!.seat, then: { do: 'damage' } });
+    for (const id of result.destroyed) for (const m of replaced[id] ?? []) run.emit({ type: 'moved', card: m, owner: run.state.instances[m]!.owner, from: 'materials', to: 'graveyard' });
+    const lost = result.destroyed.filter((id) => !replaced[id]?.length);
+    if (lost.length > 0) run.emit({ type: 'destroyedByBattle', cards: lost });
+    if (result.damage) run.emit({ type: 'battleDamage', ...result.damage });
   }
+  if (run.state.attack) run.emit({ type: 'attackEnded', replay: false });
   endIfLpGone(run);
   if (!run.state.result) run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
 }
 
-function battle(run: Run, attackerId: string, atk: number, target: string) {
-  const seat = run.state.turnPlayer;
+/**
+ * Damage calculation between an attacker and a face-up target: the monsters destroyed (not those an effect protects,
+ * Sonic Chick) and the battle damage dealt.
+ */
+function battle(state: DuelState, attackerId: string, target: string): { destroyed: string[]; damage: { player: Seat; amount: number; by: string } | null } {
+  const seat = state.turnPlayer;
   const foe = other(seat);
-  const defender = onField(run.state, target);
-  if (!defender.faceUp) run.emit({ type: 'flippedByAttack', card: target });
-  const stats = statsOf(run.state, target);
-  if (defender.position === 'attack') {
+  const atk = statsOf(state, attackerId).atk;
+  const stats = statsOf(state, target);
+  const protectedFrom = (id: string) => restricted(state, id, 'be_destroyed_by_battle', id === attackerId ? target : attackerId);
+  const result = (destroyed: string[], damage: { player: Seat; amount: number; by: string } | null) => ({ destroyed: destroyed.filter((id) => !protectedFrom(id)), damage });
+  if (onField(state, target).position === 'attack') {
     const def = stats.atk;
-    if (atk > def) {
-      run.emit({ type: 'destroyedByBattle', cards: [target] });
-      run.emit({ type: 'battleDamage', player: foe, amount: atk - def, by: attackerId });
-    } else if (atk < def) {
-      run.emit({ type: 'destroyedByBattle', cards: [attackerId] });
-      run.emit({ type: 'battleDamage', player: seat, amount: def - atk, by: target });
-    } else if (atk > 0) {
-      run.emit({ type: 'destroyedByBattle', cards: [attackerId, target] });
-    }
-  } else {
-    const def = stats.def;
-    if (atk > def) run.emit({ type: 'destroyedByBattle', cards: [target] });
-    else if (atk < def) run.emit({ type: 'battleDamage', player: seat, amount: def - atk, by: target });
+    if (atk > def) return result([target], { player: foe, amount: atk - def, by: attackerId });
+    if (atk < def) return result([attackerId], { player: seat, amount: def - atk, by: target });
+    return result(atk > 0 ? [attackerId, target] : [], null);
   }
+  const def = stats.def;
+  if (atk > def) return result([target], null);
+  return result([], atk < def ? { player: seat, amount: def - atk, by: target } : null);
+}
+
+/**
+ * Cards that destroy themselves in this End Phase: those of the turn player's opponent whose count of that player's
+ * turns since activation has come (Swords of Revealing Light).
+ */
+function selfDestructing(state: DuelState): string[] {
+  return continuousOnField(state).flatMap((f) => {
+    if (f.effect.apply !== 'self_destruct' || f.seat === state.turnPlayer) return [];
+    const since = onField(state, f.source).activatedTurn;
+    if (since === null) return [];
+    // Turns alternate, so the turns of this card's controller's opponent since then are every other one, ending now.
+    const turns = Math.floor((state.turn - since + 1) / 2);
+    return turns === f.effect.opponentTurns ? [f.source] : [];
+  });
 }
 
 /** Discards down to the hand limit (the cards the player chose, if still in hand) and starts the next turn. */
@@ -517,6 +688,8 @@ function endTurn(run: Run, chosen: string[]) {
   const excess = Math.max(0, hand.length - HAND_LIMIT);
   const kept = chosen.filter((id) => hand.includes(id));
   const discard = [...kept, ...hand.filter((id) => !kept.includes(id)).reverse()].slice(0, excess);
+  const expiring = selfDestructing(state);
+  for (const id of expiring) run.emit({ type: 'destroyed', cards: [id], by: locate(state, id)!.seat });
   if (discard.length > 0) run.emit({ type: 'discarded', player: seat, cards: discard });
   beginTurn(run, other(seat), state.turn + 1);
 }

@@ -18,11 +18,15 @@ import {
   cardOf,
   decide,
   evolve,
+  locate,
+  nextStep,
+  triggerEvent,
   replay,
   statsOf,
   type CardData,
   type DuelEvent,
   type DuelState,
+  type Intent,
   type JudgeRecord,
   type ModelUsage,
   type Seat,
@@ -49,18 +53,27 @@ interface Side {
   banished?: string[];
   deck?: string[];
   extra?: string[];
+  /** Face-up Xyz Monsters in Attack Position, each as [its name, ...the names of its Xyz Materials]. */
+  xyz?: string[][];
 }
 
 export interface EvalCase {
   name: string;
-  /** The activating player is on turn, in Main Phase 1 of turn 3. */
+  /** In Main Phase 1 of turn 3, on the activating player's turn, or player 0's when the case has `before`. */
   board: [Side, Side];
+  /**
+   * What happens first, each by the player named, given card IDs by name: an activation here is ruled on but doesn't
+   * resolve, and then the duel goes on by itself as the server runs it (passes for a player with nothing to activate,
+   * battle steps, mandatory triggers and the chains they start) until a player must act.
+   */
+  before?: (id: (name: string) => string) => [Seat, Intent][];
   /** The player who activates (default 0). */
   seat?: Seat;
-  activate: string;
+  /** The card to activate; without one, the case checks the board once `before` is over (a mandatory trigger). */
+  activate?: string;
   /** Which of the card's effects to activate, by its index in the sheet (default 0). */
   effect?: number;
-  /** Names or choices to pick, one list per question, in order. Unlisted questions get the first options. */
+  /** Names or choices to pick, one list per question, in order (`before` first). Unlisted questions get the first options. */
   picks?: string[][];
   legal: boolean;
   /** Checks the board after resolution; returns a problem, or null. */
@@ -81,6 +94,7 @@ class Board {
       const places = { hand: p.hand, deck: p.deck, gy: p.graveyard, banished: p.banished, extra: p.extra };
       for (const [place, ids] of Object.entries(places)) for (const id of ids) if (cardOf(this.state, id).name === name) found.push(`${s}:${place}`);
       for (const c of p.monsters) if (c && cardOf(this.state, c.id).name === name) found.push(`${s}:monsters`);
+      for (const c of p.monsters) for (const m of c?.materials ?? []) if (cardOf(this.state, m).name === name) found.push(`${s}:materials`);
       for (const c of p.spellTraps) if (c && cardOf(this.state, c.id).name === name) found.push(`${s}:spellTraps`);
     }
     return found;
@@ -228,6 +242,14 @@ export const CASES: EvalCase[] = [
     legal: false,
   },
   {
+    name: 'synchro blast wave destroys a target once a synchro monster is out',
+    board: [{ hand: ['Synchro Blast Wave'], monsters: ['Junk Warrior'] }, { monsters: ['Sonic Chick'] }],
+    activate: 'Synchro Blast Wave',
+    picks: [['Sonic Chick']],
+    legal: true,
+    check: (b) => expectAt(b, 'Sonic Chick', '1:gy'),
+  },
+  {
     name: 'poison of the old man inflicts 800 when chosen',
     board: [{ hand: ['Poison of the Old Man'] }, {}],
     activate: 'Poison of the Old Man',
@@ -279,7 +301,7 @@ export const CASES: EvalCase[] = [
     activate: 'Reinforce Truth',
     picks: [['Speed Warrior'], ['Defense']],
     legal: true,
-    check: (b) => all(expectAt(b, 'Speed Warrior', '0:monsters'), b.monster('Speed Warrior')?.position === 'defense' ? null : 'not in Defense Position', expectAt(b, 'Reinforce Truth', '0:gy')),
+    check: (b) => all(expectAt(b, 'Speed Warrior', '0:monsters'), b.monster('Speed Warrior')?.position === 'defense' ? null : 'not in Defense Position', expectAt(b, 'Reinforce Truth', '0:gy'), b.state.forbidden.some((f) => f.player === 0 && f.what === 'battle_phase') ? null : 'no Battle Phase ban'),
   },
   {
     name: 'backup soldier needs 5 monsters in the GY',
@@ -418,7 +440,7 @@ export const CASES: EvalCase[] = [
     board: [{ set: ['Threatening Roar'] }, { monsters: ['Speed Warrior'] }],
     activate: 'Threatening Roar',
     legal: true,
-    check: (b) => expectAt(b, 'Threatening Roar', '0:gy'),
+    check: (b) => all(expectAt(b, 'Threatening Roar', '0:gy'), b.state.forbidden.some((f) => f.player === 1 && f.what === 'declare_attack') ? null : 'no attack ban on player 1'),
   },
   {
     name: 'backup soldier returns up to 3 non-effect monsters',
@@ -451,6 +473,212 @@ export const CASES: EvalCase[] = [
     board: [{ set: ['Trap Hole'] }, { monsters: ['Axe Raider'] }],
     activate: 'Trap Hole',
     legal: false,
+  },
+  {
+    name: 'xyz energy detaches a material to destroy a face-up monster',
+    board: [{ hand: ['Xyz Energy'], xyz: [['Number 39: Utopia', 'Axe Raider', 'Dark Blade']] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Xyz Energy',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Speed Warrior', '1:gy'), expectAt(b, 'Axe Raider', '0:gy'), expectAt(b, 'Dark Blade', '0:materials')),
+  },
+  {
+    name: 'reinforced space gives 300 ATK per xyz material',
+    board: [{ set: ['Reinforced Space'], xyz: [['Number 39: Utopia', 'Axe Raider', 'Dark Blade']] }, {}],
+    activate: 'Reinforced Space',
+    legal: true,
+    check: (b) => (b.monster('Number 39: Utopia')?.atk === 3100 ? null : `Utopia has ATK ${b.monster('Number 39: Utopia')?.atk}`),
+  },
+  {
+    name: 'banner of courage stays on the field and gives 200 ATK only in your battle phase',
+    board: [{ hand: ['Banner of Courage'], monsters: ['Axe Raider'] }, {}],
+    activate: 'Banner of Courage',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Banner of Courage', '0:spellTraps'), b.monster('Axe Raider')?.atk === 1700 ? null : `Axe Raider has ATK ${b.monster('Axe Raider')?.atk} in Main Phase 1`),
+  },
+  {
+    name: 'swords of revealing light stays on the field and flips face-down monsters',
+    board: [{ hand: ['Swords of Revealing Light'] }, { setMonsters: ['Mystic Tomato'] }],
+    activate: 'Swords of Revealing Light',
+    effect: 1,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Swords of Revealing Light', '0:spellTraps'), b.state.players[1].monsters[0]?.faceUp ? null : 'Mystic Tomato is still face-down'),
+  },
+  {
+    name: 'lucky iron axe equips a monster for 500 ATK',
+    board: [{ hand: ['Lucky Iron Axe'], monsters: ['Axe Raider'] }, {}],
+    activate: 'Lucky Iron Axe',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Lucky Iron Axe', '0:spellTraps'), b.monster('Axe Raider')?.atk === 2200 ? null : `Axe Raider has ATK ${b.monster('Axe Raider')?.atk}`),
+  },
+  {
+    name: 'synchro boost gives 500 ATK and a level',
+    board: [{ hand: ['Synchro Boost'], monsters: ['Speed Warrior'] }, {}],
+    activate: 'Synchro Boost',
+    legal: true,
+    check: (b) => (b.monster('Speed Warrior')?.atk === 1400 && b.monster('Speed Warrior')?.level === 3 ? null : `Speed Warrior is ${JSON.stringify(b.monster('Speed Warrior'))}`),
+  },
+  {
+    name: 'symbols of duty sends a normal monster to revive and equip a monster',
+    board: [{ hand: ['Symbols of Duty'], monsters: ['Axe Raider'], gy: ['Junk Synchron'] }, {}],
+    activate: 'Symbols of Duty',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Axe Raider', '0:gy'), expectAt(b, 'Junk Synchron', '0:monsters'), expectAt(b, 'Symbols of Duty', '0:spellTraps')),
+  },
+  {
+    name: 'spellbinding circle ties itself to an opponent monster',
+    board: [{ set: ['Spellbinding Circle'] }, { monsters: ['Dark Blade'] }],
+    activate: 'Spellbinding Circle',
+    legal: true,
+    check: (b) => (b.state.players[0].spellTraps[0]?.linked === b.state.players[1].monsters[0]?.id ? null : 'Spellbinding Circle is not tied to Dark Blade'),
+  },
+  {
+    name: 'birthright summons a normal monster and ties itself to it',
+    board: [{ set: ['Birthright'], gy: ['Axe Raider'] }, {}],
+    activate: 'Birthright',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Axe Raider', '0:monsters'), b.state.players[0].spellTraps[0]?.linked === b.state.players[0].monsters[0]?.id ? null : 'Birthright is not tied to Axe Raider'),
+  },
+  {
+    name: 'limit reverse summons a weak monster in attack position',
+    board: [{ set: ['Limit Reverse'], gy: ['Speed Warrior'] }, {}],
+    activate: 'Limit Reverse',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Speed Warrior', '0:monsters'), b.monster('Speed Warrior')?.position === 'attack' ? null : 'not in Attack Position', expectAt(b, 'Limit Reverse', '0:spellTraps')),
+  },
+  {
+    name: 'miniaturize takes a level and 1000 ATK while it stays',
+    board: [{ set: ['Miniaturize'] }, { monsters: ['Dark Blade'] }],
+    activate: 'Miniaturize',
+    legal: true,
+    check: (b) => (b.monster('Dark Blade')?.atk === 800 && b.monster('Dark Blade')?.level === 3 ? null : `Dark Blade is ${JSON.stringify(b.monster('Dark Blade'))}`),
+  },
+  {
+    name: 'seven tools negates a trap for 1000 lp',
+    board: [{ set: ['Limit Reverse'], gy: ['Speed Warrior'] }, { set: ['Seven Tools of the Bandit'] }],
+    before: (id) => [[0, { type: 'activate', card: id('Limit Reverse'), effect: 0, zone: null }]],
+    seat: 1,
+    activate: 'Seven Tools of the Bandit',
+    legal: true,
+    check: (b) => all(b.lp(1) === 7000 ? null : `LP is ${b.lp(1)}`, b.state.chain[0]?.negated ? null : 'Limit Reverse was not negated'),
+  },
+  {
+    name: 'seven tools cannot answer a monster effect',
+    board: [{ monsters: ['Exiled Force'] }, { set: ['Seven Tools of the Bandit'], monsters: ['Axe Raider'] }],
+    before: (id) => [[0, { type: 'activate', card: id('Exiled Force'), effect: 0, zone: null }]],
+    seat: 1,
+    activate: 'Seven Tools of the Bandit',
+    legal: false,
+  },
+  {
+    name: 'divine wrath discards to negate a monster effect',
+    board: [{ monsters: ['Exiled Force'] }, { set: ['Divine Wrath'], hand: ['Sonic Chick'], monsters: ['Axe Raider'] }],
+    before: (id) => [[0, { type: 'activate', card: id('Exiled Force'), effect: 0, zone: null }]],
+    seat: 1,
+    activate: 'Divine Wrath',
+    picks: [['Axe Raider'], ['Sonic Chick']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Sonic Chick', '1:gy'), expectAt(b, 'Exiled Force', '0:gy'), expectAt(b, 'Axe Raider', '1:monsters'), b.state.chain[0]?.negated ? null : 'Exiled Force was not negated'),
+  },
+  {
+    name: 'scrap-iron scarecrow negates an attack and sets itself again',
+    board: [{ monsters: ['Axe Raider'] }, { set: ['Scrap-Iron Scarecrow'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Axe Raider'), target: 'direct' }],
+    ],
+    seat: 1,
+    activate: 'Scrap-Iron Scarecrow',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Scrap-Iron Scarecrow', '1:spellTraps'), b.state.players[1].spellTraps.some((s) => s && !s.faceUp) ? null : 'it is not Set again', b.state.attack ? 'the attack goes on' : null),
+  },
+  {
+    name: 'junk synchron revives a level 2 or lower with its effects negated',
+    board: [{ hand: ['Junk Synchron'], gy: ['Speed Warrior', 'Axe Raider'] }, {}],
+    before: (id) => [[0, { type: 'normalSummon', card: id('Junk Synchron'), tributes: [], zone: 0 }]],
+    activate: 'Junk Synchron',
+    picks: [['Speed Warrior']],
+    legal: true,
+    check: (b) =>
+      all(expectAt(b, 'Speed Warrior', '0:monsters'), b.monster('Speed Warrior')?.position === 'defense' ? null : 'not in Defense Position', b.monster('Speed Warrior')?.effectsNegated ? null : 'its effects are not negated'),
+  },
+  {
+    name: 'speed bird revives two level 2 monsters with their effects negated',
+    board: [{ monsters: ['Dark Blade'] }, { monsters: ['Speed Bird'], gy: ['Speed Warrior', 'Tenshin'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Dark Blade'), target: 0 }],
+    ],
+    seat: 1,
+    activate: 'Speed Bird',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Speed Warrior', '1:monsters'), expectAt(b, 'Tenshin', '1:monsters'), b.monster('Tenshin')?.effectsNegated ? null : 'Tenshin is not negated'),
+  },
+  {
+    name: 'zubaba knight destroys a face-up defense position monster it attacks',
+    board: [{ monsters: ['Zubaba Knight'] }, { defense: ['Spirit of the Harp'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Zubaba Knight'), target: 0 }],
+    ],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Spirit of the Harp', '1:gy'), b.lp(1) === 8000 ? null : `LP is ${b.lp(1)}`),
+  },
+  {
+    name: 'majestic mech senku goes to the gy in the end phase of its summon turn',
+    board: [{ hand: ['Majestic Mech - Senku'] }, {}],
+    before: (id) => [
+      [0, { type: 'normalSummon', card: id('Majestic Mech - Senku'), tributes: [], zone: 0 }],
+      [0, { type: 'endTurn', discard: [] }],
+    ],
+    legal: true,
+    check: (b) => expectAt(b, 'Majestic Mech - Senku', '0:gy'),
+  },
+  {
+    name: 'frequency magician spends its spell counter for 500 atk',
+    board: [{ hand: ['Frequency Magician'], monsters: ['Axe Raider'] }, {}],
+    before: (id) => [[0, { type: 'normalSummon', card: id('Frequency Magician'), tributes: [], zone: 1 }]],
+    activate: 'Frequency Magician',
+    effect: 1,
+    picks: [['Axe Raider']],
+    legal: true,
+    check: (b) => all(b.monster('Axe Raider')?.atk === 2200 ? null : `Axe Raider has ${b.monster('Axe Raider')?.atk} ATK`, b.monster('Frequency Magician')?.counters.spell === 0 ? null : 'the counter is still there'),
+  },
+  {
+    name: 'frequency magician needs a spell counter',
+    board: [{ monsters: ['Frequency Magician', 'Axe Raider'] }, {}],
+    activate: 'Frequency Magician',
+    effect: 1,
+    legal: false,
+  },
+  {
+    name: "lucky iron axe draws when the opponent's effect destroys it",
+    board: [{ monsters: ['Axe Raider'], hand: ['Lucky Iron Axe'], deck: ['Dark Blade'] }, { set: ['Raigeki Break'], hand: ['Twister'] }],
+    before: (id) => [
+      [0, { type: 'activate', card: id('Lucky Iron Axe'), effect: 0, zone: 0 }],
+      [1, { type: 'pass' }],
+      [0, { type: 'enterBattle' }],
+    ],
+    seat: 1,
+    activate: 'Raigeki Break',
+    picks: [['Axe Raider'], ['Twister'], ['Lucky Iron Axe']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Lucky Iron Axe', '0:gy'), expectAt(b, 'Dark Blade', '0:hand')),
+  },
+  {
+    name: 'gachi gachi gantetsu can detach a material instead of being destroyed',
+    board: [{ set: ['Raigeki Break'], hand: ['Twister'] }, { xyz: [['Gachi Gachi Gantetsu', 'Speed Warrior', 'Tenshin']] }],
+    activate: 'Raigeki Break',
+    picks: [['Twister'], ['Gachi Gachi Gantetsu'], ['Detach instead'], ['Tenshin']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Gachi Gachi Gantetsu', '1:monsters'), expectAt(b, 'Tenshin', '1:gy'), expectAt(b, 'Speed Warrior', '1:materials')),
+  },
+  {
+    name: 'gachi gachi gantetsu can still be destroyed',
+    board: [{ set: ['Raigeki Break'], hand: ['Twister'] }, { xyz: [['Gachi Gachi Gantetsu', 'Speed Warrior', 'Tenshin']] }],
+    activate: 'Raigeki Break',
+    picks: [['Twister'], ['Gachi Gachi Gantetsu'], ['Let it be destroyed']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Gachi Gachi Gantetsu', '1:gy'), expectAt(b, 'Tenshin', '1:gy')),
   },
   {
     name: 'xyz effect needs an xyz summon',
@@ -492,18 +720,30 @@ export const CASES: EvalCase[] = [
 export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: Awaited<ReturnType<typeof loadSheets>>): DuelState {
   const byName = new Map(Object.values(data).map((d) => [d.name, d.code]));
   const instances: Record<string, { code: number; owner: Seat }> = {};
-  const places: { id: string; seat: Seat; how: keyof Side }[] = [];
+  const places: { id: string; seat: Seat; how: Exclude<keyof Side, 'xyz'> }[] = [];
+  const xyzs: { id: string; seat: Seat; materials: string[] }[] = [];
   const decks: [string[], string[]] = [[], []];
   const extras: [string[], string[]] = [[], []];
   c.board.forEach((side, s) => {
     const seat = s as Seat;
     let n = 0;
-    for (const [how, names] of Object.entries(side) as [keyof Side, string[]][]) {
+    const instance = (name: string) => {
+      const code = byName.get(name);
+      if (code === undefined) throw new Error(`${c.name}: unknown card ${name}`);
+      const id = `${'ab'[seat]}${n++}`;
+      instances[id] = { code, owner: seat };
+      return id;
+    };
+    for (const [xyz, ...materials] of side.xyz ?? []) {
+      const id = instance(xyz!);
+      extras[seat].push(id);
+      const attached = materials.map(instance);
+      decks[seat].push(...attached);
+      xyzs.push({ id, seat, materials: attached });
+    }
+    for (const [how, names] of Object.entries(side).filter(([how]) => how !== 'xyz') as [Exclude<keyof Side, 'xyz'>, string[]][]) {
       for (const name of names) {
-        const code = byName.get(name);
-        if (code === undefined) throw new Error(`${c.name}: unknown card ${name}`);
-        const id = `${'ab'[seat]}${n++}`;
-        instances[id] = { code, owner: seat };
+        const id = instance(name);
         if (how === 'extra') extras[seat].push(id);
         else decks[seat].push(id);
         if (how !== 'deck' && how !== 'extra') places.push({ id, seat, how });
@@ -543,7 +783,10 @@ export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: 
       events.push({ type: 'effectActivated', player: seat, card: id, effect: 0, zone: zones[seat]![1]++, cause: null }, { type: 'linkResolved' });
     }
   }
-  events.push({ type: 'turnStarted', player: c.seat ?? 0, turn: 3 }, { type: 'phaseChanged', phase: 'main1' });
+  for (const { id, seat, materials } of xyzs) {
+    events.push({ type: 'extraSummoned', player: seat, card: id, how: 'xyz', materials, zone: zones[seat]![0]++, position: 'attack' });
+  }
+  events.push({ type: 'turnStarted', player: c.before ? 0 : (c.seat ?? 0), turn: 3 }, { type: 'phaseChanged', phase: 'main1' });
   return replay(events);
 }
 
@@ -559,20 +802,14 @@ export interface EvalResult {
  * Runs one case: the activation check, then (if legal) the resolution, answering questions from `picks`. A scripted
  * effect runs without the model, so `model` may be null for cases whose effects all have scripts.
  */
-export async function runCase(c: EvalCase, state: DuelState, model: ModelCall | null): Promise<EvalResult> {
+export async function runCase(c: EvalCase, board: DuelState, model: ModelCall | null): Promise<EvalResult> {
   const seat = c.seat ?? 0;
-  const p = state.players[seat];
-  const id = [...p.hand, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((m) => (m ? [m.id] : []))].find((x) => cardOf(state, x).name === c.activate)!;
-  const zone = p.hand.includes(id) ? p.spellTraps.indexOf(null) : null;
-  const intent = decide(state, seat, { type: 'activate', card: id, effect: c.effect ?? 0, zone });
-  // Code refuses an activation that the effect's script or `when` rules out, with no judge call.
-  if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   const picks = [...(c.picks ?? [])];
   const unmatched: string[] = [];
   // A pick names a card, or a phrase found in one of the judge's choices (its wording varies between runs).
   const ask = async (q: Question) => {
     const want = picks.shift() ?? [];
-    const named = q.cards.filter((o) => want.includes(cardOf(state, o.id).name)).map((o) => o.id);
+    const named = q.cards.filter((o) => want.includes(cardOf(board, o.id).name)).map((o) => o.id);
     const chosen = [...named, ...q.choices.filter((x) => want.some((w) => x.toLowerCase().includes(w.toLowerCase())))];
     if (chosen.length >= Math.max(q.min, 1)) return chosen.slice(0, q.max);
     if (c.picks && !want.length) unmatched.push(`the judge asked more questions than the case has picks: "${q.text}"`);
@@ -580,6 +817,19 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall | 
     return [...q.cards.map((o) => o.id), ...q.choices].slice(0, Math.max(q.min, 1));
   };
   const deps = { model, ask, random: Math.random };
+  const state = await playBefore(c, board, deps);
+  if (!c.activate) {
+    const problem = unmatched[0] ?? c.check?.(new Board(state)) ?? null;
+    return { name: c.name, passed: problem === null, detail: problem ?? 'the board is as expected', records: [] };
+  }
+  const p = state.players[seat];
+  const id = [...p.hand, ...p.graveyard, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((m) => (m ? [m.id] : []))].find(
+    (x) => cardOf(state, x).name === c.activate,
+  )!;
+  const zone = p.hand.includes(id) && cardOf(state, id).kind !== 'monster' ? p.spellTraps.indexOf(null) : null;
+  const intent = decide(state, seat, { type: 'activate', card: id, effect: c.effect ?? 0, zone });
+  // Code refuses an activation that the effect's script or `when` rules out, with no judge call.
+  if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   let scratch = intent.events.slice(1).reduce(evolve, state);
   const checked = await rule({ stage: 'activation', state: scratch, link: scratch.chain.at(-1)! }, deps);
   const records = [checked.record];
@@ -589,19 +839,58 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall | 
   if (checked.record.legal !== c.legal) return result(false, `ruled ${checked.record.legal ? 'legal' : 'illegal'}: ${checked.record.summary}`);
   if (!c.legal) return result(true, checked.record.summary);
   scratch = checked.events.reduce(evolve, scratch);
+  // Nobody responds: the chain resolves.
+  while (scratch.step.at === 'respond') scratch = evolve(scratch, { type: 'passed', player: scratch.step.priority });
   const resolved = await rule({ stage: 'resolution', state: scratch, link: scratch.chain.at(-1)! }, deps);
   records.push(resolved.record);
   if (resolved.record.error) return result(false, `judge failed resolving: ${resolved.record.error}`);
-  const after = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, scratch);
+  const resolvedState = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, scratch);
+  // With the chain over, what it set off follows (Lucky Iron Axe's draw); a chain still building is checked as it is.
+  const after = resolvedState.chain.length ? resolvedState : await settle(resolvedState, deps);
   if (picks.length) unmatched.push(`the judge never asked for ${JSON.stringify(picks[0])}`);
   const problem = unmatched[0] ?? c.check?.(new Board(after)) ?? null;
   return result(problem === null, problem ?? resolved.record.summary);
 }
 
+/** Plays the case's `before` intents, each followed by what code does on its own. */
+async function playBefore(c: EvalCase, board: DuelState, deps: Parameters<typeof rule>[1]): Promise<DuelState> {
+  const id = (name: string) => {
+    const found = Object.keys(board.instances).find((x) => cardOf(board, x).name === name && locate(board, x)?.zone !== 'deck');
+    if (!found) throw new Error(`${c.name}: no ${name} on the board`);
+    return found;
+  };
+  let state = board;
+  for (const [seat, intent] of c.before?.(id) ?? []) {
+    const d = decide(state, seat, intent);
+    if (!d.ok) throw new Error(`${c.name}: ${d.error}`);
+    state = d.events.reduce(evolve, state);
+    if (intent.type === 'activate') state = (await rule({ stage: 'activation', state, link: state.chain.at(-1)! }, deps)).events.reduce(evolve, state);
+    state = await settle(state, deps);
+  }
+  return state;
+}
+
+/** Goes on with the duel as the server would, until a player must act. */
+async function settle(from: DuelState, deps: Parameters<typeof rule>[1]): Promise<DuelState> {
+  let state = from;
+  for (;;) {
+    const next = nextStep(state);
+    if (next?.kind === 'events') state = next.events.reduce(evolve, state);
+    else if (next?.kind === 'wait' && next.autoPass) state = evolve(state, { type: 'passed', player: next.player });
+    else if (next?.kind === 'trigger') {
+      state = triggerEvent(next.trigger).reduce(evolve, state);
+      state = (await rule({ stage: 'activation', state, link: state.chain.at(-1)! }, deps)).events.reduce(evolve, state);
+    } else if (next?.kind === 'resolve') {
+      const resolved = await rule({ stage: 'resolution', state, link: state.chain.at(-1)! }, deps);
+      state = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, state);
+    } else return state;
+  }
+}
+
 /** Runs the matching cases `repeat` times; each round runs its cases in parallel. Returns one list per round. */
 export async function runEvals(db: Db, model: ModelCall, filter = '', repeat = 1): Promise<EvalResult[][]> {
   const cases = CASES.filter((c) => c.name.includes(filter));
-  const names = [...new Set(cases.flatMap((c) => [...c.board.flatMap((s) => Object.values(s).flat() as string[]), 'Sonic Chick']))];
+  const names = [...new Set(cases.flatMap((c) => [...c.board.flatMap((s) => Object.values(s).flat(2) as string[]), 'Sonic Chick']))];
   const rows = await db.select().from(cards).where(inArray(cards.name, names));
   const data = Object.fromEntries(rows.map((r) => [r.id, toCardData(r)]));
   const sheets = await loadSheets(db, data);

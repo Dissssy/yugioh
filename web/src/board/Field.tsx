@@ -21,6 +21,8 @@ export interface FieldProps {
   onCardPress?: (id: string, e: React.PointerEvent<HTMLElement>) => void;
   /** Opens a pile's viewer. */
   onPile: (place: PileKind) => void;
+  /** Whether a card in your Extra Deck can be Summoned now, which makes the pile glow. */
+  extraPlayable?: boolean;
 }
 
 export type Row = 'm' | 's';
@@ -34,7 +36,7 @@ export const dropKey = (seat: Seat, row: Row, index: number) => `${seat}:${row}:
  * each column faces the zone across from it.
  */
 export function Field(props: FieldProps) {
-  const { seat, side, mine, turned, onPile } = props;
+  const { seat, side, mine, turned, onPile, extraPlayable } = props;
   const order = (zones: (FieldCardView | null)[]) => {
     const indexed = zones.map((z, i) => [z, i] as const);
     return mine ? indexed : indexed.reverse();
@@ -81,6 +83,7 @@ export function Field(props: FieldProps) {
       top={side.extra.length > 0 ? { hidden: true } : null}
       count={side.extra.length}
       options={options('extra')}
+      playable={extraPlayable}
       onOpen={mine ? () => onPile('extra') : undefined}
     />
   );
@@ -140,6 +143,12 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
       tabIndex={pick ? 0 : undefined}
       role={pick ? 'button' : undefined}
     >
+      {card && card.materials.length > 0 && <Materials cards={card.materials} />}
+      {card && card.spellCounters > 0 && (
+        <span className="counters-chip" aria-label={`${card.spellCounters} Spell Counter${card.spellCounters === 1 ? '' : 's'}`} title="Spell Counters">
+          {card.spellCounters}
+        </span>
+      )}
       {card && (
         <FieldCard
           view={card}
@@ -151,6 +160,51 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
       )}
       {card && <StatsBadge view={card} />}
     </div>
+  );
+}
+
+/**
+ * An Xyz Monster's materials, tucked under it with their edges showing, and a count. While a question offers them,
+ * they fan out so each can be picked.
+ */
+function Materials({ cards }: { cards: CardView[] }) {
+  const hover = useCardHover();
+  const { imageSize } = useBoardLook();
+  const choice = useChoice();
+  const fanned = cards.some((c) => choice?.state(idOf(c)) != null);
+  return (
+    <>
+      {cards.map((c, i) => {
+        const id = idOf(c);
+        const picking = choice?.state(id) ?? null;
+        const pick = picking ? () => choice!.toggle(id) : undefined;
+        const step = fanned ? `calc(${i + 1} * var(--card-w) * 0.55)` : `${(i + 1) * 5}px`;
+        const data = dataOf(c);
+        return (
+          <motion.div
+            key={id ?? i}
+            layout
+            layoutId={id ?? undefined}
+            className={`slot material ${picking ?? ''}`}
+            style={{ translate: `calc(-1 * ${step}) calc(-1 * ${fanned ? '0px' : step})`, zIndex: -1 - i }}
+            {...hover(data)}
+            onClick={pick}
+            onKeyDown={pick ? (e: KeyboardEvent<HTMLDivElement>) => e.key === 'Enter' && pick() : undefined}
+            tabIndex={pick ? 0 : undefined}
+            role={pick ? 'button' : undefined}
+            aria-label={`Xyz Material: ${data?.name ?? 'a card'}`}
+            aria-pressed={picking ? picking === 'picked' : undefined}
+          >
+            <div className="fx" data-card-id={id ?? undefined}>
+              <CardFace card={data} size={imageSize} />
+            </div>
+          </motion.div>
+        );
+      })}
+      <span className="materials-chip" aria-label={`${cards.length} Xyz Material${cards.length === 1 ? '' : 's'}`}>
+        {cards.length}
+      </span>
+    </>
   );
 }
 
@@ -215,6 +269,7 @@ function Pile({
   top,
   count,
   options,
+  playable,
   onOpen,
   extra,
 }: {
@@ -224,6 +279,7 @@ function Pile({
   count: number;
   /** How many of the cards the judge offers are in this pile. */
   options: number;
+  playable?: boolean;
   onOpen?: () => void;
   extra?: React.ReactNode;
 }) {
@@ -239,7 +295,7 @@ function Pile({
     <div className="fx" data-pile={pile} />
   );
   return (
-    <div className={`zone pile${options > 0 ? ' pickable' : ''}`}>
+    <div className={`zone pile${options > 0 ? ' pickable' : ''}${playable ? ' playable' : ''}`}>
       {onOpen ? (
         <button className="plain pile-button" onClick={onOpen} aria-label={`${label}, ${count} cards${options > 0 ? `, ${options} to choose from` : ''}`}>
           {face}

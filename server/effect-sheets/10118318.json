@@ -54,12 +54,18 @@
                   "rank": null
                 },
                 "position": "choice"
+              },
+              {
+                "do": "forbid",
+                "player": "you",
+                "what": "battle_phase"
               }
             ]
           }
         ],
-        "unapplied": "You cannot conduct your Battle Phase the turn you activate this card."
+        "unapplied": null
       },
+      "continuous": null,
       "status": "unverified"
     }
   ],

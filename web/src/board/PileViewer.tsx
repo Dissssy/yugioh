@@ -7,8 +7,24 @@ import { useChoice } from './choice.tsx';
 /**
  * A Graveyard, banished pile or Extra Deck opened over the board: large cards, searchable by name. While the judge
  * asks for cards, the ones you may pick glow and are picked here, the rest dim, and `bar` (the question) sits on top.
+ * Otherwise a card you can act on from here (Summon it from the Extra Deck) glows, and clicking it opens its menu.
  */
-export function PileViewer({ title, cards, bar, onClose }: { title: string; cards: CardView[]; bar: ReactNode; onClose: () => void }) {
+export function PileViewer({
+  title,
+  cards,
+  bar,
+  onClose,
+  playable,
+  onCard,
+}: {
+  title: string;
+  cards: CardView[];
+  bar: ReactNode;
+  onClose: () => void;
+  /** Cards you can do something with from here (Summon from the Extra Deck), which glow and open their menu when clicked. */
+  playable?: (id: string) => boolean;
+  onCard?: (id: string, el: HTMLElement) => void;
+}) {
   const [search, setSearch] = useState('');
   const hover = useCardHover();
   const choice = useChoice();
@@ -46,6 +62,10 @@ export function PileViewer({ title, cards, bar, onClose }: { title: string; card
                   onClick={() => choice!.toggle(id)}
                   {...hover(dataOf(c))}
                 >
+                  <CardFace card={dataOf(c)} size="full" />
+                </button>
+              ) : id && playable?.(id) && onCard ? (
+                <button key={id} className="plain sheet-card playable" onClick={(e) => onCard(id, e.currentTarget)} {...hover(dataOf(c))}>
                   <CardFace card={dataOf(c)} size="full" />
                 </button>
               ) : (

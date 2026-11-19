@@ -14,6 +14,32 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 100,
+        "def": 0,
+        "per": {
+          "side": "either",
+          "place": "graveyard",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [
+            "Warrior"
+          ],
+          "attributes": [],
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
       "status": "unverified"
     },
     {
@@ -31,11 +57,20 @@
         "filter": null,
         "how": [],
         "from": "graveyard",
-        "canMiss": true
+        "canMiss": true,
+        "by": null
       },
       "script": null,
+      "continuous": null,
       "status": "unverified"
     }
   ],
-  "materials": "1 Tuner + 1 or more non-Tuner monsters"
+  "materials": {
+    "summon": "synchro",
+    "tuner": null,
+    "nonTuners": {
+      "min": 1,
+      "max": null
+    }
+  }
 }

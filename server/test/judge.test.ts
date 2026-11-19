@@ -31,7 +31,7 @@ const sheets: Record<number, EffectSheet> = {
     textHash: '',
     model: 'test',
     materials: null,
-    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, status: 'unverified' }],
+    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, continuous: null, status: 'unverified' }],
   },
 };
 
@@ -121,9 +121,11 @@ describe('the judge loop', () => {
     const after = events.reduce(evolve, state);
     expect(after.players[0].graveyard).toEqual(['a9', 'a2']);
     expect(after.chain[0]!.targets).toEqual(['a9']);
-    // Haiku with reasoning off, strict tools, the rules reference cached.
+    // Haiku with reasoning off, strict tools (up to the API's 20), the rules reference cached.
     expect(sent[0]).toMatchObject({ model: 'claude-haiku-5-5', thinking: { type: 'disabled' }, output_config: { effort: 'high' }, tool_choice: { type: 'any' } });
-    expect(sent[0]!.tools!.every((t) => 'strict' in t && t.strict)).toBe(true);
+    const strict = sent[0]!.tools!.filter((t) => 'strict' in t && t.strict).map((t) => ('name' in t ? t.name : ''));
+    expect(strict).toEqual(expect.arrayContaining(['move', 'special_summon', 'ask_player', 'finish']));
+    expect(strict.length).toBeLessThanOrEqual(20);
   });
 
   it('returns refused ops as errors the model can correct, skipping the rest of that turn', async () => {
@@ -332,9 +334,10 @@ describe('the eval suite', () => {
     let scripted = 0;
     for (const c of CASES) {
       const state = buildBoard(c, data, sheets);
-      const code = Object.values(data).find((d) => d.name === c.activate)!.code;
-      const effect = sheets[code]!.effects[c.effect ?? 0]!;
-      if (effect.script || effect.when) {
+      const code = Object.values(data).find((d) => d.name === c.activate)?.code;
+      // A case with no activation checks what scripted triggers did on their own.
+      const effect = code === undefined ? null : sheets[code]!.effects[c.effect ?? 0]!;
+      if (!effect || effect.script || effect.when) {
         // Code rules on these exactly, without a model.
         const result = await runCase(c, state, null);
         expect(result.passed, `${c.name}: ${result.detail}`).toBe(true);

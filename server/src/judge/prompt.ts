@@ -1,6 +1,6 @@
 // What the judge reads: a fixed rules reference (cached), then per request the board and the effect at hand.
 
-import { cardOf, levelOf, MONSTER_ZONES, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Happening, type Seat } from '@yugioh/engine';
+import { cardOf, levelOf, MONSTER_ZONES, summonName, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Happening, type Seat } from '@yugioh/engine';
 
 export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs every generic rule: turns, phases, summons, battle, damage, LP, zones, once-per-turn counting. Your only job is to apply one card effect at a time exactly as its text says, using tools. Every tool call is checked by code against the board; a refused call comes back as an error that you can correct.
 
@@ -29,6 +29,7 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 - A "face-up monster" is one whose card is face-up on the field. Monsters in the GY have their printed ATK/DEF/Level.
 - Monster types (Warrior, Spellcaster, ...), Attributes, Levels, ATK/DEF and card types (Normal Monster, Effect Monster, Tuner, Spell, Trap) are in the card list in each request. "Non-Effect Monster" means Normal Monster.
 - An effect that would do nothing at all if it resolved now can't be activated: Reinforced Space ("Each face-up Xyz Monster you control gains ...") is illegal while you control no face-up Xyz Monster.
+- Before destroying a monster whose text lets it detach Xyz Materials instead of being destroyed (Gachi Gachi Gantetsu), ask its controller whether to; if they do, detach instead of destroying it.
 - If part of an effect can't be expressed with the tools you have (for example a restriction like "you cannot conduct your Battle Phase this turn", counters, or negating), do every part you can and say in the summary which part was not applied.
 
 # Choices
@@ -69,9 +70,10 @@ export function describeState(state: DuelState, activating: string | null = null
   const fieldCard = (zone: 'monsters' | 'spellTraps', index: number, c: FieldCard) => {
     const activated = c.placedTurn < state.turn ? `Set on turn ${c.placedTurn}, flipped face-up because it is being activated now` : 'placed from the hand, face-up because it is being activated now';
     const face = c.id === activating && zone === 'spellTraps' ? activated : c.faceUp ? 'face-up' : 'face-down';
-    if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face})`;
+    const counters = c.counters.spell ? `, ${c.counters.spell} Spell Counter${c.counters.spell === 1 ? '' : 's'}` : '';
+    if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face}${c.linked ? `, linked to ${label(c.linked)}` : ''}${counters})`;
     const s = statsOf(state, c.id);
-    return `[${index}${index >= MONSTER_ZONES ? ', Extra Monster Zone' : ''}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''})`;
+    return `[${index}${index >= MONSTER_ZONES ? ', Extra Monster Zone' : ''}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''}${c.materials.length ? `, Xyz Materials attached: ${c.materials.map(label).join('; ')}` : ''}${counters})`;
   };
   const phase = { draw: 'Draw Phase', standby: 'Standby Phase', main1: 'Main Phase 1', battle: 'Battle Phase', main2: 'Main Phase 2', end: 'End Phase' };
   lines.push(`Turn ${state.turn}: player ${state.turnPlayer}'s turn, ${phase[state.phase]}. Normal Summons/Sets used this turn: ${state.normalSummons} of ${state.normalSummonLimit}.`);
@@ -87,6 +89,9 @@ export function describeState(state: DuelState, activating: string | null = null
     lines.push(`  Banished: ${typedPile(p.banished)}`);
     lines.push(`  Deck (${p.deck.length} cards, top first): ${pile(p.deck)}`);
     lines.push(`  Extra Deck: ${pile(p.extra)}`);
+  }
+  for (const f of state.forbidden) {
+    lines.push('', `This turn, player ${f.player} can't ${f.what === 'battle_phase' ? 'conduct their Battle Phase' : 'declare an attack'}.`);
   }
   if (state.modifiers.length) {
     lines.push('', 'Active stat changes:');
@@ -128,17 +133,25 @@ function describeHappening(state: DuelState, h: Happening): string {
   const label = (id: string) => `${id} ${cardOf(state, id).name}`;
   switch (h.event) {
     case 'summoned':
-      return `player ${h.player} ${h.how === 'normal' ? 'Normal' : h.how === 'flip' ? 'Flip' : 'Special'} Summoned ${label(h.card)}`;
+      return `player ${h.player} ${summonName[h.how]} Summoned ${label(h.card)}`;
     case 'attack_declared':
       return `player ${h.player}'s ${label(h.card)} declared an attack ${h.target ? `on ${label(h.target)}` : 'directly'}`;
     case 'attacked':
       return `player ${h.player}'s ${label(h.card)} was targeted for an attack by ${label(h.attacker)}`;
     case 'destroyed_by_battle':
       return `player ${h.player}'s ${label(h.card)} was destroyed by battle`;
+    case 'battle_destroying':
+      return `player ${h.player}'s ${label(h.card)} destroyed ${label(h.target)} by battle`;
     case 'battle_damage':
       return `player ${h.player}'s ${label(h.card)} inflicted ${h.amount} battle damage to the opponent`;
+    case 'activated':
+      return `player ${h.player} activated ${label(h.card)} (chain link ${h.link + 1})`;
     case 'phase':
       return `the start of player ${h.player}'s ${h.phase === 'battle' ? 'Battle Phase' : 'End Phase'}`;
+    case 'destroyed_by_effect':
+      return `player ${h.player}'s ${h.faceUp ? 'face-up' : 'face-down'} ${label(h.card)} was destroyed by player ${h.by}'s card effect`;
+    case 'damage_step_start':
+      return `the Damage Step of player ${h.player}'s ${label(h.card)}'s attack ${h.target ? `on ${label(h.target)}` : 'directly'} started`;
   }
 }
 
@@ -147,7 +160,8 @@ export function activationRequest(state: DuelState, link: ChainLink, appealRulin
   return `${describeState(state, link.card)}\n\n# Request: check an activation\nPlayer ${link.player} is activating this effect.${appeal}\n${context(state, link)}\n${describeEffect(state, link)}`;
 }
 
-export function resolutionRequest(state: DuelState, link: ChainLink): string {
+export function resolutionRequest(state: DuelState, link: ChainLink, appealRuling: string | null): string {
   const targets = link.targets.length ? link.targets.map((id) => `${id} ${cardOf(state, id).name}`).join('; ') : 'none';
-  return `${describeState(state)}\n\n# Request: resolve the effect\nThe activation was legal and its cost is paid. Targets declared on activation: ${targets}.${link.choice ? ` Effect chosen on activation: ${link.choice}.` : ''}\n${context(state, link)}\n${describeEffect(state, link)}`;
+  const appeal = appealRuling ? ` An appeal overturned an earlier resolution of this effect on this board, and its ruling binds: ${appealRuling}` : '';
+  return `${describeState(state)}\n\n# Request: resolve the effect\nThe activation was legal and its cost is paid.${appeal} Targets declared on activation: ${targets}.${link.choice ? ` Effect chosen on activation: ${link.choice}.` : ''}\n${context(state, link)}\n${describeEffect(state, link)}`;
 }

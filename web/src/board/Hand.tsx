@@ -198,6 +198,7 @@ function HandCard({
         tip.onPointerLeave?.();
       }}
       onContextMenu={tip.onContextMenu}
+      data-zoom={tip['data-zoom']}
       onDragStart={() => {
         dragged.current = true;
         drag.start(id);

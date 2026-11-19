@@ -18,9 +18,34 @@
         "filter": null,
         "how": [],
         "from": "field",
-        "canMiss": false
+        "canMiss": false,
+        "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "detach",
+            "cards": {
+              "from": "self"
+            },
+            "count": 1
+          }
+        ],
+        "targets": null,
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "negate_attack"
+              }
+            ]
+          }
+        ]
+      },
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -38,11 +63,41 @@
         "filter": null,
         "how": [],
         "from": "field",
-        "canMiss": false
+        "canMiss": false,
+        "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "materials",
+            "min": null,
+            "max": 0
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "self"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "continuous": null,
       "status": "unverified"
     }
   ],
-  "materials": "2 Level 4 monsters"
+  "materials": {
+    "summon": "xyz",
+    "level": 4,
+    "count": 2
+  }
 }

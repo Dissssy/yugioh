@@ -49,12 +49,19 @@
                   "from": "targets"
                 },
                 "position": "attack"
+              },
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
               }
             ]
           }
         ],
         "unapplied": null
       },
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -68,12 +75,17 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "tie",
+        "destroyLinked": true,
+        "defenseBreaks": true
+      },
       "status": "unverified"
     },
     {
-      "kind": "trigger",
+      "kind": "continuous",
       "speed": 1,
-      "mandatory": true,
+      "mandatory": false,
       "opt": "none",
       "window": "When this card leaves the field",
       "cost": "",
@@ -81,12 +93,13 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": null,
       "status": "unverified"
     },
     {
-      "kind": "trigger",
+      "kind": "continuous",
       "speed": 1,
-      "mandatory": true,
+      "mandatory": false,
       "opt": "none",
       "window": "When the target is destroyed",
       "cost": "",
@@ -94,6 +107,7 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": null,
       "status": "unverified"
     }
   ],

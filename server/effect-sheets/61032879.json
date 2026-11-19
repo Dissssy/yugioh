@@ -25,6 +25,7 @@
         ],
         "unapplied": null
       },
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -48,19 +49,39 @@
           ],
           "races": [],
           "attributes": [],
-          "faceUp": null,
+          "faceUp": true,
           "position": null,
           "level": null,
           "atk": null,
           "def": null
         },
         "how": [
-          "special"
+          "synchro"
         ],
         "from": "field",
-        "canMiss": false
+        "canMiss": false,
+        "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": 500,
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
       "status": "unverified"
     }
   ],

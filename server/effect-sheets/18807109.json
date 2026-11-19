@@ -13,7 +13,43 @@
       "effect": "Activate this card by targeting 1 monster your opponent controls; it cannot attack or change its battle position.",
       "targets": "1 monster your opponent controls",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "monsters",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -27,6 +63,17 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": "linked",
+        "others": false,
+        "cannot": [
+          "attack",
+          "change_position"
+        ],
+        "by": null,
+        "while": []
+      },
       "status": "unverified"
     },
     {
@@ -40,6 +87,11 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "tie",
+        "destroyLinked": false,
+        "defenseBreaks": false
+      },
       "status": "unverified"
     }
   ],

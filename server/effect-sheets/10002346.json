@@ -14,6 +14,10 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "replace_destruction",
+        "detach": 1
+      },
       "status": "unverified"
     },
     {
@@ -27,8 +31,34 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "atk": 200,
+        "def": 200,
+        "per": "materials",
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
       "status": "unverified"
     }
   ],
-  "materials": "2 Level 2 monsters"
+  "materials": {
+    "summon": "xyz",
+    "level": 2,
+    "count": 2
+  }
 }

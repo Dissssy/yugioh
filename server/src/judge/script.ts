@@ -6,14 +6,18 @@
 import { createHash } from 'node:crypto';
 import {
   applyOp,
+  battling,
+  replacement,
   cardOf,
   chooseFrom,
   cardsFitting,
   describeFilter,
+  detachFrom,
   evolve,
   feasibleOptions,
   fits,
   locate,
+  materialsOf,
   monsterZonesFor,
   scriptOf,
   statsOf,
@@ -29,6 +33,8 @@ import {
 } from '@yugioh/engine';
 import { checkQuestion, judge, type JudgeCall, type JudgeDeps, type JudgeOutcome, type ModelCall } from './judge.ts';
 import type { AskPlayer } from './tools.ts';
+
+const counterName = (counter: 'spell', count: number) => `${count} ${counter === 'spell' ? 'Spell Counter' : 'counter'}${count === 1 ? '' : 's'}`;
 
 /** The `model` of a ruling made by a script. */
 export const SCRIPT = 'script';
@@ -76,8 +82,8 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     events.push(...applied.events);
     ops.push(op);
   };
-  const ask = async (q: Omit<AskPlayer, 'player'>): Promise<string[]> => {
-    const question = checkQuestion(state, { player: seat, ...q });
+  const ask = async (q: Omit<AskPlayer, 'player'>, player = seat): Promise<string[]> => {
+    const question = checkQuestion(state, { player, ...q });
     if ('error' in question) throw new Refused(`A question was refused: ${question.error}`);
     const picks = await deps.ask(question);
     transcript.push({ question: q.prompt, cards: q.cards, choices: q.choices, picks });
@@ -88,11 +94,14 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     ([0, 1] as const).every((p) => visibleTo(before, id, p)) || ([0, 1] as const).every((p) => visibleTo(state, id, p)) ? cardOf(state, id).name : 'a card';
   const list = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 
+  /** Targets an earlier step of this effect Special Summoned: still its targets ("Special Summon it, and if you do, equip this card to it"). */
+  const summonedHere = new Set<string>();
   /** The cards a selection picks, asking the player when it is theirs to choose. */
   const select = async (sel: Selection, verb: string, limit = Infinity): Promise<string[]> => {
     if (sel.from === 'self') return locate(state, self) ? [self] : [];
-    if (sel.from === 'targets') return link.targets.filter((id) => script.targets && fits(state, id, script.targets.filter, seat));
+    if (sel.from === 'targets') return link.targets.filter((id) => summonedHere.has(id) || (script.targets && fits(state, id, script.targets.filter, seat)));
     if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, self);
+    if (sel.from === 'battling') return battling(state, sel.filter, seat, self);
     const options = chooseFrom(state, sel, seat, self);
     const max = Math.min(sel.max, options.length, limit);
     if (max === 0) return [];
@@ -119,8 +128,26 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       case 'destroy': {
         const cards = (await select(step.cards, 'destroy')).filter((id) => ['monsters', 'spellTraps'].includes(locate(state, id)!.zone));
         if (!cards.length) return null;
-        apply({ op: 'destroy', cards });
-        return `${list(cards.map((id) => shown(id, before)))} ${cards.length === 1 ? 'was' : 'were'} destroyed.`;
+        // A monster that can detach materials instead (Gachi Gachi Gantetsu): its controller decides.
+        const kept: string[] = [];
+        for (const id of cards) {
+          const count = replacement(state, id);
+          if (count === null) continue;
+          const owner = locate(state, id)!.seat;
+          const label = cardOf(state, id).name;
+          const [answer] = await ask({ prompt: `${label} would be destroyed. Detach ${count} Xyz Material${count === 1 ? '' : 's'} instead?`, cards: [], choices: ['Detach instead', 'Let it be destroyed'], min: 1, max: 1 }, owner);
+          if (answer !== 'Detach instead') continue;
+          const attached = materialsOf(state, id);
+          const picked =
+            attached.length === count ? attached : await ask({ prompt: `${label}: choose ${count} Xyz Material${count === 1 ? '' : 's'} to detach.`, cards: attached, choices: [], min: count, max: count }, owner);
+          for (const m of picked) apply({ op: 'detach', card: m });
+          kept.push(id);
+        }
+        const lost = cards.filter((id) => !kept.includes(id));
+        if (lost.length) apply({ op: 'destroy', cards: lost });
+        const said = kept.map((id) => `${shown(id, before)} detached Xyz Material instead of being destroyed.`);
+        if (lost.length) said.unshift(`${list(lost.map((id) => shown(id, before)))} ${lost.length === 1 ? 'was' : 'were'} destroyed.`);
+        return said.join(' ');
       }
       case 'move': {
         const fromHand = step.cards.from === 'choose' && step.cards.filter.place === 'hand' && step.to === 'graveyard';
@@ -142,6 +169,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
                 ? 'defense'
                 : 'attack';
           apply({ op: 'special_summon', card: id, controller: seat, position });
+          summonedHere.add(id);
         }
         return cards.length ? `${list(cards.slice(0, free).map((id) => shown(id, before)))} ${cards.length === 1 ? 'was' : 'were'} Special Summoned.` : null;
       }
@@ -187,6 +215,67 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         if (!state.attack) return null;
         apply({ op: 'negate_attack' });
         return 'The attack was negated.';
+      case 'detach': {
+        const from = detachFrom(state, step, seat, self);
+        if (!from.length) return null;
+        const [xyz] = from.length === 1 ? from : await ask({ prompt: `${name}: detach ${step.count} Xyz Material${step.count === 1 ? '' : 's'} from which Xyz Monster?`, cards: from, choices: [], min: 1, max: 1 });
+        const attached = materialsOf(state, xyz!);
+        const picked =
+          attached.length === step.count
+            ? attached
+            : await ask({ prompt: `${name}: choose ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`, cards: attached, choices: [], min: step.count, max: step.count });
+        for (const id of picked) apply({ op: 'detach', card: id });
+        return cost ? null : `${list(picked.map((id) => shown(id, before)))} ${picked.length === 1 ? 'was' : 'were'} detached from ${shown(xyz!, before)}.`;
+      }
+      case 'link': {
+        const [monster] = (await select(step.cards, 'equip it to')).filter((id) => locate(state, id)?.zone === 'monsters');
+        if (!monster) return null;
+        apply({ op: 'link', card: monster });
+        return `${name} ${cardOf(state, self).race === 'Equip' ? 'was equipped to' : 'now applies to'} ${shown(monster, before)}.`;
+      }
+      case 'negate_activation': {
+        const cause = link.cause?.event === 'activated' ? link.cause : null;
+        const answered = cause && state.chain[cause.link];
+        if (!answered || answered.card !== cause.card || answered.negated) return null;
+        apply({ op: 'negate_activation', card: cause.card });
+        const where = locate(state, cause.card)?.zone;
+        const destroyed = step.destroy && (where === 'monsters' || where === 'spellTraps');
+        if (destroyed) apply({ op: 'destroy', cards: [cause.card] });
+        return `The activation of ${shown(cause.card, before)} was negated${destroyed ? ', and it was destroyed' : ''}.`;
+      }
+      case 'negate_effects': {
+        const cards = (await select(step.cards, 'negate the effects of')).filter((id) => {
+          const at = locate(state, id);
+          return at?.zone === 'monsters' && state.players[at.seat].monsters[at.index]!.faceUp;
+        });
+        for (const id of cards) apply({ op: 'negate_effects', card: id });
+        return cards.length ? `${list(cards.map((id) => shown(id, before)))} ${cards.length === 1 ? 'has its' : 'have their'} effects negated.` : null;
+      }
+      case 'set_again':
+        apply({ op: 'set_again' });
+        return `${name} will be Set again.`;
+      case 'add_counters': {
+        const counted: string[] = [];
+        for (const id of await select(step.cards, 'place counters on')) {
+          const at = locate(state, id);
+          const c = at && (at.zone === 'monsters' || at.zone === 'spellTraps') ? state.players[at.seat][at.zone][at.index]! : null;
+          if (!c?.faceUp || (step.max !== null && (c.counters[step.counter] ?? 0) >= step.max)) continue;
+          apply({ op: 'add_counters', card: id, counter: step.counter, count: step.count, max: step.max });
+          counted.push(id);
+        }
+        return counted.length ? `${list(counted.map((id) => shown(id, before)))} got ${counterName(step.counter, step.count)}.` : null;
+      }
+      case 'remove_counters': {
+        const [id] = await select(step.cards, 'remove counters from', 1);
+        if (!id) return null;
+        apply({ op: 'remove_counters', card: id, counter: step.counter, count: step.count });
+        return `${counterName(step.counter, step.count)} removed from ${shown(id, before)}.`;
+      }
+      case 'forbid': {
+        const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
+        apply({ op: 'forbid', player, what: step.what });
+        return `${state.players[player].name} can't ${step.what === 'battle_phase' ? 'conduct their Battle Phase' : 'declare an attack'} this turn.`;
+      }
       case 'extra_normal_summon':
         apply({ op: 'extra_normal_summon', player: seat });
         return `${state.players[seat].name} may conduct one more Normal Summon or Set this turn.`;

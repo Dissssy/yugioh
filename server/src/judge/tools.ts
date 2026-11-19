@@ -1,9 +1,10 @@
 // The judge's tools: one per op, plus ask_player and finish. The same Zod schemas give the tool definitions sent to
-// Claude (strict, so every call parses) and the runtime check of each call.
+// Claude and the runtime check of each call. Tools are strict, so every call parses, except those marked `loose`: the
+// API allows 20 strict tools, so ones with a card ID or two and little else go without (parseOp still checks them).
 
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { DESTINATIONS, UNTIL, type Op } from '@yugioh/engine';
+import { DESTINATIONS, FORBIDDEN, UNTIL, type Op } from '@yugioh/engine';
 
 const card = z.string().describe('A card instance ID from the state, such as "k3f9a0b2".');
 const seat = z.union([z.literal(0), z.literal(1)]).describe('Player 0 or player 1.');
@@ -57,6 +58,47 @@ export const opTools = {
     description: 'Negate the attack being made ("negate the attack"): it ends with no damage.',
     input: z.object({}),
   },
+  link: {
+    description:
+      'Equip the card being resolved (an Equip Spell) to a face-up monster, or tie a Continuous Trap to the monster it works on ("that monster cannot attack", Birthright\'s Special Summoned monster). Code then applies its continuous effect to that monster and destroys the card when the monster leaves the field. Only while resolving.',
+    input: z.object({ card }),
+  },
+  negate_activation: {
+    loose: true,
+    description:
+      'Negate the activation of a card or effect below this one on the chain ("negate the activation"): it resolves doing nothing. Name the card whose activation it is. "And if you do, destroy it" is a separate destroy call.',
+    input: z.object({ card }),
+  },
+  negate_effects: {
+    loose: true,
+    description: 'A face-up monster has its effects negated while it stays face-up on the field ("but it has its effects negated"): its triggers, ignition and continuous effects stop.',
+    input: z.object({ card }),
+  },
+  set_again: {
+    loose: true,
+    description: 'Set the card being resolved face-down again instead of sending it to the GY ("Set this card face-down instead of sending it to the GY"). Only while resolving.',
+    input: z.object({}),
+  },
+  forbid: {
+    description:
+      'For the rest of this turn, stop a player declaring attacks ("your opponent cannot declare an attack this turn") or conducting their Battle Phase ("you cannot conduct your Battle Phase this turn").',
+    input: z.object({ player: seat, what: z.enum(FORBIDDEN) }),
+  },
+  add_counters: {
+    loose: true,
+    description: 'Place counters on a face-up card ("place 1 Spell Counter on it"). max: the most it can hold ("max. 1"), or null.',
+    input: z.object({ card, counter: z.enum(['spell']), count: z.number().int().min(1), max: z.number().int().min(1).nullable() }),
+  },
+  remove_counters: {
+    loose: true,
+    description: 'Remove counters from a card ("remove 1 Spell Counter from this card"), usually as a cost.',
+    input: z.object({ card, counter: z.enum(['spell']), count: z.number().int().min(1) }),
+  },
+  detach: {
+    loose: true,
+    description: 'Detach an Xyz Material from the Xyz Monster it is attached to: it goes to its owner\'s GY. One call per material.',
+    input: z.object({ card }),
+  },
   declare_targets: {
     description: 'Record the targets of the effect being activated. Only while checking an activation, after the player chose them.',
     input: z.object({ cards: z.array(card) }),
@@ -102,16 +144,16 @@ export function strictSchema(schema: z.ZodType): Anthropic.Tool.InputSchema {
   return clean(json) as Anthropic.Tool.InputSchema;
 }
 
-const tool = (name: string, description: string, input: z.ZodType): Anthropic.Tool => ({
+const tool = (name: string, description: string, input: z.ZodType, strict = true): Anthropic.Tool => ({
   name,
   description,
   input_schema: strictSchema(input),
-  strict: true,
+  strict,
 });
 
 /** Tool definitions in a fixed order, so the prompt cache holds. */
 export const TOOLS: Anthropic.Tool[] = [
-  ...Object.entries(opTools).map(([name, t]) => tool(name, t.description, t.input)),
+  ...Object.entries(opTools).map(([name, t]) => tool(name, t.description, t.input, !('loose' in t))),
   tool(
     'ask_player',
     'Ask a player to choose, and wait for the answer: costs such as "discard 1 card", targets, searches, or a choice between effects. The answer is the list of picked card IDs or choices.',

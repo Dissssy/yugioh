@@ -16,6 +16,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   drew: 450,
   tributed: 450,
   normalSummoned: 550,
+  extraSummoned: 700,
   monsterSet: 400,
   spellTrapSet: 400,
   flipSummoned: 500,
@@ -38,6 +39,18 @@ const baseMs: Record<LogEvent['type'], number> = {
   lpChanged: 650,
   statsModified: 400,
   normalSummonGranted: 300,
+  forbidden: 300,
+  linked: 400,
+  activationNegated: 500,
+  effectsNegated: 300,
+  setAgain: 0,
+  countersChanged: 300,
+  damageStepStarted: 0,
+  replacementOffered: 0,
+  replacementChosen: 300,
+  rollbackOffered: 0,
+  rollbackAnswered: 0,
+  rolledBack: 600,
   linkResolved: 200,
   chatted: 0,
 };
@@ -83,8 +96,10 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
   const slot = (seat: Seat, row: 'm' | 's', zone: number) => q(`[data-slot="${seat}:${row}:${zone}"]`);
   const card = (id: string | null) => (id ? q(`[data-card-id="${id}"]`) : null);
   const hand = (seat: Seat) => q(`[data-hand="${seat}"]`);
-  const flash = (el: HTMLElement | null) =>
-    el && void animate(el, { scale: [1.15, 1], filter: ['brightness(1.8)', 'brightness(1)'] }, { duration: s * 0.6 });
+  /** A brightness pulse, which leaves no filter behind once it is over. */
+  const glow = (el: HTMLElement, keyframes: Parameters<typeof animate>[1], options: Parameters<typeof animate>[2]) =>
+    void animate(el, keyframes, options).then(() => (el.style.filter = ''));
+  const flash = (el: HTMLElement | null) => el && glow(el, { scale: [1.15, 1], filter: ['brightness(1.8)', 'brightness(1)'] }, { duration: s * 0.6 });
   const shake = () => {
     const table = q('.table');
     if (table) void animate(table, { x: [0, -6, 6, -4, 4, 0] }, { duration: Math.min(0.35, s) });
@@ -153,16 +168,17 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
       if (e.zone !== null && e.player !== view.you) flyFrom(slot(e.player, 's', e.zone), hand(e.player));
       const wasSet = prev?.players[e.player].spellTraps.some((z) => z && idOf(z.card) === e.card && !z.faceUp);
       if (wasSet && el) void animate(el, { rotateY: [90, 0] }, { duration: s * 0.5, ease: 'easeOut' });
-      if (el) void animate(el, { filter: ['brightness(1)', 'brightness(1.9)', 'brightness(1)'], scale: [1, 1.12, 1] }, { duration: s, delay: s * 0.2 });
+      if (el) glow(el, { filter: ['brightness(1)', 'brightness(1.9)', 'brightness(1)'], scale: [1, 1.12, 1] }, { duration: s, delay: s * 0.2 });
       return;
     }
     case 'targeted':
       for (const id of e.cards) {
         const el = card(id);
-        if (el) void animate(el, { scale: [1, 1.1, 1], filter: ['brightness(1)', 'brightness(1.6)', 'brightness(1)'] }, { duration: s });
+        if (el) glow(el, { scale: [1, 1.1, 1], filter: ['brightness(1)', 'brightness(1.6)', 'brightness(1)'] }, { duration: s });
       }
       return;
-    case 'specialSummoned': {
+    case 'specialSummoned':
+    case 'extraSummoned': {
       const el = slot(e.player, 'm', e.zone);
       if (!el) return;
       void animate(el, { scale: [1.4, 1], opacity: [0, 1] }, { duration: s * 0.6, ease: 'easeIn' });
