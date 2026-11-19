@@ -74,9 +74,9 @@ export const HAND_LIMIT = 6;
 
 /** What a player asks for. Own cards are named by instance ID; opponent's monsters by zone, since a face-down card has no ID in their view. */
 export type Intent =
-  | { type: 'normalSummon'; card: string; tributes: string[] }
-  | { type: 'setMonster'; card: string; tributes: string[] }
-  | { type: 'setSpellTrap'; card: string }
+  | { type: 'normalSummon'; card: string; tributes: string[]; zone: number }
+  | { type: 'setMonster'; card: string; tributes: string[]; zone: number }
+  | { type: 'setSpellTrap'; card: string; zone: number }
   | { type: 'flipSummon'; card: string }
   | { type: 'changePosition'; card: string }
   | { type: 'enterBattle' }
@@ -178,9 +178,10 @@ export interface PlayerSideView {
 
 /** What the player may do now; the client turns one into an Intent, filling in the choices. */
 export type LegalAction =
-  | { type: 'normalSummon'; card: string; tributes: number; tributeFrom: string[] }
-  | { type: 'setMonster'; card: string; tributes: number; tributeFrom: string[] }
-  | { type: 'setSpellTrap'; card: string }
+  /** `zones` are the Monster Zones it may go to: the empty ones, plus those of possible tributes. */
+  | { type: 'normalSummon'; card: string; tributes: number; tributeFrom: string[]; zones: number[] }
+  | { type: 'setMonster'; card: string; tributes: number; tributeFrom: string[]; zones: number[] }
+  | { type: 'setSpellTrap'; card: string; zones: number[] }
   | { type: 'flipSummon'; card: string }
   | { type: 'changePosition'; card: string }
   | { type: 'enterBattle' }

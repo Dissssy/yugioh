@@ -59,7 +59,7 @@ The hand should feel like holding cards.
 
 ## Drag and drop
 
-Built on dnd-kit (which zone did a card land on, pointer and touch sensors, keyboard dragging) with Motion rendering the dragged card so it moves with spring physics. Check the current dnd-kit package and its React API when adding it; it is not installed yet.
+Built with Motion alone. A hand card is a Motion `Reorder` item that can also be dragged off the hand: along the hand it reorders, above it it stops reordering and becomes a drop. The zone under the pointer comes from the browser's `elementsFromPoint` and a `data-drop` key on every zone and LP plate. Aiming an attack doesn't move the card at all; it draws an SVG arrow from the attacker to the pointer. (dnd-kit was the plan, but with Motion already handling the drag it would have been a second drag system on the same cards.)
 
 **Feel while dragging:**
 
@@ -200,14 +200,14 @@ The UI can leak what the server so carefully hides. Rules:
 
 ## Accessibility and settings
 
-- Keyboard: Tab through your hand and field, Enter opens a card's action menu, arrow keys move between zones while choosing, Esc cancels. dnd-kit's keyboard dragging covers drag for keyboard users.
+- Keyboard: Tab through your hand and field, Enter opens a card's action menu, arrow keys move between zones while choosing, Esc cancels. Keyboard players use the click flow, which can do everything a drag can: Enter opens a card's menu, choosing an action lights the legal zones, Tab and Enter pick one.
 - Every card and zone has an accessible label ("Your Main Monster Zone 3, Tenshin, Attack position").
 - Highlights use shape as well as colour (outline style, badges), so they work for colour-blind players.
 - Settings panel: animation speed (normal, fast), reduced motion, sound mute and volume (once there are sounds), auto-pass defaults.
 
 ## Frontend structure
 
-- **Libraries:** Motion (already installed) for springs, layout, hand fan and all animations; dnd-kit for drag between zones; plain SVG for arrows and the chain lines. No canvas or PixiJS: nothing here needs it, and DOM keeps text, tooltips and accessibility easy. A tooltip positioning library (Floating UI) is worth adding for the hover cards, since placing a tooltip on the side with room and keeping it on screen is what it's for.
+- **Libraries:** Motion (already installed) for springs, layout, hand fan, dragging and all animations; plain SVG for arrows and the chain lines. No canvas or PixiJS: nothing here needs it, and DOM keeps text, tooltips and accessibility easy. A tooltip positioning library (Floating UI) is worth adding for the hover cards, since placing a tooltip on the side with room and keeping it on screen is what it's for.
 - **Interaction state** (selected card, what's being chosen, dragged card, pinned tooltip) moves from the separate `useState` calls in `Board.tsx` to one reducer, since the number of modes grows with every layer.
 - **Components:** split `Board.tsx` into table layout, `Hand`, `Zone`, `Pile`, `PhaseStepper`, `LpPlate`, `CardTooltip`, `ActionMenu`, `ChoicePrompt`, `Log`, and the animation queue hook. Each piece stays small.
 
@@ -217,9 +217,10 @@ PC first (see Decisions). Each step ends with a board two people can play on, an
 
 1. **Table and feel (on today's layer-1 engine).** Full-window duel screen that fits without scrolling, playmat zone layout (plain styling), phase stepper, LP plates with counting and floating damage numbers, fanned hand with hover lift and reorder, playable glow, action menu next to the clicked card, hover tooltips replacing the sidebar card, pile viewer, `srcset` and image preloading, structured turn-grouped log in the sidebar. Server sends public events with each view; the animation queue plays draw, summon, Set, flip, position change, tribute, attack, damage, destroy, turn banner and duel end. Reduced motion and speed setting.
    - Done when: a full duel plays with no sidebar buttons and every change is animated.
-   - Built 2026-11-19. Notes from building it: Motion's `Reorder` already handles the hand (including Space and arrow keys to move a card, and swallowing the click after a drag), Floating UI places the tooltip and the action menu, and Motion's newer `Reorder.Board` (dragging items between groups) is worth checking before reaching for dnd-kit in step 2. Only your own deck's images are preloaded: preloading the opponent's would reveal their decklist once custom decks exist. The queue plays bursts faster. Sound is not wired in yet: with no assets it would be code with nothing to play, so it comes with step 7.
-2. **Drag and drop.** dnd-kit, the zone parameter on summon and Set intents, drag to summon/Set, drag to attack with the arrow, the shared choosing pattern for tributes and discards.
+   - Built 2026-11-19. Notes from building it: Motion's `Reorder` already handles the hand (including Space and arrow keys to move a card, and swallowing the click after a drag), Floating UI places the tooltip and the action menu, and Motion's newer `Reorder.Board` (dragging items between groups) was checked for step 2 and isn't needed (see Drag and drop). Only your own deck's images are preloaded: preloading the opponent's would reveal their decklist once custom decks exist. The queue plays bursts faster. Sound is not wired in yet: with no assets it would be code with nothing to play, so it comes with step 7.
+2. **Drag and drop.** The zone parameter on summon and Set intents, drag to summon/Set, drag to attack with the arrow, the shared choosing pattern for tributes and discards.
    - Done when: every layer-1 action can be done by dragging on a PC.
+   - Built 2026-11-19. Dropping a Tribute Summon onto one of your own monsters picks that monster as a tribute, since its zone is where the new one goes. Clicking still does everything: choosing Normal Summon, Set or Attack from a card's menu lights up the legal zones or targets.
 3. **Effects (with engine layer 2).** Activate from the action menu or by dragging, targeting arrows, the card picker sheet for `ask_player`, activation and resolution animations, judge rulings in the log with the Contest button and appeal result.
 4. **Extra Deck (with engine layer 3).** Synchro and Xyz from the Extra Deck pile: choose materials with the choosing pattern, summon animations, overlay units shown under Xyz monsters.
 5. **Chains and responses (with engine layer 4).** Chain stack, response bar, the floor's progress line, per-card auto-response settings and global auto-pass, and the turn timer.

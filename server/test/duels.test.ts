@@ -161,7 +161,7 @@ describe('a challenge link played by a guest', () => {
     let view = a.turnPlayer === 0 ? a : b;
     const set = view.actions.find((x) => x.type === 'setMonster' && x.tributes === 0);
     expect(set).toBeDefined();
-    expect((await send(first, { type: 'setMonster', card: (set as { card: string }).card, tributes: [] })).status).toBe(204);
+    expect((await send(first, { type: 'setMonster', card: (set as { card: string }).card, tributes: [], zone: 0 })).status).toBe(204);
     view = await firstStream.next();
     const otherUpdate = await secondStream.update();
     if (otherUpdate.type !== 'steps') throw new Error('expected steps');

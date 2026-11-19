@@ -2,16 +2,17 @@ import './board.css';
 import { useMutation } from '@tanstack/react-query';
 import type { CardView, Intent, LegalAction, PlayerView, Seat } from '@yugioh/engine';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
-import { useCallback, useEffect, useLayoutEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { api, errorText } from '../api.ts';
 import { ActionMenu } from './ActionMenu.tsx';
-import { idOf, imageUrl, preloadImages } from './Card.tsx';
+import { AimArrow, dropAt, dropCentre, type Point } from './aim.tsx';
+import { dataOf, idOf, imageUrl, preloadImages } from './Card.tsx';
 import { CardTooltipProvider } from './CardTooltip.tsx';
 import { cueMs, playCue } from './cues.ts';
 import { DuelLog } from './DuelLog.tsx';
-import { Field } from './Field.tsx';
-import { FoeHand, OwnHand } from './Hand.tsx';
+import { dropKey, Field, type Row } from './Field.tsx';
+import { FoeHand, OwnHand, type HandDrag } from './Hand.tsx';
 import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
 import { LpPlate } from './LpPlate.tsx';
 import { PhaseStrip } from './PhaseStrip.tsx';
@@ -19,13 +20,32 @@ import { PileViewer } from './PileViewer.tsx';
 import { systemReducesMotion, useDuelSettings } from './settings.ts';
 import { useDuel } from './useDuel.ts';
 
+type Summon = Extract<LegalAction, { type: 'normalSummon' | 'setMonster' }>;
+/** An action that puts a card from the hand into a zone the player picks. */
+type Placeable = Summon | Extract<LegalAction, { type: 'setSpellTrap' }>;
+type Attack = Extract<LegalAction, { type: 'attack' }>;
+
+const isPlaceable = (a: LegalAction): a is Placeable => a.type === 'normalSummon' || a.type === 'setMonster' || a.type === 'setSpellTrap';
+const rowOf = (a: Placeable): Row => (a.type === 'setSpellTrap' ? 's' : 'm');
+
 /** What the player is in the middle of doing on the board. */
 type Mode =
   | { kind: 'idle' }
   | { kind: 'menu'; id: string; anchor: HTMLElement }
-  | { kind: 'tributes'; action: Extract<LegalAction, { type: 'normalSummon' | 'setMonster' }>; chosen: string[] }
-  | { kind: 'target'; action: Extract<LegalAction, { type: 'attack' }> }
+  /** Picking a zone by clicking, after choosing the action from the card's menu. */
+  | { kind: 'zone'; action: Placeable }
+  /** A card was dropped on a zone where it can be Summoned or Set: which one? */
+  | { kind: 'place'; options: Placeable[]; zone: number; anchor: HTMLElement }
+  /** `keep` is the monster in the chosen zone, which must be one of the tributes. */
+  | { kind: 'tributes'; action: Summon; zone: number; chosen: string[]; keep: string | null }
+  | { kind: 'target'; action: Attack }
   | { kind: 'discard'; count: number; chosen: string[] };
+
+/** A drag in progress: a hand card toward a zone, or an attacker's arrow toward a target. */
+type Drag = { kind: 'card'; id: string } | { kind: 'aim'; action: Attack; from: Point; to: Point };
+
+/** How far the pointer moves on a monster before a press becomes an aimed attack rather than a click. */
+const AIM_THRESHOLD_PX = 8;
 
 const idle: Mode = { kind: 'idle' };
 
@@ -40,7 +60,10 @@ export function Board({ duelId }: { duelId: string }) {
   const [mode, setMode] = useReducer((_: Mode, next: Mode) => next, idle);
   const [pile, setPile] = useState<{ title: string; cards: CardView[] } | null>(null);
   const [highlight, setHighlight] = useState<string[]>([]);
-  const [dragging, setDragging] = useState(false);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+  /** Set when an aimed attack ends on the attacker, so the click that follows doesn't open its menu. */
+  const swallowClick = useRef(false);
   const [confirmSurrender, setConfirmSurrender] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [table, setTable] = useState<HTMLDivElement | null>(null);
@@ -78,19 +101,28 @@ export function Board({ duelId }: { duelId: string }) {
   const playable = new Set(actions.flatMap((a) => ('card' in a ? [a.card] : a.type === 'attack' ? [a.attacker] : [])));
   const myHand = view.players[me].hand.map((c) => idOf(c)!);
 
+  const myMonsters = view.players[me].monsters;
+  const cardName = (id: string) => {
+    const c = view.players[me].hand.find((h) => idOf(h) === id);
+    return (c && dataOf(c)?.name) ?? 'the card';
+  };
+  const placeables = (id: string) => actionsFor(id).filter(isPlaceable);
+  const attackOf = (id: string) => actionsFor(id).find((a): a is Attack => a.type === 'attack');
+  /** Placeable actions that may put card `id` in this zone. */
+  const fitsZone = (options: Placeable[], row: Row, zone: number) => options.filter((a) => rowOf(a) === row && a.zones.includes(zone));
+
   function start(action: LegalAction) {
     switch (action.type) {
       case 'normalSummon':
       case 'setMonster':
-        if (action.tributes > 0) return setMode({ kind: 'tributes', action, chosen: [] });
-        return send.mutate({ type: action.type, card: action.card, tributes: [] });
+      case 'setSpellTrap':
+        return setMode({ kind: 'zone', action });
       case 'attack':
         if (action.direct) return send.mutate({ type: 'attack', attacker: action.attacker, target: 'direct' });
         return setMode({ kind: 'target', action });
       case 'endTurn':
         if (action.discard > 0) return setMode({ kind: 'discard', count: action.discard, chosen: [] });
         return send.mutate({ type: 'endTurn', discard: [] });
-      case 'setSpellTrap':
       case 'flipSummon':
       case 'changePosition':
         return send.mutate({ type: action.type, card: action.card });
@@ -101,12 +133,35 @@ export function Board({ duelId }: { duelId: string }) {
     }
   }
 
+  /** Puts a card in the chosen zone, first asking for tributes if it needs them. */
+  function place(action: Placeable, zone: number) {
+    if (action.type === 'setSpellTrap') return send.mutate({ type: 'setSpellTrap', card: action.card, zone });
+    if (action.tributes === 0) return send.mutate({ type: action.type, card: action.card, tributes: [], zone });
+    // Dropping onto one of your monsters tributes it, so its zone is free for the new one.
+    const occupant = myMonsters[zone] ? idOf(myMonsters[zone].card) : null;
+    const chosen = occupant ? [occupant] : [];
+    if (chosen.length === action.tributes) return send.mutate({ type: action.type, card: action.card, tributes: chosen, zone });
+    setMode({ kind: 'tributes', action, zone, chosen, keep: occupant });
+  }
+
+  /** Placing with several possible actions (Summon or Set) asks which, right where the card was dropped. */
+  function placeAt(options: Placeable[], zone: number, anchor: HTMLElement) {
+    if (options.length === 1) return place(options[0]!, zone);
+    if (options.length > 1) setMode({ kind: 'place', options, zone, anchor });
+  }
+
   /** Clicking one of your own cards: pick it for the current choice, or open its action menu. */
   function clickOwn(id: string, anchor: HTMLElement) {
     if (busy) return;
-    if (mode.kind === 'tributes' && mode.action.tributeFrom.includes(id)) {
+    if (swallowClick.current) {
+      swallowClick.current = false;
+      return;
+    }
+    if (mode.kind === 'tributes' && mode.action.tributeFrom.includes(id) && id !== mode.keep) {
       const chosen = toggle(mode.chosen, id);
-      if (chosen.length === mode.action.tributes) return send.mutate({ type: mode.action.type, card: mode.action.card, tributes: chosen });
+      if (chosen.length === mode.action.tributes) {
+        return send.mutate({ type: mode.action.type, card: mode.action.card, tributes: chosen, zone: mode.zone });
+      }
       return setMode({ ...mode, chosen });
     }
     if (mode.kind === 'discard' && myHand.includes(id)) {
@@ -118,13 +173,82 @@ export function Board({ duelId }: { duelId: string }) {
     setMode(actionsFor(id).length > 0 ? { kind: 'menu', id, anchor } : idle);
   }
 
-  function clickTarget(zone: number) {
-    if (mode.kind === 'target' && mode.action.targets.includes(zone)) {
+  /** Whether a zone can be picked now, by click or drop. */
+  function zoneState(seat: Seat, row: Row, zone: number): 'open' | 'over' | null {
+    let open = false;
+    // The zone a card was just dropped on stays lit while you pick Summon or Set.
+    if (seat === me && mode.kind === 'place' && mode.zone === zone && fitsZone(mode.options, row, zone).length > 0) return 'over';
+    if (seat === me) {
+      const options = drag?.kind === 'card' ? placeables(drag.id) : mode.kind === 'zone' ? [mode.action] : [];
+      open = fitsZone(options, row, zone).length > 0;
+    } else if (row === 'm') {
+      const attack = drag?.kind === 'aim' ? drag.action : mode.kind === 'target' ? mode.action : null;
+      open = attack?.targets.includes(zone) ?? false;
+    }
+    return open ? (over === dropKey(seat, row, zone) ? 'over' : 'open') : null;
+  }
+
+  function clickZone(seat: Seat, row: Row, zone: number) {
+    if (seat === me && mode.kind === 'zone' && fitsZone([mode.action], row, zone).length > 0) place(mode.action, zone);
+    if (seat === foe && mode.kind === 'target' && mode.action.targets.includes(zone)) {
       send.mutate({ type: 'attack', attacker: mode.action.attacker, target: zone });
     }
   }
 
-  const choosing = mode.kind === 'tributes' || mode.kind === 'target' || mode.kind === 'discard';
+  const handDrag: HandDrag = {
+    start: (id) => {
+      setMode(idle);
+      setDrag({ kind: 'card', id });
+    },
+    move: (_, point) => setOver(dropAt(point)),
+    end: (id, point) => {
+      const key = dropAt(point);
+      setDrag(null);
+      setOver(null);
+      const [seat, row, zone] = key?.split(':') ?? [];
+      if (busy || Number(seat) !== me || (row !== 'm' && row !== 's')) return;
+      const anchor = document.querySelector<HTMLElement>(`[data-drop="${key}"]`);
+      if (anchor) placeAt(fitsZone(placeables(id), row, Number(zone)), Number(zone), anchor);
+    },
+  };
+
+  /** Pressing one of your monsters that can attack, then dragging, aims an arrow at what to attack. */
+  function pressOwn(id: string, e: React.PointerEvent<HTMLElement>) {
+    const action = attackOf(id);
+    if (busy || !action || e.button !== 0) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const from = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    const down = { x: e.clientX, y: e.clientY };
+    let aiming = false;
+    const directKey = `lp:${foe}`;
+    const valid = (key: string | null) =>
+      key !== null && (key === directKey ? action.direct : action.targets.some((z) => key === dropKey(foe, 'm', z)));
+    const move = (ev: PointerEvent) => {
+      const to = { x: ev.clientX, y: ev.clientY };
+      if (!aiming && Math.hypot(to.x - down.x, to.y - down.y) < AIM_THRESHOLD_PX) return;
+      aiming = true;
+      const key = dropAt(to);
+      setOver(key);
+      setDrag({ kind: 'aim', action, from, to: (valid(key) && dropCentre(key!)) || to });
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      if (!aiming) return;
+      swallowClick.current = true;
+      setTimeout(() => (swallowClick.current = false), 0);
+      setDrag(null);
+      setOver(null);
+      const key = dropAt({ x: ev.clientX, y: ev.clientY });
+      if (!valid(key)) return;
+      const target = key === directKey ? 'direct' : Number(key!.split(':')[2]);
+      send.mutate({ type: 'attack', attacker: action.attacker, target });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  const choosing = mode.kind === 'tributes' || mode.kind === 'target' || mode.kind === 'discard' || mode.kind === 'zone';
   const pickable = (id: string) =>
     (mode.kind === 'tributes' && mode.action.tributeFrom.includes(id)) || (mode.kind === 'discard' && myHand.includes(id));
   const marks: CardMarks = {
@@ -136,6 +260,8 @@ export function Board({ duelId }: { duelId: string }) {
             (mode.kind === 'tributes' || mode.kind === 'discard') && mode.chosen.includes(id) && 'picked',
             pickable(id) && 'pickable',
             mode.kind === 'target' && mode.action.attacker === id && 'selected',
+            drag?.kind === 'aim' && drag.action.attacker === id && 'selected',
+            mode.kind === 'zone' && mode.action.card === id && 'selected',
             !choosing && playable.has(id) && 'playable',
             highlight.includes(id) && 'highlight',
           ]
@@ -147,10 +273,16 @@ export function Board({ duelId }: { duelId: string }) {
     <span className="choice-prompt">
       {mode.kind === 'tributes' && `Choose ${plural(mode.action.tributes - mode.chosen.length, 'monster')} to Tribute.`}
       {mode.kind === 'target' && "Choose one of your opponent's monsters to attack."}
+      {mode.kind === 'zone' && `Choose a zone for ${cardName(mode.action.card)}.`}
       {mode.kind === 'discard' && `Your hand is over 6 cards. Choose ${plural(mode.count - mode.chosen.length, 'card')} to discard.`}
       <button onClick={() => setMode(idle)}>Cancel</button>
     </span>
   );
+
+  const lpTarget = (): 'open' | 'over' | null => {
+    const attack = drag?.kind === 'aim' ? drag.action : null;
+    return attack?.direct ? (over === `lp:${foe}` ? 'over' : 'open') : null;
+  };
 
   const yourTurn = view.turnPlayer === me && !view.result;
   const enterBattle = has('enterBattle');
@@ -163,15 +295,15 @@ export function Board({ duelId }: { duelId: string }) {
   return (
     <MotionConfig reducedMotion={reduceMotion ? 'always' : 'never'}>
       <BoardLookProvider value={look}>
-        <CardTooltipProvider suppressed={choosing || dragging || mode.kind === 'menu'}>
-          <div className={`duel${choosing ? ' choosing' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
+        <CardTooltipProvider suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}>
+          <div className={`duel${choosing ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
             <div className="table" ref={setTable}>
               {!ready ? (
                 <div className="duel-loading">Loading cards…</div>
               ) : (
                 <>
                   <div className="hand-row foe-row">
-                    <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={view.turnPlayer === foe} />
+                    <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={view.turnPlayer === foe} target={lpTarget()} />
                     <FoeHand seat={foe} count={view.players[foe].hand.length} />
                   </div>
                   <Field
@@ -179,9 +311,9 @@ export function Board({ duelId }: { duelId: string }) {
                     side={view.players[foe]}
                     mine={false}
                     marks={marks}
-                    targetable={mode.kind === 'target' ? mode.action.targets : []}
+                    zoneState={(row, zone) => zoneState(foe, row, zone)}
+                    onZone={(row, zone) => clickZone(foe, row, zone)}
                     onCard={() => undefined}
-                    onTarget={clickTarget}
                     onPile={(title, cards) => setPile({ title, cards })}
                   />
                   <PhaseStrip
@@ -202,14 +334,15 @@ export function Board({ duelId }: { duelId: string }) {
                     side={view.players[me]}
                     mine
                     marks={marks}
-                    targetable={[]}
+                    zoneState={(row, zone) => zoneState(me, row, zone)}
+                    onZone={(row, zone) => clickZone(me, row, zone)}
                     onCard={clickOwn}
-                    onTarget={() => undefined}
+                    onCardPress={pressOwn}
                     onPile={(title, cards) => setPile({ title, cards })}
                   />
                   <div className="hand-row own-row">
                     <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={view.turnPlayer === me} />
-                    <OwnHand duelId={duelId} seat={me} cards={view.players[me].hand} marks={marks} onCard={clickOwn} onDragging={setDragging} />
+                    <OwnHand duelId={duelId} seat={me} cards={view.players[me].hand} marks={marks} onCard={clickOwn} drag={handDrag} />
                   </div>
                 </>
               )}
@@ -287,6 +420,14 @@ export function Board({ duelId }: { duelId: string }) {
                 onClose={() => setMode(idle)}
               />
             )}
+            {mode.kind === 'place' && (
+              <ActionMenu
+                anchor={mode.anchor}
+                items={mode.options.map((a) => ({ label: actionLabel(a, view), run: () => place(a, mode.zone) }))}
+                onClose={() => setMode(idle)}
+              />
+            )}
+            {drag?.kind === 'aim' && <AimArrow from={drag.from} to={drag.to} />}
             {pile && <PileViewer title={pile.title} cards={pile.cards} onClose={() => setPile(null)} />}
           </div>
         </CardTooltipProvider>

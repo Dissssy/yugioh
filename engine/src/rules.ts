@@ -3,7 +3,9 @@
 import { evolve, locate, other, replay } from './state.ts';
 import {
   HAND_LIMIT,
+  MONSTER_ZONES,
   OPENING_HAND,
+  SPELL_TRAP_ZONES,
   type CardData,
   type DuelEvent,
   type DuelState,
@@ -44,6 +46,8 @@ const isMainPhase = (state: DuelState) => state.phase === 'main1' || state.phase
 const ownMonsters = (state: DuelState, seat: Seat) =>
   state.players[seat].monsters.filter((c): c is FieldCard => c !== null);
 const freeZone = (zones: (FieldCard | null)[]) => zones.indexOf(null);
+const isZone = (i: number, count: number) => Number.isInteger(i) && i >= 0 && i < count;
+const freeZones = (zones: (FieldCard | null)[]) => zones.flatMap((z, i) => (z ? [] : [i]));
 
 // ---------------------------------------------------------------------------
 // Starting a duel
@@ -124,11 +128,13 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
           const fits = tributes > 0 ? monsters.length >= tributes : freeZone(p.monsters) >= 0;
           if (!state.normalSummonUsed && !card.extraDeck && fits) {
             const tributeFrom = tributes > 0 ? monsters.map((m) => m.id) : [];
-            actions.push({ type: 'normalSummon', card: id, tributes, tributeFrom });
-            actions.push({ type: 'setMonster', card: id, tributes, tributeFrom });
+            // A tribute leaves its zone free for the monster it makes way for.
+            const zones = tributes > 0 ? p.monsters.flatMap((z, i) => (z === null || tributeFrom.includes(z.id) ? [i] : [])) : freeZones(p.monsters);
+            actions.push({ type: 'normalSummon', card: id, tributes, tributeFrom, zones });
+            actions.push({ type: 'setMonster', card: id, tributes, tributeFrom, zones });
           }
         } else if (freeZone(p.spellTraps) >= 0) {
-          actions.push({ type: 'setSpellTrap', card: id });
+          actions.push({ type: 'setSpellTrap', card: id, zones: freeZones(p.spellTraps) });
         }
       }
       for (const m of monsters) {
@@ -206,18 +212,18 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
         check(at?.zone === 'monsters' && at.seat === seat, 'Tributes must be monsters you control.');
       }
       if (needed > 0) run.emit({ type: 'tributed', player: seat, cards: [...tributes] });
-      const zone = freeZone(run.state.players[seat].monsters);
-      check(zone >= 0, 'Your Monster Zones are full.');
-      run.emit({ type: intent.type === 'normalSummon' ? 'normalSummoned' : 'monsterSet', player: seat, card: intent.card, zone });
+      check(isZone(intent.zone, MONSTER_ZONES), 'There is no Monster Zone there.');
+      check(run.state.players[seat].monsters[intent.zone] === null, 'That Monster Zone is not empty.');
+      run.emit({ type: intent.type === 'normalSummon' ? 'normalSummoned' : 'monsterSet', player: seat, card: intent.card, zone: intent.zone });
       return;
     }
     case 'setSpellTrap': {
       check(isMainPhase(state), 'You can only Set cards in a Main Phase.');
       check(p.hand.includes(intent.card), 'That card is not in your hand.');
       check(cardOf(state, intent.card).kind !== 'monster', 'Only Spells and Traps go in the Spell & Trap Zone.');
-      const zone = freeZone(p.spellTraps);
-      check(zone >= 0, 'Your Spell & Trap Zones are full.');
-      run.emit({ type: 'spellTrapSet', player: seat, card: intent.card, zone });
+      check(isZone(intent.zone, SPELL_TRAP_ZONES), 'There is no Spell & Trap Zone there.');
+      check(p.spellTraps[intent.zone] === null, 'That Spell & Trap Zone is not empty.');
+      run.emit({ type: 'spellTrapSet', player: seat, card: intent.card, zone: intent.zone });
       return;
     }
     case 'flipSummon': {

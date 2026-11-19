@@ -15,9 +15,9 @@ import { displayName, guestKey, playerKey, viewerOf, type Viewer } from './viewe
 
 const id = z.string();
 const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('normalSummon'), card: id, tributes: z.array(id).max(3) }),
-  z.object({ type: z.literal('setMonster'), card: id, tributes: z.array(id).max(3) }),
-  z.object({ type: z.literal('setSpellTrap'), card: id }),
+  z.object({ type: z.literal('normalSummon'), card: id, tributes: z.array(id).max(3), zone: z.number().int().min(0).max(4) }),
+  z.object({ type: z.literal('setMonster'), card: id, tributes: z.array(id).max(3), zone: z.number().int().min(0).max(4) }),
+  z.object({ type: z.literal('setSpellTrap'), card: id, zone: z.number().int().min(0).max(4) }),
   z.object({ type: z.literal('flipSummon'), card: id }),
   z.object({ type: z.literal('changePosition'), card: id }),
   z.object({ type: z.literal('enterBattle') }),

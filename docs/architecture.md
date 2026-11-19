@@ -204,7 +204,7 @@ The engine is a library with one entry point: given the event log and a new play
 
 **Stack:** TypeScript on both ends, so the state, intent and op types are shared. Zod schemas for ops serve three jobs at once: the tool definitions sent to Claude, runtime validation, and client types. Postgres for cards, decks and the event log. The official Anthropic TypeScript SDK for Claude calls.
 
-**Frontend:** React + Vite (the duel screen's design is in [duel-ui.md](duel-ui.md)). A card table is a few dozen to about 100 images on screen, not thousands of sprites, so the regular DOM is fast enough and keeps card text, tooltips and accessibility easy. [Motion](https://motion.dev) (formerly Framer Motion) gives spring physics, drag, and layout animations, which is what makes the other cards in hand slide aside when one is reordered (`Reorder` / `layout`). dnd-kit handles the "which zone did I drop this on" logic between hand, field and GY. PixiJS (WebGL canvas) is the step up if particle effects or a 3D table are ever wanted, at the cost of building text and UI inside the canvas.
+**Frontend:** React + Vite (the duel screen's design is in [duel-ui.md](duel-ui.md)). A card table is a few dozen to about 100 images on screen, not thousands of sprites, so the regular DOM is fast enough and keeps card text, tooltips and accessibility easy. [Motion](https://motion.dev) (formerly Framer Motion) gives spring physics, drag, and layout animations, which is what makes the other cards in hand slide aside when one is reordered (`Reorder` / `layout`). Motion's drag also carries cards from the hand to the field; the zone under the pointer is found with the browser's own `elementsFromPoint`, so no separate drag-and-drop library is needed (see duel-ui.md). PixiJS (WebGL canvas) is the step up if particle effects or a 3D table are ever wanted, at the cost of building text and UI inside the canvas.
 
 ## Build order
 
@@ -251,7 +251,7 @@ Decided 2026-11-18.
 | Formats and banlists | Banlists are user-customizable data, enforced by code at deck save and match join |
 | Response windows | Fixed minimum window plus jitter to hide timing; per-card default responses |
 | Rollback | Both players must agree; one or two sentence explanation that reveals no hidden info |
-| Stack | TypeScript end to end; React + Vite + Motion + dnd-kit on the frontend |
+| Stack | TypeScript end to end; React + Vite + Motion on the frontend |
 | Accounts | Anonymous play with premade decks as a guest through a challenge link; account needed to build decks |
 | Access and cost | Owner pays; invite-only; new accounts need admin approval |
 | Docs | Plans live as Markdown under `docs/` |
