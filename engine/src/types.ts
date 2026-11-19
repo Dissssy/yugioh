@@ -129,6 +129,11 @@ export interface DuelState {
   chain: ChainLink[];
   /** Effects used this turn, for once-per-turn clauses. */
   usedThisTurn: { card: string; code: number; effect: number }[];
+  /**
+   * Activations the judge ruled illegal on the board as it is now. Code refuses them without asking the judge again,
+   * until any event changes the board; another illegal ruling or an upheld appeal changes nothing.
+   */
+  ruledIllegal: { player: Seat; card: string; effect: number; summary: string }[];
   result: DuelResult | null;
 }
 

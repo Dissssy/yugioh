@@ -175,6 +175,29 @@ describe('a card effect', () => {
     mine.close();
     theirs.close();
   });
+
+  it('answers a repeat of a refused activation from the ruling, without the judge, until the board changes', async () => {
+    let judgeCalls = 0;
+    h.setModel(async (params) => (judgeCalls++, tools(params.model, [{ name: 'finish', input: { legal: false, summary: 'There is no Warrior in your GY.' } }])));
+    const view = await until(new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`)), (u) => (u.type === 'sync' ? u.view : undefined));
+    expect(view.actions.some((a) => a.type === 'activate' && a.card === returning)).toBe(false);
+    expect(view.actions.some((a) => a.type === 'setSpellTrap' && a.card === returning)).toBe(true);
+    const again = await guest.json<{ error: string }>(`${h.baseUrl}/api/duels/${duel.id}/intents`, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'activate', card: returning, effect: 0, zone: 1 }),
+    });
+    expect(again.status).toBe(422);
+    expect(again.body.error).toMatch(/There is no Warrior in your GY\./);
+    expect(judgeCalls).toBe(0);
+
+    const mine = new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
+    await mine.update();
+    // Setting the card changes the board, so the judge may be asked again.
+    await guest.json(`${h.baseUrl}/api/duels/${duel.id}/intents`, { method: 'POST', body: JSON.stringify({ type: 'setSpellTrap', card: returning, zone: 1 }) });
+    const after = await until(mine, (u) => (u.type === 'steps' ? u.steps.at(-1)!.view : undefined));
+    expect(after.actions.some((a) => a.type === 'activate' && a.card === returning)).toBe(true);
+    mine.close();
+  });
 });
 
 async function login() {

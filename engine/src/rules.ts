@@ -187,6 +187,7 @@ function activatableEffects(state: DuelState, seat: Seat, id: string): Extract<L
   const result: Extract<LegalAction, { type: 'activate' }>[] = [];
   sheet.effects.forEach((effect, index) => {
     if (!onceOk(state, id, card.code, index, effect.opt)) return;
+    if (ruledIllegal(state, seat, id, index)) return;
     const text = effect.effect;
     if (lingers) return;
     if (card.kind === 'spell' && effect.kind === 'activation' && ACTIVATABLE_SPELLS.includes(card.race)) {
@@ -214,6 +215,9 @@ function activatableEffects(state: DuelState, seat: Seat, id: string): Extract<L
   });
   return result;
 }
+
+const ruledIllegal = (state: DuelState, seat: Seat, id: string, effect: number) =>
+  state.ruledIllegal.find((r) => r.player === seat && r.card === id && r.effect === effect);
 
 function onceOk(state: DuelState, id: string, code: number, effect: number, opt: 'none' | 'soft' | 'hard') {
   if (opt === 'soft') return !state.usedThisTurn.some((u) => u.card === id && u.effect === effect);
@@ -313,6 +317,8 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
       return;
     }
     case 'activate': {
+      const ruling = ruledIllegal(state, seat, intent.card, intent.effect);
+      check(!ruling, `The judge already ruled this activation illegal, and nothing has changed since: ${ruling?.summary}`);
       const options = activatableEffects(state, seat, intent.card).filter((a) => a.effect === intent.effect);
       check(options.length > 0, "That effect can't be activated now.");
       const fromHand = options.find((a) => a.zones !== null);
