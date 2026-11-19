@@ -187,7 +187,6 @@ function stacked(deck0: number[], deck1: number[]): DuelEvent[] {
         { name: 'Yusei', deck: ids('a', 0, deck0), extra: [] },
         { name: 'Yuma', deck: ids('b', 1, deck1), extra: [] },
       ],
-      first: 0,
     },
     { type: 'drew', player: 0, count: 5 },
     { type: 'drew', player: 1, count: 5 },

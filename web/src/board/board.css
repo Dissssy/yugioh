@@ -161,7 +161,7 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
   z-index: 20;
 }
 .turn-banner.yours { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 35%, var(--bg)) 20% 80%, transparent); }
-.result-overlay {
+.result-overlay, .table-overlay {
   position: absolute;
   inset: 0;
   margin: auto;
@@ -178,6 +178,11 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
   z-index: 25;
 }
 .result-overlay strong { font-size: 2.4em; }
+.start-panel { text-align: center; }
+.start-panel > strong { font-size: 1.6em; }
+.rps-picks button { border-color: var(--line); display: grid; justify-items: center; gap: 4px; min-width: 96px; padding: 10px 14px; }
+.rps-icon, .rps-thrown b { font-size: 2em; line-height: 1; }
+.rps-thrown { display: flex; gap: 16px; align-items: center; margin: 0; font-weight: 600; }
 
 /* Side panel */
 .panel { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 12px; border-left: 1px solid var(--line); }

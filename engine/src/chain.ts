@@ -83,6 +83,10 @@ export function nextStep(state: DuelState): Next | null {
   if (state.result) return null;
   const step = state.step;
   switch (step.at) {
+    // Deciding who goes first waits on the players' own picks; nothing happens by itself.
+    case 'rps':
+    case 'order':
+      return null;
     case 'open':
       return { kind: 'wait', player: state.turnPlayer, autoPass: false, floor: false };
     case 'triggers': {

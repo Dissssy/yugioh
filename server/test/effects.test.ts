@@ -69,7 +69,7 @@ async function setUp(scripts: boolean): Promise<Setup> {
     { players: [{ name: 'Ethan', main: d0!.main, extra: d0!.extra }, { name: 'Kaiba (guest)', main: d1!.main, extra: d1!.extra }], cards, sheets },
     Math.random,
   );
-  const start = { ...(dealt as Extract<DuelEvent, { type: 'duelStarted' }>), first: 1 as const };
+  const start = dealt as Extract<DuelEvent, { type: 'duelStarted' }>;
   const poison = start.players[1].deck.find((id) => start.instances[id]!.code === POISON)!;
   const returning = start.players[1].deck.find((id) => start.instances[id]!.code === RETURNING)!;
   const events: DuelEvent[] = [

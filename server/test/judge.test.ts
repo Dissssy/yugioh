@@ -53,7 +53,6 @@ function board(): DuelState {
         { name: 'Yusei', deck: ids('a', 0, [3, 1, 1, 1, 1, 1, 1, 1, 1, 2]), extra: [] },
         { name: 'Yuma', deck: ids('b', 1, [2, 2, 2, 2, 2, 2]), extra: [] },
       ],
-      first: 0,
     },
     { type: 'drew', player: 0, count: 5 },
     { type: 'drew', player: 1, count: 5 },

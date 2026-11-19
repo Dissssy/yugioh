@@ -40,7 +40,7 @@ Card effects arrived with layer 2; see [effects.md](effects.md) for what works a
 
 1. An approved user picks a deck and creates a challenge, which opens `/duel/:id`. They send that link to their opponent.
 2. The opponent opens the link and picks a deck. An approved user or a guest accepts directly; a signed-out visitor either logs in or plays as a guest under a name they pick (see [accounts.md](accounts.md)).
-3. Accepting deals the opening hands and starts the duel. Who goes first is a coin toss.
+3. Accepting shuffles both Decks. The players then play rock-paper-scissors: both pick, the server keeps each pick hidden until both are in, and a tie is picked again. The winner chooses to go first or second, and the opening hands are dealt. Each round and the choice go in the duel log.
 4. Each browser listens on `GET /api/duels/:id/stream` (Server-Sent Events). On connect it gets a `sync`: its whole view and the duel log. After every change it gets `steps`: one per visible event, each with the log entry and the board right after that event, so the board can animate events one at a time (see [duel-ui.md](duel-ui.md)). Only the last step offers actions. Moves go to `POST /api/duels/:id/intents`; a refused move answers 422 with the reason.
 
 The server is the only authority. Live duels are held in memory and rebuilt from `match_events` on first use, and each duel handles one intent at a time. That assumes a single server process, which is how the site runs today.

@@ -2,9 +2,10 @@
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
 import { scriptOf, scriptProblem } from './script.ts';
-import { evolve, locate, onField, other, replay, statsOf } from './state.ts';
+import { evolve, locate, onField, other, statsOf } from './state.ts';
 import {
   HAND_LIMIT,
+  HANDS,
   MONSTER_ZONES,
   OPENING_HAND,
   SPELL_TRAP_ZONES,
@@ -12,6 +13,7 @@ import {
   type DuelEvent,
   type EffectSheet,
   type DuelState,
+  type Hand,
   type FieldCard,
   type Happening,
   type Intent,
@@ -63,7 +65,10 @@ export interface DuelSetup {
   sheets: Record<number, EffectSheet>;
 }
 
-/** Shuffles, picks who goes first and deals opening hands. `random` returns [0, 1), like Math.random. */
+/**
+ * Shuffles the Decks. The players then decide who goes first with rock-paper-scissors, and the opening hands are dealt
+ * once the winner has chosen. `random` returns [0, 1), like Math.random.
+ */
 export function startDuel(setup: DuelSetup, random: () => number): DuelEvent[] {
   const instances: Record<string, { code: number; owner: Seat }> = {};
   const used = new Set<string>();
@@ -84,14 +89,32 @@ export function startDuel(setup: DuelSetup, random: () => number): DuelEvent[] {
     return { name: p.name, deck: shuffle(p.main.map(make), random), extra: p.extra.map(make) };
   }) as [{ name: string; deck: string[]; extra: string[] }, { name: string; deck: string[]; extra: string[] }];
 
-  const first: Seat = random() < 0.5 ? 0 : 1;
-  const start: DuelEvent = { type: 'duelStarted', cards: setup.cards, sheets: setup.sheets, instances, players, first };
-  const run = new Run(replay([start]));
-  run.events.push(start);
+  return [{ type: 'duelStarted', cards: setup.cards, sheets: setup.sheets, instances, players }];
+}
+
+/** What each pick beats. */
+const BEATS: Record<Hand, Hand> = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+
+/** A rock-paper-scissors pick, or the winner's choice of who goes first, which deals the opening hands. */
+function decideStart(run: Run, seat: Seat, intent: Extract<Intent, { type: 'rps' | 'chooseOrder' }>) {
+  const step = run.state.step;
+  if (intent.type === 'rps') {
+    check(step.at === 'rps', 'Rock-paper-scissors is over.');
+    check(step.picks[seat] === null, 'You already picked.');
+    check(HANDS.includes(intent.hand), 'Pick rock, paper or scissors.');
+    const picks: [Hand | null, Hand | null] = [...step.picks];
+    picks[seat] = intent.hand;
+    run.emit({ type: 'rpsPicked', player: seat, hand: intent.hand });
+    const [a, b] = picks;
+    if (a && b) run.emit({ type: 'rpsShown', hands: [a, b], winner: a === b ? null : BEATS[a] === b ? 0 : 1 });
+    return;
+  }
+  check(step.at === 'order' && step.chooser === seat, 'Only the winner of rock-paper-scissors chooses who goes first.');
+  const first = intent.goFirst ? seat : other(seat);
+  run.emit({ type: 'orderChosen', player: seat, first });
   run.emit({ type: 'drew', player: first, count: OPENING_HAND });
   run.emit({ type: 'drew', player: other(first), count: OPENING_HAND });
   beginTurn(run, first, 1);
-  return run.events;
 }
 
 function shuffle<T>(items: T[], random: () => number): T[] {
@@ -126,7 +149,11 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
   if (state.result) return [];
   const actions: LegalAction[] = [];
   const step = state.step;
-  if (step.at === 'triggers') {
+  if (step.at === 'rps') {
+    if (step.picks[seat] === null) actions.push({ type: 'rps' });
+  } else if (step.at === 'order') {
+    if (step.chooser === seat) actions.push({ type: 'chooseOrder' });
+  } else if (step.at === 'triggers') {
     // Optional triggers wait for their controller once every mandatory one is on the chain (see chain.ts).
     const pending = pendingTriggers(state);
     const first = pending[0];
@@ -302,6 +329,11 @@ export function decide(state: DuelState, seat: Seat, intent: Intent): Decision {
       run.emit({ type: 'passed', player: seat });
       return { ok: true, events: run.events };
     }
+    if (intent.type === 'rps' || intent.type === 'chooseOrder') {
+      decideStart(run, seat, intent);
+      return { ok: true, events: run.events };
+    }
+    check(state.turn > 0, 'The duel starts once rock-paper-scissors decides who goes first.');
     if (intent.type === 'activate') {
       activate(run, seat, intent);
       return { ok: true, events: run.events };
@@ -316,7 +348,7 @@ export function decide(state: DuelState, seat: Seat, intent: Intent): Decision {
   }
 }
 
-function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender' | 'pass' | 'activate' }>) {
+function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender' | 'pass' | 'activate' | 'rps' | 'chooseOrder' }>) {
   const state = run.state;
   const p = state.players[seat];
   switch (intent.type) {

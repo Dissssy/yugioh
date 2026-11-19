@@ -512,7 +512,6 @@ export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: 
         { name: 'Yusei', deck: decks[0], extra: extras[0] },
         { name: 'Yuma', deck: decks[1], extra: extras[1] },
       ],
-      first: 0,
     },
     { type: 'turnStarted', player: 0, turn: 2 },
   ];

@@ -52,7 +52,7 @@ async function setUp() {
     { players: [{ name: 'Ethan', main: d0!.main, extra: d0!.extra }, { name: 'Kaiba (guest)', main: d1!.main, extra: d1!.extra }], cards, sheets },
     Math.random,
   );
-  const start = { ...(dealt as Extract<DuelEvent, { type: 'duelStarted' }>), first: 0 as const };
+  const start = dealt as Extract<DuelEvent, { type: 'duelStarted' }>;
   const find = (seat: Seat, code: number) => start.players[seat].deck.find((id) => start.instances[id]!.code === code)!;
   const ids = {
     speedWarrior: find(0, SPEED_WARRIOR),
