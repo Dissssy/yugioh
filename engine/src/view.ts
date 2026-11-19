@@ -148,7 +148,14 @@ function reviewText(state: DuelState, event: DuelEvent): string {
     case 'aiDecided': {
       const a = event.record;
       const picked = a.picks.map((i) => `${i + 1}. ${a.options[i]}`).join('; ') || 'nothing';
-      const flags = [a.stale && 'STALE, not played', a.error && `Error: ${a.error}`].filter(Boolean).join(' | ');
+      const flags = [
+        a.contest && `Wants to contest #${a.contest.seq}: ${a.contest.why}`,
+        a.missing && `Expected a move: ${a.missing}`,
+        a.stale && 'STALE, not played',
+        a.error && `Error: ${a.error}`,
+      ]
+        .filter(Boolean)
+        .join(' | ');
       return `AI (${a.model}) for ${who(a.player)} picked ${picked} of ${a.options.length}. ${a.reason} | Note: ${a.note}${flags ? ` | ${flags}` : ''}`;
     }
     default:

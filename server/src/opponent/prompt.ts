@@ -22,10 +22,15 @@ How to play well:
 - Keep in mind the moves you have already made this turn (the log shows them).
 - Pass when you have nothing useful to do in a response window; end your turn when you have nothing left to gain.
 
+Contesting a ruling: when you pick a move, you are shown the judge's rulings since your last move. If you are confident one of them is wrong under the official rules (an activation refused that was legal, or allowed that wasn't, or an effect resolved wrongly), contest it: a stronger model reviews it, and if it was wrong the duel can be rewound. You may contest only a few rulings per duel, so don't contest on a hunch. Otherwise leave contest null.
+
+A missing move: if you are confident the rules let you do something right now that isn't in your list of moves (say, a Trap that should be able to answer this summon), say what in "missing". It is posted in the duel chat so the game's maintainer can fix it; pick the best move from the list as usual. Otherwise leave missing null.
+
 Answer with JSON only:
 - reason: one or two sentences on why.
 - choice (for a move) or picks (for a question): the number(s) of what you pick.
-- note: your note to yourself for the next call, one or two sentences.`;
+- note: your note to yourself for the next call, one or two sentences.
+- contest and missing (for a move): null, unless as above.`;
 
 /** A decklist with each card's text, one line per card. */
 function deckList(title: string, main: CardData[], extra: CardData[]): string {
@@ -105,9 +110,14 @@ export function logBlocks(log: LogEntry[]): Anthropic.TextBlockParam[] {
 }
 
 /** What the call asks: a move from the numbered list, or the answer to a judge question. */
-export function askText(view: PlayerView, note: string, ask: { moves: string[] } | { judging: JudgingView; options: string[] }): string {
+export function askText(view: PlayerView, note: string, ask: { moves: string[]; rulings: LogEntry[]; contestsLeft: number } | { judging: JudgingView; options: string[] }): string {
   const parts = [boardText(view), `# Your note from last time\n${note || '(none yet)'}`];
   if ('moves' in ask) {
+    if (ask.rulings.length && ask.contestsLeft > 0) {
+      parts.push(
+        `# Rulings you may contest (${ask.contestsLeft} contests left this duel)\nContest one by its # in the "contest" field, or leave it null.\n${ask.rulings.map((e) => `#${e.seq} ${e.text}`).join('\n')}`,
+      );
+    }
     parts.push(`# Your moves\nPick one by its number (the "choice" field).\n${ask.moves.map((m, i) => `${i + 1}. ${m}`).join('\n')}`);
   } else {
     const p = ask.judging.prompt!;

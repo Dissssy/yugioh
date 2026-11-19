@@ -610,6 +610,10 @@ export interface AiRecord {
   reason: string;
   /** Its note to itself for the next call. */
   note: string;
+  /** The ruling (its event's seq) it contested, and why; null if none. */
+  contest: { seq: number; why: string } | null;
+  /** A move it expected but wasn't offered, said in chat; null if none. */
+  missing: string | null;
   /** The board moved on while it thought, so its answer was thrown away. */
   stale: boolean;
   /** Set when the call failed or the answer didn't fit; a safe default was played instead. */
