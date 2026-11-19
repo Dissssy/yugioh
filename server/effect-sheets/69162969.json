@@ -1,0 +1,19 @@
+{
+  "code": 69162969,
+  "textHash": "3fbb558c92940627c7e985a5ed195dd9c04cfbc05fedfd9844c90fbe23160fdc",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "Discard 1 card",
+      "effect": "Destroy all face-up monsters your opponent controls.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

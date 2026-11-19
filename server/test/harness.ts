@@ -6,7 +6,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
 import { OAuth2Server } from 'oauth2-mock-server';
+import type Anthropic from '@anthropic-ai/sdk';
 import { createApp } from '../src/app.ts';
+import type { ModelCall } from '../src/judge/judge.ts';
+import type { DuelUpdate, PlayerView } from '@yugioh/engine';
 import type { LoginClaims } from '../src/accounts.ts';
 import { connect, type Db } from '../src/db/client.ts';
 import { runMigrations } from '../src/db/migrate.ts';
@@ -21,6 +24,8 @@ export interface Harness {
   imageDir: string;
   /** The identity the mock provider puts in the next ID token it issues. */
   setIdentity(claims: LoginClaims): void;
+  /** Stands in for Claude, for both the judge and appeals. Unset, any model call fails the test. */
+  setModel(model: ModelCall): void;
   close(): Promise<void>;
 }
 
@@ -44,7 +49,10 @@ export async function startHarness(): Promise<Harness> {
   const server = createServer();
   await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
   const baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
-  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir }, db));
+  let model: ModelCall = () => Promise.reject(new Error('No model set for this test'));
+  const call = (params: Anthropic.MessageCreateParamsNonStreaming) => model(params);
+  const ai = { judge: call, appeal: call, judgeCalls: 300, appeals: 10 };
+  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10 }, db, ai));
 
   return {
     db,
@@ -52,6 +60,7 @@ export async function startHarness(): Promise<Harness> {
     ygoprodeck: ygoprodeck.url,
     imageDir,
     setIdentity: (claims) => void (identity = claims),
+    setModel: (m) => void (model = m),
     async close() {
       server.closeAllConnections();
       await new Promise((r) => server.close(r));
@@ -131,5 +140,39 @@ export class Browser {
     });
     const text = await res.text();
     return { status: res.status, body: (text ? JSON.parse(text) : null) as T };
+  }
+}
+
+/** Reads a Server-Sent Events stream one update at a time. */
+export class Stream {
+  private buffer = '';
+  private reader: ReadableStreamDefaultReader<Uint8Array>;
+  private decoder = new TextDecoder();
+  constructor(res: Response) {
+    this.reader = res.body!.getReader();
+  }
+  /** The board after the next update. */
+  async next(): Promise<PlayerView> {
+    for (;;) {
+      const update = await this.update();
+      if (update.type !== 'judging') return update.type === 'sync' ? update.view : update.steps.at(-1)!.view;
+    }
+  }
+  async update(): Promise<DuelUpdate> {
+    for (;;) {
+      const end = this.buffer.indexOf('\n\n');
+      if (end >= 0) {
+        const message = this.buffer.slice(0, end);
+        this.buffer = this.buffer.slice(end + 2);
+        if (message.startsWith('data: ')) return JSON.parse(message.slice(6)) as DuelUpdate;
+        continue;
+      }
+      const { value, done } = await this.reader.read();
+      if (done) throw new Error('stream ended');
+      this.buffer += this.decoder.decode(value, { stream: true });
+    }
+  }
+  close() {
+    void this.reader.cancel();
   }
 }

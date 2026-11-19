@@ -1,0 +1,19 @@
+{
+  "code": 60082869,
+  "textHash": "7e73ad87c150838ef1e0d7e4f83ee9c1ba947f2951b3619ab06d5dbd859f5295",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn",
+      "cost": "",
+      "effect": "Destroy that target, then you can Set 1 Spell/Trap from your hand.",
+      "targets": "1 Spell/Trap your opponent controls"
+    }
+  ],
+  "materials": null
+}

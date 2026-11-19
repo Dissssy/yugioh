@@ -10,7 +10,7 @@ import { findUserBySub, listUsers, setStatus, setUsername, syncUser, toUser, typ
 import type { Config } from './config.ts';
 import type { Db } from './db/client.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
-import { Duels } from './duels.ts';
+import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
 import { username } from './usernames.ts';
 import { userKey, viewerOf, type Viewer } from './viewer.ts';
@@ -20,7 +20,7 @@ const GUEST_COOKIE = 'guest';
 const GUEST_COOKIE_MS = 365 * 24 * 60 * 60 * 1000;
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
-export function createApp(config: Config, db: Db) {
+export function createApp(config: Config, db: Db, ai: Ai) {
   const app = express();
   app.set('trust proxy', 'loopback, linklocal, uniquelocal');
   const secure = config.BASE_URL.startsWith('https:');
@@ -119,7 +119,7 @@ export function createApp(config: Config, db: Db) {
     res.json(user);
   });
 
-  app.use('/api', duelRoutes(db, new Duels(db), guestCookie));
+  app.use('/api', duelRoutes(db, new Duels(db, ai), guestCookie));
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'not_found' }));
 
   // Card images, downloaded by the card sync. They never change, so browsers may cache them for long.

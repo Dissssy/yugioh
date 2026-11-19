@@ -1,0 +1,19 @@
+{
+  "code": 8842266,
+  "textHash": "cea93772199e4140ac6b7abf988fc8ab21667b9a306b8430b1676518a04b4c13",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn (layer 2: your own Main or Battle Phase)",
+      "cost": "",
+      "effect": "Activate 1 of these effects: Gain 1200 LP; or inflict 800 damage to your opponent.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

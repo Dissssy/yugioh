@@ -1,0 +1,19 @@
+{
+  "code": 24291651,
+  "textHash": "70e238c2a2bb7280b5cd9a3dc64d4bda5ba9ec1db443e836c4c8a87bf082ae84",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "When this face-up Attack Position card is targeted for an attack",
+      "cost": "",
+      "effect": "Change it to Defense Position.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

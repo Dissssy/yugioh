@@ -1,0 +1,19 @@
+{
+  "code": 66788016,
+  "textHash": "41051b65985eeff250ba276766eeac457eb19f150de6246a901f1da8f208482a",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase, while your opponent controls a face-up monster",
+      "cost": "",
+      "effect": "Destroy the 1 face-up monster your opponent controls that has the lowest ATK (your choice, if tied).",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

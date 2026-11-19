@@ -5,4 +5,5 @@ A private website for playing Yu-Gi-Oh online, with rules handled by code and ca
 - [docs/architecture.md](docs/architecture.md): the duel engine plan.
 - [docs/accounts.md](docs/accounts.md): login, approval, guests, and how to run the site locally.
 - [docs/duels.md](docs/duels.md): card import, premade decks, and how a duel runs.
+- [docs/effects.md](docs/effects.md): card effects, effect sheets, the judge, contests and the eval suite.
 - [docs/deploy.md](docs/deploy.md): running the site in production with Docker.

@@ -1,0 +1,19 @@
+{
+  "code": 20474741,
+  "textHash": "b3c2b1006a47b9d0ed12906193812e5b437c205aac92fbbcb15c88188512bc1e",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "When this card is Normal Summoned",
+      "cost": "",
+      "effect": "Special Summon 1 Level 3 monster from your hand.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

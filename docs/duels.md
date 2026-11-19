@@ -34,7 +34,7 @@ They are rows in `decks` with a `slug` and no owner. Cards keep their current of
 
 Rules covered in layer 1: opening hands of five, the first player skips their first draw and Battle Phase, one Normal Summon or Set per turn, tributes for Level 5 and up, Flip Summons, one position change per turn (not on the turn a monster arrived or after it attacked), Setting Spells and Traps, battle against attack and defense position (face-down monsters are flipped), battle damage, the six-card hand limit, and winning by LP 0, deck-out or surrender.
 
-Not yet: card effects. Effect monsters fight as plain bodies with their printed ATK and DEF; Spells and Traps can be Set but not activated; Extra Deck monsters stay in the Extra Deck. Layers 2 and 3 add these.
+Card effects arrived with layer 2; see [effects.md](effects.md) for what works and what waits for later layers. Extra Deck monsters stay in the Extra Deck until layer 3.
 
 ## How a duel runs
 

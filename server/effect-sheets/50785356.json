@@ -1,0 +1,19 @@
+{
+  "code": 50785356,
+  "textHash": "ea64c461ab0ae9c53d4b6f385728519f0349afde3cd5746a72d45940e5cb17c8",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "When this card is Normal or Special Summoned",
+      "cost": "",
+      "effect": "It becomes Level 3.",
+      "targets": "1 face-up monster you control"
+    }
+  ],
+  "materials": null
+}

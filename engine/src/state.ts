@@ -35,11 +35,16 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
   return {
     instances: start.instances,
     cards: start.cards,
+    sheets: start.sheets,
     players: [player(start.players[0]), player(start.players[1])],
     turn: 0,
     turnPlayer: start.first,
     phase: 'draw',
-    normalSummonUsed: false,
+    normalSummons: 0,
+    normalSummonLimit: 1,
+    modifiers: [],
+    chain: [],
+    usedThisTurn: [],
     result: null,
   };
 }
@@ -50,14 +55,24 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'duelStarted':
         throw new Error('duelStarted can only be the first event');
       case 'intent':
+      case 'judged':
+      case 'appealed':
         return;
       case 'turnStarted':
         s.turn = event.turn;
         s.turnPlayer = event.player;
-        s.normalSummonUsed = false;
+        s.normalSummons = 0;
+        s.normalSummonLimit = 1;
+        s.usedThisTurn = [];
+        s.modifiers = s.modifiers.filter((m) => m.until !== 'end_of_turn');
         return;
       case 'phaseChanged':
         s.phase = event.phase;
+        s.modifiers = s.modifiers.filter(
+          (m) =>
+            !(m.until === 'end_of_battle_phase' && event.phase !== 'battle') &&
+            !(m.until === 'next_standby_phase' && event.phase === 'standby' && m.player === s.turnPlayer && m.turn < s.turn),
+        );
         return;
       case 'drew': {
         const p = s.players[event.player];
@@ -74,7 +89,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const p = s.players[event.player];
         take(p.hand, event.card);
         p.monsters[event.zone] = fieldCard(event.card, s.turn, event.type === 'normalSummoned');
-        s.normalSummonUsed = true;
+        s.normalSummons++;
         return;
       }
       case 'spellTrapSet': {
@@ -107,11 +122,90 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         p.lp = Math.max(0, p.lp - event.amount);
         return;
       }
+      case 'effectActivated': {
+        const p = s.players[event.player];
+        if (event.zone !== null) {
+          take(p.hand, event.card);
+          p.spellTraps[event.zone] = { ...fieldCard(event.card, s.turn, true), position: 'attack' };
+        } else {
+          const at = locate(s, event.card);
+          if (at?.zone === 'spellTraps') onField(s, event.card).faceUp = true;
+        }
+        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [] });
+        s.usedThisTurn.push({ card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
+        return;
+      }
+      case 'targeted':
+        s.chain.at(-1)!.targets = event.cards;
+        return;
+      case 'moved': {
+        removeFromPlay(s, event.card);
+        const owner = s.players[event.owner];
+        const card = s.cards[s.instances[event.card]!.code]!;
+        if (card.extraDeck && event.to !== 'graveyard' && event.to !== 'banished') owner.extra.push(event.card);
+        else if (event.to === 'hand') owner.hand.push(event.card);
+        else if (event.to === 'deck_top') owner.deck.unshift(event.card);
+        else if (event.to === 'deck_bottom' || event.to === 'deck_shuffled') owner.deck.push(event.card);
+        else owner[event.to === 'graveyard' ? 'graveyard' : 'banished'].push(event.card);
+        return;
+      }
+      case 'deckShuffled': {
+        const p = s.players[event.player];
+        if (event.order.length !== p.deck.length || !event.order.every((id) => p.deck.includes(id))) {
+          throw new Error('A shuffle must keep the same cards');
+        }
+        p.deck = [...event.order];
+        return;
+      }
+      case 'specialSummoned': {
+        removeFromPlay(s, event.card);
+        s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position };
+        return;
+      }
+      case 'destroyed':
+        for (const id of event.cards) sendToGraveyard(s, id);
+        return;
+      case 'lpChanged': {
+        const p = s.players[event.player];
+        p.lp = Math.max(0, p.lp + event.amount);
+        return;
+      }
+      case 'statsModified':
+        s.modifiers.push(event.modifier);
+        return;
+      case 'normalSummonGranted':
+        s.normalSummonLimit++;
+        return;
+      case 'linkResolved': {
+        const link = s.chain.pop();
+        if (!link) throw new Error('No chain link to resolve');
+        const at = locate(s, link.card);
+        const card = s.cards[s.instances[link.card]!.code]!;
+        const leaves = card.kind === 'spell' ? ['Normal', 'Quick-Play', 'Ritual'] : card.kind === 'trap' ? ['Normal', 'Counter'] : [];
+        if (at?.zone === 'spellTraps' && leaves.includes(card.race)) sendToGraveyard(s, link.card);
+        return;
+      }
       case 'duelEnded':
         s.result = event.result;
         return;
     }
   });
+}
+
+/** A face-up monster's ATK, DEF and Level after modifiers. Level modifiers apply in order; a set Level overrides earlier ones. */
+export function statsOf(state: DuelState, id: string): { atk: number; def: number; level: number | null } {
+  const card = state.cards[state.instances[id]!.code]!;
+  let atk = card.atk ?? 0;
+  let def = card.def ?? 0;
+  let level = card.level;
+  for (const m of state.modifiers) {
+    if (m.card !== id) continue;
+    atk += m.atk;
+    def += m.def;
+    if (m.levelSet !== null) level = m.levelSet;
+    if (level !== null) level = Math.max(1, level + m.levelDelta);
+  }
+  return { atk: Math.max(0, atk), def: Math.max(0, def), level };
 }
 
 function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
@@ -156,12 +250,19 @@ export function onField(state: DuelState, id: string): FieldCard {
   return state.players[at.seat][at.zone][at.index]!;
 }
 
-/** Cards always go to their owner's Graveyard. */
-function sendToGraveyard(state: DuelState, id: string) {
+/** Takes a card out of wherever it is. A card leaving the field loses its modifiers. */
+function removeFromPlay(state: DuelState, id: string) {
   const at = locate(state, id);
   if (!at) throw new Error(`Unknown card ${id}`);
   const p = state.players[at.seat];
-  if (at.zone === 'monsters' || at.zone === 'spellTraps') p[at.zone][at.index] = null;
-  else take(p[at.zone], id);
+  if (at.zone === 'monsters' || at.zone === 'spellTraps') {
+    p[at.zone][at.index] = null;
+    state.modifiers = state.modifiers.filter((m) => m.card !== id);
+  } else take(p[at.zone], id);
+}
+
+/** Cards always go to their owner's Graveyard. */
+function sendToGraveyard(state: DuelState, id: string) {
+  removeFromPlay(state, id);
   state.players[state.instances[id]!.owner].graveyard.push(id);
 }

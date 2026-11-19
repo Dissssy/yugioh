@@ -103,7 +103,8 @@ export function Board({ duelId }: { duelId: string }) {
   const me = view.you;
   const foe: Seat = me === 0 ? 1 : 0;
   const busy = cue !== null || send.isPending;
-  const actions = busy ? [] : view.actions;
+  // Activating effects needs the targeting and prompt UI of duel UI step 3, so the board doesn't offer it yet.
+  const actions: LegalAction[] = busy ? [] : view.actions.filter((a) => a.type !== 'activate');
   const has = <T extends LegalAction['type']>(type: T) => actions.find((a): a is Extract<LegalAction, { type: T }> => a.type === type);
   const actionsFor = (id: string) => actions.filter((a) => ('card' in a && a.card === id) || (a.type === 'attack' && a.attacker === id));
   const playable = new Set(actions.flatMap((a) => ('card' in a ? [a.card] : a.type === 'attack' ? [a.attacker] : [])));

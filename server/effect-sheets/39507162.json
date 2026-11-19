@@ -1,0 +1,29 @@
+{
+  "code": 39507162,
+  "textHash": "b33d98f75f97cf328d9fa8e00b87770f2d63462ece4e7c1a625fa50b227b0709",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "",
+      "cost": "",
+      "effect": "Gains 400 ATK while you have 1 or less cards in your hand.",
+      "targets": null
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "",
+      "cost": "",
+      "effect": "If you control no other monsters, the effects of Flip monsters destroyed by battle with this card are negated.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

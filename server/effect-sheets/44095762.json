@@ -1,0 +1,19 @@
+{
+  "code": 44095762,
+  "textHash": "f7c34952d5586fff92c201469a9bba322921888c172a5ae85afbf4b03b0c456b",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "When an opponent's monster declares an attack",
+      "cost": "",
+      "effect": "Destroy all your opponent's Attack Position monsters.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

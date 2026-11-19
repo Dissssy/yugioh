@@ -1,0 +1,19 @@
+{
+  "code": 22346472,
+  "textHash": "6061caef5e4b612b37cd45467d6fad23966d44cc23a328714259d7c2e8a32dfc",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "It gains 1000 ATK and DEF until your next Standby Phase.",
+      "targets": "1 face-up monster you control"
+    }
+  ],
+  "materials": null
+}

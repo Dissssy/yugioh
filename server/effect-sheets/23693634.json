@@ -1,0 +1,29 @@
+{
+  "code": 23693634,
+  "textHash": "5c219eba32bbcb0a70867286d75f14c3e21fdd2438c95fcecba50a19f0e79b1f",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "",
+      "cost": "",
+      "effect": "This card gains 100 ATK for every Warrior monster in any GY.",
+      "targets": null
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "When this card is destroyed by battle and sent to the GY",
+      "cost": "",
+      "effect": "Special Summon that target.",
+      "targets": "1 Warrior monster in either GY"
+    }
+  ],
+  "materials": "1 Tuner + 1 or more non-Tuner monsters"
+}

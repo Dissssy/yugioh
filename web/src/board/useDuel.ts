@@ -51,6 +51,8 @@ export function useDuel(duelId: string, pace: (event: LogEvent, waiting: number)
         setShown({ view: update.view, prev: null, log: update.log, cue: null });
         return;
       }
+      // The judge's progress and questions aren't shown yet (duel UI step 3).
+      if (update.type === 'judging') return;
       queue.push(...update.steps);
       if (!playing) {
         playing = true;

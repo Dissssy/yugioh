@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { DuelUpdate, Intent, PlayerView } from '@yugioh/engine';
+import type { DuelUpdate, Intent } from '@yugioh/engine';
 import type { DeckDetail, DeckSummary, DuelSummary, AdminUser, Me } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { guests } from '../src/db/schema.ts';
 import { deleteIdleGuests, GUEST_GRACE_MS } from '../src/guests.ts';
-import { ADMIN_EMAIL, Browser, startHarness, type Harness } from './harness.ts';
+import { ADMIN_EMAIL, Browser, startHarness, Stream, type Harness } from './harness.ts';
 
 let h: Harness;
 beforeAll(async () => {
@@ -22,38 +22,6 @@ async function login(claims: Parameters<Harness['setIdentity']>[0], browser = ne
 
 const me = (b: Browser) => b.json<Me>(`${h.baseUrl}/api/me`).then((r) => r.body);
 const guestCount = async () => (await h.db.select().from(guests)).length;
-
-/** Reads a Server-Sent Events stream one update at a time. */
-class Stream {
-  private buffer = '';
-  private reader: ReadableStreamDefaultReader<Uint8Array>;
-  private decoder = new TextDecoder();
-  constructor(res: Response) {
-    this.reader = res.body!.getReader();
-  }
-  /** The board after the next update. */
-  async next(): Promise<PlayerView> {
-    const update = await this.update();
-    return update.type === 'sync' ? update.view : update.steps.at(-1)!.view;
-  }
-  async update(): Promise<DuelUpdate> {
-    for (;;) {
-      const end = this.buffer.indexOf('\n\n');
-      if (end >= 0) {
-        const message = this.buffer.slice(0, end);
-        this.buffer = this.buffer.slice(end + 2);
-        if (message.startsWith('data: ')) return JSON.parse(message.slice(6)) as DuelUpdate;
-        continue;
-      }
-      const { value, done } = await this.reader.read();
-      if (done) throw new Error('stream ended');
-      this.buffer += this.decoder.decode(value, { stream: true });
-    }
-  }
-  close() {
-    void this.reader.cancel();
-  }
-}
 
 describe('card data', () => {
   it('imports cards, builds both starter decks from their sets and downloads their images', async () => {
@@ -168,7 +136,7 @@ describe('a challenge link played by a guest', () => {
     if (otherUpdate.type !== 'steps') throw new Error('expected steps');
     const other = otherUpdate.steps.at(-1)!.view;
     expect(view.players[view.you].monsters[0]).toMatchObject({ faceUp: false, card: { id: (set as { card: string }).card } });
-    expect(other.players[view.you].monsters[0]).toEqual({ card: { hidden: true }, position: 'defense', faceUp: false });
+    expect(other.players[view.you].monsters[0]).toEqual({ card: { hidden: true }, position: 'defense', faceUp: false, stats: null });
     expect(otherUpdate.steps.map((s) => s.entry.text)).toEqual([expect.stringMatching(/Set a monster$/)]);
     expect(JSON.stringify(otherUpdate)).not.toContain((set as { card: string }).card);
 

@@ -1,0 +1,19 @@
+{
+  "code": 97169186,
+  "textHash": "ede7e50c76ee09f648392990e4671567feb828daf2f876fc8e60da1cefc5c679",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase, while your opponent controls a face-up monster",
+      "cost": "",
+      "effect": "Destroy the 1 face-up monster your opponent controls that has the highest DEF (your choice, if tied).",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

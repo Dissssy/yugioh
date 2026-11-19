@@ -1,0 +1,19 @@
+{
+  "code": 4178474,
+  "textHash": "668320461887aa47e3accc75a0ac007f451f93eb5d8cff33b4a53f5969d68b42",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn",
+      "cost": "Discard 1 card",
+      "effect": "Destroy it.",
+      "targets": "1 card on the field"
+    }
+  ],
+  "materials": null
+}

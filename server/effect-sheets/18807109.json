@@ -1,0 +1,29 @@
+{
+  "code": 18807109,
+  "textHash": "4d38cc0b29ea627d5b1d50eb09efaa27d47181dc87b7edae96a772b2ff2762b7",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn",
+      "cost": "",
+      "effect": "It cannot attack or change its battle position.",
+      "targets": "1 monster your opponent controls"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "When that monster is destroyed",
+      "cost": "",
+      "effect": "Destroy this card.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

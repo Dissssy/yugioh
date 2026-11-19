@@ -1,17 +1,18 @@
 // What each player is allowed to see. Hidden cards are sent without an ID or card data, so nothing leaks to the browser.
 
-import { legalActions } from './rules.ts';
-import { evolve, locate, replay } from './state.ts';
-import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, LogEntry, LogEvent, Phase, PlayerView, Seat } from './types.ts';
+import { legalActions, normalSummonUsed } from './rules.ts';
+import { evolve, locate, replay, statsOf } from './state.ts';
+import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, LogEntry, LogEvent, Phase, Place, PlayerView, Seat } from './types.ts';
 
 export function viewFor(state: DuelState, seat: Seat): PlayerView {
   const shown = (id: string): CardView => ({ id, card: state.cards[state.instances[id]!.code]! });
   const hidden: CardView = { hidden: true };
-  const field = (owner: Seat) => (c: FieldCard | null): FieldCardView | null =>
+  const field = (owner: Seat, monsters: boolean) => (c: FieldCard | null): FieldCardView | null =>
     c && {
       card: c.faceUp || owner === seat ? shown(c.id) : hidden,
       position: c.position,
       faceUp: c.faceUp,
+      stats: monsters && c.faceUp ? statsOf(state, c.id) : null,
     };
   const deckList = [
     ...new Set(Object.values(state.instances).filter((i) => i.owner === seat).map((i) => i.code)),
@@ -23,7 +24,7 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
     turn: state.turn,
     turnPlayer: state.turnPlayer,
     phase: state.phase,
-    normalSummonUsed: state.normalSummonUsed,
+    normalSummonUsed: normalSummonUsed(state),
     result: state.result,
     players: ([0, 1] as const).map((owner) => {
       const p = state.players[owner];
@@ -33,13 +34,14 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
         lp: p.lp,
         deckCount: p.deck.length,
         hand: p.hand.map((id) => (mine ? shown(id) : hidden)),
-        monsters: p.monsters.map(field(owner)),
-        spellTraps: p.spellTraps.map(field(owner)),
+        monsters: p.monsters.map(field(owner, true)),
+        spellTraps: p.spellTraps.map(field(owner, false)),
         graveyard: p.graveyard.map(shown),
         banished: p.banished.map(shown),
         extra: p.extra.map((id) => (mine ? shown(id) : hidden)),
       };
     }) as PlayerView['players'],
+    chain: state.chain.map((link) => ({ player: link.player, card: shown(link.card), effect: link.effect, targets: link.targets })),
     actions: legalActions(state, seat),
   };
 }
@@ -60,11 +62,47 @@ export function entryFor(state: DuelState, event: DuelEvent, seq: number, turn: 
   return visible && { seq, turn, event: visible, text: describe(state, visible) };
 }
 
+/** Places both players can see into. */
+const PUBLIC: Place[] = ['monsters', 'spellTraps', 'graveyard', 'banished'];
+
+/** Whether a card is visible to `seat` where it is now. */
+export function visibleTo(state: DuelState, id: string, seat: Seat): boolean {
+  const at = locate(state, id);
+  if (!at) return false;
+  if (at.zone === 'graveyard' || at.zone === 'banished') return true;
+  if (at.zone === 'monsters' || at.zone === 'spellTraps') return at.seat === seat || state.players[at.seat][at.zone][at.index]!.faceUp;
+  return at.zone !== 'deck' && at.seat === seat;
+}
+
 function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat): LogEvent | null {
   switch (event.type) {
     case 'duelStarted':
     case 'intent':
+    case 'deckShuffled':
       return null;
+    case 'moved': {
+      // A card moving between places this player can't see (Deck to hand, say) stays anonymous.
+      const seen = event.owner === seat || PUBLIC.includes(event.from) || visibleTo(state, event.card, seat);
+      return { ...event, card: seen ? event.card : null };
+    }
+    case 'judged': {
+      const r = event.record;
+      // A refused activation from the hand never revealed the card to the opponent, so they see nothing.
+      if (!r.legal && r.player !== seat && !visibleTo(state, r.card, seat)) return null;
+      return {
+        type: 'judged',
+        stage: r.stage,
+        player: r.player,
+        card: visibleTo(state, r.card, seat) || r.player === seat ? r.card : null,
+        legal: r.legal,
+        summary: r.summary,
+        failed: r.error !== null,
+      };
+    }
+    case 'appealed': {
+      const { judged, by, verdict, explanation } = event.appeal;
+      return { type: 'appealed', judged, by, verdict, explanation };
+    }
     case 'monsterSet':
     case 'spellTrapSet':
       return event.player === seat ? event : { ...event, card: null };
@@ -126,7 +164,41 @@ function describe(state: DuelState, event: LogEvent): string | null {
       const why = { lp: `${loser}'s LP reached 0`, deckOut: `${loser} couldn't draw`, surrender: `${loser} surrendered` }[reason];
       return `${who(winner)} won: ${why}`;
     }
+    case 'judged':
+      return event.summary;
+    case 'appealed':
+      return `Appeal ${event.verdict === 'upheld' ? 'upheld the ruling' : 'overturned the ruling'}: ${event.explanation}`;
+    case 'effectActivated':
+      return `${who(event.player)} activated ${name(event.card)}`;
+    case 'targeted':
+      return `Targeting ${names(event.cards)}`;
+    case 'moved': {
+      const to = { hand: 'to the hand', deck_top: 'on top of the Deck', deck_bottom: 'to the bottom of the Deck', deck_shuffled: 'into the Deck', graveyard: 'to the GY', banished: 'banished' }[event.to];
+      const from = { deck: 'Deck', hand: 'hand', monsters: 'field', spellTraps: 'field', graveyard: 'GY', banished: 'banished cards', extra: 'Extra Deck' }[event.from];
+      return `${event.card ? name(event.card) : `${who(event.owner)}'s card`} from the ${from} ${to}`;
+    }
+    case 'specialSummoned':
+      return `${who(event.player)} Special Summoned ${name(event.card)} in ${event.position} position`;
+    case 'destroyed':
+      return `${names(event.cards)} destroyed`;
+    case 'lpChanged':
+      return event.kind === 'gain'
+        ? `${who(event.player)} gained ${event.amount} LP`
+        : `${who(event.player)} ${event.kind === 'cost' ? 'paid' : 'took'} ${-event.amount} ${event.kind === 'cost' ? 'LP' : 'damage'}`;
+    case 'statsModified': {
+      const m = event.modifier;
+      const parts = [
+        m.atk ? `${m.atk > 0 ? '+' : ''}${m.atk} ATK` : '',
+        m.def ? `${m.def > 0 ? '+' : ''}${m.def} DEF` : '',
+        m.levelSet !== null ? `Level ${m.levelSet}` : '',
+        m.levelDelta ? `${m.levelDelta > 0 ? '+' : ''}${m.levelDelta} Level` : '',
+      ].filter(Boolean);
+      return `${name(m.card)}: ${parts.join(', ')}`;
+    }
+    case 'normalSummonGranted':
+      return `${who(event.player)} may Normal Summon again this turn`;
     case 'flippedByAttack':
+    case 'linkResolved':
       return null;
   }
 }

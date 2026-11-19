@@ -24,8 +24,12 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('attack'), attacker: id, target: z.union([z.number().int().min(0).max(4), z.literal('direct')]) }),
   z.object({ type: z.literal('enterMain2') }),
   z.object({ type: z.literal('endTurn'), discard: z.array(id).max(60) }),
+  z.object({ type: z.literal('activate'), card: id, effect: z.number().int().min(0).max(9), zone: z.number().int().min(0).max(4).nullable() }),
   z.object({ type: z.literal('surrender') }),
 ]);
+
+const answerBody = z.object({ prompt: z.string(), picks: z.array(z.string()).max(60) });
+const contestBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
 
 const deckChoice = z.object({ deckId: z.number().int() });
 /** Signed-out visitors also give the name they play under as a guest. */
@@ -163,6 +167,32 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     const result = await duels.act(row.id, p.key, body.data);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(204).end();
+  });
+
+  // The answer to the judge's open question (a PromptView): the picked card IDs or choices.
+  router.post('/duels/:id/answer', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const body = answerBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    const row = await duels.find(req.params.id);
+    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    const result = await duels.answer(row.id, p.key, body.data.prompt, body.data.picks);
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.status(204).end();
+  });
+
+  // Contests the judge decision at log entry `seq`. The appeal's verdict arrives later as a log entry.
+  router.post('/duels/:id/contest', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const body = contestBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    const row = await duels.find(req.params.id);
+    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    const result = await duels.contest(row.id, p.key, body.data.seq, body.data.note);
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.status(202).end();
   });
 
   return router;

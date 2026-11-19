@@ -1,0 +1,19 @@
+{
+  "code": 59563768,
+  "textHash": "b5924b277846fcb8475b1c2b60bc7b3e4ee05f8e534b08aa92f6258fc38c64b9",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "",
+      "cost": "",
+      "effect": "This card gains 400 ATK for each face-up Level 2 monster you control.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

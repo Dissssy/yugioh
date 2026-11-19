@@ -1,0 +1,29 @@
+{
+  "code": 10012614,
+  "textHash": "7a4483b22c2732e6680d5fd269b61677568cccda38274b5741ae684b20f5046e",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "No effect on activation; the card stays on the field.",
+      "targets": null
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "",
+      "cost": "",
+      "effect": "All monsters you control gain 200 ATK during your Battle Phase only.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

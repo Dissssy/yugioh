@@ -1,0 +1,19 @@
+{
+  "code": 36472900,
+  "textHash": "af1a10f57d32c14cf505c55f2a749e553896d78bb37e1fd70592a701d49b1ec1",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "",
+      "cost": "",
+      "effect": "Cannot be destroyed by battle with a monster that has 1900 or more ATK.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}
