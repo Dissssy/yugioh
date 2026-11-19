@@ -9,7 +9,7 @@
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "Your Main Phase",
+      "window": "Your Main Phase, while your opponent controls a face-up monster",
       "cost": "Discard 1 card",
       "effect": "Destroy all face-up monsters your opponent controls.",
       "targets": null

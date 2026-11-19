@@ -129,6 +129,13 @@ export interface DuelState {
   chain: ChainLink[];
   /** Effects used this turn, for once-per-turn clauses. */
   usedThisTurn: { card: string; code: number; effect: number }[];
+  /**
+   * Rulings on activations that stand for the board as it is now, until any event changes it (another illegal ruling
+   * or an appeal changes nothing). An activation the judge ruled illegal is refused without asking it again
+   * (`legal` false, the judge's summary); once an appeal overturns that, the next try must be ruled legal (`legal`
+   * true, the appeal's ruling, which the judge is given).
+   */
+  rulings: { player: Seat; card: string; effect: number; legal: boolean; summary: string }[];
   result: DuelResult | null;
 }
 
@@ -203,6 +210,8 @@ export interface JudgeRecord {
 export interface AppealRecord {
   /** Event index of the contested `judged` event. */
   judged: number;
+  /** Which decision that was. */
+  decision: Pick<JudgeRecord, 'stage' | 'player' | 'card' | 'effect' | 'legal'>;
   by: Seat;
   note: string;
   model: string;
@@ -332,8 +341,11 @@ export interface JudgingView {
 export interface PromptView {
   id: string;
   text: string;
-  /** Cards to pick from; the asked player may see all of them, even ones from their Deck. */
-  cards: { id: string; card: CardData; place: Place }[];
+  /**
+   * Cards to pick from, answered by `pick`: the card's ID, or for a face-down card on the field (which the asked
+   * player may not identify) a key for this question only. `zone` is the zone index of a card on the field.
+   */
+  cards: { pick: string; card: CardView; place: Place; seat: Seat; zone: number | null }[];
   /** Picks that aren't cards, such as "Gain 1200 LP". */
   choices: string[];
   min: number;
