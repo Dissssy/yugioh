@@ -53,7 +53,8 @@ interface LiveDuel {
 interface Judging {
   stage: 'activation' | 'resolution';
   link: ChainLink;
-  question: (Question & { id: string; answer: (picks: string[]) => void }) | null;
+  /** `picks` holds what the player sends for each of `cards`: its ID, or a one-off key for a face-down card. */
+  question: (Question & { id: string; picks: string[]; answer: (picks: string[]) => void }) | null;
 }
 
 export type ActResult = { ok: true } | { ok: false; status: number; error: string };
@@ -244,7 +245,8 @@ export class Duels {
           random: secureRandom,
           ask: (question) =>
             new Promise<string[]>((answer) => {
-              duel.judging!.question = { ...question, id: randomBytes(6).toString('base64url'), answer };
+              const picks = question.cards.map((c) => (c.hidden ? randomBytes(6).toString('base64url') : c.id));
+              duel.judging!.question = { ...question, id: randomBytes(6).toString('base64url'), picks, answer };
               this.broadcastJudging(duel);
             }).finally(() => {
               duel.judging!.question = null;
@@ -265,12 +267,12 @@ export class Duels {
     if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
     const q = duel.judging?.question;
     if (!q || q.id !== promptId || q.player !== seat) return { ok: false, status: 409, error: 'That question is no longer open.' };
-    const options = new Set([...q.cards.map((c) => c.id), ...q.choices]);
+    const options = new Set([...q.picks, ...q.choices]);
     if (new Set(picks).size !== picks.length || !picks.every((p) => options.has(p))) return { ok: false, status: 422, error: 'Pick from the options given.' };
     if (picks.length < q.min || picks.length > q.max) {
       return { ok: false, status: 422, error: q.min === q.max ? `Pick ${q.min}.` : `Pick ${q.min} to ${q.max}.` };
     }
-    q.answer(picks);
+    q.answer(picks.map((p) => q.cards[q.picks.indexOf(p)]?.id ?? p));
     return { ok: true };
   }
 
@@ -366,7 +368,14 @@ function judgingFor(duel: LiveDuel, seat: Seat): JudgingView | null {
     waitingOn: q?.player ?? null,
     prompt:
       q && q.player === seat
-        ? { id: q.id, text: q.text, cards: q.cards.map((c) => ({ ...shown(c.id), place: c.place })), choices: q.choices, min: q.min, max: q.max }
+        ? {
+            id: q.id,
+            text: q.text,
+            cards: q.cards.map((c, i) => ({ pick: q.picks[i]!, card: c.hidden ? { hidden: true as const } : shown(c.id), place: c.place, seat: c.seat, zone: c.zone })),
+            choices: q.choices,
+            min: q.min,
+            max: q.max,
+          }
         : null,
   };
 }

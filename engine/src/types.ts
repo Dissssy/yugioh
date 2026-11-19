@@ -330,8 +330,11 @@ export interface JudgingView {
 export interface PromptView {
   id: string;
   text: string;
-  /** Cards to pick from; the asked player may see all of them, even ones from their Deck. */
-  cards: { id: string; card: CardData; place: Place }[];
+  /**
+   * Cards to pick from, answered by `pick`: the card's ID, or for a face-down card on the field (which the asked
+   * player may not identify) a key for this question only. `zone` is the zone index of a card on the field.
+   */
+  cards: { pick: string; card: CardView; place: Place; seat: Seat; zone: number | null }[];
   /** Picks that aren't cards, such as "Gain 1200 LP". */
   choices: string[];
   min: number;

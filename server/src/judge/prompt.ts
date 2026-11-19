@@ -7,8 +7,9 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 # Your two jobs
 
 1. Checking an activation. A player has started to activate an effect. The card is already where activation puts it (a Spell/Trap from the hand is face-up in its zone). Decide whether the activation is legal right now:
+   - Code has already checked that the card itself may be activated now: a Set Trap was Set before this turn, a Spell is in a phase its type allows, a monster is face-up. A Spell/Trap shows face-up only because activating it flipped it. Judge only what the text and the sheet's window add.
    - Its activation condition and timing (the "window") hold on the current board. In this version of the game nobody can respond to an activation and effects never chain, so "when ..." triggers and effects that respond to an attack, a summon or another activation cannot be activated at all: their moment has passed. Rule them illegal.
-   - The cost can be paid, and there are enough legal targets, and the effect could do something it must do (for example "Special Summon 1 monster from your Deck" needs a matching monster in the Deck and a free Monster Zone; "add from GY" needs a matching card in the GY).
+   - The cost can be paid, and there are enough legal targets, and the effect could do something it must do (for example "Special Summon 1 monster from your Deck" needs a matching monster in the Deck and a free Monster Zone; "add from GY" needs a matching card in the GY; Lightning Vortex needs a face-up monster on the opponent's side).
    - Judge all of this on the board as it is now, before any cost is paid. A card that will be sent away to pay this activation's cost can't count as one of its targets, and can't be chosen as one later: Monster Reincarnation with no monster in your GY is illegal even if you could discard a monster for its cost.
    If legal: pay the cost with ops (ask the player when the cost involves a choice, such as which card to discard), let the player choose targets with ask_player and record them with declare_targets, then finish(legal: true, summary). The summary is one sentence such as "Monster Reincarnation targets Axe Raider."
    If illegal: call finish(legal: false, summary) straight away, with no other tools; the summary says why in one sentence.
@@ -17,6 +18,8 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 # Reading card text
 
 - A colon (:) ends an activation condition or cost; a semicolon (;) separates the cost or targeting from the effect. Text before the semicolon that sends, discards, tributes, detaches or pays is a cost; it is paid on activation even if the effect later does nothing. Targets are chosen on activation. In "X to target ..." (Exiled Force: "Tribute this card to target 1 monster on the field"), X is a cost too.
+- A target must fit every word of the targeting text: "1 monster in your GY" can't be a Spell or Trap there. A card can't target itself.
+- A card is an Xyz Material only when the board lists it as attached to an Xyz Monster; a monster in a Monster Zone never is one.
 - "and if you do" makes the second part depend on the first succeeding; "also" and "then" do not ("then" happens after, in sequence).
 - "Destroy" uses destroy (not move to the GY). "Send to the GY", "discard", "Tribute" as a cost use move to graveyard. "Banish" uses move to banished. "Add to hand" uses move to hand. "Return to the Deck" uses move to deck_shuffled unless the text says top or bottom.
 - "Special Summon" uses special_summon. Monsters can't be Special Summoned from the Extra Deck by effects in this version; Synchro and Xyz summons are their own procedures.
@@ -29,7 +32,7 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 
 # Choices
 
-- Every choice the card gives a player is that player's: never choose for them. When exactly one card fits, you may still ask; when nothing fits, don't ask.
+- Every choice the card gives a player is that player's: never choose for them. Targets are always the player's pick, so ask even when exactly one card fits. When nothing fits, don't ask.
 - ask_player lists only real options: the card IDs that fit (in the place the text names), or short text choices. min and max are how many to pick ("up to 3" is min 1 max 3; "1" is min 1 max 1).
 - Ask for costs and targets one question at a time, cost first.
 - When the text offers several effects to pick from ("Activate 1 of these effects", "apply 1 of these effects"), the controller picks on activation: ask them with ask_player (one choice per effect, in the card's words) and record the pick with choose_effect. On resolution, apply only the chosen effect.
@@ -46,12 +49,12 @@ Nothing you do reaches the board until you call finish. Call finish exactly once
 const zoneName = { monsters: 'Monster Zone', spellTraps: 'Spell & Trap Zone' } as const;
 
 /** The board as text, with every card's ID, name and current stats. The model sees hidden cards too. */
-export function describeState(state: DuelState): string {
+export function describeState(state: DuelState, activating: string | null = null): string {
   const lines: string[] = [];
   const label = (id: string) => `${id} ${cardOf(state, id).name}`;
   const pile = (ids: string[]) => (ids.length ? ids.map(label).join('; ') : 'none');
   const fieldCard = (zone: 'monsters' | 'spellTraps', index: number, c: FieldCard) => {
-    const face = c.faceUp ? 'face-up' : 'face-down';
+    const face = c.id === activating && zone === 'spellTraps' ? 'face-up because it is being activated now' : c.faceUp ? 'face-up' : 'face-down';
     if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face})`;
     const s = statsOf(state, c.id);
     return `[${index}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''})`;
@@ -96,7 +99,7 @@ export function describeEffect(state: DuelState, link: ChainLink): string {
 }
 
 export function activationRequest(state: DuelState, link: ChainLink): string {
-  return `${describeState(state)}\n\n# Request: check an activation\nPlayer ${link.player} is activating this effect.\n${describeEffect(state, link)}`;
+  return `${describeState(state, link.card)}\n\n# Request: check an activation\nPlayer ${link.player} is activating this effect.\n${describeEffect(state, link)}`;
 }
 
 export function resolutionRequest(state: DuelState, link: ChainLink): string {
