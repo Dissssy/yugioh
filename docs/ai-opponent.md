@@ -79,7 +79,7 @@ One structured output (strict JSON schema), with the fields in this order, so th
 
 ## Model and cost
 
-The default is **Claude Haiku 5.5 with thinking disabled at effort high** (Ethan's choice, 2026-11-19), like the judge: `reason` comes first in the answer, which gives it room to think in the open. `AI_OPPONENT_MODEL` sets the model, and `pricing.ts` already prices Haiku and Opus (add Sonnet if it's used).
+The default is **Claude Haiku 5.5 with thinking disabled at effort high** (Ethan's choice, 2026-11-19), like the judge: `reason` comes first in the answer, which gives it room to think in the open. The model is the env var `AI_OPPONENT_MODEL` (default `claude-haiku-5-5`), so a deeper test run only needs a restart with, say, `claude-sonnet-5-5`. Thinking and effort follow the model: Haiku runs with thinking disabled at effort high, and any other model runs with adaptive thinking. The server refuses to start if `pricing.ts` has no price for the model, so every duel's cost stays counted (it prices Haiku and Opus today; add Sonnet when it's first used). Each `aiDecided` record stores the model, so duels played on different models can be compared later.
 
 Rough cost per call, assuming 12,000 tokens read from the cache, 4,000 new input tokens and 300 output tokens:
 
