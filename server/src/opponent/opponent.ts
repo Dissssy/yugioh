@@ -14,7 +14,13 @@ import { movesFor, optionsFor, safeMove, type Move } from './moves.ts';
 import { askText, decksText, logBlocks, SYSTEM, type Decks } from './prompt.ts';
 
 // Plain numbers: structured outputs don't take the bounds an integer schema carries. Code checks them against the options.
-const moveAnswer = z.object({ reason: z.string(), choice: z.number(), note: z.string() });
+const moveAnswer = z.object({
+  reason: z.string(),
+  choice: z.number(),
+  note: z.string(),
+  contest: z.object({ seq: z.number(), why: z.string() }).nullable(),
+  missing: z.string().nullable(),
+});
 const questionAnswer = z.object({ reason: z.string(), picks: z.array(z.number()), note: z.string() });
 const MOVE_SCHEMA = z.toJSONSchema(moveAnswer);
 const QUESTION_SCHEMA = z.toJSONSchema(questionAnswer);
@@ -81,6 +87,11 @@ export class Opponents {
   }
 }
 
+interface Extras {
+  contest: { seq: number; why: string } | null;
+  missing: string | null;
+}
+
 interface Context {
   id: string;
   seat: Seat;
@@ -98,6 +109,13 @@ interface Context {
 
 /** Model text without control characters: Postgres can't store a NUL in JSON, and the log has no use for the rest. */
 const clean = (text: string) => text.replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim();
+
+/** Rulings it may contest per duel; they come out of the duel's appeals. */
+export const CONTESTS_PER_DUEL = 3;
+/** Missing-move messages it may post per duel. */
+export const MISSING_PER_DUEL = 10;
+/** How its missing-move messages start, in chat. */
+export const MISSING_PREFIX = 'I expected to be able to: ';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -117,6 +135,10 @@ class Opponent {
   private done = false;
   /** Whether the last model call failed, so a run of failures is said in chat once. */
   private failing = false;
+  /** The log length at its last move call: rulings after it are new to it. */
+  private seenUpTo: number;
+  /** Rulings it contested while the server still knows of no appeal for them. */
+  private contesting = new Set<number>();
   private decks: string;
   private calls: number;
   private note: string;
@@ -128,6 +150,7 @@ class Opponent {
     this.decks = decksText(c.decks);
     this.calls = c.calls;
     this.note = c.note;
+    this.seenUpTo = Number.POSITIVE_INFINITY;
   }
 
   update(update: DuelUpdate) {
@@ -143,6 +166,8 @@ class Opponent {
       this.judging = update.judging;
     }
     if (this.board() !== before) this.changedAt = Date.now();
+    // Rulings already in the log when it starts (after a restart) aren't new.
+    if (this.seenUpTo === Number.POSITIVE_INFINITY) this.seenUpTo = this.log.length;
     this.poke();
   }
 
@@ -199,13 +224,18 @@ class Opponent {
 
     let move = moves[0]!;
     let failed = false;
+    let extras: Extras = { contest: null, missing: null };
     if (moves.length > 1) {
       if (!(await this.settled(board))) return;
       if (!(await this.withinLimit(board))) return;
-      const picked = await this.ask(view, board, moves.map((m) => m.text), { moves: moves.map((m) => m.text) });
+      const rulings = this.log.slice(this.seenUpTo).filter((e) => e.event.type === 'judged' && e.text !== null);
+      const contestsLeft = CONTESTS_PER_DUEL - this.contestsMade();
+      const picked = await this.ask(view, board, moves.map((m) => m.text), { moves: moves.map((m) => m.text), rulings, contestsLeft });
       if (picked === 'stale') return;
-      move = picked === null ? safeMove(moves) : moves[picked[0]!]!;
+      this.seenUpTo = this.log.length;
+      move = picked === null ? safeMove(moves) : moves[picked.picks[0]!]!;
       failed = picked === null;
+      if (picked) extras = this.allowed(picked, rulings.map((e) => e.seq), contestsLeft, view.turn);
     }
     // A pass waits out the response floor, so its timing looks like the server's automatic pass.
     if (move.intent.type === 'pass') await sleep(this.changedAt + this.c.floorMs * (1 + this.c.random() / 2) - Date.now());
@@ -214,6 +244,35 @@ class Opponent {
     await this.act(board, move);
     // Said after the move, since a chat message changes the board it decided on.
     if (failed) await this.sayOnce(`I couldn't decide on a move, so I picked: ${move.text}.`);
+    if (extras.missing) await this.c.duels.chat(this.c.id, this.c.seatKey, `${MISSING_PREFIX}${extras.missing}`.slice(0, 300));
+    if (extras.contest) await this.contest(extras.contest);
+  }
+
+  /** Its contests so far: appeals in its log, and those still being reviewed. */
+  private contestsMade(): number {
+    const appealed = this.log.flatMap((e) => (e.event.type === 'appealed' && e.event.by === this.c.seat ? [e.event.judged] : []));
+    return new Set([...appealed, ...this.contesting]).size;
+  }
+
+  /**
+   * What of its contest and missing move code lets through: a contest only of a ruling it was shown, within its
+   * contests; a missing move only once a turn each, within its messages.
+   */
+  private allowed(answer: Extras, offered: number[], contestsLeft: number, turn: number): Extras {
+    const contest = answer.contest && offered.includes(answer.contest.seq) && contestsLeft > 0 ? answer.contest : null;
+    const mine = this.log.filter((e) => e.event.type === 'chatted' && e.event.player === this.c.seat && e.event.text.startsWith(MISSING_PREFIX));
+    const said = mine.some((e) => e.turn === turn && e.event.type === 'chatted' && e.event.text === `${MISSING_PREFIX}${answer.missing}`.slice(0, 300));
+    const missing = answer.missing && mine.length < MISSING_PER_DUEL && !said ? answer.missing : null;
+    return { contest, missing };
+  }
+
+  private async contest(contest: { seq: number; why: string }) {
+    this.contesting.add(contest.seq);
+    const result = await this.c.duels.contest(this.c.id, this.c.seatKey, contest.seq, contest.why.slice(0, 500));
+    if (!result.ok) {
+      this.contesting.delete(contest.seq);
+      console.warn(`AI opponent in duel ${this.c.id}: its contest of #${contest.seq} was refused: ${result.error}`);
+    }
   }
 
   private async act(board: string, move: Move) {
@@ -247,7 +306,7 @@ class Opponent {
       if (!(await this.settled(board))) return;
       const picked = await this.ask(view, board, options.map((o) => o.text), { judging, options: options.map((o) => o.text) }, prompt);
       if (picked === 'stale') return;
-      picks = picked ?? fallback;
+      picks = picked?.picks ?? fallback;
     }
     await sleep(this.lastMoveAt + this.c.model.paceMs - Date.now());
     if (this.board() !== board) return;
@@ -290,7 +349,7 @@ class Opponent {
     options: string[],
     ask: Parameters<typeof askText>[2],
     question?: NonNullable<JudgingView['prompt']>,
-  ): Promise<number[] | 'stale' | null> {
+  ): Promise<(Extras & { picks: number[] }) | 'stale' | null> {
     this.calls++;
     const { model, call } = this.c.model;
     const settings = settingsFor(model);
@@ -300,9 +359,9 @@ class Opponent {
     // A record that can't be stored is logged, and the duel goes on without it.
     const record = (picks: number[], fields: Partial<AiRecord>): Promise<void> =>
       this.c.duels
-        .recordAi(this.c.id, { player: this.c.seat, model, options, picks, reason: '', note: this.note, stale: false, error: null, usage, ...fields })
+        .recordAi(this.c.id, { player: this.c.seat, model, options, picks, reason: '', note: this.note, contest: null, missing: null, stale: false, error: null, usage, ...fields })
         .catch((error: unknown) => console.error(`AI opponent in duel ${this.c.id} couldn't store a record:`, error));
-    let answer: { reason: string; note: string; picks: number[] };
+    let answer: Extras & { reason: string; note: string; picks: number[] };
     try {
       const response = await call({
         model,
@@ -316,7 +375,16 @@ class Opponent {
       if (response.stop_reason === 'refusal') throw new Error('The model declined the request.');
       const text = response.content.find((b) => b.type === 'text')?.text ?? '';
       const parsed = question ? questionAnswer.parse(JSON.parse(text)) : moveAnswer.parse(JSON.parse(text));
-      answer = { reason: clean(parsed.reason), note: clean(parsed.note), picks: 'picks' in parsed ? parsed.picks.map((n) => n - 1) : [parsed.choice - 1] };
+      answer =
+        'picks' in parsed
+          ? { reason: clean(parsed.reason), note: clean(parsed.note), picks: parsed.picks.map((n) => n - 1), contest: null, missing: null }
+          : {
+              reason: clean(parsed.reason),
+              note: clean(parsed.note),
+              picks: [parsed.choice - 1],
+              contest: parsed.contest && { seq: parsed.contest.seq, why: clean(parsed.contest.why) },
+              missing: parsed.missing && (clean(parsed.missing) || null),
+            };
     } catch (error) {
       await record([], { error: error instanceof Error ? error.message : String(error) });
       return null;
@@ -330,7 +398,7 @@ class Opponent {
     this.note = answer.note;
     this.failing = false;
     const stale = this.board() !== board;
-    await record(answer.picks, { reason: answer.reason, note: answer.note, stale });
-    return stale ? 'stale' : answer.picks;
+    await record(answer.picks, { reason: answer.reason, note: answer.note, contest: answer.contest, missing: answer.missing, stale });
+    return stale ? 'stale' : answer;
   }
 }

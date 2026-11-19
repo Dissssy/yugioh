@@ -1,6 +1,6 @@
 # AI opponent
 
-Status, 2026-11-19: step 1 of the build order (play against Claude) is built; contests, missing-move complaints and deck plans (steps 2 and 3) are not yet. Notes marked **Built** say where the code differs from the plan.
+Status, 2026-11-19: steps 1 and 2 of the build order (play against Claude; contests and missing-move complaints) are built; deck plans and tuning (step 3) are not yet. Notes marked **Built** say where the code differs from the plan.
 
 The admin can start a duel against Claude. Claude sits in a seat like any other player: it sees what that seat sees, picks one move at a time from the moves code already offers, answers the judge's questions, can contest a ruling, and says in the duel chat when it thinks a move should be possible but isn't offered. It is for the admin only, both to play against and as a playtester that finds rules bugs.
 
@@ -66,7 +66,7 @@ A rewind (rolled back log) changes the start of the log once, so that call misse
 
 ### The answer
 
-One structured output (strict JSON schema), with the fields in this order, so the model reasons before it commits (the same lesson as the judge's summary-before-verdict in PR #26). **Built:** step 1 has `reason`, `choice` (or `picks`) and `note`; `contest` and `missing` come with step 2. The numbers are plain `number`s in the schema, because structured outputs refuse the bounds Zod puts on an integer; code checks they are whole and in range.
+One structured output (strict JSON schema), with the fields in this order, so the model reasons before it commits (the same lesson as the judge's summary-before-verdict in PR #26). **Built:** answers to a judge question have only `reason`, `picks` and `note`; `contest` and `missing` come with moves. The numbers are plain `number`s in the schema, because structured outputs refuse the bounds Zod puts on an integer; code checks they are whole and in range.
 
 ```ts
 {
@@ -90,7 +90,7 @@ Rough cost per call, assuming 12,000 tokens read from the cache, 4,000 new input
 | Sonnet 5.5 | about $0.013 | about $2.50 |
 | Opus 5.5 | about $0.026 | about $5 |
 
-**Measured** (live check, 2026-11-19, Haiku playing both seats for 8 turns): 34 calls cost $0.012, about $0.00036 a call. Each read about 9,000 tokens from the cache and sent about 600 new input tokens and 220 output tokens, so a 200-call duel is about $0.07.
+**Measured** (live check, 2026-11-19, Haiku playing both seats for 8 turns): 34 calls cost $0.012, about $0.00036 a call. With the contest fields (step 2), 26 calls cost $0.0098 (about 9,500 cached tokens and 800 new tokens a call); it contested nothing and named no missing move, which was right for that duel. It did misread Swords of Revealing Light as stopping its own attacks, the kind of thing step 3's deck plans and evals are for. Each read about 9,000 tokens from the cache and sent about 600 new input tokens and 220 output tokens, so a 200-call duel is about $0.07.
 
 The 200 calls are a guess for a full duel. Code makes the trivial decisions, and the response floor already passes for it in every window where it holds nothing to activate, so most windows never reach the model. Contests run on the appeal model (Opus) and cost the same as a person's.
 
@@ -114,11 +114,12 @@ The 200 calls are a guess for a full duel. Code makes the trivial decisions, and
 - Each call lists the rulings (`judged` log entries) that arrived since its last call, by `seq`, with their summaries. If the model thinks one is wrong, it fills in `contest`, and the opponent calls `duels.contest` with `why` as the note. Everything after that (the appeal, the verdict in both logs, a rollback offer) is the existing flow.
 - The AI may contest at most **3 rulings per duel**. They come out of the duel's 10 appeals, so it can never use up more than 3 of the person's.
 - It can contest a ruling only on its first call after the ruling arrives, so a disagreement comes up once, not on every move.
+- **Built:** the rulings are listed only when it has contests left. Code lets a contest through only for a ruling it was shown, counts its contests from the `appealed` entries in its own log (plus any still under review), and sends the contest after its move. The record keeps what it wanted to contest even when code doesn't let it through.
 
 ## When a move seems missing
 
 - If the model believes a move should be possible but it isn't in the list (for example "Trap Hole should be able to answer that Summon"), it fills in `missing`. The opponent posts that in the duel chat as an ordinary message, starting with "I expected to be able to: ", and the game goes on with the move it chose.
-- Code drops a complaint it already made this turn, and allows at most 10 per duel, so the chat doesn't fill up.
+- Code drops a complaint it already made this turn, and allows at most 10 per duel, so the chat doesn't fill up. **Built:** both are counted from its own chat messages in the log, so they hold after a restart.
 - This is chat only, and it does **not** file a ruling report (Ethan, 2026-11-19). A report flags a card's scripts in every duel at once, and the AI will sometimes be wrong about the rules.
 - Because chat is in the duel log, every complaint shows up in the admin Full log with the board around it.
 
@@ -138,5 +139,5 @@ A later step could let the admin start a duel where Claude plays both seats, to 
 Each step works end to end on its own.
 
 1. **Play against Claude** (built 2026-11-19). The admin entry point, the AI seat, the watch loop, move expansion, judge questions, code-made decisions, the model call and its answer, `aiDecided` records and cost, limits, errors, and the response-window timing. One generic plan for every deck. Offline tests use a fake model that picks at random and play whole duels through, which also tests the engine.
-2. **Contests and missing moves.** The `contest` and `missing` fields, their limits and the chat messages.
+2. **Contests and missing moves** (built 2026-11-19). The `contest` and `missing` fields, their limits and the chat messages.
 3. **Deck plans and tuning.** A plan file per premade deck, and a small eval set of positions with a clear best move (lethal on board, don't attack into a face-up Mirror Force, use Trap Hole on the big Summon), run by hand like the judge evals.
