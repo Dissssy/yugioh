@@ -9,7 +9,7 @@
       "speed": 2,
       "mandatory": false,
       "opt": "none",
-      "window": "Either player's turn, if you have not conducted your Battle Phase this turn",
+      "window": "Either player's turn, if you have not conducted your Battle Phase this turn, while your Deck has a Level 2 or lower Warrior monster and you have a free Monster Zone",
       "cost": "",
       "effect": "Special Summon 1 Level 2 or lower Warrior monster from your Deck. You cannot conduct your Battle Phase the turn you activate this card.",
       "targets": null
