@@ -215,10 +215,14 @@ export function Board({ duelId }: { duelId: string }) {
     setMode({ kind: 'tributes', action, zone, chosen, keep: occupant });
   }
 
-  /** Placing with several possible actions (Summon or Set) asks which, right where the card was dropped. */
+  /**
+   * Placing with several possible actions (Summon or Set) asks which, right where the card was dropped. So does an
+   * activation even when it is the only option: while you hold priority a card can't be Set, and a drop meant as a
+   * Set must not activate it.
+   */
   function placeAt(options: Placeable[], zone: number, anchor: HTMLElement): boolean {
-    if (options.length === 1) place(options[0]!, zone);
-    if (options.length > 1) setMode({ kind: 'place', options, zone, anchor });
+    if (options.length === 1 && options[0]!.type !== 'activate') place(options[0]!, zone);
+    else if (options.length > 0) setMode({ kind: 'place', options, zone, anchor });
     return options.length > 0;
   }
 
