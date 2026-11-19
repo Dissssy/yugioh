@@ -180,6 +180,8 @@ Built 2026-11-19, after Ethan's phone showed the board cut off beside the log. O
 - **Small zones** (under 110 pixels, as on a landscape phone or a 720-pixel laptop) keep the log beside the board, but the turn controls and prompts leave the middle row for a bar above the log, where they have room.
 - **Tight zones** (under 80 pixels) shrink the Life Points plates to a zone's width, showing just the number (the name is its tooltip), so they clear the hand.
 - **Playing by touch** needs no new controls: every action already works by tap. Tap a card for its menu, pick the action, then tap the lit zone or target. Dragging a hand card to a zone and dragging an attacker's arrow to a target also work with a finger (the table takes every touch, so the page never scrolls or zooms under a drag).
+- **The screen is what's visible:** the duel is `100dvh` tall, so a phone's browser bars never hide the chat, and only the log scrolls (it follows new entries unless you scrolled up to read; it never scrolls the page). `interactive-widget=resizes-content` in `index.html` makes Android browsers shrink the page for the on-screen keyboard instead of panning it.
+- **Typing with the keyboard up** (portrait, a text field focused, and less than 80% of the screen showing) hides the board and the bar, so the log and chat get the screen. Closing the keyboard, even with the field still focused, brings the board back. (Ethan, 2026-11-19.)
 - **Card details:** a long press (450 ms without moving) pins the same tooltip a right-click does, while choosing or dragging too, as Shift zoom does. Tapping elsewhere closes it. Hover tooltips and the hand's hover lift are mouse-only, since a tap would only flash them.
 
 ## Card images

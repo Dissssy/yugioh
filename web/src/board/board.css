@@ -9,8 +9,12 @@ main:has(.duel) { max-width: none; padding: 0; }
   --gap: 6px;
   --glow: color-mix(in srgb, var(--accent) 70%, white);
   --gold: #e0a526;
+  /* The visible screen: dvh leaves out a phone's browser bars, and (see index.html) its on-screen keyboard. */
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
   grid-template-rows: auto minmax(0, 1fr);
@@ -365,3 +369,6 @@ form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit
 .duel.stacked .table { padding: 4px; }
 .duel.stacked .duel-bar { border-left: 0; }
 .duel.stacked .panel { border-left: 0; border-top: 1px solid var(--line); padding: 8px 12px; }
+/* Typing with the keyboard up leaves too little screen for both: the log and chat take it, and the board returns after. */
+.duel.stacked.typing > .table, .duel.stacked.typing > .duel-bar { display: none; }
+.duel.stacked.typing { grid-template-rows: minmax(0, 1fr); }
