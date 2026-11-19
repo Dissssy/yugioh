@@ -1,0 +1,19 @@
+{
+  "code": 11224934,
+  "textHash": "12cc1272ff21cbc7698a165398bf9c129ca2dd3312d8f51f37ef1a72055c1275",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn",
+      "cost": "",
+      "effect": "Each face-up Xyz Monster you control gains 300 ATK for each Xyz Material attached to it, until the End Phase.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

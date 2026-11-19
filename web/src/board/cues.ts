@@ -23,6 +23,18 @@ const baseMs: Record<LogEvent['type'], number> = {
   destroyedByBattle: 500,
   discarded: 450,
   duelEnded: 300,
+  // Card effects (layer 2). Plain timings until the effect animations land.
+  judged: 300,
+  appealed: 300,
+  effectActivated: 600,
+  targeted: 400,
+  moved: 450,
+  specialSummoned: 550,
+  destroyed: 500,
+  lpChanged: 650,
+  statsModified: 400,
+  normalSummonGranted: 300,
+  linkResolved: 200,
 };
 
 /** Phases nobody acts in pass almost instantly. */

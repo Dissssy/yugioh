@@ -1,0 +1,19 @@
+{
+  "code": 35537860,
+  "textHash": "685c1296abbeea473ba076510e377e3f71aba197c6e77b5237aca51bdd7b45bd",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase, if you control a Synchro Monster",
+      "cost": "",
+      "effect": "Destroy that target.",
+      "targets": "1 monster your opponent controls"
+    }
+  ],
+  "materials": null
+}

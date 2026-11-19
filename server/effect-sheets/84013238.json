@@ -1,0 +1,29 @@
+{
+  "code": 84013238,
+  "textHash": "fc46fbfff41d3461a587d3501bde2b19d08977f2008a766ee5cbddfce2e28fca",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "quick",
+      "speed": 2,
+      "mandatory": false,
+      "opt": "none",
+      "window": "When a monster declares an attack",
+      "cost": "Detach 1 material from this card",
+      "effect": "Negate the attack.",
+      "targets": null
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "If this card is targeted for an attack, while it has no material",
+      "cost": "",
+      "effect": "Destroy this card.",
+      "targets": null
+    }
+  ],
+  "materials": "2 Level 4 monsters"
+}

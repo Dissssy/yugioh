@@ -1,0 +1,103 @@
+// What the judge reads: a fixed rules reference (cached), then per request the board and the effect at hand.
+
+import { cardOf, statsOf, type ChainLink, type DuelState, type FieldCard, type Seat } from '@yugioh/engine';
+
+export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs every generic rule: turns, phases, summons, battle, damage, LP, zones, once-per-turn counting. Your only job is to apply one card effect at a time exactly as its text says, using tools. Every tool call is checked by code against the board; a refused call comes back as an error that you can correct.
+
+# Your two jobs
+
+1. Checking an activation. A player has started to activate an effect. The card is already where activation puts it (a Spell/Trap from the hand is face-up in its zone). Decide whether the activation is legal right now:
+   - Its activation condition and timing (the "window") hold on the current board. In this version of the game nobody can respond to an activation and effects never chain, so "when ..." triggers and effects that respond to an attack, a summon or another activation cannot be activated at all: their moment has passed. Rule them illegal.
+   - The cost can be paid, and there are enough legal targets, and the effect could do something it must do (for example "Special Summon 1 monster from your Deck" needs a matching monster in the Deck and a free Monster Zone; "add from GY" needs a matching card in the GY).
+   If legal: pay the cost with ops (ask the player when the cost involves a choice, such as which card to discard), let the player choose targets with ask_player and record them with declare_targets, then finish(legal: true, summary). The summary is one sentence such as "Monster Reincarnation targets Axe Raider."
+   If illegal: call finish(legal: false, summary) straight away, with no other tools; the summary says why in one sentence.
+2. Resolving the effect. Apply the effect's text (not its cost, which was paid) with ops, asking players where the text gives them a choice ("Special Summon 1 ... from your Deck": ask the controller which). A targeted card that is no longer where it was, or no longer fits the targeting text, is not affected; if none of the targets are left, the effect does nothing. Then finish(legal: true, summary) with one sentence on what happened.
+
+# Reading card text
+
+- A colon (:) ends an activation condition or cost; a semicolon (;) separates the cost or targeting from the effect. Text before the semicolon that sends, discards, tributes, detaches or pays is a cost; it is paid on activation even if the effect later does nothing. Targets are chosen on activation.
+- "and if you do" makes the second part depend on the first succeeding; "also" and "then" do not ("then" happens after, in sequence).
+- "Destroy" uses destroy (not move to the GY). "Send to the GY", "discard", "Tribute" as a cost use move to graveyard. "Banish" uses move to banished. "Add to hand" uses move to hand. "Return to the Deck" uses move to deck_shuffled unless the text says top or bottom.
+- "Special Summon" uses special_summon. Monsters can't be Special Summoned from the Extra Deck by effects in this version; Synchro and Xyz summons are their own procedures.
+- "Gains/loses X ATK" is modify_stats with a delta. "Until the end of this turn" and "until the End Phase" are end_of_turn; "until your next Standby Phase" is next_standby_phase; "until the end of the Battle Phase" is end_of_battle_phase; a change with no end ("becomes Level 3") is while_on_field.
+- "Inflict X damage" is change_lp kind damage on that player; "gain X LP" is kind gain; "pay X LP" is kind cost.
+- "Your" and "you" mean the player who activated the effect. "Your opponent" is the other player. "Control" means on that player's side of the field.
+- A "face-up monster" is one whose card is face-up on the field. Monsters in the GY have their printed ATK/DEF/Level.
+- Monster types (Warrior, Spellcaster, ...), Attributes, Levels, ATK/DEF and card types (Normal Monster, Effect Monster, Tuner, Spell, Trap) are in the card list in each request. "Non-Effect Monster" means Normal Monster.
+- If part of an effect can't be expressed with the tools you have (for example a restriction like "you cannot conduct your Battle Phase this turn", counters, or negating), do every part you can and say in the summary which part was not applied.
+
+# Choices
+
+- Every choice the card gives a player is that player's: never choose for them. When exactly one card fits, you may still ask; when nothing fits, don't ask.
+- ask_player lists only real options: the card IDs that fit (in the place the text names), or short text choices. min and max are how many to pick ("up to 3" is min 1 max 3; "1" is min 1 max 1).
+- Ask for costs and targets one question at a time, cost first.
+- The answer comes back as the picked IDs or choices. Use exactly those.
+
+# Hidden information
+
+You can see every card, but players can't: the opponent's hand, both Decks, face-down cards and the Extra Decks are hidden from the opponent. Your summaries are shown to both players, and an ask_player prompt to the player asked. Never name a card a player can't see in text shown to them; code refuses such text. Say "a card" instead.
+
+# Finishing
+
+Nothing you do reaches the board until you call finish. Call finish exactly once, as the last call. If a tool call is refused, read the error, fix the call, and continue. Be brief: no commentary outside tool calls.`;
+
+const zoneName = { monsters: 'Monster Zone', spellTraps: 'Spell & Trap Zone' } as const;
+
+/** The board as text, with every card's ID, name and current stats. The model sees hidden cards too. */
+export function describeState(state: DuelState): string {
+  const lines: string[] = [];
+  const label = (id: string) => `${id} ${cardOf(state, id).name}`;
+  const pile = (ids: string[]) => (ids.length ? ids.map(label).join('; ') : 'none');
+  const fieldCard = (zone: 'monsters' | 'spellTraps', index: number, c: FieldCard) => {
+    const face = c.faceUp ? 'face-up' : 'face-down';
+    if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face})`;
+    const s = statsOf(state, c.id);
+    return `[${index}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''})`;
+  };
+  const phase = { draw: 'Draw Phase', standby: 'Standby Phase', main1: 'Main Phase 1', battle: 'Battle Phase', main2: 'Main Phase 2', end: 'End Phase' };
+  lines.push(`Turn ${state.turn}: player ${state.turnPlayer}'s turn, ${phase[state.phase]}. Normal Summons/Sets used this turn: ${state.normalSummons} of ${state.normalSummonLimit}.`);
+  for (const seat of [0, 1] as Seat[]) {
+    const p = state.players[seat];
+    lines.push('', `Player ${seat} (${p.name}), LP ${p.lp}`);
+    lines.push(`  Hand: ${pile(p.hand)}`);
+    for (const zone of ['monsters', 'spellTraps'] as const) {
+      const cards = p[zone].flatMap((c, i) => (c ? [fieldCard(zone, i, c)] : []));
+      lines.push(`  ${zoneName[zone]}s: ${cards.length ? cards.join('; ') : 'empty'}`);
+    }
+    lines.push(`  GY: ${pile(p.graveyard)}`);
+    lines.push(`  Banished: ${pile(p.banished)}`);
+    lines.push(`  Deck (${p.deck.length} cards, top first): ${pile(p.deck)}`);
+    lines.push(`  Extra Deck: ${pile(p.extra)}`);
+  }
+  if (state.modifiers.length) {
+    lines.push('', 'Active stat changes:');
+    for (const m of state.modifiers) lines.push(`  ${label(m.card)}: ATK ${m.atk}, DEF ${m.def}, Level ${m.levelSet ?? `+${m.levelDelta}`}, until ${m.until}`);
+  }
+  lines.push('', 'Cards in this duel (name: type; attribute/type; Level; ATK/DEF):');
+  for (const code of [...new Set(Object.values(state.instances).map((i) => i.code))].sort((a, b) => a - b)) {
+    const c = state.cards[code]!;
+    const stats = c.kind === 'monster' ? `; ${c.attribute ?? ''} ${c.race}; Level ${c.level ?? '-'}; ${c.atk ?? '?'}/${c.def ?? '?'}` : `; ${c.race}`;
+    lines.push(`  ${c.name}: ${c.type}${stats}`);
+  }
+  return lines.join('\n');
+}
+
+/** The effect being judged: the card's full text and its sheet entry. */
+export function describeEffect(state: DuelState, link: ChainLink): string {
+  const card = cardOf(state, link.card);
+  const effect = state.sheets[card.code]!.effects[link.effect]!;
+  return [
+    `Card: ${link.card} ${card.name} (${card.type}${card.kind === 'monster' ? '' : `, ${card.race}`}), controlled by player ${link.player}.`,
+    `Full text: ${card.text}`,
+    `The effect being used (effect ${link.effect} of its sheet): kind ${effect.kind}; window: ${effect.window || 'none given'}; cost: ${effect.cost || 'none'}; targets: ${effect.targets ?? 'none'}; effect: ${effect.effect}`,
+  ].join('\n');
+}
+
+export function activationRequest(state: DuelState, link: ChainLink): string {
+  return `${describeState(state)}\n\n# Request: check an activation\nPlayer ${link.player} is activating this effect.\n${describeEffect(state, link)}`;
+}
+
+export function resolutionRequest(state: DuelState, link: ChainLink): string {
+  const targets = link.targets.length ? link.targets.map((id) => `${id} ${cardOf(state, id).name}`).join('; ') : 'none';
+  return `${describeState(state)}\n\n# Request: resolve the effect\nThe activation was legal and its cost is paid. Targets declared on activation: ${targets}.\n${describeEffect(state, link)}`;
+}

@@ -1,0 +1,29 @@
+{
+  "code": 32918479,
+  "textHash": "941ff4c958e846a88890750ef83c9f872b10e4c445cb04c49cb54098db782c50",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "When this card inflicts battle damage to your opponent by a direct attack",
+      "cost": "",
+      "effect": "Draw 1 card.",
+      "targets": null
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "During the End Phase of the turn this card was Summoned",
+      "cost": "",
+      "effect": "Send it to the GY.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

@@ -1,0 +1,19 @@
+{
+  "code": 95281259,
+  "textHash": "afe16278ea087c268a9a7b3a2220793df701a5bc7bc6e3c097b20b8579ebd0ec",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Add that target to your hand.",
+      "targets": "1 Warrior monster in your GY"
+    }
+  ],
+  "materials": null
+}

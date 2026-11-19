@@ -1,0 +1,19 @@
+{
+  "code": 4206964,
+  "textHash": "a5001d10074bce1a7fe580c433eb407728ea1cef6b67be85c03e56d94651895c",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "When your opponent Normal or Flip Summons 1 monster with 1000 or more ATK",
+      "cost": "",
+      "effect": "Destroy that target.",
+      "targets": "That monster"
+    }
+  ],
+  "materials": null
+}

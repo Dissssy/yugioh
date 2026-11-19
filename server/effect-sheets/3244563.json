@@ -1,0 +1,19 @@
+{
+  "code": 3244563,
+  "textHash": "35b581d7f203911d32d1d80e891185581dcfa5c056c26acfb56c29cbecee5854",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn",
+      "cost": "",
+      "effect": "It gains 400 ATK/DEF until the end of this turn.",
+      "targets": "1 face-up monster on the field"
+    }
+  ],
+  "materials": null
+}

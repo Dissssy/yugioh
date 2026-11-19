@@ -1,0 +1,19 @@
+{
+  "code": 70046172,
+  "textHash": "e48aa02e3b383f0767daf18cac89a2f1175e076d6a7f3198f6d2b7a40aacbe98",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn (layer 2: your own Main or Battle Phase)",
+      "cost": "",
+      "effect": "It gains 700 ATK until the end of this turn.",
+      "targets": "1 face-up monster on the field"
+    }
+  ],
+  "materials": null
+}

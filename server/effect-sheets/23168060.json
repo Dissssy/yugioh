@@ -1,0 +1,19 @@
+{
+  "code": 23168060,
+  "textHash": "a29dc11f10dc160482891327eeb13628aea7af6440c865504979b1510013b130",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "soft",
+      "window": "Once per turn, during your Main Phase",
+      "cost": "",
+      "effect": "Make this card Level 3 until the End Phase.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

@@ -1,0 +1,19 @@
+{
+  "code": 58441120,
+  "textHash": "90ea239e3d836599894491740597739a14a7ed131ffef091e0bc0851b8c27664",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "It becomes Level 4 until the End Phase.",
+      "targets": "1 face-up monster on the field"
+    }
+  ],
+  "materials": null
+}

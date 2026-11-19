@@ -1,0 +1,19 @@
+{
+  "code": 5318639,
+  "textHash": "a4a0864cd0093cd0e3e0be993f1f84a2225ee4900901d534ab6208e17ac7e443",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn (layer 2: your own Main or Battle Phase)",
+      "cost": "",
+      "effect": "Destroy that target.",
+      "targets": "1 Spell/Trap on the field"
+    }
+  ],
+  "materials": null
+}

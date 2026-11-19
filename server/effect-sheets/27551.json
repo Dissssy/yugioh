@@ -1,0 +1,49 @@
+{
+  "code": 27551,
+  "textHash": "cd26edd1cf8005b1a014bf72b4a06399e9cc187537276ed4cf57ceabca49c7ea",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn",
+      "cost": "",
+      "effect": "Special Summon it in Attack Position.",
+      "targets": "1 monster with 1000 or less ATK in your GY"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "If the target is changed to Defense Position",
+      "cost": "",
+      "effect": "Destroy it and this card.",
+      "targets": null
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "When this card leaves the field",
+      "cost": "",
+      "effect": "Destroy the target.",
+      "targets": null
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "When the target is destroyed",
+      "cost": "",
+      "effect": "Destroy this card.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

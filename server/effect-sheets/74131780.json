@@ -1,0 +1,19 @@
+{
+  "code": 74131780,
+  "textHash": "487dcf7528459ecc9367b649780501b4d651f71fba06c479b67e57a2fbe8daf5",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "Tribute this card",
+      "effect": "Destroy that target.",
+      "targets": "1 monster on the field"
+    }
+  ],
+  "materials": null
+}

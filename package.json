@@ -16,7 +16,9 @@
     "test": "npm test --workspaces --if-present",
     "db:generate": "npm run db:generate -w server",
     "db:migrate": "npm run db:migrate -w server",
-    "cards:import": "npm run cards:import -w server --"
+    "cards:import": "npm run cards:import -w server --",
+    "sheets:compile": "npm run sheets:compile -w server --",
+    "judge:eval": "npm run judge:eval -w server --"
   },
   "engines": {
     "node": ">=22.18"

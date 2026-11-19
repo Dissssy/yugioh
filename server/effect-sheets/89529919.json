@@ -1,0 +1,19 @@
+{
+  "code": 89529919,
+  "textHash": "9961b40642c50da5c45e865c5606bfb3386a92088227a801236147c459a724d6",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "When this card is Normal or Special Summoned",
+      "cost": "",
+      "effect": "Choose 1 Level 4 or lower Warrior monster from your Deck, except \"Field-Commander Rahz\", and place it on top of your Deck.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

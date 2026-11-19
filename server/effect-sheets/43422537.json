@@ -1,0 +1,19 @@
+{
+  "code": 43422537,
+  "textHash": "d1da34f5217653427cbb7a2f0cfb4efbb5b075f3c64729609d7e17847ea993c0",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "You can conduct 2 Normal Summons/Sets this turn, not just 1.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

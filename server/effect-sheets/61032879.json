@@ -1,0 +1,29 @@
+{
+  "code": 61032879,
+  "textHash": "d4b7c0c21d1bfb08862234b8368bb18274347b01ba2ff351d47e156375dc9f53",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "No effect on activation; the card stays on the field.",
+      "targets": null
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "Each time you Synchro Summon a Synchro Monster",
+      "cost": "",
+      "effect": "Inflict 500 damage to your opponent.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

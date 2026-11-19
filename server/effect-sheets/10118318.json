@@ -1,0 +1,19 @@
+{
+  "code": 10118318,
+  "textHash": "5694ddfbc33576db21e8507adcef372febb0f283a834dae8214e4d5212911753",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Either player's turn, if you have not conducted your Battle Phase this turn",
+      "cost": "",
+      "effect": "Special Summon 1 Level 2 or lower Warrior monster from your Deck. You cannot conduct your Battle Phase the turn you activate this card.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

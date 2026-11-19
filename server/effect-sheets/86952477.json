@@ -1,0 +1,19 @@
+{
+  "code": 86952477,
+  "textHash": "7b9f32490aa1d0616b1db7e422b21fc3b249d92b75ef15719003a0cdbbea91da",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "",
+      "cost": "",
+      "effect": "This card is Level 4 while in face-up Defense Position.",
+      "targets": null
+    }
+  ],
+  "materials": null
+}

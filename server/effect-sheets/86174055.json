@@ -1,0 +1,19 @@
+{
+  "code": 86174055,
+  "textHash": "231eb229c93ee1bd8bdf47ffe409bd72242ea0d622be6e8f01c97316e8bb6e73",
+  "verified": false,
+  "model": "hand-written in a Claude Code session",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "When this card is destroyed by battle and sent to the GY",
+      "cost": "",
+      "effect": "Special Summon them, but their effects are negated.",
+      "targets": "2 Level 2 monsters in your GY"
+    }
+  ],
+  "materials": null
+}
