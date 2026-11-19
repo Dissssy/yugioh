@@ -98,6 +98,7 @@ main:has(.duel) { max-width: none; padding: 0; }
 .hand-card { flex: none; perspective: 800px; touch-action: none; }
 .hand.own .hand-card { cursor: grab; }
 .hand.own .hand-card:active { cursor: grabbing; }
+.hand-card.held { z-index: 10; pointer-events: none; }
 
 /* Life Points */
 .lp-plate {

@@ -1,6 +1,7 @@
 import type { CardData, CardView, Seat } from '@yugioh/engine';
-import { motion, useMotionValue, useSpring, useTransform, useVelocity } from 'motion/react';
-import { useMemo, useRef, useState } from 'react';
+import { animate, motion, useMotionValue, useSpring, useTransform, useVelocity } from 'motion/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { dropCentre } from './aim.tsx';
 import { CardFace, dataOf, idOf } from './Card.tsx';
 import { useCardHover } from './CardTooltip.tsx';
 import { CARD_ASPECT, CARD_HEIGHT_IN_ZONE, useBoardLook, type CardMarks } from './look.ts';
@@ -26,8 +27,8 @@ function fan(i: number, n: number, zone: number, hovered: number | null) {
 export interface HandDrag {
   start(id: string): void;
   move(id: string, point: { x: number; y: number }): void;
-  /** The card was released at `point`. */
-  end(id: string, point: { x: number; y: number }): void;
+  /** The card was released at `point`. True when the board took it, so it stays where it was dropped. */
+  end(id: string, point: { x: number; y: number }): boolean;
 }
 
 /**
@@ -42,6 +43,7 @@ export function OwnHand({
   marks,
   onCard,
   drag,
+  held,
 }: {
   duelId: string;
   seat: Seat;
@@ -49,6 +51,8 @@ export function OwnHand({
   marks: CardMarks;
   onCard: (id: string, el: HTMLElement) => void;
   drag: HandDrag;
+  /** A card waiting over a zone (`id`, held over the drop target `key`) while you choose how to play it. */
+  held: { id: string; key: string } | null;
 }) {
   const { zone } = useBoardLook();
   const [saved, setSaved] = useState(() => loadOrder(duelId));
@@ -105,12 +109,13 @@ export function OwnHand({
           id={id}
           data={dataOf(byId.get(id)!)!}
           place={fan(i, order.length, zone, hoveredIndex)}
-          lifted={hovered === id}
+          lifted={hovered === id && held?.id !== id}
           marks={marks}
           onHover={(on) => setHovered((h) => (on ? id : h === id ? null : h))}
           onCard={onCard}
           onStep={(by) => move(id, i + by)}
           drag={cardDrag}
+          heldAt={held?.id === id ? held.key : null}
         />
       ))}
     </div>
@@ -127,6 +132,7 @@ function HandCard({
   onCard,
   onStep,
   drag,
+  heldAt,
 }: {
   id: string;
   data: CardData;
@@ -138,26 +144,44 @@ function HandCard({
   /** Move this card along the hand by one place, from the keyboard. */
   onStep: (by: -1 | 1) => void;
   drag: HandDrag;
+  heldAt: string | null;
 }) {
   const { zone, imageSize } = useBoardLook();
   const hover = useCardHover();
   const tip = hover(data);
   // The card leans into the direction it's dragged, and settles when it slows down.
   const x = useMotionValue(0);
+  const y = useMotionValue(0);
   const lean = useSpring(useTransform(useVelocity(x), [-2000, 2000], [-18, 18], { clamp: true }), { stiffness: 300, damping: 25 });
   // A drag ends with a click on the card; that click isn't a request for its menu.
   const dragged = useRef(false);
   const at = (point: { x: number; y: number }) => ({ x: point.x - window.scrollX, y: point.y - window.scrollY });
+  const el = useRef<HTMLDivElement>(null);
+  /** Glides the card by (dx, dy) from its place in the hand: home is (0, 0). */
+  const glide = (dx: number, dy: number) => {
+    const a = animate(x, dx, spring);
+    const b = animate(y, dy, spring);
+    return () => (a.stop(), b.stop());
+  };
+  // Held over a zone, the card centres on it; let go of, it returns to the hand.
+  useEffect(() => {
+    const centre = heldAt ? dropCentre(heldAt) : null;
+    const r = el.current?.getBoundingClientRect();
+    if (!centre || !r) return glide(0, 0);
+    return glide(centre.x - (r.left + r.width / 2 - x.get()), centre.y - (r.top + r.height / 2 - y.get()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heldAt]);
   return (
     <motion.div
+      ref={el}
       layout
       layoutId={id}
       drag
-      dragSnapToOrigin
       dragMomentum={false}
       tabIndex={0}
-      className={`hand-card slot ${marks.classes(id)}`}
-      style={{ marginLeft: place.marginLeft, x }}
+      className={`hand-card slot ${marks.classes(id)}${heldAt ? ' held' : ''}`}
+      style={{ marginLeft: place.marginLeft, x, y }}
+      animate={{ scale: heldAt ? 1.08 : 1 }}
       transition={spring}
       whileDrag={{ scale: 1.08, zIndex: 10 }}
       onPointerEnter={(e) => {
@@ -176,7 +200,7 @@ function HandCard({
       onDrag={(_, info) => drag.move(id, at(info.point))}
       onDragEnd={(_, info) => {
         setTimeout(() => (dragged.current = false), 0);
-        drag.end(id, at(info.point));
+        if (!drag.end(id, at(info.point))) glide(0, 0);
       }}
       onClick={(e) => !dragged.current && onCard(id, e.currentTarget)}
       onKeyDown={(e) => {
@@ -188,7 +212,7 @@ function HandCard({
     >
       <motion.div style={{ rotate: lean }}>
         <motion.div
-          animate={lifted ? { rotate: 0, y: -zone * 0.3, scale: 1.15 } : { rotate: place.rotate, y: place.y, scale: 1 }}
+          animate={lifted ? { rotate: 0, y: -zone * 0.3, scale: 1.15 } : heldAt ? { rotate: 0, y: 0, scale: 1 } : { rotate: place.rotate, y: place.y, scale: 1 }}
           transition={spring}
         >
           <div className="fx" data-card-id={id}>
