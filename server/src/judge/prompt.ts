@@ -71,7 +71,7 @@ export function describeState(state: DuelState, activating: string | null = null
     const face = c.id === activating && zone === 'spellTraps' ? activated : c.faceUp ? 'face-up' : 'face-down';
     if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face})`;
     const s = statsOf(state, c.id);
-    return `[${index}${index >= MONSTER_ZONES ? ', Extra Monster Zone' : ''}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''})`;
+    return `[${index}${index >= MONSTER_ZONES ? ', Extra Monster Zone' : ''}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''}${c.materials.length ? `, Xyz Materials attached: ${c.materials.map(label).join('; ')}` : ''})`;
   };
   const phase = { draw: 'Draw Phase', standby: 'Standby Phase', main1: 'Main Phase 1', battle: 'Battle Phase', main2: 'Main Phase 2', end: 'End Phase' };
   lines.push(`Turn ${state.turn}: player ${state.turnPlayer}'s turn, ${phase[state.phase]}. Normal Summons/Sets used this turn: ${state.normalSummons} of ${state.normalSummonLimit}.`);
@@ -135,6 +135,8 @@ function describeHappening(state: DuelState, h: Happening): string {
       return `player ${h.player}'s ${label(h.card)} was targeted for an attack by ${label(h.attacker)}`;
     case 'destroyed_by_battle':
       return `player ${h.player}'s ${label(h.card)} was destroyed by battle`;
+    case 'battle_destroying':
+      return `player ${h.player}'s ${label(h.card)} destroyed ${label(h.target)} by battle`;
     case 'battle_damage':
       return `player ${h.player}'s ${label(h.card)} inflicted ${h.amount} battle damage to the opponent`;
     case 'phase':

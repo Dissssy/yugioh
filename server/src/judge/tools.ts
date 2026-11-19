@@ -57,6 +57,10 @@ export const opTools = {
     description: 'Negate the attack being made ("negate the attack"): it ends with no damage.',
     input: z.object({}),
   },
+  detach: {
+    description: 'Detach an Xyz Material from the Xyz Monster it is attached to: it goes to its owner\'s GY. One call per material.',
+    input: z.object({ card }),
+  },
   declare_targets: {
     description: 'Record the targets of the effect being activated. Only while checking an activation, after the player chose them.',
     input: z.object({ cards: z.array(card) }),

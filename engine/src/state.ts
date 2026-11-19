@@ -177,13 +177,22 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         p.hand.push(...p.deck.splice(0, event.count));
         return;
       }
-      case 'destroyedByBattle':
-        for (const id of event.cards) {
+      case 'destroyedByBattle': {
+        // Each monster destroyed was destroyed by the other one in the battle.
+        const destroyers = event.cards.map((id) => {
+          const by = s.attack && (id === s.attack.attacker ? s.attack.target : s.attack.attacker);
+          const at = by ? locate(s, by) : null;
+          return by && at ? { by, seat: at.seat } : null;
+        });
+        event.cards.forEach((id, i) => {
           const player = locate(s, id)!.seat;
           sendToGraveyard(s, id);
           s.happened.push({ event: 'destroyed_by_battle', card: id, player, group });
-        }
+          const d = destroyers[i];
+          if (d) s.happened.push({ event: 'battle_destroying', card: d.by, player: d.seat, target: id, group });
+        });
         return;
+      }
       case 'tributed':
       case 'discarded':
         for (const id of event.cards) sendToGraveyard(s, id);
@@ -289,10 +298,12 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         return;
       }
       case 'extraSummoned': {
-        if (event.how !== 'synchro') throw new Error('Xyz Summons come with Xyz Materials (a later step)');
-        for (const id of event.materials) sendToGraveyard(s, id);
+        // Synchro Materials go to the GY; Xyz Materials go under the Xyz Monster.
+        if (event.how === 'synchro') for (const id of event.materials) sendToGraveyard(s, id);
+        else for (const id of event.materials) removeFromPlay(s, id);
         take(s.players[event.player].extra, event.card);
-        s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position };
+        const materials = event.how === 'xyz' ? [...event.materials] : [];
+        s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position, materials };
         summoned(s, event.card, event.player, event.how, group);
         return;
       }
@@ -376,6 +387,7 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     positionChangedTurn: null,
     attackedTurn: null,
     summoned: null,
+    materials: [],
   };
 }
 
@@ -385,9 +397,9 @@ function take(pile: string[], id: string) {
   pile.splice(i, 1);
 }
 
-/** Where a card instance is right now. */
+/** Where a card instance is right now. An Xyz Material's `index` is the Monster Zone of the monster it is attached to. */
 export type Location =
-  | { seat: Seat; zone: 'monsters' | 'spellTraps'; index: number }
+  | { seat: Seat; zone: 'monsters' | 'spellTraps' | 'materials'; index: number }
   | { seat: Seat; zone: 'deck' | 'hand' | 'graveyard' | 'banished' | 'extra' };
 
 export function locate(state: DuelState, id: string): Location | null {
@@ -397,6 +409,8 @@ export function locate(state: DuelState, id: string): Location | null {
       const index = p[zone].findIndex((c) => c?.id === id);
       if (index >= 0) return { seat, zone, index };
     }
+    const under = p.monsters.findIndex((c) => c?.materials.includes(id));
+    if (under >= 0) return { seat, zone: 'materials', index: under };
     for (const zone of ['hand', 'deck', 'graveyard', 'banished', 'extra'] as const) {
       if (p[zone].includes(id)) return { seat, zone };
     }
@@ -410,15 +424,21 @@ export function onField(state: DuelState, id: string): FieldCard {
   return state.players[at.seat][at.zone][at.index]!;
 }
 
-/** Takes a card out of wherever it is. A card leaving the field loses its modifiers. */
+/**
+ * Takes a card out of wherever it is. A card leaving the field loses its modifiers, and its Xyz Materials go to their
+ * owners' GYs.
+ */
 function removeFromPlay(state: DuelState, id: string) {
   const at = locate(state, id);
   if (!at) throw new Error(`Unknown card ${id}`);
   const p = state.players[at.seat];
   if (at.zone === 'monsters' || at.zone === 'spellTraps') {
+    const card = p[at.zone][at.index]!;
     p[at.zone][at.index] = null;
     state.modifiers = state.modifiers.filter((m) => m.card !== id);
-  } else take(p[at.zone], id);
+    for (const m of card.materials) state.players[state.instances[m]!.owner].graveyard.push(m);
+  } else if (at.zone === 'materials') take(p.monsters[at.index]!.materials, id);
+  else take(p[at.zone], id);
 }
 
 /** Cards always go to their owner's Graveyard. */

@@ -19,9 +19,11 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   const at = locate(state, id);
   if (!at) return false;
   if (filter.side !== 'either' && (filter.side === 'you') !== (at.seat === seat)) return false;
+  // An Xyz Material is not a card on the field, so no filter's place fits it.
+  if (at.zone === 'materials') return false;
   const onField = at.zone === 'monsters' || at.zone === 'spellTraps';
   if (filter.place === 'field' ? !onField : filter.place !== at.zone) return false;
-  const field = onField ? state.players[at.seat][at.zone][at.index]! : null;
+  const field = at.zone === 'monsters' || at.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
   if (filter.faceUp !== null && (!field || field.faceUp !== filter.faceUp)) return false;
   if (filter.position !== null && (at.zone !== 'monsters' || field!.position !== filter.position)) return false;
   if (field && !field.faceUp) {
@@ -83,6 +85,7 @@ const freeMonsterZones = (state: DuelState, seat: Seat) => monsterZonesFor(state
 /** Why a step couldn't do what it must on this board, or null. A `choose` with min 0 ("you can") and steps on targets need nothing here. */
 function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): string | null {
   if (step.do === 'negate_attack') return state.attack ? null : 'No attack is being made.';
+  if (step.do === 'detach') return detachFrom(state, step, seat, card).length > 0 ? null : `No ${step.cards.from === 'self' ? 'this card has' : 'monster here has'} ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`;
   if (!('cards' in step)) return null;
   const sel = step.cards;
   if (step.do === 'special_summon' && freeMonsterZones(state, seat) === 0) return 'You have no free Monster Zone to Special Summon into.';
@@ -91,6 +94,19 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): st
     return sel.min === 1 ? `There is no ${describeFilter(sel.filter)}.` : `There are fewer than ${sel.min} of: ${describeFilter(sel.filter)}.`;
   }
   return null;
+}
+
+/** The Xyz Monsters a detach step may take its materials from: those its selection allows that have enough. */
+export function detachFrom(state: DuelState, step: Extract<Step, { do: 'detach' }>, seat: Seat, card: string): string[] {
+  const sel = step.cards;
+  const ids = sel.from === 'self' ? [card] : sel.from === 'choose' ? chooseFrom(state, sel, seat, card) : sel.from === 'all' ? cardsFitting(state, sel.filter, seat, card) : [];
+  return ids.filter((id) => materialsOf(state, id).length >= step.count);
+}
+
+/** The Xyz Materials attached to a monster on the field (none for any other card). */
+export function materialsOf(state: DuelState, id: string): string[] {
+  const at = locate(state, id);
+  return at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.materials : [];
 }
 
 /** The options of a script whose steps can all do what they must now, by index. */
@@ -123,6 +139,12 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
       return `It needs ${c.min === 1 ? 'a' : `at least ${c.min} of:`} ${describeFilter(c.filter)}.`;
     }
     if (c.if === 'phase' && !c.phases.includes(state.phase)) return `It can only be activated during the ${c.phases.map((p) => phaseNames[p]).join(' or ')}.`;
+    if (c.if === 'materials') {
+      const n = materialsOf(state, card).length;
+      if ((c.min !== null && n < c.min) || (c.max !== null && n > c.max)) {
+        return c.max === 0 ? 'It needs this card to have no Xyz Material.' : `It needs this card to have ${c.min ?? 0}${c.max === null ? ' or more' : ` to ${c.max}`} Xyz Materials.`;
+      }
+    }
     if (c.if === 'summoned_this_turn') {
       const at = locate(state, card);
       const summoned = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.summoned : null;
@@ -137,7 +159,8 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
     if (step.do === 'change_lp' && step.kind === 'cost' && state.players[seat].lp < step.amount) return `You can't pay ${step.amount} LP.`;
     const problem = stepProblem(state, step, seat, card);
     if (problem) return `The cost can't be paid: ${problem}`;
-    if ('cards' in step && step.cards.from === 'choose') {
+    // A card the cost uses can't also be a target (an Xyz Monster that only loses a material still can).
+    if ('cards' in step && step.cards.from === 'choose' && step.do !== 'detach') {
       for (const id of chooseFrom(state, step.cards, seat, card)) costCards.add(id);
       costCount += step.cards.min;
     }

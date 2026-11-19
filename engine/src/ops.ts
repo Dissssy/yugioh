@@ -140,12 +140,18 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(state.attack, 'No attack is being made.');
       run.emit({ type: 'attackEnded', replay: false });
       return;
+    case 'detach': {
+      const at = known(state, op.card);
+      check(at.zone === 'materials', `${cardOf(state, op.card).name} is not an Xyz Material.`);
+      run.emit({ type: 'moved', card: op.card, owner: state.instances[op.card]!.owner, from: 'materials', to: 'graveyard' });
+      return;
+    }
     case 'declare_targets': {
       check(ctx.stage === 'activation', 'Targets are chosen when the effect is activated, not when it resolves.');
       check(new Set(op.cards).size === op.cards.length, 'Each target may be named once.');
       for (const id of op.cards) {
         const at = known(state, id);
-        check(at.zone !== 'deck' && at.zone !== 'hand' && at.zone !== 'extra', 'Only cards on the field, in a GY or banished can be targeted.');
+        check(at.zone !== 'deck' && at.zone !== 'hand' && at.zone !== 'extra' && at.zone !== 'materials', 'Only cards on the field, in a GY or banished can be targeted.');
       }
       run.emit({ type: 'targeted', cards: op.cards });
       return;

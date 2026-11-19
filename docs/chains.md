@@ -35,7 +35,7 @@ A window opens after a Normal or Flip Summon, an attack declaration, every activ
 
 ## Effect sheets
 
-An effect's `when` (`When` in `engine/src/types.ts`) names the event it answers: `summoned` (with `how` and `from`), `attack_declared`, `attacked`, `destroyed_by_battle`, `battle_damage`, `phase`, or `activated`. `self` limits it to this card, `filter` to cards that fit, and `canMiss` marks "When ... you can" triggers. Script targets with `event: true` pick the card the event is about, without asking (Trap Hole's summoned monster). Scripts gained `set_stats` ("ATK becomes"), `negate_attack`, and the conditions `phase` and `summoned_this_turn`.
+An effect's `when` (`When` in `engine/src/types.ts`) names the event it answers: `summoned` (with `how` and `from`), `attack_declared`, `attacked`, `destroyed_by_battle`, `battle_destroying` (the monster that destroyed it), `battle_damage`, `phase`, or `activated`. `self` limits it to this card, `filter` to cards that fit, and `canMiss` marks "When ... you can" triggers. Script targets with `event: true` pick the card the event is about, without asking (Trap Hole's summoned monster). Scripts gained `set_stats` ("ATK becomes"), `negate_attack`, and the conditions `phase` and `summoned_this_turn`.
 
 ## Not yet
 

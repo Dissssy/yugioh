@@ -19,9 +19,7 @@
           "side": "you",
           "place": "monsters",
           "kinds": [],
-          "types": [
-            "Xyz"
-          ],
+          "types": [],
           "races": [],
           "attributes": [],
           "faceUp": null,
@@ -31,12 +29,47 @@
           "def": null
         },
         "how": [
-          "special"
+          "xyz"
         ],
         "from": "field",
         "canMiss": false
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "place": "field",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ]
+      },
       "status": "unverified"
     }
   ],

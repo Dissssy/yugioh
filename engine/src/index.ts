@@ -4,4 +4,4 @@ export { cardOf, decide, legalActions, startDuel, tributesFor, type Decision, ty
 export { describeCause, nextStep, pendingTriggers, triggerEvent, whenMatches, type Next, type PendingTrigger } from './chain.ts';
 export { applyOp, type OpContext, type OpResult } from './ops.ts';
 export { entryFor, logFor, reviewLog, viewFor, visibleTo } from './view.ts';
-export { cardsFitting, chooseFrom, describeFilter, feasibleOptions, fits, scriptOf, scriptProblem, targetable } from './script.ts';
+export { cardsFitting, chooseFrom, describeFilter, detachFrom, materialsOf, feasibleOptions, fits, scriptOf, scriptProblem, targetable } from './script.ts';

@@ -20,7 +20,30 @@
         "from": "field",
         "canMiss": false
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "detach",
+            "cards": {
+              "from": "self"
+            },
+            "count": 1
+          }
+        ],
+        "targets": null,
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "negate_attack"
+              }
+            ]
+          }
+        ]
+      },
       "status": "unverified"
     },
     {
@@ -40,7 +63,31 @@
         "from": "field",
         "canMiss": false
       },
-      "script": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "materials",
+            "min": null,
+            "max": 0
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "self"
+                }
+              }
+            ]
+          }
+        ]
+      },
       "status": "unverified"
     }
   ],

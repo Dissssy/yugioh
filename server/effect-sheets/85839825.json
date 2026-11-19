@@ -8,12 +8,73 @@
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "Your Main Phase, while you control an Xyz Monster with Xyz Material",
+      "window": "Your Main Phase",
       "cost": "Detach 1 Xyz Material you control",
       "effect": "Destroy that target.",
       "targets": "1 face-up monster your opponent controls",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "detach",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "place": "monsters",
+                "kinds": [],
+                "types": [
+                  "Xyz"
+                ],
+                "races": [],
+                "attributes": [],
+                "faceUp": true,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null
+            },
+            "count": 1
+          }
+        ],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "monsters",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ]
+      },
       "status": "unverified"
     }
   ],

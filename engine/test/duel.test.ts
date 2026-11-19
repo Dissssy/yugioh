@@ -18,6 +18,8 @@ import {
   type JudgeRecord,
   type Seat,
   type SummonKind,
+  type Script,
+  scriptProblem,
   evolve,
   pendingTriggers,
   cardsFitting,
@@ -56,6 +58,8 @@ const cards: Record<number, CardData> = {
   14: { ...monster(14, 'Speed Warrior', 2, 900, 400), type: 'Effect Monster' },
   15: { ...monster(15, 'Gaia Knight, the Force of Earth', 6, 2600, 800), type: 'Synchro Monster', extraDeck: true },
   16: { ...monster(16, 'Tune Warrior', 3, 1600, 200), type: 'Normal Tuner Monster' },
+  17: { ...monster(17, 'Number 39: Utopia', 4, 2500, 2000), type: 'XYZ Monster', extraDeck: true },
+  18: { ...monster(18, 'Grenosaurus', 3, 2000, 1900), type: 'XYZ Monster', extraDeck: true },
 };
 
 function spell(code: number, name: string): CardData {
@@ -76,6 +80,8 @@ const effect = (kind: SheetEffect['kind'], opt: SheetEffect['opt'] = 'none'): Sh
   status: 'unverified',
 });
 const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null });
+const detachSelf = { do: 'detach', cards: { from: 'self' }, count: 1 } as const;
+const scripted = (script: Partial<Script>): Pick<SheetEffect, 'script'> => ({ script: { conditions: [], cost: [], targets: null, options: [], unapplied: null, ...script } });
 const sheets: Record<number, EffectSheet> = {
   8: sheet(8, effect('activation')),
   9: sheet(9, effect('activation')),
@@ -84,6 +90,27 @@ const sheets: Record<number, EffectSheet> = {
   12: sheet(12, effect('activation')),
   7: { ...sheet(7), materials: { summon: 'synchro', tuner: 'Junk Synchron', nonTuners: { min: 1, max: null } } },
   15: { ...sheet(15), materials: { summon: 'synchro', tuner: null, nonTuners: { min: 1, max: null } } },
+  17: {
+    ...sheet(
+      17,
+      { ...effect('quick'), ...scripted({ cost: [detachSelf], options: [{ label: '', steps: [{ do: 'negate_attack' }] }] }) },
+      {
+        ...effect('trigger'),
+        mandatory: true,
+        when: { event: 'attacked', self: true, filter: null, how: [], from: 'field', canMiss: false },
+        ...scripted({ conditions: [{ if: 'materials', min: null, max: 0 }], options: [{ label: '', steps: [{ do: 'destroy', cards: { from: 'self' } }] }] }),
+      },
+    ),
+    materials: { summon: 'xyz', level: 4, count: 2 },
+  },
+  18: {
+    ...sheet(18, {
+      ...effect('trigger'),
+      when: { event: 'battle_destroying', self: true, filter: null, how: [], from: 'field', canMiss: true },
+      ...scripted({ cost: [detachSelf], options: [{ label: '', steps: [{ do: 'change_lp', player: 'opponent', amount: 1000, kind: 'damage' }] }] }),
+    }),
+    materials: { summon: 'xyz', level: 3, count: 2 },
+  },
 };
 
 /**
@@ -104,7 +131,7 @@ function stacked(deck0: number[], deck1: number[]): DuelEvent[] {
       sheets,
       instances,
       players: [
-        { name: 'Yusei', deck: ids('a', 0, deck0), extra: ids('ax', 0, [7, 15]) },
+        { name: 'Yusei', deck: ids('a', 0, deck0), extra: ids('ax', 0, [7, 15, 17, 18]) },
         { name: 'Yuma', deck: ids('b', 1, deck1), extra: [] },
       ],
     },
@@ -253,8 +280,8 @@ describe('summoning', () => {
     t.play(0, { type: 'setMonster', card: 'a1', tributes: [], zone: 0 });
     const theirs = viewFor(t.state, 1);
     const theirLog = logFor(t.events, 1);
-    expect(theirs.players[0].spellTraps[0]).toEqual({ card: { hidden: true }, position: 'attack', faceUp: false, stats: null });
-    expect(theirs.players[0].monsters[0]).toEqual({ card: { hidden: true }, position: 'defense', faceUp: false, stats: null });
+    expect(theirs.players[0].spellTraps[0]).toEqual({ card: { hidden: true }, position: 'attack', faceUp: false, stats: null, materials: [] });
+    expect(theirs.players[0].monsters[0]).toEqual({ card: { hidden: true }, position: 'defense', faceUp: false, stats: null, materials: [] });
     expect(theirs.players[0].hand.every((c) => 'hidden' in c)).toBe(true);
     expect(JSON.stringify(theirs)).not.toContain('a0');
     expect(JSON.stringify(theirLog)).not.toContain('a0');
@@ -357,7 +384,7 @@ describe('Synchro Summons', () => {
     t.play(0, { type: 'extraSummon', card: 'ax0', materials: ['a1', 'a0'], zone: 6, position: 'defense' });
     expect(t.state.players[0].graveyard).toEqual(['a1', 'a0']);
     expect(t.state.players[0].monsters[6]).toMatchObject({ id: 'ax0', faceUp: true, position: 'defense', summoned: { how: 'synchro', turn: 3 } });
-    expect(t.state.players[0].extra).toEqual(['ax1']);
+    expect(t.state.players[0].extra).toEqual(['ax1', 'ax2', 'ax3']);
     expect(t.state.normalSummons).toBe(0);
     expect(logFor(t.events, 1).at(-1)?.text).toBe('Yusei Synchro Summoned Junk Warrior in defense position, using Speed Warrior, Junk Synchron');
   });
@@ -369,6 +396,65 @@ describe('Synchro Summons', () => {
     const events = decide(before, 0, { type: 'extraSummon', card: 'ax0', materials: ['a0', 'a1'], zone: 0, position: 'attack' });
     const state = events.ok ? events.events.slice(1).reduce(evolve, before) : before;
     expect(pendingTriggers(state).map((p) => p.effect)).toEqual([0, 1]);
+  });
+});
+
+describe('Xyz Summons', () => {
+  /** Yusei's monsters on the field on his turn 3, and Yuma's, put there directly. */
+  function board(codes: number[], theirs: number[] = []) {
+    const t = new Table(stacked([...codes, ...filler(40 - codes.length)], [...theirs, ...filler(40 - theirs.length, 2)]));
+    codes.forEach((_, i) => t.push({ type: 'specialSummoned', player: 0, card: `a${i}`, zone: i, position: 'attack' }));
+    theirs.forEach((_, i) => t.push({ type: 'specialSummoned', player: 1, card: `b${i}`, zone: i, position: 'attack' }));
+    t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
+    return t;
+  }
+  const xyz = (t: Table, card: string) => legalActions(t.state, 0).find((a) => a.type === 'extraSummon' && a.card === card);
+  const op = (t: Table, o: Op) => {
+    const r = applyOp(t.state, o, { player: 0, stage: 'resolution', random: () => 0 });
+    if (!r.ok) throw new Error(r.error);
+    return t.push(...r.events);
+  };
+
+  it('offers an Xyz Monster for each set of face-up monsters with its Rank as their Level, Tuners included', () => {
+    const t = board([1, 14, 2, 5]);
+    expect(xyz(t, 'ax2')).toMatchObject({ how: 'xyz', options: [{ materials: ['a0', 'a2'] }, { materials: ['a0', 'a3'] }, { materials: ['a2', 'a3'] }] });
+    expect(xyz(t, 'ax3')).toBeUndefined();
+    expect(xyz(board([13, 16]), 'ax3')).toMatchObject({ options: [{ materials: ['a0', 'a1'] }] });
+  });
+
+  it('attaches the materials, which both players see, and sends them to the GY when it leaves the field', () => {
+    const t = board([1, 2]);
+    t.play(0, { type: 'extraSummon', card: 'ax2', materials: ['a0', 'a1'], zone: 5, position: 'attack' });
+    expect(t.state.players[0].monsters[5]).toMatchObject({ id: 'ax2', materials: ['a0', 'a1'], summoned: { how: 'xyz' } });
+    expect(t.state.players[0].graveyard).toEqual([]);
+    expect(viewFor(t.state, 1).players[0].monsters[5]!.materials).toMatchObject([{ id: 'a0' }, { id: 'a1' }]);
+    // An Xyz Monster has no Level, so it is never an Xyz Material itself, and a material is not on the field.
+    expect(cardsFitting(t.state, { side: 'you', place: 'field', kinds: [], types: [], races: [], attributes: [], faceUp: null, position: null, level: null, atk: null, def: null }, 0, '')).toEqual(['ax2']);
+    op(t, { op: 'destroy', cards: ['ax2'] });
+    expect(t.state.players[0].graveyard).toEqual(['a0', 'a1', 'ax2']);
+  });
+
+  it('detaches materials to pay costs, and checks conditions on how many it has', () => {
+    const t = board([1, 2]);
+    t.play(0, { type: 'extraSummon', card: 'ax2', materials: ['a0', 'a1'], zone: 0, position: 'attack' });
+    expect(() => op(t, { op: 'detach', card: 'ax2' })).toThrow(/not an Xyz Material/);
+    // "While it has no material" doesn't hold yet.
+    expect(scriptProblem(t.state, 0, 'ax2', 1, null)).toMatch(/no Xyz Material/);
+    op(t, { op: 'detach', card: 'a0' });
+    op(t, { op: 'detach', card: 'a1' });
+    expect(t.state.players[0].monsters[0]!.materials).toEqual([]);
+    expect(t.state.players[0].graveyard).toEqual(['a0', 'a1']);
+    expect(scriptProblem(t.state, 0, 'ax2', 0, null)).toMatch(/cost can't be paid/);
+    expect(scriptProblem(t.state, 0, 'ax2', 1, null)).toBeNull();
+  });
+
+  it('fires "when this card destroys a monster by battle" for the monster that destroyed it', () => {
+    const t = board([13, 16], [2]);
+    t.play(0, { type: 'extraSummon', card: 'ax3', materials: ['a0', 'a1'], zone: 0, position: 'attack' });
+    t.play(0, { type: 'enterBattle' }).play(0, { type: 'attack', attacker: 'ax3', target: 0 });
+    expect(t.state.players[1].graveyard).toEqual(['b0']);
+    expect(t.state.happened).toContainEqual(expect.objectContaining({ event: 'battle_destroying', card: 'ax3', target: 'b0' }));
+    expect(pendingTriggers(t.state)).toMatchObject([{ card: 'ax3', effect: 0 }]);
   });
 });
 

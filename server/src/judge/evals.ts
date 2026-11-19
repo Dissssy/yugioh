@@ -49,6 +49,8 @@ interface Side {
   banished?: string[];
   deck?: string[];
   extra?: string[];
+  /** Face-up Xyz Monsters in Attack Position, each as [its name, ...the names of its Xyz Materials]. */
+  xyz?: string[][];
 }
 
 export interface EvalCase {
@@ -81,6 +83,7 @@ class Board {
       const places = { hand: p.hand, deck: p.deck, gy: p.graveyard, banished: p.banished, extra: p.extra };
       for (const [place, ids] of Object.entries(places)) for (const id of ids) if (cardOf(this.state, id).name === name) found.push(`${s}:${place}`);
       for (const c of p.monsters) if (c && cardOf(this.state, c.id).name === name) found.push(`${s}:monsters`);
+      for (const c of p.monsters) for (const m of c?.materials ?? []) if (cardOf(this.state, m).name === name) found.push(`${s}:materials`);
       for (const c of p.spellTraps) if (c && cardOf(this.state, c.id).name === name) found.push(`${s}:spellTraps`);
     }
     return found;
@@ -461,6 +464,20 @@ export const CASES: EvalCase[] = [
     legal: false,
   },
   {
+    name: 'xyz energy detaches a material to destroy a face-up monster',
+    board: [{ hand: ['Xyz Energy'], xyz: [['Number 39: Utopia', 'Axe Raider', 'Dark Blade']] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Xyz Energy',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Speed Warrior', '1:gy'), expectAt(b, 'Axe Raider', '0:gy'), expectAt(b, 'Dark Blade', '0:materials')),
+  },
+  {
+    name: 'reinforced space gives 300 ATK per xyz material',
+    board: [{ set: ['Reinforced Space'], xyz: [['Number 39: Utopia', 'Axe Raider', 'Dark Blade']] }, {}],
+    activate: 'Reinforced Space',
+    legal: true,
+    check: (b) => (b.monster('Number 39: Utopia')?.atk === 3100 ? null : `Utopia has ATK ${b.monster('Number 39: Utopia')?.atk}`),
+  },
+  {
     name: 'xyz effect needs an xyz summon',
     board: [{ set: ['Xyz Effect'] }, { monsters: ['Axe Raider'] }],
     activate: 'Xyz Effect',
@@ -500,18 +517,30 @@ export const CASES: EvalCase[] = [
 export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: Awaited<ReturnType<typeof loadSheets>>): DuelState {
   const byName = new Map(Object.values(data).map((d) => [d.name, d.code]));
   const instances: Record<string, { code: number; owner: Seat }> = {};
-  const places: { id: string; seat: Seat; how: keyof Side }[] = [];
+  const places: { id: string; seat: Seat; how: Exclude<keyof Side, 'xyz'> }[] = [];
+  const xyzs: { id: string; seat: Seat; materials: string[] }[] = [];
   const decks: [string[], string[]] = [[], []];
   const extras: [string[], string[]] = [[], []];
   c.board.forEach((side, s) => {
     const seat = s as Seat;
     let n = 0;
-    for (const [how, names] of Object.entries(side) as [keyof Side, string[]][]) {
+    const instance = (name: string) => {
+      const code = byName.get(name);
+      if (code === undefined) throw new Error(`${c.name}: unknown card ${name}`);
+      const id = `${'ab'[seat]}${n++}`;
+      instances[id] = { code, owner: seat };
+      return id;
+    };
+    for (const [xyz, ...materials] of side.xyz ?? []) {
+      const id = instance(xyz!);
+      extras[seat].push(id);
+      const attached = materials.map(instance);
+      decks[seat].push(...attached);
+      xyzs.push({ id, seat, materials: attached });
+    }
+    for (const [how, names] of Object.entries(side).filter(([how]) => how !== 'xyz') as [Exclude<keyof Side, 'xyz'>, string[]][]) {
       for (const name of names) {
-        const code = byName.get(name);
-        if (code === undefined) throw new Error(`${c.name}: unknown card ${name}`);
-        const id = `${'ab'[seat]}${n++}`;
-        instances[id] = { code, owner: seat };
+        const id = instance(name);
         if (how === 'extra') extras[seat].push(id);
         else decks[seat].push(id);
         if (how !== 'deck' && how !== 'extra') places.push({ id, seat, how });
@@ -550,6 +579,9 @@ export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: 
     } else if (how === 'faceUp') {
       events.push({ type: 'effectActivated', player: seat, card: id, effect: 0, zone: zones[seat]![1]++, cause: null }, { type: 'linkResolved' });
     }
+  }
+  for (const { id, seat, materials } of xyzs) {
+    events.push({ type: 'extraSummoned', player: seat, card: id, how: 'xyz', materials, zone: zones[seat]![0]++, position: 'attack' });
   }
   events.push({ type: 'turnStarted', player: c.seat ?? 0, turn: 3 }, { type: 'phaseChanged', phase: 'main1' });
   return replay(events);
@@ -609,7 +641,7 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall | 
 /** Runs the matching cases `repeat` times; each round runs its cases in parallel. Returns one list per round. */
 export async function runEvals(db: Db, model: ModelCall, filter = '', repeat = 1): Promise<EvalResult[][]> {
   const cases = CASES.filter((c) => c.name.includes(filter));
-  const names = [...new Set(cases.flatMap((c) => [...c.board.flatMap((s) => Object.values(s).flat() as string[]), 'Sonic Chick']))];
+  const names = [...new Set(cases.flatMap((c) => [...c.board.flatMap((s) => Object.values(s).flat(2) as string[]), 'Sonic Chick']))];
   const rows = await db.select().from(cards).where(inArray(cards.name, names));
   const data = Object.fromEntries(rows.map((r) => [r.id, toCardData(r)]));
   const sheets = await loadSheets(db, data);

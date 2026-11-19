@@ -76,10 +76,10 @@ export interface When {
   /**
    * `summoned`: a monster is Summoned. `attack_declared`: a monster declares an attack (the event's card is the
    * attacker). `attacked`: a monster is targeted for an attack (the event's card is the target). `destroyed_by_battle`: a monster is destroyed by battle. `battle_damage`: a monster inflicts battle
-   * damage to its controller's opponent. `activated`: a card or effect is activated (Counter Traps); not offered until
+   * damage to its controller's opponent. `battle_destroying`: a monster destroys another by battle (the event's card is the one that destroyed it: "When this card destroys a monster by battle"). `activated`: a card or effect is activated (Counter Traps); not offered until
    * negation arrives.
    */
-  event: 'summoned' | 'attack_declared' | 'attacked' | 'destroyed_by_battle' | 'battle_damage' | 'activated';
+  event: 'summoned' | 'attack_declared' | 'attacked' | 'destroyed_by_battle' | 'battle_destroying' | 'battle_damage' | 'activated';
   /** Only when it happens to this card itself ("When this card is Normal Summoned"). */
   self: boolean;
   /** The card it happens to must fit this as it is after the event ("this face-up Attack Position card"); null for any card. */
@@ -123,7 +123,9 @@ export type Condition =
   /** It is one of these phases. For an ignition effect this replaces the Main Phase it otherwise needs (Speed Warrior). */
   | { if: 'phase'; phases: Phase[] }
   /** This card was Summoned this turn, in one of these ways (empty for any). */
-  | { if: 'summoned_this_turn'; how: SummonKind[] };
+  | { if: 'summoned_this_turn'; how: SummonKind[] }
+  /** This card has between `min` and `max` Xyz Materials (null: no bound); "while it has no material" is max 0. */
+  | { if: 'materials'; min: number | null; max: number | null };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
 export type Step =
@@ -138,7 +140,9 @@ export type Step =
   | { do: 'draw'; player: 'you' | 'opponent'; count: number }
   | { do: 'extra_normal_summon' }
   /** Negates the attack being made: it ends without damage. */
-  | { do: 'negate_attack' };
+  | { do: 'negate_attack' }
+  /** Detaches `count` Xyz Materials from an Xyz Monster the selection picks (only those with that many can be picked). */
+  | { do: 'detach'; cards: Selection; count: number };
 
 /**
  * A stat read from a card when the step resolves: `self` or the first target still there. `original` is the printed
@@ -246,6 +250,7 @@ export type Happening =
   | { event: 'attack_declared'; card: string; player: Seat; target: string | null; group: number }
   | { event: 'attacked'; card: string; player: Seat; attacker: string; group: number }
   | { event: 'destroyed_by_battle'; card: string; player: Seat; group: number }
+  | { event: 'battle_destroying'; card: string; player: Seat; target: string; group: number }
   | { event: 'battle_damage'; card: string; player: Seat; amount: number; group: number }
   | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number };
 
@@ -286,6 +291,8 @@ export interface FieldCard {
   attackedTurn: number | null;
   /** How and on which turn it was last Summoned; null if it was Set and not flipped since. */
   summoned: { how: SummonKind; turn: number } | null;
+  /** Xyz Materials attached to it, first attached first. They go to the GY when it leaves the field. */
+  materials: string[];
 }
 
 export type Zones = (FieldCard | null)[];
@@ -395,6 +402,8 @@ export type Op =
   | { op: 'draw'; player: Seat; count: number }
   | { op: 'extra_normal_summon'; player: Seat }
   | { op: 'negate_attack' }
+  /** Detaches this Xyz Material: it goes to its owner's GY. */
+  | { op: 'detach'; card: string }
   | { op: 'declare_targets'; cards: string[] }
   | { op: 'choose_effect'; choice: string };
 
@@ -631,7 +640,8 @@ export interface PromptView {
 }
 
 /** Where a card is, without the slot. */
-export type Place = 'deck' | 'hand' | 'monsters' | 'spellTraps' | 'graveyard' | 'banished' | 'extra';
+/** `materials`: attached to an Xyz Monster as Xyz Material. */
+export type Place = 'deck' | 'hand' | 'monsters' | 'spellTraps' | 'materials' | 'graveyard' | 'banished' | 'extra';
 
 export type CardView = { id: string; card: CardData } | { hidden: true };
 
@@ -641,6 +651,8 @@ export interface FieldCardView {
   faceUp: boolean;
   /** A face-up monster's current ATK, DEF and Level, after modifiers. */
   stats: { atk: number; def: number; level: number | null } | null;
+  /** Its Xyz Materials, which both players can see. */
+  materials: CardView[];
 }
 
 export interface PlayerSideView {

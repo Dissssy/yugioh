@@ -81,6 +81,7 @@ const step = z.union([
   z.object({ do: z.literal('draw'), player, count: z.number().int() }),
   z.object({ do: z.literal('extra_normal_summon') }),
   z.object({ do: z.literal('negate_attack') }),
+  z.object({ do: z.literal('detach'), cards: selection, count: z.number().int() }),
 ]) satisfies z.ZodType<Step>;
 
 const script = z.object({
@@ -90,6 +91,7 @@ const script = z.object({
       z.object({ if: z.literal('before_battle_phase') }),
       z.object({ if: z.literal('phase'), phases: z.array(phase) }),
       z.object({ if: z.literal('summoned_this_turn'), how: z.array(summonKind) }),
+      z.object({ if: z.literal('materials'), min: z.number().int().nullable(), max: z.number().int().nullable() }),
     ]),
   ),
   cost: z.array(step),
@@ -99,7 +101,7 @@ const script = z.object({
 }) satisfies z.ZodType<Script>;
 
 const when = z.object({
-  event: z.enum(['summoned', 'attack_declared', 'attacked', 'destroyed_by_battle', 'battle_damage', 'activated']),
+  event: z.enum(['summoned', 'attack_declared', 'attacked', 'destroyed_by_battle', 'battle_destroying', 'battle_damage', 'activated']),
   self: z.boolean(),
   filter: cardFilter.nullable(),
   how: z.array(summonKind),
@@ -278,7 +280,7 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 
 "You" is the player activating the effect. Code already handles phases, once-per-turn clauses, spell speed and the event in "when", so a script says only what the card itself adds.
 
-- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n} needs at least n cards that fit ("While there are 5 or more monsters in your GY", "If you control a Synchro Monster"). {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon).
+- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n} needs at least n cards that fit ("While there are 5 or more monsters in your GY", "If you control a Synchro Monster"). {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon). {"if": "materials", "min": n | null, "max": n | null} needs this Xyz Monster to have that many Xyz Materials ("while this card has no Xyz Material": min null, max 0).
 - cost: steps paid on activation, in order ("Discard 1 card" is a move to graveyard of 1 card chosen from your hand; "Pay 500 LP" is change_lp kind cost; "Tribute this card" is a move of self to graveyard).
 - targets: {"filter", "min", "max", "event"} for "target 1 ..." ("up to 3" is min 1 max 3), or null. The player picks them on activation, after paying the cost; resolution steps reach them with {"from": "targets"}, and a target that no longer fits the filter isn't affected. event true for "target that monster", where the target is the card the "when" event happened to (Trap Hole); else false.
 - options: what the effect does. One option (label "") unless the text says "activate 1 of these effects", then one per bullet with the bullet's wording as label; the player picks one on activation.
@@ -294,6 +296,7 @@ Steps (each "cards" is a selection):
 - {"do": "draw", "player", "count"}.
 - {"do": "extra_normal_summon"}: you may conduct one more Normal Summon/Set this turn.
 - {"do": "negate_attack"}: "negate the attack"; the attack ends with no damage.
+- {"do": "detach", "cards", "count"}: detach count Xyz Materials from an Xyz Monster the selection picks. "Detach 1 Xyz Material from this card" (usually a cost): cards {"from": "self"}, count 1. "Detach 1 Xyz Material from a monster you control": a choose selection of face-up Xyz monsters you control.
 
 Selections:
 - {"from": "self"}: the card being activated.
@@ -315,7 +318,7 @@ Filters ({"side", "place", "kinds", "types", "races", "attributes", "faceUp", "p
 # When
 
 {"event", "self", "filter", "how", "from", "canMiss"}, every property required:
-- event: "summoned" (a monster is Summoned), "attack_declared" (a monster declares an attack; the event's card is the attacker), "attacked" (a monster is targeted for an attack: "When this card is targeted for an attack"; the event's card is the target), "destroyed_by_battle", "battle_damage" (a monster inflicts battle damage to its controller's opponent), or "activated" (a card or effect is activated, as for Counter Traps). An event outside this list (sent to the GY by an effect, flipped, targeted, leaves the field, a phase starts): when null, and the effect never fires; say so in its window.
+- event: "summoned" (a monster is Summoned), "attack_declared" (a monster declares an attack; the event's card is the attacker), "attacked" (a monster is targeted for an attack: "When this card is targeted for an attack"; the event's card is the target), "destroyed_by_battle", "battle_destroying" (a monster destroys another by battle: "When this card destroys a monster by battle"; the event's card is the destroyer, so self is true), "battle_damage" (a monster inflicts battle damage to its controller's opponent), or "activated" (a card or effect is activated, as for Counter Traps). An event outside this list (sent to the GY by an effect, flipped, targeted, leaves the field, a phase starts): when null, and the effect never fires; say so in its window.
 - self: true when it must happen to this card ("When this card is Normal Summoned", "If this card inflicts battle damage").
 - filter: the card it happens to must fit this filter (with self, for "When this face-up Attack Position card is targeted for an attack": faceUp true, position "attack") as it is after the event ("When your opponent Normal Summons a monster with 1000 or more ATK": side "opponent", place "monsters", atk {"min": 1000, "max": null}; "When an opponent's monster declares an attack": side "opponent", place "monsters"); null for any card. "you" and "opponent" are from this card's controller's view.
 - how: for "summoned", which Summons count: any of "normal" (a Tribute Summon is one), "flip", "special" (any Special Summon, Synchro and Xyz Summons included), "synchro", "xyz"; [] for "Summoned" with no kind. "If this card is Synchro Summoned" is ["synchro"].

@@ -14,6 +14,7 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
       position: c.position,
       faceUp: c.faceUp,
       stats: monsters && c.faceUp ? statsOf(state, c.id) : null,
+      materials: c.materials.map(shown),
     };
   const deckList = [
     ...new Set(Object.values(state.instances).filter((i) => i.owner === seat).map((i) => i.code)),
@@ -147,13 +148,13 @@ function reviewText(state: DuelState, event: DuelEvent): string {
 }
 
 /** Places both players can see into. */
-const PUBLIC: Place[] = ['monsters', 'spellTraps', 'graveyard', 'banished'];
+const PUBLIC: Place[] = ['monsters', 'spellTraps', 'materials', 'graveyard', 'banished'];
 
 /** Whether a card is visible to `seat` where it is now. */
 export function visibleTo(state: DuelState, id: string, seat: Seat): boolean {
   const at = locate(state, id);
   if (!at) return false;
-  if (at.zone === 'graveyard' || at.zone === 'banished') return true;
+  if (at.zone === 'graveyard' || at.zone === 'banished' || at.zone === 'materials') return true;
   if (at.zone === 'monsters' || at.zone === 'spellTraps') return at.seat === seat || state.players[at.seat][at.zone][at.index]!.faceUp;
   return at.zone !== 'deck' && at.seat === seat;
 }
@@ -274,7 +275,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `Chose: ${event.choice}`;
     case 'moved': {
       const to = { hand: 'to the hand', deck_top: 'on top of the Deck', deck_bottom: 'to the bottom of the Deck', deck_shuffled: 'into the Deck', graveyard: 'to the GY', banished: 'banished' }[event.to];
-      const from = { deck: 'Deck', hand: 'hand', monsters: 'field', spellTraps: 'field', graveyard: 'GY', banished: 'banished cards', extra: 'Extra Deck' }[event.from];
+      const from = { deck: 'Deck', hand: 'hand', monsters: 'field', spellTraps: 'field', materials: 'Xyz Materials', graveyard: 'GY', banished: 'banished cards', extra: 'Extra Deck' }[event.from];
       return `${event.card ? name(event.card) : `${who(event.owner)}'s card`} from the ${from} ${to}`;
     }
     case 'specialSummoned':

@@ -213,16 +213,29 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
 
 type ExtraSummon = Extract<LegalAction, { type: 'extraSummon' }>;
 
-/** A Synchro Summon of `id` the player can make now with the monsters they control, or null. */
+/** A Synchro or Xyz Summon of `id` the player can make now with the monsters they control, or null. */
 function extraSummonAction(state: DuelState, seat: Seat, id: string): ExtraSummon | null {
   const card = cardOf(state, id);
   const materials = state.sheets[card.code]?.materials;
-  if (materials?.summon !== 'synchro' || card.level === null) return null;
-  const options = synchroMaterials(state, seat, materials, card.level).flatMap((set) => {
+  if (!materials) return null;
+  const sets = materials.summon === 'xyz' ? xyzMaterials(state, seat, materials) : card.level === null ? [] : synchroMaterials(state, seat, materials, card.level);
+  const options = sets.flatMap((set) => {
     const zones = zonesAfterLeaving(state, seat, set);
     return zones.length > 0 ? [{ materials: set, zones }] : [];
   });
-  return options.length > 0 ? { type: 'extraSummon', card: id, how: 'synchro', options } : null;
+  return options.length > 0 ? { type: 'extraSummon', card: id, how: materials.summon, options } : null;
+}
+
+/** Every set of `count` face-up monsters the player controls whose current Level is the Xyz Monster's. */
+function xyzMaterials(state: DuelState, seat: Seat, materials: Extract<Materials, { summon: 'xyz' }>): string[][] {
+  const fitting = ownMonsters(state, seat).filter((m) => m.faceUp && statsOf(state, m.id).level === materials.level).map((m) => m.id);
+  const sets: string[][] = [];
+  const pick = (from: number, chosen: string[]) => {
+    if (chosen.length === materials.count) return void sets.push(chosen);
+    for (let i = from; i < fitting.length; i++) pick(i + 1, [...chosen, fitting[i]!]);
+  };
+  pick(0, []);
+  return sets;
 }
 
 /**

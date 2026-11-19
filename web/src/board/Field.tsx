@@ -143,6 +143,7 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
       tabIndex={pick ? 0 : undefined}
       role={pick ? 'button' : undefined}
     >
+      {card && card.materials.length > 0 && <Materials cards={card.materials} />}
       {card && (
         <FieldCard
           view={card}
@@ -154,6 +155,51 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
       )}
       {card && <StatsBadge view={card} />}
     </div>
+  );
+}
+
+/**
+ * An Xyz Monster's materials, tucked under it with their edges showing, and a count. While a question offers them,
+ * they fan out so each can be picked.
+ */
+function Materials({ cards }: { cards: CardView[] }) {
+  const hover = useCardHover();
+  const { imageSize } = useBoardLook();
+  const choice = useChoice();
+  const fanned = cards.some((c) => choice?.state(idOf(c)) != null);
+  return (
+    <>
+      {cards.map((c, i) => {
+        const id = idOf(c);
+        const picking = choice?.state(id) ?? null;
+        const pick = picking ? () => choice!.toggle(id) : undefined;
+        const step = fanned ? `calc(${i + 1} * var(--card-w) * 0.55)` : `${(i + 1) * 5}px`;
+        const data = dataOf(c);
+        return (
+          <motion.div
+            key={id ?? i}
+            layout
+            layoutId={id ?? undefined}
+            className={`slot material ${picking ?? ''}`}
+            style={{ translate: `calc(-1 * ${step}) calc(-1 * ${fanned ? '0px' : step})`, zIndex: -1 - i }}
+            {...hover(data)}
+            onClick={pick}
+            onKeyDown={pick ? (e: KeyboardEvent<HTMLDivElement>) => e.key === 'Enter' && pick() : undefined}
+            tabIndex={pick ? 0 : undefined}
+            role={pick ? 'button' : undefined}
+            aria-label={`Xyz Material: ${data?.name ?? 'a card'}`}
+            aria-pressed={picking ? picking === 'picked' : undefined}
+          >
+            <div className="fx" data-card-id={id ?? undefined}>
+              <CardFace card={data} size={imageSize} />
+            </div>
+          </motion.div>
+        );
+      })}
+      <span className="materials-chip" aria-label={`${cards.length} Xyz Material${cards.length === 1 ? '' : 's'}`}>
+        {cards.length}
+      </span>
+    </>
   );
 }
 

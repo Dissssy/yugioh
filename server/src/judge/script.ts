@@ -10,10 +10,12 @@ import {
   chooseFrom,
   cardsFitting,
   describeFilter,
+  detachFrom,
   evolve,
   feasibleOptions,
   fits,
   locate,
+  materialsOf,
   monsterZonesFor,
   scriptOf,
   statsOf,
@@ -187,6 +189,18 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         if (!state.attack) return null;
         apply({ op: 'negate_attack' });
         return 'The attack was negated.';
+      case 'detach': {
+        const from = detachFrom(state, step, seat, self);
+        if (!from.length) return null;
+        const [xyz] = from.length === 1 ? from : await ask({ prompt: `${name}: detach ${step.count} Xyz Material${step.count === 1 ? '' : 's'} from which Xyz Monster?`, cards: from, choices: [], min: 1, max: 1 });
+        const attached = materialsOf(state, xyz!);
+        const picked =
+          attached.length === step.count
+            ? attached
+            : await ask({ prompt: `${name}: choose ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`, cards: attached, choices: [], min: step.count, max: step.count });
+        for (const id of picked) apply({ op: 'detach', card: id });
+        return cost ? null : `${list(picked.map((id) => shown(id, before)))} ${picked.length === 1 ? 'was' : 'were'} detached from ${shown(xyz!, before)}.`;
+      }
       case 'extra_normal_summon':
         apply({ op: 'extra_normal_summon', player: seat });
         return `${state.players[seat].name} may conduct one more Normal Summon or Set this turn.`;

@@ -307,6 +307,9 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
 .contest textarea { font: inherit; padding: 4px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); resize: vertical; }
 .duel-log li button { font-size: 0.85em; padding: 1px 8px; margin-left: 6px; }
 .stats-badge { position: absolute; bottom: 2px; left: 50%; translate: -50% 0; padding: 0 6px; border-radius: 999px; font-size: 0.7em; font-weight: 700; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--bg) 88%, transparent); pointer-events: none; white-space: nowrap; }
+.zone > .slot { grid-area: 1 / 1; }
+.slot.material { position: relative; }
+.materials-chip { position: absolute; top: 2px; right: 2px; z-index: 3; min-width: 1.4em; padding: 0 5px; border-radius: 999px; font-size: 0.7em; font-weight: 700; text-align: center; background: var(--gold); color: #000; pointer-events: none; }
 .stats-badge .up { color: #2f9e44; }
 .stats-badge .down { color: var(--danger); }
 .report-ruling { margin-top: 8px; font-size: 0.85em; }

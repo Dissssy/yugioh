@@ -13,7 +13,7 @@ type Option = PromptView['cards'][number];
  * the player can't see has no ID; any other card by its ID.
  */
 const slotOf = (o: Option) => (o.zone === null ? null : dropKey(o.seat, o.place === 'monsters' ? 'm' : 's', o.zone));
-const pileOf = (o: Option): string | null => (o.zone === null && o.place !== 'hand' ? pileKey(o.seat, o.place as PileKind) : null);
+const pileOf = (o: Option): string | null => (o.zone === null && o.place !== 'hand' && o.place !== 'materials' ? pileKey(o.seat, o.place as PileKind) : null);
 
 /**
  * The judge's question being answered on the board: its cards glow where they are and are picked by clicking them

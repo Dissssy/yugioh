@@ -131,6 +131,8 @@ export function describeCause(state: DuelState, cause: Happening | null): string
       return `the attack on ${isFaceDown(state, cause.card) ? 'a face-down monster' : name(cause.card)}`;
     case 'destroyed_by_battle':
       return `the destruction of ${name(cause.card)}`;
+    case 'battle_destroying':
+      return `${name(cause.card)} destroying ${name(cause.target)} by battle`;
     case 'battle_damage':
       return `the battle damage ${name(cause.card)} inflicted`;
   }
