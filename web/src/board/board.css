@@ -282,6 +282,8 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
 .judge-choice { flex: 3 1 auto; min-width: 0; justify-content: center; gap: 8px; font-weight: 400; }
 .choice-text { min-width: 0; font-size: 0.9em; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .choice-text .muted { white-space: nowrap; }
+/* A rewind offer explains the appeal, so it gets more room. */
+.choice-text.long { -webkit-line-clamp: 5; font-size: 0.8em; font-weight: 500; }
 .judge-choice button { flex: none; padding: 3px 12px; }
 .pick-choices { display: flex; flex-wrap: wrap; gap: 6px; }
 .pick-choices button.picked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }

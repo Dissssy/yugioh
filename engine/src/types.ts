@@ -447,7 +447,25 @@ export interface DuelState {
    * true, the appeal's ruling, which the judge is given).
    */
   rulings: { player: Seat; card: string; effect: number; legal: boolean; summary: string }[];
+  /** An overturned ruling's offer to rewind the duel to just before it; both players must accept. */
+  rollback: RollbackOffer | null;
+  /** After a rollback to before a resolution, the appeal's ruling the judge must follow when that link resolves again. */
+  binding: { player: Seat; card: string; effect: number; ruling: string } | null;
   result: DuelResult | null;
+}
+
+/** The board as it was at an earlier event, without what never changes (the cards) or must stay current (the sheets). */
+export type Board = Omit<DuelState, 'instances' | 'cards' | 'sheets'>;
+
+export interface RollbackOffer {
+  /** The event index of the overturned `judged` event, and of the first event the rollback undoes. */
+  judged: number;
+  to: number;
+  decision: AppealRecord['decision'];
+  /** The appeal's ruling (for the judge) and its explanation (for the players). */
+  ruling: string;
+  explanation: string;
+  accepted: Seat[];
 }
 
 export interface DuelResult {
@@ -485,6 +503,8 @@ export type Intent =
   | { type: 'activate'; card: string; effect: number; zone: number | null }
   /** Declines to respond, or to activate optional triggers. */
   | { type: 'pass' }
+  /** Accepts or declines rewinding to before an overturned ruling. */
+  | { type: 'rollback'; accept: boolean }
   /** Answers a `replace` step: the materials to detach instead of the destruction, or none to let it be destroyed. */
   | { type: 'replace'; materials: string[] }
   | { type: 'rps'; hand: Hand }
@@ -644,6 +664,11 @@ export type DuelEvent =
   /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
   | { type: 'linkResolved' }
   | { type: 'appealed'; appeal: AppealRecord }
+  /** After an overturned ruling that changed the board: both players may rewind to before it. */
+  | { type: 'rollbackOffered'; offer: Omit<RollbackOffer, 'accepted'> }
+  | { type: 'rollbackAnswered'; player: Seat; accept: boolean }
+  /** Both accepted: the board goes back to `board` (the state before event `to`), and the corrected ruling applies. */
+  | { type: 'rolledBack'; to: number; board: Board }
   /** A card's sheet changed while the duel was going (a report flagged it, or it was fixed); null if it no longer has one. */
   | { type: 'sheetUpdated'; code: number; sheet: EffectSheet | null }
   | { type: 'duelEnded'; result: DuelResult }
@@ -677,6 +702,8 @@ export interface PlayerView {
   waiting: { player: Seat; for: 'respond' | 'triggers' | 'replace'; cause: string | null } | null;
   /** Deciding who goes first, before turn 1; null once the duel is under way. */
   start: StartView | null;
+  /** An offer to rewind to before an overturned ruling: what the appeal said, how many log entries it undoes, who accepted. */
+  rollback: { explanation: string; accepted: Seat[] } | null;
   actions: LegalAction[];
 }
 
@@ -821,6 +848,8 @@ export type LegalAction =
   | { type: 'activate'; card: string; effect: number; zones: number[] | null; text: string }
   /** Pass in a response window, or decline your optional triggers. */
   | { type: 'pass' }
+  /** Answer the rollback offer. */
+  | { type: 'rollback' }
   /** Detach `count` of `materials` from `card` instead of its destruction, or not. */
   | { type: 'replace'; card: string; materials: string[]; count: number }
   | { type: 'rps' }

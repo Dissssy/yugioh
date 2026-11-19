@@ -48,6 +48,9 @@ const baseMs: Record<LogEvent['type'], number> = {
   damageStepStarted: 0,
   replacementOffered: 0,
   replacementChosen: 300,
+  rollbackOffered: 0,
+  rollbackAnswered: 0,
+  rolledBack: 600,
   linkResolved: 200,
   chatted: 0,
 };

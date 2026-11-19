@@ -48,6 +48,7 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
     chain: state.chain.map((link) => ({ player: link.player, card: shown(link.card), effect: link.effect, targets: link.targets, choice: link.choice })),
     waiting: waitingFor(state, seat),
     start: startFor(state, seat),
+    rollback: state.rollback && { explanation: state.rollback.explanation, accepted: state.rollback.accepted },
     actions: legalActions(state, seat),
   };
 }
@@ -314,7 +315,12 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `${name(event.card)} ${event.delta > 0 ? 'gets' : 'loses'} ${Math.abs(event.delta)} ${event.counter === 'spell' ? 'Spell Counter' : 'counter'}${Math.abs(event.delta) === 1 ? '' : 's'}`;
     case 'damageStepStarted':
     case 'replacementOffered':
+    case 'rollbackOffered':
       return null;
+    case 'rollbackAnswered':
+      return `${who(event.player)} ${event.accept ? 'accepted' : 'declined'} the rewind`;
+    case 'rolledBack':
+      return 'Both players agreed: the duel went back to before the overturned ruling';
     case 'replacementChosen':
       return event.materials.length ? `${name(event.card)} detaches ${names(event.materials)} instead of being destroyed` : null;
     case 'linked':

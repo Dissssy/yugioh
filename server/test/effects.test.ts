@@ -370,3 +370,53 @@ async function login() {
   await b.json(`${h.baseUrl}/api/me/username`, { method: 'POST', body: JSON.stringify({ username: 'Ethan' }) });
   return b;
 }
+
+describe('a rewind after an overturned ruling', () => {
+  it('rewinds to before an overturned resolution once both players accept, and resolves it again as the appeal said', async () => {
+    const fresh = await setUp(false);
+    const url = `${h.baseUrl}/api/duels/${fresh.duel.id}`;
+    const requests: string[] = [];
+    h.setModel(async (params) => {
+      const request = params.messages[0]!.content as string;
+      requests.push(request);
+      if (request.includes('check an activation')) return tools(params.model, [{ name: 'finish', input: { legal: true, summary: 'Poison of the Old Man is activated.' } }]);
+      // Wrong at first; right once an appeal binds it.
+      const gain = request.includes('An appeal overturned');
+      return tools(params.model, [
+        gain ? { name: 'change_lp', input: { player: 1, amount: 1200, kind: 'gain' } } : { name: 'change_lp', input: { player: 0, amount: 800, kind: 'damage' } },
+        { name: 'finish', input: { legal: true, summary: gain ? 'Kaiba gained 1200 LP.' : 'Ethan took 800 damage.' } },
+      ]);
+    });
+    const mine = new Stream(await fresh.guest.fetch(`${url}/stream`));
+    const sent = await fresh.guest.json(`${url}/intents`, { method: 'POST', body: JSON.stringify({ type: 'activate', card: fresh.poison, effect: 0, zone: 2 }) });
+    expect(sent.status).toBe(204);
+    const ruled = await until(mine, (u) => entries(u).find((e) => e.event.type === 'judged' && e.event.stage === 'resolution'));
+
+    h.setModel(async (params) =>
+      message(params.model, [{ type: 'text', text: JSON.stringify({ verdict: 'overturned', explanation: 'The player chose to gain LP.', ruling: 'Player 1 gains 1200 LP.' }) }], 'end_turn'),
+    );
+    expect((await fresh.guest.json(`${url}/contest`, { method: 'POST', body: JSON.stringify({ seq: ruled.seq, note: 'I chose the gain.' }) })).status).toBe(202);
+    const offered = await until(mine, (u) => (u.type === 'steps' ? (u.steps.at(-1)!.view.rollback ?? undefined) : undefined));
+    expect(offered).toEqual({ explanation: 'The player chose to gain LP.', accepted: [] });
+
+    h.setModel(async (params) => {
+      const request = params.messages[0]!.content as string;
+      requests.push(request);
+      return tools(params.model, [
+        { name: 'change_lp', input: { player: 1, amount: 1200, kind: 'gain' } },
+        { name: 'finish', input: { legal: true, summary: 'Kaiba gained 1200 LP.' } },
+      ]);
+    });
+    const rewind = (who: Browser) => who.json(`${url}/intents`, { method: 'POST', body: JSON.stringify({ type: 'rollback', accept: true }) });
+    expect((await rewind(fresh.guest)).status).toBe(204);
+    expect((await rewind(fresh.guest)).status).toBe(422);
+    expect((await rewind(fresh.admin)).status).toBe(204);
+    const after = await until(mine, (u) => (u.type === 'steps' && entries(u).some((e) => e.event.type === 'linkResolved') ? u.steps.at(-1)!.view : undefined));
+    expect(after.players.map((p) => p.lp)).toEqual([8000, 9200]);
+    expect(after.rollback).toBeNull();
+    expect(requests.at(-1)).toContain('its ruling binds: Player 1 gains 1200 LP.');
+    // The undone ruling can't be contested any more.
+    expect((await fresh.admin.json(`${url}/contest`, { method: 'POST', body: JSON.stringify({ seq: ruled.seq, note: 'again' }) })).status).toBe(409);
+    mine.close();
+  });
+});

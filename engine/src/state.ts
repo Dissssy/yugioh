@@ -78,6 +78,8 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     attack: null,
     usedThisTurn: [],
     rulings: [],
+    rollback: null,
+    binding: null,
     result: null,
   };
 }
@@ -115,12 +117,32 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       }
       case 'judged': {
         const r = event.record;
+        // The resolution a rollback bound is ruled again.
+        if (r.stage === 'resolution' && s.binding?.card === r.card && s.binding.effect === r.effect) s.binding = null;
         // A failed call isn't a ruling, so the player may try again. A legal activation changes the board anyway.
         if (r.stage === 'activation' && !r.legal && r.error === null) {
           s.rulings.push({ player: r.player, card: r.card, effect: r.effect, legal: false, summary: r.summary });
         }
         // A trigger that couldn't be activated, for whatever reason, is set aside for this sequence.
         if (r.stage === 'activation' && !r.legal && s.step.at === 'triggers') s.step.handled.push(`${r.card}:${r.effect}`);
+        return;
+      }
+      case 'rollbackOffered':
+        s.rollback = { ...event.offer, accepted: [] };
+        return;
+      case 'rollbackAnswered':
+        if (!s.rollback) throw new Error('No rollback offered');
+        if (event.accept) s.rollback.accepted.push(event.player);
+        else s.rollback = null;
+        return;
+      case 'rolledBack': {
+        const offer = s.rollback;
+        if (!offer) throw new Error('No rollback offered');
+        Object.assign(s, structuredClone(event.board), { rollback: null });
+        const d = offer.decision;
+        // A wrongly allowed activation is refused from now on; a resolution is ruled again, bound to the appeal.
+        if (d.stage === 'activation') s.rulings.push({ player: d.player, card: d.card, effect: d.effect, legal: false, summary: offer.ruling });
+        else s.binding = { player: d.player, card: d.card, effect: d.effect, ruling: offer.ruling };
         return;
       }
       case 'appealed': {
@@ -391,6 +413,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       }
       case 'duelEnded':
         s.result = event.result;
+        s.rollback = null;
         return;
     }
   });

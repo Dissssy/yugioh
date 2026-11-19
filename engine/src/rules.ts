@@ -165,7 +165,9 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
     }
   } else if (step.at === 'respond') {
     if (step.priority === seat) actions.push(...usable(state, seat), { type: 'pass' });
-  } else if (step.at === 'replace') {
+  }
+  if (state.rollback && !state.rollback.accepted.includes(seat)) actions.push({ type: 'rollback' });
+  if (step.at === 'replace') {
     const count = replacement(state, step.card);
     if (step.player === seat && count !== null) actions.push({ type: 'replace', card: step.card, materials: onField(state, step.card).materials, count });
   } else if (step.at === 'open' && state.turnPlayer === seat) {
@@ -436,6 +438,11 @@ export function decide(state: DuelState, seat: Seat, intent: Intent): Decision {
     check(state.turn > 0, 'The duel starts once rock-paper-scissors decides who goes first.');
     if (intent.type === 'activate') {
       activate(run, seat, intent);
+      return { ok: true, events: run.events };
+    }
+    if (intent.type === 'rollback') {
+      check(state.rollback && !state.rollback.accepted.includes(seat), 'There is no rewind for you to answer.');
+      run.emit({ type: 'rollbackAnswered', player: seat, accept: intent.accept });
       return { ok: true, events: run.events };
     }
     if (intent.type === 'replace') {

@@ -8,7 +8,7 @@ As of 2026-11-19. This is build layer 2 of [architecture.md](architecture.md): e
 - **Resolving** right after activation. Nobody can respond yet (layer 4), so the chain holds at most one link and everyone waits until it resolves.
 - **Choices** through `ask_player`: costs such as "discard 1 card", targets, searches, and choices between effects.
 - **Stat changes** with an end: until end of turn, end of the Battle Phase, your next Standby Phase, or while on the field. Battle uses the changed ATK and DEF.
-- **Contest** on any ruling a player can see: Claude Opus 5.5 (thinking on) re-examines it and its verdict and one- or two-sentence explanation join both logs. There is no rollback yet (layer 6).
+- **Contest** on any ruling a player can see: Claude Opus 5.5 (thinking on) re-examines it and its verdict and one- or two-sentence explanation join both logs. If it overturns a ruling that changed the board, both players are offered a rewind to just before it (see step 7 in [roadmap.md](roadmap.md)).
 
 Not yet, by design of the build order:
 

@@ -788,6 +788,35 @@ describe('timing', () => {
   });
 });
 
+describe('rollback', () => {
+  it('rewinds to before an overturned activation once both players accept, and refuses it from then on', () => {
+    const t = new Table(stacked([11, ...filler(39)], filler(40, 2)));
+    t.play(0, { type: 'setSpellTrap', card: 'a0', zone: 0 }).play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
+    const to = t.events.length;
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: null });
+    const decision = { stage: 'activation', player: 0, card: 'a0', effect: 0, legal: true } as const;
+    t.push({ type: 'rollbackOffered', offer: { judged: to + 1, to, decision, ruling: 'It needs a Level 1 Warrior in the Deck.', explanation: 'There was nothing to Summon.' } });
+    expect(viewFor(t.state, 1).rollback).toEqual({ explanation: 'There was nothing to Summon.', accepted: [] });
+    t.play(1, { type: 'rollback', accept: true });
+    expect(t.refuse(1, { type: 'rollback', accept: true })).toMatch(/no rewind/);
+    expect(legalActions(t.state, 0)).toContainEqual({ type: 'rollback' });
+    t.play(0, { type: 'rollback', accept: true });
+    const { instances: _i, cards: _c, sheets: _s, ...board } = replay(t.events.slice(0, t.state.rollback!.to));
+    t.push({ type: 'rolledBack', to, board });
+    expect(t.state.chain).toEqual([]);
+    expect(t.state.players[0].spellTraps[0]).toMatchObject({ id: 'a0', faceUp: false });
+    expect(t.refuse(0, { type: 'activate', card: 'a0', effect: 0, zone: null })).toMatch(/Level 1 Warrior/);
+  });
+
+  it('drops the offer when either player declines', () => {
+    const t = new Table(stacked(filler(40), filler(40, 2)));
+    const decision = { stage: 'resolution', player: 0, card: 'a0', effect: 0, legal: true } as const;
+    t.push({ type: 'rollbackOffered', offer: { judged: 3, to: 3, decision, ruling: '', explanation: '' } });
+    t.play(1, { type: 'rollback', accept: false });
+    expect(t.state.rollback).toBeNull();
+  });
+});
+
 describe('positions', () => {
   it("can't change position on the turn a monster arrives, then once per turn after", () => {
     const t = new Table(stacked(filler(40), filler(40, 2)));

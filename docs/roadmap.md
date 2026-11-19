@@ -66,6 +66,8 @@ The biggest step: ten monsters and a dozen Spells and Traps in the two decks nee
 
 "Then undo it" was asked for in the reviewed duel, right after the Mirror Force overturn. An overturned ruling offers both players a rewind to just before it, with the corrected ops. Both must accept.
 
+- **Built 2026-11-19.** When an appeal overturns a ruling that changed the board (an activation ruled legal, or a resolution) and the duel isn't over, the server adds `rollbackOffered` after the `appealed` event: the point to go back to (before the activation's intent, or before the resolution's `judged` event) and the appeal's ruling. Both players see the explanation with Rewind and Keep playing on the board (`rollback` intent; `DuelState.rollback`, `PlayerView.rollback`). One decline drops it; play goes on meanwhile. Once both accept, the server replays the log up to that point and commits `rolledBack` with that board (without the cards, and keeping the current sheets, so a script an appeal set aside stays aside). The event log stays append-only: everything after the rewind point stays in the log, and evolving `rolledBack` puts the old board back. A rewound activation is refused from then on with the appeal's ruling (a standing ruling, as for a refusal); a rewound resolution resolves again with the appeal's ruling binding the judge (`DuelState.binding`), instead of the appeal writing corrected ops itself. A ruling a rewind undid can't be contested. No preview of the rewound board yet.
+
 ## Alongside: things players noticed
 
 - **Card zoom while aiming an attack** didn't work (Shift held during the attack drag). Reproduce in the browser first.

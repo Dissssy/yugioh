@@ -160,7 +160,8 @@ export function activationRequest(state: DuelState, link: ChainLink, appealRulin
   return `${describeState(state, link.card)}\n\n# Request: check an activation\nPlayer ${link.player} is activating this effect.${appeal}\n${context(state, link)}\n${describeEffect(state, link)}`;
 }
 
-export function resolutionRequest(state: DuelState, link: ChainLink): string {
+export function resolutionRequest(state: DuelState, link: ChainLink, appealRuling: string | null): string {
   const targets = link.targets.length ? link.targets.map((id) => `${id} ${cardOf(state, id).name}`).join('; ') : 'none';
-  return `${describeState(state)}\n\n# Request: resolve the effect\nThe activation was legal and its cost is paid. Targets declared on activation: ${targets}.${link.choice ? ` Effect chosen on activation: ${link.choice}.` : ''}\n${context(state, link)}\n${describeEffect(state, link)}`;
+  const appeal = appealRuling ? ` An appeal overturned an earlier resolution of this effect on this board, and its ruling binds: ${appealRuling}` : '';
+  return `${describeState(state)}\n\n# Request: resolve the effect\nThe activation was legal and its cost is paid.${appeal} Targets declared on activation: ${targets}.${link.choice ? ` Effect chosen on activation: ${link.choice}.` : ''}\n${context(state, link)}\n${describeEffect(state, link)}`;
 }

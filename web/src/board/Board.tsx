@@ -204,6 +204,8 @@ export function Board({ duelId }: { duelId: string }) {
         return send.mutate({ type: action.type });
       case 'replace':
         return send.mutate({ type: 'replace', materials: action.materials.slice(0, action.count) });
+      case 'rollback':
+        return send.mutate({ type: 'rollback', accept: true });
     }
   }
 
@@ -446,6 +448,30 @@ export function Board({ duelId }: { duelId: string }) {
   const waiting = view.waiting;
   const pass = has('pass');
   const replace = has('replace');
+  /** An overturned ruling's rewind offer: both players must accept. */
+  const offer = view.rollback;
+  const rollbackNote = offer && (
+    <span className="choice-prompt" role="group">
+      <span className="choice-text long" title={offer.explanation}>
+        Ruling overturned: {offer.explanation}{' '}
+        <strong>
+          {has('rollback')
+            ? offer.accepted.length
+              ? `${view.players[offer.accepted[0]!].name} wants to rewind to before it, undoing everything since.`
+              : 'Rewind to before it? Both players must agree.'
+            : `Waiting for ${view.players[me === 0 ? 1 : 0].name} to answer…`}
+        </strong>
+      </span>
+      {has('rollback') && (
+        <>
+          <button className="primary" onClick={() => send.mutate({ type: 'rollback', accept: true })}>
+            Rewind
+          </button>
+          <button onClick={() => send.mutate({ type: 'rollback', accept: false })}>Keep playing</button>
+        </>
+      )}
+    </span>
+  );
   const replacing = replace && myMonsters.find((m) => m && idOf(m.card) === replace.card);
   const materialName = (id: string) => {
     const c = replacing?.materials.find((m) => idOf(m) === id);
@@ -574,7 +600,7 @@ export function Board({ duelId }: { duelId: string }) {
                       }}
                       extraZones={[<ExtraMonsterZone key="left" side="left" mine={myField} foe={foeField} />, <ExtraMonsterZone key="right" side="right" mine={myField} foe={foeField} />]}
                       chain={chainNote || null}
-                      prompt={prompt || choiceBar || judgeNote || replaceNote || respondNote || null}
+                      prompt={prompt || choiceBar || judgeNote || rollbackNote || replaceNote || respondNote || null}
                       endTurn={endTurn && !choosing ? () => start(endTurn) : null}
                     />
                     <Field {...myField} />
@@ -744,6 +770,8 @@ function actionLabel(a: LegalAction, view: PlayerView): string {
       return a.direct ? 'Attack directly' : 'Attack';
     case 'replace':
       return 'Detach instead of being destroyed';
+    case 'rollback':
+      return 'Rewind';
     case 'activate': {
       // A card with one effect to activate just says so; with several, each names its own.
       const several = view.actions.filter((o) => o.type === 'activate' && o.card === a.card).length > 1;
