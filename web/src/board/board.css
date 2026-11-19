@@ -24,7 +24,7 @@ main:has(.duel) { max-width: none; padding: 0; }
   min-height: 0;
   padding: 8px 12px;
   display: grid;
-  grid-template-rows: calc(var(--zone) * 0.5) auto 52px auto 1fr;
+  grid-template-rows: calc(var(--zone) * 0.5) auto var(--zone) auto 1fr;
   grid-template-columns: calc(var(--zone) * 7 + var(--gap) * 6);
   justify-content: center;
   align-content: center;
@@ -124,23 +124,25 @@ main:has(.duel) { max-width: none; padding: 0; }
 .lp-delta.gain { color: #2f9e44; }
 .lp-delta { position: absolute; right: 12px; top: 6px; font-weight: 800; font-size: 1.3em; color: var(--danger); pointer-events: none; }
 
-/* Phase strip */
+/* The middle row: turn and phases, the Extra Monster Zones with the chain between them, and the prompt */
 .phase-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 12px;
+  display: grid;
+  grid-template-columns: repeat(7, var(--zone));
+  gap: var(--gap);
   border-radius: 10px;
   background: color-mix(in srgb, var(--fg) 5%, transparent);
 }
 .phase-strip.yours { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.turn-label, .strip-actions { flex: 1 1 0; white-space: nowrap; }
-.strip-actions { display: flex; justify-content: flex-end; }
-.phases { display: flex; gap: 2px; list-style: none; margin: 0; padding: 0; }
+.strip-turn { grid-column: 1 / 3; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 6px; padding: 0 10px; min-width: 0; }
+.turn-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.strip-chain { display: flex; align-items: center; justify-content: center; min-width: 0; }
+.strip-prompt { grid-column: 6 / 8; display: flex; align-items: center; padding: 0 10px; min-width: 0; }
+.strip-prompt > * { flex-wrap: wrap; }
+.zone.extra-zone { border-style: solid; border-color: color-mix(in srgb, var(--fg) 22%, transparent); }
+.phases { display: flex; flex-wrap: wrap; gap: 2px; list-style: none; margin: 0; padding: 0; }
 .phases li { position: relative; }
 .phase-pill { position: absolute; inset: 0; border-radius: 999px; background: var(--accent); }
-.phase { position: relative; display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 0.85em; font-weight: 600; color: var(--muted); }
+.phase { position: relative; display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 0.85em; font-weight: 600; color: var(--muted); }
 .phases li.current .phase { color: white; }
 button.phase.go { border: 1px solid var(--accent); color: var(--accent); background: none; }
 .choice-prompt { display: flex; gap: 12px; align-items: center; font-weight: 600; }
@@ -305,10 +307,10 @@ form.report-ruling { display: flex; flex-direction: column; gap: 6px; }
 form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .report-ruling .report-actions { display: flex; justify-content: flex-end; gap: 6px; }
 /* The opponent's cards point at them, as across a real table, unless the viewer's settings say otherwise. */
-.field.turned .card { rotate: 180deg; }
+.field.turned .card, .extra-zone.turned .card { rotate: 180deg; }
 
-/* The chain waiting to resolve, link 1 first, in the phase strip */
-.chain-list { display: flex; gap: 6px; align-items: center; font-size: 0.85em; min-width: 0; flex-wrap: wrap; }
-.chain-list span { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+/* The chain waiting to resolve, link 1 first, between the Extra Monster Zones */
+.chain-list { display: flex; flex-direction: column; gap: 4px; align-items: stretch; font-size: 0.8em; min-width: 0; max-width: 100%; }
+.chain-list span { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chain-list .mine { border-color: var(--accent); }
 .chain-list .theirs { border-color: var(--danger); }

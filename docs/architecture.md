@@ -239,7 +239,7 @@ The first card pool is two starter decks, used as the premade decks, unchanged:
 | Yu-Gi-Oh! 5D's Starter Deck 2008 | Synchro Summoning | Tuners and level sums, Special Summons, banishing, targeting cards in the GY, effects that check what is on the field |
 | Starter Deck: Dawn of the Xyz | Xyz Summoning | Xyz materials of the same Level, overlay units, detaching as a cost |
 
-What this changes in the build order: Synchro and Xyz move up to layer 3, right after the judge works, while Fusion, Link and Pendulum wait until a deck needs them. Neither deck needs Link Monsters, so under the current rules every Extra Deck monster they use can go to a Main Monster Zone.
+What this changes in the build order: Synchro and Xyz move up to layer 3, right after the judge works, while Fusion, Link and Pendulum wait until a deck needs them. Neither deck needs Link Monsters, so under the current rules every Extra Deck monster they use can go to a Main Monster Zone, or to an empty Extra Monster Zone (built 2026-11-19, see [roadmap.md](roadmap.md)).
 
 The exact decklists are imported from the card database by set (YGOPRODeck can filter cards by set name; to verify when the importer is written), so no list is typed by hand. The cards keep their current official text, which may differ from the 2008 printing.
 

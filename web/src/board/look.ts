@@ -25,7 +25,7 @@ const MAX_ZONE = 170;
 
 /**
  * Sizes the board to fit its container without scrolling. Vertically the table stacks: the opponent's hand
- * (half shown), four zone rows, the middle strip and your hand (a little over one zone); horizontally seven
+ * (half shown), four zone rows around the middle row of Extra Monster Zones, and your hand (a little over one zone); horizontally seven
  * zone columns.
  */
 export function useBoardSize(el: HTMLElement | null): BoardLook {
@@ -40,9 +40,8 @@ export function useBoardSize(el: HTMLElement | null): BoardLook {
     return () => observer.disconnect();
   }, [el]);
 
-  const STRIP = 52;
   const GAP = 6;
-  const byHeight = (size.height - STRIP - 6 * GAP) / (0.5 + 4 + 1.2);
+  const byHeight = (size.height - 6 * GAP) / (0.5 + 5 + 1.2);
   const byWidth = (size.width - 6 * GAP) / 7;
   const zone = Math.max(48, Math.floor(Math.min(byHeight, byWidth, MAX_ZONE)));
   const cardWidth = zone * CARD_HEIGHT_IN_ZONE * CARD_ASPECT;

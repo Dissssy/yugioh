@@ -41,7 +41,7 @@ Desktop, landscape:
 ```
 
 - **Zone placement follows the real playmat:** Field Spell zone and Extra Deck on one side, GY, Banished and Deck on the other, mirrored for the opponent. Players coming from paper or other simulators find things where they expect.
-- **The middle strip** holds the phase stepper (DP, SP, M1, BP, M2, EP) with the current phase lit, and the turn's main buttons. The next phase is clickable; that replaces the separate "Battle Phase" and "Main Phase 2" buttons. Layer 7 puts the two Extra Monster Zones in this strip, so it is laid out with room for them from the start.
+- **The middle row** is one zone tall. On the left: whose turn it is, the phase stepper (DP, SP, M1, BP, M2, EP) with the current phase lit, and End turn. The next phase is clickable; that replaces the separate "Battle Phase" and "Main Phase 2" buttons. In the middle, the two shared Extra Monster Zones, above the second and fourth Main Monster Zones as on the real playmat, with the chain listed between them. Each shows whichever player's monster is in it, turned like the rest of that player's cards. On the right, what the duel waits for: an instruction, the judge's question, or whom it waits on. (Built 2026-11-19 with the Extra Monster Zones; before that a 52-pixel strip held the phases and the prompt replaced them.)
 - **LP plates** sit at the corners next to each name. A change counts the number down over about half a second, flashes red for damage and green for gain, and shows the delta as a floating number.
 - **Piles** (Deck, GY, Banished, Extra) show their top card and a count. Clicking one opens a pile viewer (see "Card details").
 - **Right sidebar:** the action log, then a small settings button. On narrower windows it collapses into a drawer with an unread badge.
@@ -87,7 +87,7 @@ Built with Motion alone. A hand card has one Motion drag for everything: while t
 
 One consistent pattern for every "pick some cards" moment: tributes, attack targets, discards, and from layer 2 effect targets and `ask_player` prompts.
 
-- A short instruction appears in the middle strip ("Choose 1 monster to Tribute", with **Cancel**).
+- A short instruction appears on the right of the middle row ("Choose 1 monster to Tribute", with **Cancel**).
 - Eligible cards glow and pulse gently; everything else dims.
 - Clicking a card marks it with a numbered badge in the order chosen. When the count is reached the choice sends; for "choose up to N" a **Confirm** button appears.
 - For targeting, an arrow (an SVG curve on an overlay above the board) runs from the source card to the pointer and snaps to a target when hovering one.

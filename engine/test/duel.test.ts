@@ -17,6 +17,9 @@ import {
   type Intent,
   type JudgeRecord,
   type Seat,
+  cardsFitting,
+  monsterZoneFree,
+  monsterZonesFor,
 } from '../src/index.ts';
 
 const monster = (code: number, name: string, level: number, atk: number, def: number): CardData => ({
@@ -231,7 +234,8 @@ describe('summoning', () => {
     expect(t.state.players[0].monsters[2]?.id).toBe('a1');
     t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
     expect(t.refuse(0, { type: 'setMonster', card: 'a2', tributes: [], zone: 2 })).toMatch(/not empty/);
-    expect(t.refuse(0, { type: 'setMonster', card: 'a2', tributes: [], zone: 7 })).toMatch(/no Monster Zone/);
+    expect(t.refuse(0, { type: 'setMonster', card: 'a2', tributes: [], zone: 7 })).toMatch(/Main Monster Zones/);
+    expect(t.refuse(0, { type: 'setMonster', card: 'a2', tributes: [], zone: 5 })).toMatch(/Main Monster Zones/);
   });
 
   it('Sets Spells and Traps face-down and hides them from the opponent', () => {
@@ -251,6 +255,62 @@ describe('summoning', () => {
     expect(logFor(t.events, 0).find((e) => e.event.type === 'monsterSet')?.event).toMatchObject({ card: 'a1' });
     const mine = viewFor(t.state, 0);
     expect(mine.players[0].monsters[0]?.card).toMatchObject({ id: 'a1' });
+  });
+});
+
+describe('Extra Monster Zones', () => {
+  /** Yusei's Junk Warrior (ax0) in his left Extra Monster Zone, on turn 2 (Yuma's) or 3 (Yusei's). */
+  function withJunkWarrior(deck0: number[], deck1: number[], turn: 2 | 3) {
+    const t = new Table(stacked(deck0, deck1));
+    t.push({ type: 'specialSummoned', player: 0, card: 'ax0', zone: 5, position: 'attack' });
+    t.play(0, { type: 'endTurn', discard: [] });
+    if (turn === 3) t.play(1, { type: 'endTurn', discard: [] });
+    return t;
+  }
+
+  it('are shared: one player\'s left is the other\'s right, and each player may use only one', () => {
+    const t = withJunkWarrior(filler(40), filler(40, 2), 2);
+    expect(t.state.players[0].monsters).toHaveLength(7);
+    expect(monsterZoneFree(t.state, 0, 6)).toBe(true);
+    expect(monsterZoneFree(t.state, 1, 6)).toBe(false);
+    expect(monsterZoneFree(t.state, 1, 5)).toBe(true);
+    expect(monsterZonesFor(t.state, 0, true)).toEqual([0, 1, 2, 3, 4]);
+    expect(monsterZonesFor(t.state, 1, true)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(monsterZonesFor(t.state, 1, false)).toEqual([0, 1, 2, 3, 4]);
+    // Main Deck monsters only go to the Main Monster Zones.
+    expect(legalActions(t.state, 1).find((a) => a.type === 'normalSummon')).toMatchObject({ zones: [0, 1, 2, 3, 4] });
+    const view = viewFor(t.state, 1);
+    expect(view.players[0].monsters[5]).toMatchObject({ card: { id: 'ax0' }, stats: { atk: 2300 } });
+  });
+
+  it('hold monsters that attack and are attacked like any other', () => {
+    const t = withJunkWarrior(filler(40), filler(40, 2), 2);
+    t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 });
+    t.play(1, { type: 'enterBattle' });
+    expect(legalActions(t.state, 1).find((a) => a.type === 'attack')).toMatchObject({ targets: [5], direct: false });
+    t.play(1, { type: 'attack', attacker: 'b0', target: 5 });
+    expect(t.state.players[1].graveyard).toEqual(['b0']);
+    expect(t.state.players[1].lp).toBe(8000 - 500);
+    t.play(1, { type: 'endTurn', discard: [] });
+    t.play(0, { type: 'enterBattle' });
+    t.play(0, { type: 'attack', attacker: 'ax0', target: 'direct' });
+    expect(t.state.players[1].lp).toBe(7500 - 2300);
+  });
+
+  it('hold monsters that are targeted, destroyed and Tributed like any other', () => {
+    const t = withJunkWarrior([4, 1, 1, 1, 1, 1, ...filler(34)], filler(40, 2), 3);
+    const destroy = applyOp(t.state, { op: 'destroy', cards: ['ax0'] }, { player: 1, stage: 'resolution', random: () => 0 });
+    expect(destroy.ok && replay([...t.events, ...destroy.events]).players[0].graveyard).toEqual(['ax0']);
+    const anyMonster = { side: 'opponent', place: 'monsters', kinds: [], types: [], races: [], attributes: [], faceUp: true, position: null, level: null, atk: { min: 2000, max: null }, def: null } as const;
+    expect(cardsFitting(t.state, { ...anyMonster, kinds: [], types: [], races: [], attributes: [] }, 1, '')).toEqual(['ax0']);
+    t.play(0, { type: 'setMonster', card: 'a1', tributes: [], zone: 4 });
+    t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [t.state.players[1].hand[0]!] });
+    // Spiral Serpent (Level 8) tributes the Extra Monster Zone's monster and goes to a Main Monster Zone.
+    const summon = legalActions(t.state, 0).find((a) => a.type === 'normalSummon' && a.card === 'a0');
+    expect(summon).toMatchObject({ tributes: 2, tributeFrom: ['a1', 'ax0'], zones: [0, 1, 2, 3, 4] });
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: ['ax0', 'a1'], zone: 0 });
+    expect(t.state.players[0].graveyard).toEqual(['ax0', 'a1']);
+    expect(monsterZonesFor(t.state, 0, true)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 });
 
