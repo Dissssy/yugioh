@@ -6,7 +6,7 @@
   "effects": [
     {
       "kind": "activation",
-      "speed": 1,
+      "speed": 2,
       "mandatory": false,
       "opt": "none",
       "window": "When your opponent Normal or Flip Summons 1 monster with 1000 or more ATK",

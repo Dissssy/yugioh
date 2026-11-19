@@ -6,7 +6,7 @@
   "effects": [
     {
       "kind": "activation",
-      "speed": 1,
+      "speed": 2,
       "mandatory": false,
       "opt": "none",
       "window": "While there are 5 or more monsters in your GY",

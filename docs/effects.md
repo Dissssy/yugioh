@@ -27,6 +27,7 @@ Sheets are files in the repository rather than database rows, so a change to one
 - A sheet with `"verified": true` has been checked by a person and is never overwritten.
 
 The current 69 sheets for the two starter decks were written by hand in the coding session that built this layer and are unverified; they match today's card text.
+- A sheet is named by the card's passcode. YGOPRODeck sometimes changes which artwork's passcode is a card's main ID (in November 2026 it did for Mystic Tomato and Number 39: Utopia). The old sheet is then never found and the card acts as if it had no effects, so rename the sheet and its `code` to the new passcode; the offline tests catch this once the fixture in `server/test/fixtures/` is refreshed.
 
 ## The judge
 
@@ -37,7 +38,7 @@ Two calls per activation:
 1. **Checking the activation.** The card is already where activation puts it (on a scratch copy of the board). The judge decides whether the activation is legal now, pays the cost with ops, asks the player for costs and targets, and records targets with `declare_targets`. If it rules the activation illegal, nothing happens: the card stays where it was, and the opponent sees nothing.
 2. **Resolving.** The judge applies the effect with ops, asking players where the text gives them a choice, then the card goes to the GY if it is a Normal or Quick-Play Spell or a Normal Trap.
 
-Each call is a tool loop: one tool per op (`move`, `special_summon`, `destroy`, `change_lp`, `modify_stats`, `change_position`, `draw`, `extra_normal_summon`, `declare_targets`, `choose_effect`), plus `ask_player` and `finish`. The engine checks every op against the scratch board (`engine/src/ops.ts`); a refused op goes back to the model as an error it can fix. Nothing reaches the duel until `finish`. A call that errors or doesn't finish within 16 turns fails safe: the activation is refused, or the effect does nothing, with a log line saying the judge couldn't rule.
+Each call is a tool loop: one tool per op (`move`, `special_summon`, `destroy`, `change_lp`, `modify_stats`, `change_position`, `draw`, `extra_normal_summon`, `declare_targets`, `choose_effect`), plus `ask_player` and `finish`. The engine checks every op against the scratch board (`engine/src/ops.ts`); a refused op goes back to the model as an error it can fix. Code also refuses to let the judge rule an activation legal before it has paid the cost or declared the targets the effect sheet lists, and refuses an `ask_player` question with only one choice. Nothing reaches the duel until `finish`. A call that errors or doesn't finish within 16 turns fails safe: the activation is refused, or the effect does nothing, with a log line saying the judge couldn't rule.
 
 Model settings: `claude-haiku-5-5`, thinking disabled with effort `high` (the "reasoning off" setting), strict tools so every call parses, a forced tool call each turn, and the rules reference cached. Appeals use `claude-opus-5-5` with adaptive thinking and a JSON schema for the verdict.
 
@@ -65,8 +66,32 @@ The board's side of this is duel UI step 3 (see [duel-ui.md](duel-ui.md)).
 
 ## The eval suite
 
-`server/src/judge/evals.ts` holds 23 hand-written cases: a board, the card to activate, the picks to make, whether the activation is legal, and a check of the board after. They cover costs (discard, pay LP, tribute), targets in the GY and on the field, searches from the Deck, choices between effects, stat changes, Level changes, and activations that must be refused (missing targets, no Synchro Monster, traps that need an attack).
+`server/src/judge/evals.ts` holds 47 hand-written cases: a board, the card to activate (and which of its effects), the picks to make, whether the activation is legal, and a check of the board after. They cover every effect of the two starter decks that can be activated in this layer: costs (discard, pay LP, tribute), targets in the GY and on the field, searches from the Deck, choices between effects, ties the player breaks, stat and Level changes, and activations that must be refused (missing targets or costs, no Synchro Monster, no Xyz Material or Spell Counter, Traps that need an attack, a summon or an Xyz Summon, a Battle Phase effect in the Main Phase).
 
-`npm run judge:eval` runs them against the real model (`-- <text>` runs only cases whose name contains it). It needs `ANTHROPIC_API_KEY` and a database with the cards imported. Run it after any change to the rules reference, the tools or the model settings, and add a case for every mistake worth fixing. It exits with an error if any case fails. The test suite builds every case's board offline, so a broken case fails CI without a model call.
+The test suite builds every case's board offline and checks that code offers the activation, so a broken case fails CI without a model call. It also checks every effect sheet's spell speed against its kind and card type.
 
-The suite isn't run in GitHub Actions: run it by hand before deploying a change to the judge, the effect sheets or the engine's ops and activation rules (in production, `docker compose exec app node server/src/judge/evals.ts`; a full run costs about $0.03). `ci.yml` runs the type checks and the offline tests on every pull request.
+The suite isn't run in GitHub Actions; the API key stays out of GitHub. Run it by hand before deploying a change to the judge, the effect sheets or the engine's ops and activation rules (in production, `docker compose exec app node server/src/judge/evals.ts`). A single pass costs about $0.06.
+
+### Running it
+
+`npm run judge:eval` needs `ANTHROPIC_API_KEY` and a database with the cards imported (`npm run db:migrate`, then `npm run cards:import`).
+
+- `npm run judge:eval -- <text>` runs only the cases whose name contains the text.
+- `npm run judge:eval -- --repeat 5` runs every case 5 times and prints each case's pass rate (`3/5`). The judge runs with reasoning off and the model doesn't take a temperature, so its rulings vary from run to run; one pass proves little, and one failure may be a fluke.
+- Each run writes `server/eval-runs/<time>/` (ignored by git): `summary.json` with the prompt version, each case's pass rate, the tokens used and the cost, and one JSON file per failed attempt holding the whole transcript of every judge call it made.
+
+In a Claude Code cloud session, the key comes from an environment variable named `JUDGE_ANTHROPIC_API_KEY` (the cloud host removes `ANTHROPIC_API_KEY` from commands), so run `ANTHROPIC_API_KEY=$JUDGE_ANTHROPIC_API_KEY npm run judge:eval`. Postgres runs there without Docker: `initdb` and `pg_ctl` from `/usr/lib/postgresql/16/bin`, as the `postgres` user, with a data directory under `/var/tmp`.
+
+### The iteration loop
+
+1. **Baseline.** Run `--repeat 5` on the current code and keep its summary. Any case below 5/5 is a candidate.
+2. **Read the transcripts** of the failed attempts, not just the one-line detail: what the judge saw, which tools it called, which calls code refused and what it said in the summary.
+3. **Fix the cause where it belongs:**
+   - The judge broke a rule that code can check (finished without paying a cost, asked a pointless question, named a hidden card): make code refuse it in `judge.ts`, with an error the model can act on. Checks in code hold on every run; prompt wording only shifts the odds.
+   - The mistake is about one card (wrong cost, targets, window or spell speed): fix its effect sheet.
+   - It's a general rule the judge keeps missing: add a short line to the rules reference in `prompt.ts`, ideally naming a card as the example.
+   - The case itself is wrong (a ruling we got wrong, or the harness mis-reading a fair answer): fix the case, and check the official ruling first.
+4. **Re-run** the affected cases with `--repeat 5`, then the whole suite with `--repeat 3` so a fix for one card doesn't break another. Compare with the baseline's summary.
+5. **Add a case** for every mistake worth fixing, and one for each tricky ruling we meet, so it stays fixed.
+
+Keep spend small: target the cases you're working on with a filter, and save full-suite repeats for the end of a round. Five runs of the whole suite cost about $0.30.
