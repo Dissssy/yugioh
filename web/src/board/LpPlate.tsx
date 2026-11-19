@@ -3,7 +3,22 @@ import { animate, AnimatePresence, motion, useMotionValue, useTransform } from '
 import { useEffect } from 'react';
 
 /** A player's name and Life Points. LP counts to its new value, and each change floats up as a number. */
-export function LpPlate({ seat, name, lp, cue, active }: { seat: Seat; name: string; lp: number; cue: LogEntry | null; active: boolean }) {
+export function LpPlate({
+  seat,
+  name,
+  lp,
+  cue,
+  active,
+  target = null,
+}: {
+  seat: Seat;
+  name: string;
+  lp: number;
+  cue: LogEntry | null;
+  active: boolean;
+  /** Whether an aimed direct attack may land here ('open') or is over it now ('over'). */
+  target?: 'open' | 'over' | null;
+}) {
   const value = useMotionValue(lp);
   const shown = useTransform(value, (v) => Math.round(v));
   useEffect(() => {
@@ -13,7 +28,11 @@ export function LpPlate({ seat, name, lp, cue, active }: { seat: Seat; name: str
   const damage = cue?.event.type === 'battleDamage' && cue.event.player === seat ? cue.event.amount : null;
 
   return (
-    <div className={`lp-plate${active ? ' active' : ''}${damage ? ' hit' : ''}`} data-lp={seat}>
+    <div
+      className={`lp-plate${active ? ' active' : ''}${damage ? ' hit' : ''}${target ? ' open' : ''}${target === 'over' ? ' over' : ''}`}
+      data-lp={seat}
+      data-drop={`lp:${seat}`}
+    >
       <span className="lp-name">{name}</span>
       <span className="lp">
         LP <motion.span>{shown}</motion.span>

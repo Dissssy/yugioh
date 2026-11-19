@@ -10,12 +10,19 @@ export interface FieldProps {
   side: PlayerSideView;
   mine: boolean;
   marks: CardMarks;
-  /** Opponent's monster zones that may be clicked as attack targets. */
-  targetable: number[];
+  /** Whether a zone can be picked now ('open'), and whether a dragged card or aimed arrow is over it ('over'). */
+  zoneState: (row: Row, index: number) => 'open' | 'over' | null;
+  onZone: (row: Row, index: number, el: HTMLElement) => void;
   onCard: (id: string, el: HTMLElement) => void;
-  onTarget: (zone: number) => void;
+  /** A press on one of your monsters, which may become an aimed attack. */
+  onCardPress?: (id: string, e: React.PointerEvent<HTMLElement>) => void;
   onPile: (title: string, cards: CardView[]) => void;
 }
+
+export type Row = 'm' | 's';
+
+/** The drop key of a zone, matched against `data-drop` under the pointer. */
+export const dropKey = (seat: Seat, row: Row, index: number) => `${seat}:${row}:${index}`;
 
 /**
  * One player's half of the field, laid out like the real playmat: Field Zone and Extra Deck on the left, Graveyard
@@ -80,31 +87,51 @@ export function Field(props: FieldProps) {
   );
 }
 
-function Zone({ row, index, card, seat, mine, marks, targetable, onCard, onTarget }: FieldProps & { row: 'm' | 's'; index: number; card: FieldCardView | null }) {
-  const target = !mine && row === 'm' && targetable.includes(index);
+function Zone({ row, index, card, seat, mine, marks, zoneState, onZone, onCard, onCardPress }: FieldProps & { row: Row; index: number; card: FieldCardView | null }) {
+  const state = zoneState(row, index);
   const label = `${mine ? 'Your' : "Opponent's"} ${row === 'm' ? 'Monster' : 'Spell & Trap'} Zone ${index + 1}`;
+  const pick = state
+    ? (e: React.SyntheticEvent<HTMLElement>) => {
+        e.stopPropagation();
+        onZone(row, index, e.currentTarget);
+      }
+    : undefined;
   return (
     <div
-      className={`zone${target ? ' target' : ''}`}
+      className={`zone${state ? ` open${mine ? '' : ' foe'}` : ''}${state === 'over' ? ' over' : ''}`}
+      data-drop={dropKey(seat, row, index)}
       aria-label={label}
-      onClick={target ? () => onTarget(index) : undefined}
-      onKeyDown={target ? (e) => e.key === 'Enter' && onTarget(index) : undefined}
-      tabIndex={target ? 0 : undefined}
-      role={target ? 'button' : undefined}
+      onClickCapture={pick}
+      onKeyDown={pick ? (e) => e.key === 'Enter' && pick(e) : undefined}
+      tabIndex={pick ? 0 : undefined}
+      role={pick ? 'button' : undefined}
     >
       {card && (
         <FieldCard
           view={card}
-          slot={`${seat}:${row}:${index}`}
+          slot={dropKey(seat, row, index)}
           marks={marks}
           onClick={mine ? onCard : undefined}
+          onPress={mine ? onCardPress : undefined}
         />
       )}
     </div>
   );
 }
 
-function FieldCard({ view, slot, marks, onClick }: { view: FieldCardView; slot: string; marks: CardMarks; onClick?: (id: string, el: HTMLElement) => void }) {
+function FieldCard({
+  view,
+  slot,
+  marks,
+  onClick,
+  onPress,
+}: {
+  view: FieldCardView;
+  slot: string;
+  marks: CardMarks;
+  onClick?: (id: string, el: HTMLElement) => void;
+  onPress?: (id: string, e: React.PointerEvent<HTMLElement>) => void;
+}) {
   const id = idOf(view.card);
   const data = dataOf(view.card);
   const hover = useCardHover();
@@ -117,6 +144,7 @@ function FieldCard({ view, slot, marks, onClick }: { view: FieldCardView; slot: 
       className={`slot ${marks.classes(id)}`}
       animate={{ rotate: view.position === 'defense' ? 90 : 0 }}
       {...hover(data)}
+      onPointerDown={onPress && id ? (e) => onPress(id, e) : undefined}
       onClick={act ? (e) => act(e.currentTarget) : undefined}
       onKeyDown={act ? (e: KeyboardEvent<HTMLDivElement>) => e.key === 'Enter' && act(e.currentTarget) : undefined}
       tabIndex={act ? 0 : undefined}

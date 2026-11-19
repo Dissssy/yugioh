@@ -55,7 +55,16 @@ main:has(.duel) { max-width: none; padding: 0; }
 }
 .pile-button { display: grid; place-items: center; }
 .banished-chip { position: absolute; top: 2px; font-size: 0.7em; padding: 1px 6px; border-radius: 999px; background: var(--bg); }
-.zone.target { outline: 2px solid var(--danger); outline-offset: 2px; cursor: crosshair; animation: pulse 1.2s ease-in-out infinite; }
+.zone.open { outline: 2px dashed var(--accent); outline-offset: -4px; background: color-mix(in srgb, var(--accent) 10%, transparent); cursor: pointer; }
+.zone.open.foe { outline: 2px solid var(--danger); outline-offset: 2px; background: color-mix(in srgb, var(--danger) 8%, transparent); cursor: crosshair; animation: pulse 1.2s ease-in-out infinite; }
+.zone.over { outline-style: solid; background: color-mix(in srgb, var(--accent) 25%, transparent); box-shadow: 0 0 18px 2px var(--glow); }
+.zone.open.foe.over { background: color-mix(in srgb, var(--danger) 25%, transparent); box-shadow: 0 0 18px 2px var(--danger); }
+.lp-plate.open { border: 2px solid var(--danger); }
+.lp-plate.over { background: color-mix(in srgb, var(--danger) 20%, var(--bg)); box-shadow: 0 0 18px 2px var(--danger); }
+.aim-arrow { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 45; overflow: visible; }
+.aim-arrow path { fill: none; stroke: var(--danger); stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 6px var(--danger)); }
+.aim-arrow marker path { fill: var(--danger); stroke: none; filter: none; }
+.duel.dragging { cursor: grabbing; }
 .zone.summoned::after {
   content: '';
   position: absolute;
@@ -78,7 +87,7 @@ main:has(.duel) { max-width: none; padding: 0; }
 .slot.picked .fx { box-shadow: 0 0 0 3px var(--danger), 0 0 12px 2px var(--danger); }
 .slot.highlight .fx { box-shadow: 0 0 0 3px var(--gold), 0 0 14px 3px var(--gold); }
 .duel.choosing .slot:not(.pickable, .picked, .selected) { opacity: 0.45; }
-.duel.choosing .zone.target .slot { opacity: 1; }
+.duel.choosing .zone.open .slot { opacity: 1; }
 
 /* Hands */
 .hand-row { position: relative; display: flex; justify-content: center; min-width: 0; }
