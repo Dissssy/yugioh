@@ -3,7 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startDuel, type DuelEvent, type DuelUpdate, type LogEntry } from '@yugioh/engine';
-import type { DeckSummary, DuelSummary } from '@yugioh/shared';
+import type { CostReport, DeckSummary, DuelSummary } from '@yugioh/shared';
 import { loadCards, syncCards } from '../src/cards.ts';
 import { decks, matchEvents } from '../src/db/schema.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
@@ -21,8 +21,13 @@ const POISON = 8842266; // Poison of the Old Man: gain 1200 LP or inflict 800 da
 const RETURNING = 95281259; // The Warrior Returning Alive: add a Warrior from your GY to your hand.
 
 type Call = { name: string; input: unknown };
-const message = (model: string, content: unknown[], stop = 'tool_use') =>
-  ({ id: 'msg', type: 'message', role: 'assistant', model, stop_reason: stop, stop_sequence: null, content, usage: { input_tokens: 0, output_tokens: 0 } }) as unknown as Anthropic.Message;
+/** Model responses so far, by model, to check what the admin is shown it cost. */
+const responses: Record<string, number> = {};
+const usage = { input_tokens: 1000, output_tokens: 100, cache_creation_input_tokens: 0, cache_read_input_tokens: 5000 };
+const message = (model: string, content: unknown[], stop = 'tool_use') => {
+  responses[model] = (responses[model] ?? 0) + 1;
+  return { id: 'msg', type: 'message', role: 'assistant', model, stop_reason: stop, stop_sequence: null, content, usage } as unknown as Anthropic.Message;
+};
 const tools = (model: string, calls: Call[]) => message(model, calls.map((c, i) => ({ type: 'tool_use', id: `tu${i}`, name: c.name, input: c.input })));
 
 /** Reads updates until one matches. */
@@ -174,6 +179,17 @@ describe('a card effect', () => {
     expect(view.players[1].spellTraps.every((z) => z === null)).toBe(true);
     mine.close();
     theirs.close();
+  });
+
+  it("shows only the admin what the duel's judge calls and appeal cost", async () => {
+    expect((await guest.json(`${h.baseUrl}/api/admin/costs`)).status).toBe(403);
+    const { body: report } = await admin.json<CostReport>(`${h.baseUrl}/api/admin/costs`);
+    // Per call: Haiku 5.5 1000 input, 5000 cache read, 100 output = $0.0002; Opus 5.5 the same = $0.007.
+    const expected = responses['claude-haiku-5-5']! * 0.0002 + responses['claude-opus-5-5']! * 0.007;
+    expect(report.duels).toEqual([
+      expect.objectContaining({ id: duel.id, createdBy: 'Ethan', judgeCalls: 3, appeals: 1, cost: expect.closeTo(expected, 10) }),
+    ]);
+    expect(report.total).toBeCloseTo(expected, 10);
   });
 });
 

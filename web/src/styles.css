@@ -141,6 +141,7 @@ main { --page-h: calc(100dvh - 52px); max-width: 1180px; margin: 0 auto; padding
 
 /* Admin */
 .admin { gap: 16px; }
+.admin + .admin { margin-top: 20px; }
 .table-scroll { overflow: auto; max-height: calc(var(--page-h) - 160px); }
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; padding: 8px 10px; font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); }

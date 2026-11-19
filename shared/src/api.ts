@@ -54,3 +54,22 @@ export interface DeckDetail {
   main: CardData[];
   extra: CardData[];
 }
+
+/** What the judge and appeals cost in one duel, for the admin. */
+export interface DuelCost {
+  id: string;
+  createdAt: string;
+  createdBy: string;
+  status: DuelStatus;
+  /** Judge decisions; each is one or more API calls. */
+  judgeCalls: number;
+  appeals: number;
+  /** Estimated from the tokens used and Anthropic's list prices, in US dollars. */
+  cost: number;
+}
+
+/** Every duel that used the judge, newest first, and what they cost together. */
+export interface CostReport {
+  total: number;
+  duels: DuelCost[];
+}

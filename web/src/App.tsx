@@ -20,7 +20,7 @@ export function App() {
           Yu-Gi-Oh Duels
         </Link>
         <nav>
-          {user?.isAdmin && <NavLink to="/admin" className="nav-link">Accounts</NavLink>}
+          {user?.isAdmin && <NavLink to="/admin" className="nav-link">Admin</NavLink>}
           {name && (
             <span className="who">
               <span className="avatar" aria-hidden>{name[0]!.toUpperCase()}</span>

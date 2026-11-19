@@ -44,7 +44,9 @@ Model settings: `claude-haiku-5-5`, thinking disabled with effort `high` (the "r
 
 **Hidden information.** The judge sees everything. Text shown to players (summaries, `ask_player` questions, appeal explanations) is refused if it names a card a player can't see, and `ask_player` may only offer cards the asked player can see, or cards in their own Deck. A card moved between places the opponent can't see (Deck to hand) is logged without its identity. Deck orders after a shuffle are never sent.
 
-**Every decision is stored** as a `judged` event with the model, the prompt version (a hash of the rules reference and tools), a hash of the board it saw, the whole transcript, the ops, and the summary. Players see only the stage, outcome and summary.
+**Every decision is stored** as a `judged` event with the model, the prompt version (a hash of the rules reference and tools), a hash of the board it saw, the whole transcript, the ops, the summary, and the tokens each API call used. Players see only the stage, outcome and summary.
+
+**Cost.** Judge and appeal records keep each API call's token counts (input, cache writes, cache reads, output). `server/src/judge/pricing.ts` is the one place that holds Anthropic's prices and turns tokens into dollars, so updating a price there reprices past duels too; the eval runner uses it as well. The admin page lists every duel that used the judge with its judge calls, appeals and estimated cost, and the total across them. An appeal that fails (an API error, a refusal, an unreadable verdict) stores nothing, so its tokens aren't counted.
 
 **Limits.** Each duel may use 300 judge calls (an activation and its resolution are two) and 10 appeals; set `JUDGE_CALLS_PER_DUEL` and `APPEALS_PER_DUEL` to change them. Without `ANTHROPIC_API_KEY` the server runs, and activating an effect answers 503.
 

@@ -14,11 +14,13 @@ import {
   type DuelEvent,
   type DuelState,
   type JudgeRecord,
+  type ModelUsage,
   type Op,
   type Place,
   type Seat,
 } from '@yugioh/engine';
 import { hiddenNameIn } from './hidden.ts';
+import { usageOf } from './pricing.ts';
 import { activationRequest, resolutionRequest, RULES } from './prompt.ts';
 import { askPlayer, finish, parseOp, TOOLS, type AskPlayer } from './tools.ts';
 
@@ -66,6 +68,7 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
   let scratch = call.state;
   const events: DuelEvent[] = [];
   const ops: Op[] = [];
+  const usage: ModelUsage[] = [];
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: stage === 'activation' ? activationRequest(scratch, link) : resolutionRequest(scratch, link) },
   ];
@@ -79,6 +82,7 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
     stateHash: createHash('sha256').update(JSON.stringify(call.state)).digest('hex'),
     transcript: messages,
     ops,
+    usage,
     ...fields,
   });
   const sheetEffect = sheetEffectOf(call.state, link);
@@ -106,6 +110,7 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
         tool_choice: { type: 'any' },
         messages,
       });
+      usage.push(usageOf(JUDGE_MODEL, response));
       if (response.stop_reason === 'refusal') return failed('The model declined the request.');
       messages.push({ role: 'assistant', content: response.content });
       const calls = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use');

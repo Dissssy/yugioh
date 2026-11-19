@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { Me } from '@yugioh/shared';
 import { findUserBySub, listUsers, setStatus, setUsername, syncUser, toUser, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
+import { costReport } from './costs.ts';
 import type { Db } from './db/client.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
@@ -107,6 +108,10 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
 
   app.get('/api/admin/users', requireAdmin, async (_req, res) => {
     res.json(await listUsers(db));
+  });
+
+  app.get('/api/admin/costs', requireAdmin, async (_req, res) => {
+    res.json(await costReport(db));
   });
 
   const statusBody = z.object({ status: z.enum(['pending', 'approved', 'rejected']) });
