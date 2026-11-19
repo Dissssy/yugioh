@@ -1,6 +1,6 @@
 // What the judge reads: a fixed rules reference (cached), then per request the board and the effect at hand.
 
-import { cardOf, statsOf, type ChainLink, type DuelState, type FieldCard, type Seat } from '@yugioh/engine';
+import { cardOf, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Seat } from '@yugioh/engine';
 
 export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs every generic rule: turns, phases, summons, battle, damage, LP, zones, once-per-turn counting. Your only job is to apply one card effect at a time exactly as its text says, using tools. Every tool call is checked by code against the board; a refused call comes back as an error that you can correct.
 
@@ -32,7 +32,7 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 
 # Choices
 
-- Every choice the card gives a player is that player's: never choose for them. Targets are always the player's pick, so ask even when exactly one card fits. When nothing fits, don't ask.
+- Every choice the card gives a player is that player's: never choose for them, and ask even when exactly one card fits ("Special Summon 1 ... from your Deck" with one match: still ask). When nothing fits, don't ask.
 - ask_player lists only real options: the card IDs that fit (in the place the text names), or short text choices. min and max are how many to pick ("up to 3" is min 1 max 3; "1" is min 1 max 1).
 - Ask for costs and targets one question at a time, cost first.
 - When the text offers several effects to pick from ("Activate 1 of these effects", "apply 1 of these effects"), the controller picks on activation: ask them with ask_player (one choice per effect, in the card's words) and record the pick with choose_effect. On resolution, apply only the chosen effect.
@@ -48,13 +48,21 @@ Nothing you do reaches the board until you call finish. Call finish exactly once
 
 const zoneName = { monsters: 'Monster Zone', spellTraps: 'Spell & Trap Zone' } as const;
 
+/** "Effect Monster, EARTH Warrior, Level 4" or "Quick-Play Spell Card". */
+function kindOf(c: CardData): string {
+  return c.kind === 'monster' ? `${c.type}, ${c.attribute ?? ''} ${c.race}, Level ${c.level ?? '-'}` : `${c.race} ${c.type}`;
+}
+
 /** The board as text, with every card's ID, name and current stats. The model sees hidden cards too. */
 export function describeState(state: DuelState, activating: string | null = null): string {
   const lines: string[] = [];
   const label = (id: string) => `${id} ${cardOf(state, id).name}`;
   const pile = (ids: string[]) => (ids.length ? ids.map(label).join('; ') : 'none');
+  /** A pile with each card's kind beside it, so the model needn't look it up when checking what fits a text. */
+  const typedPile = (ids: string[]) => (ids.length ? ids.map((id) => `${label(id)} (${kindOf(cardOf(state, id))})`).join('; ') : 'none');
   const fieldCard = (zone: 'monsters' | 'spellTraps', index: number, c: FieldCard) => {
-    const face = c.id === activating && zone === 'spellTraps' ? 'face-up because it is being activated now' : c.faceUp ? 'face-up' : 'face-down';
+    const activated = c.placedTurn < state.turn ? `Set on turn ${c.placedTurn}, flipped face-up because it is being activated now` : 'placed from the hand, face-up because it is being activated now';
+    const face = c.id === activating && zone === 'spellTraps' ? activated : c.faceUp ? 'face-up' : 'face-down';
     if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face})`;
     const s = statsOf(state, c.id);
     return `[${index}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''})`;
@@ -64,13 +72,13 @@ export function describeState(state: DuelState, activating: string | null = null
   for (const seat of [0, 1] as Seat[]) {
     const p = state.players[seat];
     lines.push('', `Player ${seat} (${p.name}), LP ${p.lp}`);
-    lines.push(`  Hand: ${pile(p.hand)}`);
+    lines.push(`  Hand: ${typedPile(p.hand)}`);
     for (const zone of ['monsters', 'spellTraps'] as const) {
       const cards = p[zone].flatMap((c, i) => (c ? [fieldCard(zone, i, c)] : []));
       lines.push(`  ${zoneName[zone]}s: ${cards.length ? cards.join('; ') : 'empty'}`);
     }
-    lines.push(`  GY: ${pile(p.graveyard)}`);
-    lines.push(`  Banished: ${pile(p.banished)}`);
+    lines.push(`  GY: ${typedPile(p.graveyard)}`);
+    lines.push(`  Banished: ${typedPile(p.banished)}`);
     lines.push(`  Deck (${p.deck.length} cards, top first): ${pile(p.deck)}`);
     lines.push(`  Extra Deck: ${pile(p.extra)}`);
   }
