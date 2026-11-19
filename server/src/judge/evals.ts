@@ -355,6 +355,10 @@ export async function runEvals(db: Db, model: ModelCall, filter = ''): Promise<E
 }
 
 if (import.meta.main) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('ANTHROPIC_API_KEY is not set; the evals call the real model.');
+    process.exit(1);
+  }
   const { connect } = await import('../db/client.ts');
   const db = connect(process.env.DATABASE_URL ?? '');
   const client = new Anthropic();

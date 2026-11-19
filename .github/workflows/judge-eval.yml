@@ -24,7 +24,7 @@ jobs:
           POSTGRES_PASSWORD: yugioh
           POSTGRES_DB: yugioh
         ports: ['5432:5432']
-        options: --health-cmd pg_isready --health-interval 2s --health-retries 20
+        options: --health-cmd "pg_isready -U yugioh" --health-interval 2s --health-retries 20
     env:
       DATABASE_URL: postgres://yugioh:yugioh@localhost:5432/yugioh
       CARD_IMAGE_DIR: ${{ github.workspace }}/card-images
