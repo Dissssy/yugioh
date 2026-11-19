@@ -7,3 +7,4 @@ A private website for playing Yu-Gi-Oh online, with rules handled by code and ca
 - [docs/duels.md](docs/duels.md): card import, premade decks, and how a duel runs.
 - [docs/effects.md](docs/effects.md): card effects, effect sheets, the judge, contests and the eval suite.
 - [docs/deploy.md](docs/deploy.md): running the site in production with Docker.
+- [docs/next-steps.md](docs/next-steps.md): plans for what comes after the starter decks, with [ask-the-judge.md](docs/ask-the-judge.md), [keyboard.md](docs/keyboard.md) and [rulings-history.md](docs/rulings-history.md).
