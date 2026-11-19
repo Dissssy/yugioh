@@ -79,7 +79,7 @@ One structured output (strict JSON schema), with the fields in this order, so th
 
 ## Model and cost
 
-The default is **Claude Haiku 5.5 with thinking disabled at effort high**, like the judge: `reason` comes first in the answer, which gives it room to think in the open. `AI_OPPONENT_MODEL` sets the model, and `pricing.ts` already prices Haiku and Opus (add Sonnet if it's used).
+The default is **Claude Haiku 5.5 with thinking disabled at effort high** (Ethan's choice, 2026-11-19), like the judge: `reason` comes first in the answer, which gives it room to think in the open. `AI_OPPONENT_MODEL` sets the model, and `pricing.ts` already prices Haiku and Opus (add Sonnet if it's used).
 
 Rough cost per call, assuming 12,000 tokens read from the cache, 4,000 new input tokens and 300 output tokens:
 
@@ -140,5 +140,4 @@ Each step works end to end on its own.
 
 ## Open questions
 
-- Which model by default (Haiku 5.5, Sonnet 5.5, or a choice on the form)?
 - Should a missing-move complaint also file a ruling report, which flags the card's scripts at once in every duel?
