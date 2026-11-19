@@ -204,7 +204,7 @@ The engine is a library with one entry point: given the event log and a new play
 
 **Stack:** TypeScript on both ends, so the state, intent and op types are shared. Zod schemas for ops serve three jobs at once: the tool definitions sent to Claude, runtime validation, and client types. Postgres for cards, decks and the event log. The official Anthropic TypeScript SDK for Claude calls.
 
-**Frontend:** React + Vite. A card table is a few dozen to about 100 images on screen, not thousands of sprites, so the regular DOM is fast enough and keeps card text, tooltips and accessibility easy. [Motion](https://motion.dev) (formerly Framer Motion) gives spring physics, drag, and layout animations, which is what makes the other cards in hand slide aside when one is reordered (`Reorder` / `layout`). dnd-kit handles the "which zone did I drop this on" logic between hand, field and GY. PixiJS (WebGL canvas) is the step up if particle effects or a 3D table are ever wanted, at the cost of building text and UI inside the canvas.
+**Frontend:** React + Vite (the duel screen's design is in [duel-ui.md](duel-ui.md)). A card table is a few dozen to about 100 images on screen, not thousands of sprites, so the regular DOM is fast enough and keeps card text, tooltips and accessibility easy. [Motion](https://motion.dev) (formerly Framer Motion) gives spring physics, drag, and layout animations, which is what makes the other cards in hand slide aside when one is reordered (`Reorder` / `layout`). dnd-kit handles the "which zone did I drop this on" logic between hand, field and GY. PixiJS (WebGL canvas) is the step up if particle effects or a 3D table are ever wanted, at the cost of building text and UI inside the canvas.
 
 ## Build order
 
@@ -259,7 +259,6 @@ Decided 2026-11-18.
 ## Still open
 
 - A rulings source (see Card data). YGOPRODeck's terms were checked on 2026-11-18.
-- The duel screen's look and feel: see [duel-ui.md](duel-ui.md) and its open questions.
 
 ## Deferred: draft mode
 
