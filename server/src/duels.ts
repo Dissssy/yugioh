@@ -44,6 +44,8 @@ interface LiveDuel {
   listeners: Set<{ seat: Seat; send: (update: DuelUpdate) => void }>;
   /** Changes to one duel happen one at a time, in arrival order: intents, judge calls, appeal verdicts. */
   queue: Promise<unknown>;
+  /** Writes to the log, one at a time. Chat goes straight here, so players can talk while the judge works. */
+  writes: Promise<unknown>;
   /** The judge call in progress, if any. Nothing it does is in `events` until it finishes. */
   judging: Judging | null;
   /** Contests being reviewed, as `seq:seat`, so the same one isn't sent twice. */
@@ -53,7 +55,8 @@ interface LiveDuel {
 interface Judging {
   stage: 'activation' | 'resolution';
   link: ChainLink;
-  question: (Question & { id: string; answer: (picks: string[]) => void }) | null;
+  /** `picks` holds what the player sends for each of `cards`: its ID, or a one-off key for a face-down card. */
+  question: (Question & { id: string; picks: string[]; answer: (picks: string[]) => void }) | null;
 }
 
 export type ActResult = { ok: true } | { ok: false; status: number; error: string };
@@ -92,6 +95,11 @@ export class Duels {
 
   async find(id: string): Promise<MatchRow | undefined> {
     return this.db.query.matches.findFirst({ where: eq(matches.id, id) });
+  }
+
+  /** The latest duels of everyone, for the admin. */
+  async recent(): Promise<MatchRow[]> {
+    return this.db.query.matches.findMany({ orderBy: [desc(matches.createdAt)], limit: 50 });
   }
 
   /** Duels the player sits in. */
@@ -167,7 +175,7 @@ export class Duels {
         if (!row || row.status === 'waiting') throw new Error(`Duel ${id} has not started`);
         const rows = await this.db.select().from(matchEvents).where(eq(matchEvents.matchId, id)).orderBy(matchEvents.seq);
         const events = rows.map((r) => r.event as DuelEvent);
-        const live: LiveDuel = { id, events, state: replay(events), listeners: new Set(), queue: Promise.resolve(), judging: null, appealing: new Set() };
+        const live: LiveDuel = { id, events, state: replay(events), listeners: new Set(), queue: Promise.resolve(), writes: Promise.resolve(), judging: null, appealing: new Set() };
         // An effect that was activated but not resolved when the server stopped resolves now.
         if (live.state.chain.length > 0) void this.enqueue(live, () => this.resolveChain(live));
         return live;
@@ -221,7 +229,9 @@ export class Duels {
   private async activate(duel: LiveDuel, events: DuelEvent[]) {
     const [intent, ...activation] = events;
     const scratch = activation.reduce(evolve, duel.state);
-    const { record, events: costs } = await this.runJudge(duel, 'activation', scratch, scratch.chain.at(-1)!);
+    const link = scratch.chain.at(-1)!;
+    const overturned = duel.state.rulings.find((r) => r.legal && r.player === link.player && r.card === link.card && r.effect === link.effect);
+    const { record, events: costs } = await this.runJudge(duel, 'activation', scratch, link, overturned?.summary ?? null);
     const judged: DuelEvent = { type: 'judged', record };
     await this.commit(duel, record.legal ? [intent!, judged, ...activation, ...costs] : [intent!, judged]);
     if (record.legal) await this.resolveChain(duel);
@@ -236,18 +246,19 @@ export class Duels {
     }
   }
 
-  private async runJudge(duel: LiveDuel, stage: 'activation' | 'resolution', state: DuelState, link: ChainLink) {
+  private async runJudge(duel: LiveDuel, stage: 'activation' | 'resolution', state: DuelState, link: ChainLink, appealRuling: string | null = null) {
     duel.judging = { stage, link, question: null };
     this.broadcastJudging(duel);
     try {
       return await judge(
-        { stage, state, link },
+        { stage, state, link, appealRuling },
         {
           model: this.ai.judge!,
           random: this.random,
           ask: (question) =>
             new Promise<string[]>((answer) => {
-              duel.judging!.question = { ...question, id: randomBytes(6).toString('base64url'), answer };
+              const picks = question.cards.map((c) => (c.hidden ? randomBytes(6).toString('base64url') : c.id));
+              duel.judging!.question = { ...question, id: randomBytes(6).toString('base64url'), picks, answer };
               this.broadcastJudging(duel);
             }).finally(() => {
               duel.judging!.question = null;
@@ -268,12 +279,12 @@ export class Duels {
     if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
     const q = duel.judging?.question;
     if (!q || q.id !== promptId || q.player !== seat) return { ok: false, status: 409, error: 'That question is no longer open.' };
-    const options = new Set([...q.cards.map((c) => c.id), ...q.choices]);
+    const options = new Set([...q.picks, ...q.choices]);
     if (new Set(picks).size !== picks.length || !picks.every((p) => options.has(p))) return { ok: false, status: 422, error: 'Pick from the options given.' };
     if (picks.length < q.min || picks.length > q.max) {
       return { ok: false, status: 422, error: q.min === q.max ? `Pick ${q.min}.` : `Pick ${q.min} to ${q.max}.` };
     }
-    q.answer(picks);
+    q.answer(picks.map((p) => q.cards[q.picks.indexOf(p)]?.id ?? p));
     return { ok: true };
   }
 
@@ -304,8 +315,23 @@ export class Duels {
     return { ok: true };
   }
 
-  /** Stores events, applies them, and sends each seat the steps. */
-  private async commit(duel: LiveDuel, events: DuelEvent[]) {
+  /** A player's chat message. It joins the log in order with everything else, even while the judge is working. */
+  async chat(id: string, seatKey: string, text: string): Promise<ActResult> {
+    const duel = await this.load(id);
+    const seat = await this.seatOf(id, seatKey);
+    if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
+    await this.commit(duel, [{ type: 'chatted', player: seat, text }]);
+    return { ok: true };
+  }
+
+  /** Stores events, applies them, and sends each seat the steps. Commits happen one at a time, in call order. */
+  private commit(duel: LiveDuel, events: DuelEvent[]): Promise<void> {
+    const run = duel.writes.then(() => this.write(duel, events));
+    duel.writes = run.catch(() => {});
+    return run;
+  }
+
+  private async write(duel: LiveDuel, events: DuelEvent[]) {
     const first = duel.events.length;
     await this.db.transaction(async (tx) => {
       await tx.insert(matchEvents).values(events.map((event, i) => ({ matchId: duel.id, seq: first + i, event })));
@@ -369,7 +395,14 @@ function judgingFor(duel: LiveDuel, seat: Seat): JudgingView | null {
     waitingOn: q?.player ?? null,
     prompt:
       q && q.player === seat
-        ? { id: q.id, text: q.text, cards: q.cards.map((c) => ({ ...shown(c.id), place: c.place })), choices: q.choices, min: q.min, max: q.max }
+        ? {
+            id: q.id,
+            text: q.text,
+            cards: q.cards.map((c, i) => ({ pick: q.picks[i]!, card: c.hidden ? { hidden: true as const } : shown(c.id), place: c.place, seat: c.seat, zone: c.zone })),
+            choices: q.choices,
+            min: q.min,
+            max: q.max,
+          }
         : null,
   };
 }

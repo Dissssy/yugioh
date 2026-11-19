@@ -29,6 +29,7 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
 ]);
 
 const answerBody = z.object({ prompt: z.string(), picks: z.array(z.string()).max(60) });
+const chatBody = z.object({ text: z.string().trim().min(1).max(300) });
 const contestBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
 
 const deckChoice = z.object({ deckId: z.number().int() });
@@ -193,6 +194,19 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     const result = await duels.contest(row.id, p.key, body.data.seq, body.data.note);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(202).end();
+  });
+
+  // A chat message, which joins the duel log for both players.
+  router.post('/duels/:id/chat', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const body = chatBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    const row = await duels.find(req.params.id);
+    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    const result = await duels.chat(row.id, p.key, body.data.text);
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.status(204).end();
   });
 
   return router;

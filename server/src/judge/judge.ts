@@ -18,6 +18,7 @@ import {
   type Op,
   type Place,
   type Seat,
+  type SheetEffect,
 } from '@yugioh/engine';
 import { hiddenNameIn } from './hidden.ts';
 import { usageOf } from './pricing.ts';
@@ -33,11 +34,21 @@ export const PROMPT_VERSION = createHash('sha256').update(RULES).update(JSON.str
 /** One Messages API call; the real one is `client.messages.create`, tests script it. */
 export type ModelCall = (params: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
 
+/** A card a player may pick: `hidden` when it is face-down on the field and the player may not know what it is. */
+export interface QuestionCard {
+  id: string;
+  place: Place;
+  seat: Seat;
+  /** The zone index of a card on the field, else null. */
+  zone: number | null;
+  hidden: boolean;
+}
+
 /** A question for a player, with its options checked to be real. */
 export interface Question {
   player: Seat;
   text: string;
-  cards: { id: string; place: Place }[];
+  cards: QuestionCard[];
   choices: string[];
   min: number;
   max: number;
@@ -55,6 +66,8 @@ export interface JudgeCall {
   /** The board the judge works on: for an activation, with the card already activated. */
   state: DuelState;
   link: ChainLink;
+  /** For an activation an appeal ruled legal on this board after the judge refused it: the appeal's ruling, which binds. */
+  appealRuling?: string | null;
 }
 
 export interface JudgeOutcome {
@@ -70,7 +83,7 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
   const ops: Op[] = [];
   const usage: ModelUsage[] = [];
   const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: stage === 'activation' ? activationRequest(scratch, link) : resolutionRequest(scratch, link) },
+    { role: 'user', content: stage === 'activation' ? activationRequest(scratch, link, call.appealRuling ?? null) : resolutionRequest(scratch, link) },
   ];
   const record = (fields: Pick<JudgeRecord, 'legal' | 'summary' | 'error'>): JudgeRecord => ({
     stage,
@@ -87,6 +100,8 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
   });
   const sheetEffect = sheetEffectOf(call.state, link);
   /** True while the effect has a cost and no op has paid anything (choosing targets or an effect pays nothing). */
+  /** Cards each player picked in answer to ask_player during this call. */
+  const picked = new Set<string>();
   const unpaid = (done: Op[]) => sheetEffect.cost.trim() !== '' && !done.some((o) => o.op !== 'declare_targets' && o.op !== 'choose_effect');
   const failed = (error: string): JudgeOutcome => ({
     record: record({
@@ -133,7 +148,9 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
           const leak = parsed.success ? hiddenNameIn(scratch, parsed.data.summary, [0, 1]) : null;
           if (!parsed.success) refused = reply(c.id, 'Invalid input.', true);
           else if (!parsed.data.summary.trim()) refused = reply(c.id, 'Write a one-sentence summary.', true);
-          else if (stage === 'activation' && !parsed.data.legal && ops.length > 0) {
+          else if (stage === 'activation' && !parsed.data.legal && call.appealRuling) {
+            refused = reply(c.id, `An appeal already ruled this activation legal on this board: ${call.appealRuling} Pay its cost and declare its targets, then finish with legal true.`, true);
+          } else if (stage === 'activation' && !parsed.data.legal && ops.length > 0) {
             refused = reply(c.id, 'An illegal activation makes no changes. The ops you made will be discarded; call finish again to confirm.', true);
             scratch = call.state;
             events.length = 0;
@@ -151,18 +168,26 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
         }
         if (c.name === 'ask_player') {
           const parsed = askPlayer.safeParse(c.input);
-          const question = parsed.success ? checkQuestion(scratch, parsed.data) : { error: 'Invalid input.' };
+          const question = !parsed.success
+            ? { error: 'Invalid input.' }
+            : (stage === 'activation' && activationPickProblem(scratch, sheetEffect, link, ops, parsed.data.cards, null)) || checkQuestion(scratch, parsed.data);
           if ('error' in question) {
             refused = reply(c.id, question.error, true);
             continue;
           }
           const picks = await deps.ask(question);
+          for (const id of picks) picked.add(id);
           reply(c.id, JSON.stringify({ picked: picks }));
           continue;
         }
         const parsed = parseOp(c.name, c.input);
         if (!parsed.ok) {
           refused = reply(c.id, parsed.error, true);
+          continue;
+        }
+        const pickProblem = parsed.op.op === 'declare_targets' && stage === 'activation' ? activationPickProblem(scratch, sheetEffect, link, ops, parsed.op.cards, picked) : null;
+        if (pickProblem) {
+          refused = reply(c.id, pickProblem.error, true);
           continue;
         }
         const named = parsed.op.op === 'choose_effect' ? hiddenNameIn(scratch, parsed.op.choice, [0, 1]) : null;
@@ -195,8 +220,51 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
 }
 
 /** The sheet entry of the effect being judged. */
-function sheetEffectOf(state: DuelState, link: ChainLink) {
+function sheetEffectOf(state: DuelState, link: ChainLink): SheetEffect {
   return state.sheets[cardOf(state, link.card).code]!.effects[link.effect]!;
+}
+
+/** Cards an op has already moved, destroyed or summoned; during an activation check these paid the cost. */
+function cardsUsed(ops: Op[]): string[] {
+  return ops.flatMap((o) => ('cards' in o ? o.cards : 'card' in o ? [o.card] : []));
+}
+
+/**
+ * During an activation check, players choose cards only for the cost and the targets. Checks cards offered by
+ * ask_player (`picked` null) or declared as targets (`picked` the cards players chose so far).
+ */
+function activationPickProblem(
+  state: DuelState,
+  effect: SheetEffect,
+  link: ChainLink,
+  ops: Op[],
+  cards: string[],
+  picked: Set<string> | null,
+): { error: string } | null {
+  if (cards.length === 0) return null;
+  const targeting = picked !== null;
+  if (targeting && !effect.targets) return { error: "This effect doesn't target, so declare no targets. Cards it affects are chosen when it resolves." };
+  if (!targeting && !effect.cost.trim() && !effect.targets) {
+    return { error: "This effect has no cost and doesn't target, so nothing is chosen on activation: rule on legality now, and ask the player which cards when it resolves." };
+  }
+  if (cards.includes(link.card)) return { error: `${link.card} is the card being activated; it can't be its own cost or target.` };
+  const used = cards.find((id) => cardsUsed(ops).includes(id));
+  if (used) {
+    return {
+      error: `${used} was used to pay this activation's cost, so it can't be chosen again or targeted: legality is judged before the cost is paid. If no other card fits, call finish with legal false.`,
+    };
+  }
+  // With no cost, every card asked for on activation is a target.
+  if ((targeting || !effect.cost.trim()) && effect.targets && /\bface-up\b/i.test(effect.targets)) {
+    const faceDown = cards.find((id) => {
+      const at = locate(state, id);
+      return (at?.zone === 'monsters' || at?.zone === 'spellTraps') && !state.players[at.seat][at.zone][at.index]!.faceUp;
+    });
+    if (faceDown) return { error: `${faceDown} is face-down, and this effect targets face-up cards only ("${effect.targets}").` };
+  }
+  const unchosen = targeting ? cards.find((id) => !picked.has(id)) : undefined;
+  if (unchosen) return { error: `The player didn't pick ${unchosen}. Targets are the player's choice: ask them with ask_player, then declare the cards they picked.` };
+  return null;
 }
 
 /** Checks an ask_player call: real options, sensible counts, and a prompt that names nothing the player can't see. */
@@ -212,9 +280,12 @@ function checkQuestion(state: DuelState, q: AskPlayer): Question | { error: stri
   for (const id of q.cards) {
     const at = state.instances[id] ? locate(state, id) : null;
     if (!at) return { error: `There is no card ${id}.` };
-    // A player may pick from what they can see, and from their own Deck when an effect lets them search it.
-    if (!visibleTo(state, id, p) && !(at.zone === 'deck' && at.seat === p)) return { error: `Player ${p} can't see ${id}, so it can't be an option for them.` };
-    cards.push({ id, place: at.zone });
+    // A player may pick from what they can see, from their own Deck when an effect lets them search it, and any card
+    // on the field: a face-down one is offered as a face-down card, without its identity.
+    const field = at.zone === 'monsters' || at.zone === 'spellTraps';
+    const hidden = !visibleTo(state, id, p);
+    if (hidden && !field && !(at.zone === 'deck' && at.seat === p)) return { error: `Player ${p} can't see ${id}, so it can't be an option for them.` };
+    cards.push({ id, place: at.zone, seat: at.seat, zone: field ? at.index : null, hidden: hidden && field });
   }
   const leak = hiddenNameIn(state, q.prompt, [p]);
   if (leak) return { error: `The prompt names ${leak}, which player ${p} can't see.` };

@@ -45,7 +45,9 @@ export function DuelLog({ log, onHighlight, contest }: { log: LogEntry[]; onHigh
               .map((e) => (
                 <li
                   key={e.seq}
-                  className={e.event.type === 'judged' ? `ruling${e.event.legal ? '' : ' refused'}` : e.event.type === 'appealed' ? 'appeal' : undefined}
+                  className={
+                    e.event.type === 'judged' ? `ruling${e.event.legal ? '' : ' refused'}` : e.event.type === 'appealed' ? 'appeal' : e.event.type === 'chatted' ? 'chat' : undefined
+                  }
                   onPointerEnter={() => onHighlight(cardsOf(e.event))}
                   onPointerLeave={() => onHighlight([])}
                 >
@@ -81,5 +83,24 @@ export function DuelLog({ log, onHighlight, contest }: { log: LogEntry[]; onHigh
       ))}
       <div ref={end} />
     </div>
+  );
+}
+
+/** A line to send to the duel's chat, which both players read in the duel log. */
+export function ChatInput({ send, sending }: { send: (text: string) => Promise<unknown>; sending: boolean }) {
+  const [text, setText] = useState('');
+  return (
+    <form
+      className="chat-input"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (text.trim()) void send(text.trim()).then(() => setText(''), () => {});
+      }}
+    >
+      <input aria-label="Chat message" placeholder="Say something…" maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
+      <button type="submit" disabled={sending || !text.trim()}>
+        Send
+      </button>
+    </form>
   );
 }

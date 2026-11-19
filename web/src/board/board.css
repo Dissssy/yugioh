@@ -247,6 +247,9 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
 .duel-log li.ruling { color: var(--fg); border-left: 3px solid var(--gold); }
 .duel-log li.ruling.refused { border-left-color: var(--danger); }
 .duel-log li.appeal { color: var(--fg); font-style: italic; }
+.duel-log li.chat { color: var(--fg); border-left: 3px solid var(--line); }
+.chat-input { display: flex; gap: 6px; padding-top: 6px; }
+.chat-input input { flex: 1; min-width: 0; font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); }
 .contest { display: grid; gap: 4px; margin: 4px 0; }
 .contest textarea { font: inherit; padding: 4px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); resize: vertical; }
 .duel-log li button { font-size: 0.85em; padding: 1px 8px; margin-left: 6px; }

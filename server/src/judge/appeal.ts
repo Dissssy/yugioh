@@ -77,7 +77,8 @@ export async function appeal(input: AppealInput, model: ModelCall): Promise<Appe
     const text = response.content.find((b) => b.type === 'text');
     const parsed = verdict.parse(JSON.parse(text?.type === 'text' ? text.text : 'null'));
     const leak = hiddenNameIn(input.now, parsed.explanation, [0, 1]);
-    const result = { judged: input.judged, by: input.by, note: input.note, model: APPEAL_MODEL, ...parsed, usage };
+    const decision = { stage: record.stage, player: record.player, card: record.card, effect: record.effect, legal: record.legal };
+    const result = { judged: input.judged, decision, by: input.by, note: input.note, model: APPEAL_MODEL, ...parsed, usage };
     if (!leak) return result;
     if (attempt === 1) return { ...result, explanation: `The appeal ${parsed.verdict === 'upheld' ? 'upheld' : 'overturned'} the ruling.` };
     messages.push(

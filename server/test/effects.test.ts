@@ -3,7 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startDuel, type DuelEvent, type DuelUpdate, type LogEntry } from '@yugioh/engine';
-import type { CostReport, DeckSummary, DuelSummary } from '@yugioh/shared';
+import type { AdminDuels, DeckSummary, DuelSummary } from '@yugioh/shared';
 import { loadCards, syncCards } from '../src/cards.ts';
 import { decks, matchEvents } from '../src/db/schema.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
@@ -181,15 +181,68 @@ describe('a card effect', () => {
     theirs.close();
   });
 
-  it("shows only the admin what the duel's judge calls and appeal cost", async () => {
-    expect((await guest.json(`${h.baseUrl}/api/admin/costs`)).status).toBe(403);
-    const { body: report } = await admin.json<CostReport>(`${h.baseUrl}/api/admin/costs`);
+  it('answers a repeat of a refused activation from the ruling, without the judge, until the board changes', async () => {
+    let judgeCalls = 0;
+    h.setModel(async (params) => (judgeCalls++, tools(params.model, [{ name: 'finish', input: { legal: false, summary: 'There is no Warrior in your GY.' } }])));
+    const view = await until(new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`)), (u) => (u.type === 'sync' ? u.view : undefined));
+    expect(view.actions.some((a) => a.type === 'activate' && a.card === returning)).toBe(false);
+    expect(view.actions.some((a) => a.type === 'setSpellTrap' && a.card === returning)).toBe(true);
+    const again = await guest.json<{ error: string }>(`${h.baseUrl}/api/duels/${duel.id}/intents`, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'activate', card: returning, effect: 0, zone: 1 }),
+    });
+    expect(again.status).toBe(422);
+    expect(again.body.error).toMatch(/There is no Warrior in your GY\./);
+    expect(judgeCalls).toBe(0);
+
+    const mine = new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
+    await mine.update();
+    // Setting the card changes the board, so the judge may be asked again.
+    await guest.json(`${h.baseUrl}/api/duels/${duel.id}/intents`, { method: 'POST', body: JSON.stringify({ type: 'setSpellTrap', card: returning, zone: 1 }) });
+    const after = await until(mine, (u) => (u.type === 'steps' ? u.steps.at(-1)!.view : undefined));
+    expect(after.actions.some((a) => a.type === 'activate' && a.card === returning)).toBe(true);
+    mine.close();
+  });
+
+  it('binds the next try of a refused activation to the appeal that overturned the refusal', async () => {
+    const requests: string[] = [];
+    const refuse: ModelCall = async (params) => {
+      if (params.messages.length === 1) requests.push(params.messages[0]!.content as string);
+      return tools(params.model, [{ name: 'finish', input: { legal: false, summary: 'There is no Warrior in your GY.' } }]);
+    };
+    h.setModel(refuse);
+    const mine = new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
+    await mine.update();
+    const activate = () =>
+      guest.json(`${h.baseUrl}/api/duels/${duel.id}/intents`, { method: 'POST', body: JSON.stringify({ type: 'activate', card: returning, effect: 0, zone: null }) });
+    expect((await activate()).status).toBe(204);
+    const refused = await until(mine, (u) => entries(u).find((e) => e.event.type === 'judged'));
+
+    h.setModel(async (params) =>
+      message(params.model, [{ type: 'text', text: JSON.stringify({ verdict: 'overturned', explanation: 'A Warrior is in the GY.', ruling: 'Exiled Force is a legal target.' }) }], 'end_turn'),
+    );
+    const contest = await guest.json(`${h.baseUrl}/api/duels/${duel.id}/contest`, { method: 'POST', body: JSON.stringify({ seq: refused.seq, note: 'There is a Warrior.' }) });
+    expect(contest.status).toBe(202);
+    await until(mine, (u) => entries(u).find((e) => e.event.type === 'appealed'));
+
+    // The judge is asked again, told the appeal binds, and its refusal is turned back.
+    h.setModel(refuse);
+    expect((await activate()).status).toBe(204);
+    const retried = await until(mine, (u) => entries(u).find((e) => e.event.type === 'judged'));
+    expect(requests.at(-1)).toContain('that ruling binds: Exiled Force is a legal target.');
+    expect(retried.event).toMatchObject({ legal: false, failed: true });
+    mine.close();
+  });
+
+  it("shows the admin what the duel's judge calls and appeals cost", async () => {
+    expect((await guest.json(`${h.baseUrl}/api/admin/duels`)).status).toBe(403);
+    const { body: list } = await admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`);
     // Per call: Haiku 5.5 1000 input, 5000 cache read, 100 output = $0.0002; Opus 5.5 the same = $0.007.
     const expected = responses['claude-haiku-5-5']! * 0.0002 + responses['claude-opus-5-5']! * 0.007;
-    expect(report.duels).toEqual([
-      expect.objectContaining({ id: duel.id, createdBy: 'Ethan', judgeCalls: 3, appeals: 1, cost: expect.closeTo(expected, 10) }),
-    ]);
-    expect(report.total).toBeCloseTo(expected, 10);
+    expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 5, appeals: 2, cost: expect.closeTo(expected, 10) });
+    expect(list.totalCost).toBeCloseTo(expected, 10);
+    const report = await admin.fetch(`${h.baseUrl}/api/admin/duels/${duel.id}/report`);
+    expect(await report.text()).toContain(`Estimated API cost: $${expected.toFixed(4)}`);
   });
 });
 

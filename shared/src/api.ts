@@ -55,12 +55,8 @@ export interface DeckDetail {
   extra: CardData[];
 }
 
-/** What the judge and appeals cost in one duel, for the admin. */
+/** What the judge and appeals cost in one duel. */
 export interface DuelCost {
-  id: string;
-  createdAt: string;
-  createdBy: string;
-  status: DuelStatus;
   /** Judge decisions; each is one or more API calls. */
   judgeCalls: number;
   appeals: number;
@@ -68,8 +64,8 @@ export interface DuelCost {
   cost: number;
 }
 
-/** Every duel that used the judge, newest first, and what they cost together. */
-export interface CostReport {
-  total: number;
-  duels: DuelCost[];
+/** The admin's list of the latest duels with what each cost, and what every duel so far cost together. */
+export interface AdminDuels {
+  totalCost: number;
+  duels: (DuelSummary & DuelCost)[];
 }

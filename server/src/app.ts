@@ -5,14 +5,15 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
-import type { Me } from '@yugioh/shared';
+import type { AdminDuels, Me } from '@yugioh/shared';
 import { findUserBySub, listUsers, setStatus, setUsername, syncUser, toUser, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
-import { costReport } from './costs.ts';
+import { duelCosts } from './costs.ts';
 import type { Db } from './db/client.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
+import { matchReport, reportText } from './matchReport.ts';
 import { username } from './usernames.ts';
 import { userKey, viewerOf, type Viewer } from './viewer.ts';
 
@@ -110,10 +111,6 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     res.json(await listUsers(db));
   });
 
-  app.get('/api/admin/costs', requireAdmin, async (_req, res) => {
-    res.json(await costReport(db));
-  });
-
   const statusBody = z.object({ status: z.enum(['pending', 'approved', 'rejected']) });
   app.post('/api/admin/users/:id/status', requireAdmin, async (req, res) => {
     const id = z.coerce.number().int().safeParse(req.params.id);
@@ -124,7 +121,24 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     res.json(user);
   });
 
-  app.use('/api', duelRoutes(db, new Duels(db, ai, random), guestCookie));
+  const duels = new Duels(db, ai, random);
+
+  app.get('/api/admin/duels', requireAdmin, async (_req, res) => {
+    const { total, byDuel } = await duelCosts(db);
+    const none = { judgeCalls: 0, appeals: 0, cost: 0 };
+    const list = await Promise.all((await duels.recent()).map(async (row) => ({ ...(await duels.summarize(row, null, false)), ...(byDuel.get(row.id) ?? none) })));
+    res.json({ totalCost: total, duels: list } satisfies AdminDuels);
+  });
+
+  // A whole duel with nothing hidden, for review: plain text, or JSON with every event (judge transcripts included).
+  app.get('/api/admin/duels/:id/report', requireAdmin, async (req, res) => {
+    const report = await matchReport(db, String(req.params.id));
+    if (!report) return void res.status(404).json({ error: 'not_found' });
+    if (req.query.format === 'json') return void res.json(report);
+    res.type('text/plain').send(reportText(report));
+  });
+
+  app.use('/api', duelRoutes(db, duels, guestCookie));
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'not_found' }));
 
   // Card images, downloaded by the card sync. They never change, so browsers may cache them for long.

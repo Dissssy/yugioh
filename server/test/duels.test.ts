@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DuelUpdate, Intent } from '@yugioh/engine';
-import type { DeckDetail, DeckSummary, DuelSummary, AdminUser, Me } from '@yugioh/shared';
+import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelSummary, Me } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { guests } from '../src/db/schema.ts';
 import { deleteIdleGuests, GUEST_GRACE_MS } from '../src/guests.ts';
@@ -160,6 +160,48 @@ describe('a challenge link played by a guest', () => {
     theirs.close();
     const { body: summary } = await admin.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`);
     expect(summary.status).toBe('finished');
+  });
+
+  it('puts chat in both logs in order with the duel, even after it ends', async () => {
+    const url = `${h.baseUrl}/api/duels/${duel.id}`;
+    const mine = new Stream(await admin.fetch(`${url}/stream`));
+    const theirs = new Stream(await guest.fetch(`${url}/stream`));
+    await mine.update();
+    await theirs.update();
+    const chat = (who: Browser, text: string) => who.json(`${url}/chat`, { method: 'POST', body: JSON.stringify({ text }) });
+    expect((await chat(guest, '   ')).status).toBe(400);
+    expect((await chat(new Browser(), 'hi')).status).toBe(401);
+    expect((await chat(guest, '  gg, Copycat never activated  ')).status).toBe(204);
+    for (const stream of [mine, theirs]) {
+      const update = await stream.update();
+      if (update.type !== 'steps') throw new Error('expected steps');
+      expect(update.steps.map((s) => [s.entry.event, s.entry.text])).toEqual([
+        [{ type: 'chatted', player: 1, text: 'gg, Copycat never activated' }, 'Kaiba (guest): gg, Copycat never activated'],
+      ]);
+    }
+    mine.close();
+    theirs.close();
+    const again = new Stream(await admin.fetch(`${url}/stream`));
+    const sync = await again.update();
+    if (sync.type !== 'sync') throw new Error('expected sync');
+    expect(sync.log.at(-1)!.text).toBe('Kaiba (guest): gg, Copycat never activated');
+    expect(sync.log.at(-2)!.event.type).toBe('duelEnded');
+    again.close();
+  });
+
+  it('gives only the admin the whole duel to review, hidden cards and all', async () => {
+    const report = `${h.baseUrl}/api/admin/duels/${duel.id}/report`;
+    expect((await guest.fetch(report)).status).toBe(403);
+    const text = await (await admin.fetch(report)).text();
+    expect(text).toContain(`Duel ${duel.id} (finished)`);
+    expect(text).toMatch(/^#\d+ \d\d:\d\d:\d\d T1 \S.* Set .+ \[.+\] in zone 0$/m);
+    expect(text).toMatch(/asked for \{"type":"surrender"\}$/m);
+    expect(text).toMatch(/Kaiba \(guest\): gg, Copycat never activated\n$/);
+    const { body } = await admin.json<{ events: { seq: number; event: { type: string } }[] }>(`${report}?format=json`);
+    expect(body.events[0]!.event.type).toBe('duelStarted');
+    expect(body.events.at(-1)!.event.type).toBe('chatted');
+    const { body: list } = await admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`);
+    expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, cost: 0 });
   });
 
   it('lets the guest take more challenges under the same identity', async () => {
