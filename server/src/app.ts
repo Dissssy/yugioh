@@ -175,6 +175,12 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     res.status(204).end();
   });
 
+  // An admin request that fails says why, so the admin page can show it.
+  app.use('/api/admin', (err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  });
+
   app.use('/api', duelRoutes(db, duels, guestCookie));
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'not_found' }));
 

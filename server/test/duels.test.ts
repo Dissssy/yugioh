@@ -4,7 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DuelUpdate, Intent } from '@yugioh/engine';
 import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelSummary, Me } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
-import { guests } from '../src/db/schema.ts';
+import { and, eq } from 'drizzle-orm';
+import { guests, matchEvents } from '../src/db/schema.ts';
 import { deleteIdleGuests, GUEST_GRACE_MS } from '../src/guests.ts';
 import { ADMIN_EMAIL, Browser, startHarness, Stream, type Harness } from './harness.ts';
 
@@ -226,6 +227,15 @@ describe('a challenge link played by a guest', () => {
     expect(body.events.at(-1)!.event.type).toBe('chatted');
     const { body: list } = await admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`);
     expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, cost: 0 });
+  });
+
+  it("tells the admin why the duel list failed, so the page shows the reason instead of hiding the list", async () => {
+    // A judge call logged before costs were tracked has no token counts.
+    await h.db.insert(matchEvents).values({ matchId: duel.id, seq: 9999, event: { type: 'judged', record: { model: 'claude-haiku-5-5' } } });
+    const { status, body } = await admin.json<{ error: string }>(`${h.baseUrl}/api/admin/duels`);
+    await h.db.delete(matchEvents).where(and(eq(matchEvents.matchId, duel.id), eq(matchEvents.seq, 9999)));
+    expect(status).toBe(500);
+    expect(body.error).toContain(`Duel ${duel.id} has a judged event without token counts`);
   });
 
   it('lets the guest take more challenges under the same identity', async () => {
