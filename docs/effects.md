@@ -12,13 +12,13 @@ As of 2026-11-19. This is build layer 2 of [architecture.md](architecture.md): e
 
 Not yet, by design of the build order:
 
-- Triggers ("when this card is Normal Summoned"), Flip effects, continuous effects and lingering restrictions (layer 5). Continuous, Equip and Field Spells, Continuous Traps, and Spells/Traps that stay on the field (Swords of Revealing Light) aren't offered for activation.
-- Responses, chains, Counter Traps and anything that reacts to an attack or activation (layer 4). The judge rules those activations illegal: their moment has passed.
+- Flip effects, continuous effects and lingering restrictions. Continuous, Equip and Field Spells, Continuous Traps, and Spells/Traps that stay on the field (Swords of Revealing Light) aren't offered for activation.
+- Negation and Counter Traps. Triggers, chains and responses to summons and attacks work: see [chains.md](chains.md).
 - Counters, Xyz materials and negation: no ops for them yet. An effect that needs one does the parts it can, and its summary says what it skipped.
 
 ## Effect sheets
 
-Each card with an effect has a sheet: per effect its kind (activation, ignition, trigger, quick, continuous, flip, condition), spell speed, whether a trigger is mandatory, its once-per-turn clause, window, cost, effect, targets, what it responds to and its script, its status, plus Extra Deck materials. Code reads the kind, the once-per-turn clause, `respondsTo`, the script and its status; the judge reads the rest next to the full card text. The spell speed follows from the kind and the card type, so the compiler sets it, not the model.
+Each card with an effect has a sheet: per effect its kind (activation, ignition, trigger, quick, continuous, flip, condition), spell speed, whether a trigger is mandatory, its once-per-turn clause, window, cost, effect, targets, what it answers (`when`) and its script, its status, plus Extra Deck materials. Code reads the kind, the once-per-turn clause, `when`, the script and its status; the judge reads the rest next to the full card text. The spell speed follows from the kind and the card type, so the compiler sets it, not the model.
 
 Sheets are data in Postgres (`effect_sheets`), so players' reports and the admin can change them without a deploy. Every version is kept in `sheet_revisions` with why it changed ("compiled", "imported", a report, an appeal, or the admin's note). `server/effect-sheets/*.json` is the seed and backup: the card sync imports any sheet the database lacks, `npm run sheets:import -- --force` overwrites the database from the files, and `npm run sheets:export` writes the database back to them. A duel copies its cards' sheets into its first event, and a later change joins the log as a `sheetUpdated` event that players never see, so replays never depend on the database. A running duel gets the change at once; one that wasn't loaded gets it when it next loads. Finished duels keep the sheets they were played with.
 
@@ -37,7 +37,7 @@ Most effects are fixed: what The Warrior Returning Alive needs ("a Warrior monst
 - **Paying and choosing.** Code pays the cost and asks the player every choice the card gives them (the card to discard, the targets, the effect to use, a Special Summon's position, a tie for lowest ATK), with the same questions the judge asks.
 - **Resolving** runs the steps as ops: destroy, move (to hand, GY, banished or Deck), Special Summon, modify stats, change LP, draw, one more Normal Summon. A target that no longer fits the filter is left alone. A part the steps can't express yet, such as a lingering "you cannot conduct your Battle Phase this turn", is named in `unapplied` and said in the summary.
 - **Records.** Each stage is logged as a `judged` event with the model `script`, the questions and answers as its transcript and no token usage, so it can be contested like any ruling. It doesn't count against the duel's judge calls, needs no API key, and costs nothing. An appeal on a scripted ruling is told the script made it, so an overturn names what the script got wrong.
-- **Responses.** Each effect's `respondsTo` says whether it is activated in response to an attack, a summon or an activation. Nothing can respond to anything until chains arrive (layer 4), so code never offers those effects.
+- **Timing.** Each effect's `when` names the event a trigger or response answers. Code offers the effect only in a matching window and runs the chain itself ([chains.md](chains.md)); the judge is told the event and never rules on timing.
 
 Opus writes the scripts when it compiles a sheet, only where the whole effect fits the vocabulary; anything else gets `script: null` and the judge. Structured outputs can't hold the script schema (too many unions), so the model returns each script as JSON text and the compiler checks it with the same Zod schema; a script that doesn't check is dropped with a log line, leaving that effect to the judge.
 
@@ -96,7 +96,7 @@ The board's side of this is duel UI step 3 (see [duel-ui.md](duel-ui.md)).
 
 `server/src/judge/evals.ts` holds 51 hand-written cases: a board, the card to activate (and which of its effects), the picks to make, whether the activation is legal, and a check of the board after. They cover every effect of the two starter decks that can be activated in this layer: costs (discard, pay LP, tribute), targets in the GY and on the field, searches from the Deck, choices between effects, ties the player breaks, stat and Level changes, and activations that must be refused (missing targets or costs, no Synchro Monster, no Xyz Material or Spell Counter, Traps that need an attack, a summon or an Xyz Summon, a Battle Phase effect in the Main Phase).
 
-The test suite runs every case whose effect has a script (or a `respondsTo`) offline, since code rules on those without a model, so a wrong script fails CI. For the rest it builds the board and checks that code offers the activation. It also checks every effect sheet's spell speed against its kind and card type. The live run calls the model only for the cases the judge handles.
+The test suite runs every case whose effect has a script (or a `when`) offline, since code rules on those without a model, so a wrong script fails CI. For the rest it builds the board and checks that code offers the activation. It also checks every effect sheet's spell speed against its kind and card type. The live run calls the model only for the cases the judge handles.
 
 The suite isn't run in GitHub Actions; the API key stays out of GitHub. Run it by hand before deploying a change to the judge, the effect sheets or the engine's ops and activation rules (in production, `docker compose exec app node server/src/judge/evals.ts`). A single pass costs about $0.06.
 

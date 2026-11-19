@@ -1,6 +1,6 @@
 // What the judge reads: a fixed rules reference (cached), then per request the board and the effect at hand.
 
-import { cardOf, levelOf, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Seat } from '@yugioh/engine';
+import { cardOf, levelOf, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Happening, type Seat } from '@yugioh/engine';
 
 export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs every generic rule: turns, phases, summons, battle, damage, LP, zones, once-per-turn counting. Your only job is to apply one card effect at a time exactly as its text says, using tools. Every tool call is checked by code against the board; a refused call comes back as an error that you can correct.
 
@@ -8,12 +8,12 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 
 1. Checking an activation. A player has started to activate an effect. The card is already where activation puts it (a Spell/Trap from the hand is face-up in its zone). Decide whether the activation is legal right now:
    - Code has already checked that the card itself may be activated now: a Set Trap was Set before this turn, a Spell is in a phase its type allows, a monster is face-up. A Spell/Trap shows face-up only because activating it flipped it. Judge only what the text and the sheet's window add.
-   - Its activation condition and timing (the "window") hold on the current board. In this version of the game nobody can respond to an activation and effects never chain, so "when ..." triggers and effects that respond to an attack, a summon or another activation cannot be activated at all: their moment has passed. Rule them illegal.
+   - Its activation condition holds on the current board. Code runs the timing: it decides when a trigger fires and when a response may be activated, and the request names the event the effect answers ("It is activated for: ..."). If that event fits the card's text, the timing is right; judge only the other conditions. An effect that needs an event and was given none is illegal.
    - The cost can be paid, and there are enough legal targets, and the effect could do something it must do (for example "Special Summon 1 monster from your Deck" needs a matching monster in the Deck and a free Monster Zone; "add from GY" needs a matching card in the GY; Lightning Vortex needs a face-up monster on the opponent's side).
    - Judge all of this on the board as it is now, before any cost is paid. A card that will be sent away to pay this activation's cost can't count as one of its targets, and can't be chosen as one later: Monster Reincarnation with no monster in your GY is illegal even if you could discard a monster for its cost.
    If legal: pay the cost with ops (ask the player when the cost involves a choice, such as which card to discard), let the player choose targets with ask_player and record them with declare_targets, then finish(legal: true, summary). The summary is one sentence such as "Monster Reincarnation targets Axe Raider."
    If illegal: call finish(legal: false, summary) straight away, with no other tools; the summary says why in one sentence.
-2. Resolving the effect. Apply the effect's text (not its cost, which was paid) with ops, asking players where the text gives them a choice ("Special Summon 1 ... from your Deck": ask the controller which). A targeted card that is no longer where it was, or no longer fits the targeting text, is not affected; if none of the targets are left, the effect does nothing. Then finish(legal: true, summary) with one sentence on what happened.
+2. Resolving the effect. Apply the effect's text (not its cost, which was paid) with ops, asking players where the text gives them a choice ("Special Summon 1 ... from your Deck": ask the controller which). A targeted card that is no longer where it was, or no longer fits the targeting text, is not affected; if none of the targets are left, the effect does nothing. Effects can form a chain: links resolve last first, so earlier links may already have changed the board, and a card the effect needs may be gone. Then finish(legal: true, summary) with one sentence on what happened.
 
 # Reading card text
 
@@ -23,7 +23,7 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 - "and if you do" makes the second part depend on the first succeeding; "also" and "then" do not ("then" happens after, in sequence).
 - "Destroy" uses destroy (not move to the GY). "Send to the GY", "discard", "Tribute" as a cost use move to graveyard. "Banish" uses move to banished. "Add to hand" uses move to hand. "Return to the Deck" uses move to deck_shuffled unless the text says top or bottom.
 - "Special Summon" uses special_summon. Monsters can't be Special Summoned from the Extra Deck by effects in this version; Synchro and Xyz summons are their own procedures.
-- "Gains/loses X ATK" is modify_stats with a delta. "Until the end of this turn" and "until the End Phase" are end_of_turn; "until your next Standby Phase" is next_standby_phase; "until the end of the Battle Phase" is end_of_battle_phase; a change with no end ("becomes Level 3") is while_on_field.
+- "Gains/loses X ATK" is modify_stats with a delta. "ATK becomes X" (Copycat, "double its original ATK") is modify_stats with atk_set; "original ATK" is the printed value in the card list. "Until the end of this turn" and "until the End Phase" are end_of_turn; "until your next Standby Phase" is next_standby_phase; "until the end of the Battle Phase" is end_of_battle_phase; a change with no end ("becomes Level 3") is while_on_field.
 - "Inflict X damage" is change_lp kind damage on that player; "gain X LP" is kind gain; "pay X LP" is kind cost.
 - "Your" and "you" mean the player who activated the effect. "Your opponent" is the other player. "Control" means on that player's side of the field.
 - A "face-up monster" is one whose card is face-up on the field. Monsters in the GY have their printed ATK/DEF/Level.
@@ -89,7 +89,10 @@ export function describeState(state: DuelState, activating: string | null = null
   }
   if (state.modifiers.length) {
     lines.push('', 'Active stat changes:');
-    for (const m of state.modifiers) lines.push(`  ${label(m.card)}: ATK ${m.atk}, DEF ${m.def}, Level ${m.levelSet ?? `+${m.levelDelta}`}, until ${m.until}`);
+    for (const m of state.modifiers) {
+      const set = [m.atkSet !== null && `ATK becomes ${m.atkSet}`, m.defSet !== null && `DEF becomes ${m.defSet}`].filter(Boolean).join(', ');
+      lines.push(`  ${label(m.card)}: ${set ? `${set}, then ` : ''}ATK ${m.atk}, DEF ${m.def}, Level ${m.levelSet ?? `+${m.levelDelta}`}, until ${m.until}`);
+    }
   }
   lines.push('', 'Cards in this duel (name: type; attribute/type; Level or Rank; ATK/DEF):');
   for (const code of [...new Set(Object.values(state.instances).map((i) => i.code))].sort((a, b) => a - b)) {
@@ -111,12 +114,39 @@ export function describeEffect(state: DuelState, link: ChainLink): string {
   ].join('\n');
 }
 
+/** What the effect answers, and the chain below it. */
+function context(state: DuelState, link: ChainLink): string {
+  const lines = [`It is activated for: ${link.cause ? describeHappening(state, link.cause) : 'nothing (it answers no event)'}.`];
+  const below = state.chain.filter((l) => l !== link && state.chain.indexOf(l) < state.chain.indexOf(link));
+  if (below.length) lines.push(`Chain below it (link 1 first): ${below.map((l, i) => `${i + 1}. ${l.card} ${cardOf(state, l.card).name} (player ${l.player})`).join('; ')}.`);
+  return lines.join('\n');
+}
+
+/** An event in the judge's words, with card IDs. */
+function describeHappening(state: DuelState, h: Happening): string {
+  const label = (id: string) => `${id} ${cardOf(state, id).name}`;
+  switch (h.event) {
+    case 'summoned':
+      return `player ${h.player} ${h.how === 'normal' ? 'Normal' : h.how === 'flip' ? 'Flip' : 'Special'} Summoned ${label(h.card)}`;
+    case 'attack_declared':
+      return `player ${h.player}'s ${label(h.card)} declared an attack ${h.target ? `on ${label(h.target)}` : 'directly'}`;
+    case 'attacked':
+      return `player ${h.player}'s ${label(h.card)} was targeted for an attack by ${label(h.attacker)}`;
+    case 'destroyed_by_battle':
+      return `player ${h.player}'s ${label(h.card)} was destroyed by battle`;
+    case 'battle_damage':
+      return `player ${h.player}'s ${label(h.card)} inflicted ${h.amount} battle damage to the opponent`;
+    case 'phase':
+      return `the start of player ${h.player}'s ${h.phase === 'battle' ? 'Battle Phase' : 'End Phase'}`;
+  }
+}
+
 export function activationRequest(state: DuelState, link: ChainLink, appealRuling: string | null): string {
   const appeal = appealRuling ? `\nAn appeal already ruled this activation legal on this board, and that ruling binds: ${appealRuling} Pay its cost and declare its targets.` : '';
-  return `${describeState(state, link.card)}\n\n# Request: check an activation\nPlayer ${link.player} is activating this effect.${appeal}\n${describeEffect(state, link)}`;
+  return `${describeState(state, link.card)}\n\n# Request: check an activation\nPlayer ${link.player} is activating this effect.${appeal}\n${context(state, link)}\n${describeEffect(state, link)}`;
 }
 
 export function resolutionRequest(state: DuelState, link: ChainLink): string {
   const targets = link.targets.length ? link.targets.map((id) => `${id} ${cardOf(state, id).name}`).join('; ') : 'none';
-  return `${describeState(state)}\n\n# Request: resolve the effect\nThe activation was legal and its cost is paid. Targets declared on activation: ${targets}.${link.choice ? ` Effect chosen on activation: ${link.choice}.` : ''}\n${describeEffect(state, link)}`;
+  return `${describeState(state)}\n\n# Request: resolve the effect\nThe activation was legal and its cost is paid. Targets declared on activation: ${targets}.${link.choice ? ` Effect chosen on activation: ${link.choice}.` : ''}\n${context(state, link)}\n${describeEffect(state, link)}`;
 }

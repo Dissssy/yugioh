@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Special Summon it in Attack Position.",
       "targets": "1 monster with 1000 or less ATK in your Graveyard",
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [],
         "cost": [],
@@ -36,7 +36,8 @@
             "def": null
           },
           "min": 1,
-          "max": 1
+          "max": 1,
+          "event": false
         },
         "options": [
           {
@@ -65,7 +66,7 @@
       "cost": "",
       "effect": "If the target is changed to Defense Position, destroy it and this card.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -78,7 +79,7 @@
       "cost": "",
       "effect": "Destroy the target.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -91,7 +92,7 @@
       "cost": "",
       "effect": "Destroy this card.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

@@ -25,6 +25,7 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('enterMain2') }),
   z.object({ type: z.literal('endTurn'), discard: z.array(id).max(60) }),
   z.object({ type: z.literal('activate'), card: id, effect: z.number().int().min(0).max(9), zone: z.number().int().min(0).max(4).nullable() }),
+  z.object({ type: z.literal('pass') }),
   z.object({ type: z.literal('surrender') }),
 ]);
 

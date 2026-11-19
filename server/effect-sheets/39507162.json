@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Gains 400 ATK while you have 1 or less cards in your hand.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +25,7 @@
       "cost": "",
       "effect": "The effects of Flip monsters destroyed by battle with this card are negated.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

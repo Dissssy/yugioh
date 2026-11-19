@@ -12,7 +12,17 @@
       "cost": "",
       "effect": "Choose 1 Level 4 or lower Warrior-Type monster from your Deck, except \"Field-Commander Rahz\", and place it on top of your Deck.",
       "targets": null,
-      "respondsTo": null,
+      "when": {
+        "event": "summoned",
+        "self": true,
+        "filter": null,
+        "how": [
+          "normal",
+          "special"
+        ],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     }

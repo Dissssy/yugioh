@@ -18,6 +18,11 @@ const env = z.object({
   JUDGE_CALLS_PER_DUEL: z.coerce.number().int().positive().default(300),
   /** Contests per duel, both players together. */
   APPEALS_PER_DUEL: z.coerce.number().int().nonnegative().default(10),
+  /**
+   * How long a response window stays open, at least, before the server passes for a player who has nothing to
+   * activate, so the speed of a pass reveals nothing. A random extra of up to half as long is added.
+   */
+  RESPONSE_FLOOR_MS: z.coerce.number().int().nonnegative().default(1000),
 });
 
 export const cardImageDir = (source: NodeJS.ProcessEnv = process.env) => env.shape.CARD_IMAGE_DIR.parse(source.CARD_IMAGE_DIR);

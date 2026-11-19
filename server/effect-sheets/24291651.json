@@ -12,7 +12,26 @@
       "cost": "",
       "effect": "Change this card to Defense Position.",
       "targets": null,
-      "respondsTo": "attack",
+      "when": {
+        "event": "attacked",
+        "self": true,
+        "filter": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": true,
+          "position": "attack",
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "from": "field",
+        "canMiss": true
+      },
       "script": null,
       "status": "unverified"
     }

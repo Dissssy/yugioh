@@ -1,5 +1,6 @@
 // What each player is allowed to see. Hidden cards are sent without an ID or card data, so nothing leaks to the browser.
 
+import { waitingFor } from './chain.ts';
 import { legalActions, normalSummonUsed } from './rules.ts';
 import { evolve, locate, replay, statsOf } from './state.ts';
 import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, LogEntry, LogEvent, Phase, Place, PlayerView, Seat } from './types.ts';
@@ -42,6 +43,7 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
       };
     }) as PlayerView['players'],
     chain: state.chain.map((link) => ({ player: link.player, card: shown(link.card), effect: link.effect, targets: link.targets, choice: link.choice })),
+    waiting: waitingFor(state, seat),
     actions: legalActions(state, seat),
   };
 }
@@ -100,6 +102,14 @@ function reviewText(state: DuelState, event: DuelEvent): string {
       return `${label(event.card)} was flipped face-up by the attack`;
     case 'linkResolved':
       return 'The chain link resolved';
+    case 'checkpoint':
+      return `Checkpoint: triggers, then a response window${event.cause ? ` for ${event.cause.event}` : ''}, then ${event.then.do}`;
+    case 'triggersDone':
+      return 'Triggers done';
+    case 'passed':
+      return `${who(event.player)} passed`;
+    case 'attackEnded':
+      return event.replay ? 'The attack ended in a replay' : 'The attack ended';
     case 'attackDeclared':
       return `${label(event.attacker)} attacked ${event.target ? label(event.target) : 'directly'}`;
     case 'judged': {
@@ -143,6 +153,10 @@ function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat): LogEvent 
     case 'intent':
     case 'deckShuffled':
     case 'sheetUpdated':
+    case 'checkpoint':
+    case 'triggersDone':
+    case 'passed':
+    case 'attackEnded':
       return null;
     case 'moved': {
       // A card moving between places this player can't see (Deck to hand, say) stays anonymous.
@@ -254,6 +268,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'statsModified': {
       const m = event.modifier;
       const parts = [
+        m.atkSet !== null ? `ATK became ${m.atkSet}` : '',
+        m.defSet !== null ? `DEF became ${m.defSet}` : '',
         m.atk ? `${m.atk > 0 ? '+' : ''}${m.atk} ATK` : '',
         m.def ? `${m.def > 0 ? '+' : ''}${m.def} DEF` : '',
         m.levelSet !== null ? `Level ${m.levelSet}` : '',

@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "This card remains on the field, but you must destroy it during the End Phase of your opponent's 3rd turn.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +25,7 @@
       "cost": "",
       "effect": "When this card is activated: If your opponent controls a face-down monster, flip all monsters they control face-up.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -38,7 +38,7 @@
       "cost": "",
       "effect": "Your opponent's monsters cannot declare an attack.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

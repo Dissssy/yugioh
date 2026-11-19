@@ -93,7 +93,8 @@ function apply(run: Run, op: Op, ctx: OpContext) {
     case 'modify_stats': {
       const { card } = onField(state, op.card);
       check(locate(state, op.card)!.zone === 'monsters' && card.faceUp, 'Only face-up monsters have stats to modify.');
-      check(op.atk !== 0 || op.def !== 0 || op.level_delta !== 0 || op.level_set !== null, 'The op changes nothing.');
+      check(op.atk !== 0 || op.def !== 0 || op.atk_set !== null || op.def_set !== null || op.level_delta !== 0 || op.level_set !== null, 'The op changes nothing.');
+      check([op.atk_set, op.def_set].every((v) => v === null || (Number.isInteger(v) && v >= 0)), 'atk_set and def_set must be whole numbers, 0 or more.');
       check(op.level_set === null || (Number.isInteger(op.level_set) && op.level_set >= 1 && op.level_set <= 12), 'level_set must be 1 to 12.');
       check(statsOf(state, op.card).level !== null || (op.level_delta === 0 && op.level_set === null), 'That monster has no Level.');
       run.emit({
@@ -103,6 +104,8 @@ function apply(run: Run, op: Op, ctx: OpContext) {
           player: ctx.player,
           atk: op.atk,
           def: op.def,
+          atkSet: op.atk_set,
+          defSet: op.def_set,
           levelDelta: op.level_delta,
           levelSet: op.level_set,
           until: op.until,
@@ -133,6 +136,10 @@ function apply(run: Run, op: Op, ctx: OpContext) {
     }
     case 'extra_normal_summon':
       run.emit({ type: 'normalSummonGranted', player: op.player });
+      return;
+    case 'negate_attack':
+      check(state.attack, 'No attack is being made.');
+      run.emit({ type: 'attackEnded', replay: false });
       return;
     case 'declare_targets': {
       check(ctx.stage === 'activation', 'Targets are chosen when the effect is activated, not when it resolves.');

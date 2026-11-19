@@ -12,8 +12,62 @@
       "cost": "",
       "effect": "Destroy the attacking monster.",
       "targets": "the attacking monster",
-      "respondsTo": "attack",
-      "script": null,
+      "when": {
+        "event": "attack_declared",
+        "self": false,
+        "filter": {
+          "side": "opponent",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "monsters",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": true
+        },
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "status": "unverified"
     }
   ],

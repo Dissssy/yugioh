@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Your opponent cannot declare an attack this turn.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

@@ -137,15 +137,16 @@ describe('a challenge link played by a guest', () => {
     const other = otherUpdate.steps.at(-1)!.view;
     expect(view.players[view.you].monsters[0]).toMatchObject({ faceUp: false, card: { id: (set as { card: string }).card } });
     expect(other.players[view.you].monsters[0]).toEqual({ card: { hidden: true }, position: 'defense', faceUp: false, stats: null });
-    expect(otherUpdate.steps.map((s) => s.entry.text)).toEqual([expect.stringMatching(/Set a monster$/)]);
+    expect(otherUpdate.steps.map((s) => s.entry?.text)).toEqual([expect.stringMatching(/Set a monster$/)]);
     expect(JSON.stringify(otherUpdate)).not.toContain((set as { card: string }).card);
 
-    // Ending the turn is several events; each is a step, and only the last offers actions.
+    // Ending the turn opens the End Phase window first; once the opponent passes (the server passes for a player who
+    // holds nothing) the next turn starts. That is several events; each is a step, and only the last offers actions.
     expect((await send(first, { type: 'endTurn', discard: [] })).status).toBe(204);
-    await firstStream.update();
-    const turnSteps = await secondStream.update();
-    if (turnSteps.type !== 'steps') throw new Error('expected steps');
-    expect(turnSteps.steps.map((s) => s.entry.event.type)).toContain('turnStarted');
+    let turnSteps: DuelUpdate;
+    do turnSteps = await secondStream.update();
+    while (turnSteps.type !== 'steps' || !turnSteps.steps.some((s) => s.entry?.event.type === 'turnStarted'));
+    expect(turnSteps.steps.map((s) => s.entry?.event.type)).toContain('turnStarted');
     expect(turnSteps.steps.slice(0, -1).every((s) => s.view.actions.length === 0)).toBe(true);
     expect(turnSteps.steps.at(-1)!.view.actions.length).toBeGreaterThan(0);
 
@@ -154,7 +155,8 @@ describe('a challenge link played by a guest', () => {
     expect(a.turnPlayer).toBe(view.you === 0 ? 1 : 0);
 
     expect((await send(second, { type: 'surrender' })).status).toBe(204);
-    a = await mine.next();
+    do a = await mine.next();
+    while (!a.result);
     expect(a.result).toEqual({ winner: view.you, reason: 'surrender' });
     mine.close();
     theirs.close();
@@ -175,7 +177,7 @@ describe('a challenge link played by a guest', () => {
     for (const stream of [mine, theirs]) {
       const update = await stream.update();
       if (update.type !== 'steps') throw new Error('expected steps');
-      expect(update.steps.map((s) => [s.entry.event, s.entry.text])).toEqual([
+      expect(update.steps.map((s) => [s.entry?.event, s.entry?.text])).toEqual([
         [{ type: 'chatted', player: 1, text: 'gg, Copycat never activated' }, 'Kaiba (guest): gg, Copycat never activated'],
       ]);
     }

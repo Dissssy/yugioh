@@ -12,8 +12,57 @@
       "cost": "",
       "effect": "Special Summon 1 Level 3 monster from your hand.",
       "targets": null,
-      "respondsTo": null,
-      "script": null,
+      "when": {
+        "event": "summoned",
+        "self": true,
+        "filter": null,
+        "how": [
+          "normal"
+        ],
+        "from": "field",
+        "canMiss": true
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "place": "hand",
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "faceUp": null,
+                    "position": null,
+                    "level": {
+                      "min": 3,
+                      "max": 3
+                    },
+                    "atk": null,
+                    "def": null
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null
+                },
+                "position": "choice"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "status": "unverified"
     }
   ],

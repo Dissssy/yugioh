@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Activates this card. It does nothing by itself and remains on the field to apply its continuous effect.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [],
         "cost": [],
@@ -36,7 +36,7 @@
       "cost": "",
       "effect": "All monsters you control gain 200 ATK during your Battle Phase only.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

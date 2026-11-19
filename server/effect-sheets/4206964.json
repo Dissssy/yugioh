@@ -12,8 +12,71 @@
       "cost": "",
       "effect": "Target that monster; destroy that target.",
       "targets": "the Normal or Flip Summoned monster with 1000 or more ATK",
-      "respondsTo": "summon",
-      "script": null,
+      "when": {
+        "event": "summoned",
+        "self": false,
+        "filter": {
+          "side": "opponent",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": {
+            "min": 1000,
+            "max": null
+          },
+          "def": null
+        },
+        "how": [
+          "normal",
+          "flip"
+        ],
+        "from": "field",
+        "canMiss": false
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "monsters",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": {
+              "min": 1000,
+              "max": null
+            },
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": true
+        },
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "status": "unverified"
     }
   ],

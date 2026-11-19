@@ -29,11 +29,13 @@ export const opTools = {
   },
   modify_stats: {
     description:
-      'Change a face-up monster\'s ATK/DEF (deltas, may be negative) and Level (level_delta added, or level_set to make it that Level; null to leave it). To make ATK "become" a value, pass the difference from its current ATK. Lasts until `until`, and always ends when the monster leaves the field. "Until the End Phase" means end_of_turn.',
+      'Change a face-up monster\'s ATK/DEF and Level. atk and def are gains or losses (deltas, may be negative, 0 for none). atk_set and def_set make the stat "become" a value (null to leave it): the latest set wins, and gains and losses still apply on top. level_delta is added to the Level, or level_set makes it that Level (null to leave it). Lasts until `until`, and always ends when the monster leaves the field. "Until the End Phase" means end_of_turn.',
     input: z.object({
       card,
       atk: z.number().int(),
       def: z.number().int(),
+      atk_set: z.number().int().nullable(),
+      def_set: z.number().int().nullable(),
       level_delta: z.number().int(),
       level_set: z.number().int().nullable(),
       until: z.enum(UNTIL),
@@ -50,6 +52,10 @@ export const opTools = {
   extra_normal_summon: {
     description: 'Let a player conduct one more Normal Summon or Set this turn (Double Summon).',
     input: z.object({ player: seat }),
+  },
+  negate_attack: {
+    description: 'Negate the attack being made ("negate the attack"): it ends with no damage.',
+    input: z.object({}),
   },
   declare_targets: {
     description: 'Record the targets of the effect being activated. Only while checking an activation, after the player chose them.',

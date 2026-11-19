@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Each face-up Xyz Monster you control gains 300 ATK for each Xyz Material attached to it, until the End Phase.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

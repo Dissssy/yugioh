@@ -135,7 +135,7 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     res.json(user);
   });
 
-  const duels = new Duels(db, ai, random);
+  const duels = new Duels(db, ai, random, config.RESPONSE_FLOOR_MS);
 
   app.get('/api/admin/duels', requireAdmin, async (_req, res) => {
     const { total, byDuel } = await duelCosts(db);

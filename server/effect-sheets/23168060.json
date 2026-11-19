@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Make this card Level 3 until the End Phase.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [],
         "cost": [],

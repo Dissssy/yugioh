@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Destroy the targeted Spell/Trap.",
       "targets": "1 Spell/Trap on the field",
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [],
         "cost": [],
@@ -34,7 +34,8 @@
             "def": null
           },
           "min": 1,
-          "max": 1
+          "max": 1,
+          "event": false
         },
         "options": [
           {

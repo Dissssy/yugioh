@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Destroy the 1 face-up monster your opponent controls that has the highest DEF (your choice, if tied).",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [],
         "cost": [],

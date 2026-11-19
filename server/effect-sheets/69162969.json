@@ -12,7 +12,7 @@
       "cost": "Discard 1 card",
       "effect": "Destroy all face-up monsters your opponent controls.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [],
         "cost": [

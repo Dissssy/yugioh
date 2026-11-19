@@ -301,3 +301,9 @@ form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit
 .report-ruling .report-actions { display: flex; justify-content: flex-end; gap: 6px; }
 /* The opponent's cards point at them, as across a real table, unless the viewer's settings say otherwise. */
 .field.turned .card { rotate: 180deg; }
+
+/* The chain waiting to resolve, link 1 first, in the phase strip */
+.chain-list { display: flex; gap: 6px; align-items: center; font-size: 0.85em; min-width: 0; flex-wrap: wrap; }
+.chain-list span { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.chain-list .mine { border-color: var(--accent); }
+.chain-list .theirs { border-color: var(--danger); }

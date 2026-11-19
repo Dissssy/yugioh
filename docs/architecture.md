@@ -52,7 +52,7 @@ The rule of thumb: if a rule is the same for every card, it is code; if it depen
 | Parsing a card's text into effects | LLM, offline | Effect sheets, see next section |
 | "Is this activation legal right now?" (conditions, costs payable, valid targets) | LLM at runtime, code double-checks what it can | Code checks costs and target zones; LLM judges text conditions |
 | Resolving an effect | LLM at runtime, via ops | Every op validated by code |
-| Which triggers fire after an event | LLM at runtime (later layer) | Code supplies the event list and candidate cards |
+| Which triggers fire after an event | Code | Each sheet's `when` names its event; see chains.md |
 | Explaining a ruling, handling a contest | Stronger LLM | Only on demand |
 
 This keeps the LLM's job small and checkable: read text, pick ops. It never decides what phase it is or how much damage an attack does.
@@ -220,8 +220,10 @@ Each layer ends with something two people can play in a browser, and each adds o
    - Playable when: each starter deck can make its Synchro and Xyz plays.
 4. **Chains and responses.** Spell speeds, chain stack, priority passing, response windows with the timing floor and per-card defaults, traps and quick-play spells, OPT tracking.
    - Playable when: a trap can respond to a summon and a counter-trap can respond to that.
+   - Built 2026-11-19 with layer 5's triggers (see [chains.md](chains.md)), without Counter Traps, negation or per-card defaults.
 5. **Triggers and lingering effects.** Event list after each resolution, trigger detection by the judge, mandatory vs optional triggers, SEGOC ordering, stat modifiers and restrictions with expiry. Synchro decks lean on "when this card is Summoned" triggers, so this layer matters early for them.
    - Playable when: both starter decks play out their normal lines without manual fixes.
+   - Triggers, SEGOC and "becomes" stat changes built 2026-11-19 with layer 4. Code detects triggers from the `when` in each sheet, not the judge. Continuous effects and lingering restrictions are next.
 6. **Rollback and rulings memory.** Overturn plus two-player rollback consent, hidden-info check on explanations, candidate/verified rulings, retrieval into prompts, admin review page, every verified ruling added to the eval suite.
 7. **Remaining Extra Deck mechanics.** Fusion, Link (and the Extra Monster Zone rules that come with it) and Pendulum, each added when a premade deck needs it.
 8. **Product.** Custom banlists, deck builder with banlist validation and `.ydk` import, more premade decks, match history. Widening the card pool happens here, gated by eval results per archetype. Accounts, Auth0 login, admin approval and guests are being built separately and ahead of the engine, since they don't depend on it.

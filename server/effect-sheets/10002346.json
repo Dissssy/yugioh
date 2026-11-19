@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "You can detach 1 Xyz Material from this card instead.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +25,7 @@
       "cost": "",
       "effect": "Face-up monsters you control gain 200 ATK and DEF for each Xyz Material attached to this card.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

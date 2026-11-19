@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Special Summon that target in face-up Attack Position.",
       "targets": "1 Normal Monster in your Graveyard",
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [],
         "cost": [],
@@ -35,7 +35,8 @@
             "def": null
           },
           "min": 1,
-          "max": 1
+          "max": 1,
+          "event": false
         },
         "options": [
           {
@@ -64,7 +65,7 @@
       "cost": "",
       "effect": "Destroy that monster.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -77,7 +78,7 @@
       "cost": "",
       "effect": "Destroy this card.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

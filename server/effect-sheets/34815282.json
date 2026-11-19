@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Its Level is reduced by 1, also it loses 1000 ATK (while this card remains face-up on the field).",
       "targets": "1 face-up monster on the field with more than 1000 original ATK that has a Level",
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +25,7 @@
       "cost": "",
       "effect": "When that monster leaves the field, destroy this card.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

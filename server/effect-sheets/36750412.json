@@ -12,8 +12,38 @@
       "cost": "",
       "effect": "It gains 200 ATK.",
       "targets": null,
-      "respondsTo": null,
-      "script": null,
+      "when": {
+        "event": "battle_damage",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "modify_stats",
+                "cards": {
+                  "from": "self"
+                },
+                "atk": 200,
+                "def": 0,
+                "levelDelta": 0,
+                "levelSet": null,
+                "until": "while_on_field"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "status": "unverified"
     }
   ],

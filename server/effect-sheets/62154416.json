@@ -12,7 +12,16 @@
       "cost": "",
       "effect": "Place 1 Spell Counter on it (max. 1).",
       "targets": null,
-      "respondsTo": null,
+      "when": {
+        "event": "summoned",
+        "self": true,
+        "filter": null,
+        "how": [
+          "normal"
+        ],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +34,7 @@
       "cost": "Remove 1 Spell Counter from this card",
       "effect": "Have 1 face-up monster you control gain 500 ATK, until the End Phase.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

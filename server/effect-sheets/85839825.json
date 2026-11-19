@@ -12,7 +12,7 @@
       "cost": "Detach 1 Xyz Material you control",
       "effect": "Destroy that target.",
       "targets": "1 face-up monster your opponent controls",
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

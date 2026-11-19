@@ -12,7 +12,26 @@
       "cost": "",
       "effect": "Negate the attack, also, after that, Set this card face-down instead of sending it to the GY.",
       "targets": "the attacking monster",
-      "respondsTo": "attack",
+      "when": {
+        "event": "attack_declared",
+        "self": false,
+        "filter": {
+          "side": "opponent",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     }

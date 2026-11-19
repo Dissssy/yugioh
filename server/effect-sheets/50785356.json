@@ -12,7 +12,17 @@
       "cost": "",
       "effect": "Target 1 face-up monster you control; it becomes Level 3.",
       "targets": "1 face-up monster you control",
-      "respondsTo": null,
+      "when": {
+        "event": "summoned",
+        "self": true,
+        "filter": null,
+        "how": [
+          "normal",
+          "special"
+        ],
+        "from": "field",
+        "canMiss": true
+      },
       "script": null,
       "status": "unverified"
     }

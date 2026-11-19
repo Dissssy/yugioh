@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Destroy that target, then you can Set 1 Spell/Trap from your hand.",
       "targets": "1 Spell/Trap your opponent controls",
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

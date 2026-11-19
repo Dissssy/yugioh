@@ -41,10 +41,11 @@ export interface SheetEffect {
   /** What it targets, or null if it doesn't target. */
   targets: string | null;
   /**
-   * The event it is activated in response to ("When an opponent's monster declares an attack"), or null. Nothing can
-   * be responded to until chains arrive (layer 4), so such an effect is never offered.
+   * The event it needs, as data code checks: for a trigger, what makes it fire ("When this card is Normal Summoned");
+   * for any other effect, the event it must be activated in response to ("When an opponent's monster declares an
+   * attack"). Null when it needs no event.
    */
-  respondsTo: 'attack' | 'summon' | 'activation' | null;
+  when: When | null;
   /** The effect as data that code runs exactly, with no judge, or null when the judge applies it (see docs/effects.md). */
   script: Script | null;
   /**
@@ -53,6 +54,33 @@ export interface SheetEffect {
    * judge rules on it until someone fixes or restores it.
    */
   status: 'unverified' | 'verified' | 'flagged';
+}
+
+/** How a monster was Summoned. A Tribute Summon is a Normal Summon. */
+export type SummonKind = 'normal' | 'flip' | 'special';
+
+/** The event an effect waits for (see `SheetEffect.when`). */
+export interface When {
+  /**
+   * `summoned`: a monster is Summoned. `attack_declared`: a monster declares an attack (the event's card is the
+   * attacker). `attacked`: a monster is targeted for an attack (the event's card is the target). `destroyed_by_battle`: a monster is destroyed by battle. `battle_damage`: a monster inflicts battle
+   * damage to its controller's opponent. `activated`: a card or effect is activated (Counter Traps); not offered until
+   * negation arrives.
+   */
+  event: 'summoned' | 'attack_declared' | 'attacked' | 'destroyed_by_battle' | 'battle_damage' | 'activated';
+  /** Only when it happens to this card itself ("When this card is Normal Summoned"). */
+  self: boolean;
+  /** The card it happens to must fit this as it is after the event ("this face-up Attack Position card"); null for any card. */
+  filter: CardFilter | null;
+  /** For `summoned`, which Summons count; empty for any. */
+  how: SummonKind[];
+  /** For a trigger: where this card must be when the event happens (Ganbara Knight waits in the hand). */
+  from: 'field' | 'hand' | 'graveyard';
+  /**
+   * An optional "When ...: You can" trigger misses the timing unless its event was the last thing to happen (it
+   * happened during the last chain link to resolve). "If ..." triggers and mandatory ones never miss.
+   */
+  canMiss: boolean;
 }
 
 /**
@@ -64,8 +92,11 @@ export interface Script {
   conditions: Condition[];
   /** Paid on activation, in order. */
   cost: Step[];
-  /** Chosen by the activating player on activation, after the cost; null if the effect doesn't target. */
-  targets: { filter: CardFilter; min: number; max: number } | null;
+  /**
+   * Chosen by the activating player on activation, after the cost; null if the effect doesn't target. `event`: only
+   * the card the effect's `when` event happened to may be targeted ("Target that monster").
+   */
+  targets: { filter: CardFilter; min: number; max: number; event: boolean } | null;
   /** What the effect does. One option, or several when the text says "activate 1 of these effects" (picked on activation by `label`). */
   options: { label: string; steps: Step[] }[];
   /** Any part of the text the steps can't express yet (a lingering restriction), said in the summary; else null. */
@@ -76,7 +107,11 @@ export type Condition =
   /** At least `min` cards fit `filter`. */
   | { if: 'count'; filter: CardFilter; min: number }
   /** The activating player hasn't conducted their Battle Phase this turn. */
-  | { if: 'before_battle_phase' };
+  | { if: 'before_battle_phase' }
+  /** It is one of these phases. For an ignition effect this replaces the Main Phase it otherwise needs (Speed Warrior). */
+  | { if: 'phase'; phases: Phase[] }
+  /** This card was Summoned this turn, in one of these ways (empty for any). */
+  | { if: 'summoned_this_turn'; how: SummonKind[] };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
 export type Step =
@@ -85,9 +120,24 @@ export type Step =
   /** `choice`: the activating player picks Attack or Defense Position. */
   | { do: 'special_summon'; cards: Selection; position: Position | 'choice' }
   | { do: 'modify_stats'; cards: Selection; atk: number; def: number; levelDelta: number; levelSet: number | null; until: Until }
+  /** ATK and/or DEF "become" a value (null leaves that stat alone). Gains and losses still apply on top. */
+  | { do: 'set_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
   | { do: 'change_lp'; player: 'you' | 'opponent'; amount: number; kind: 'cost' | 'damage' | 'gain' }
   | { do: 'draw'; player: 'you' | 'opponent'; count: number }
-  | { do: 'extra_normal_summon' };
+  | { do: 'extra_normal_summon' }
+  /** Negates the attack being made: it ends without damage. */
+  | { do: 'negate_attack' };
+
+/**
+ * A stat read from a card when the step resolves: `self` or the first target still there. `original` is the printed
+ * value, else the current one. `times` multiplies it ("double its original ATK" is 2).
+ */
+export interface StatValue {
+  of: 'self' | 'targets';
+  stat: 'atk' | 'def';
+  original: boolean;
+  times: number;
+}
 
 /**
  * Which cards a step affects. `choose` asks the activating player for `min` to `max` cards that fit (from those tied
@@ -145,6 +195,9 @@ export interface Modifier {
   player: Seat;
   atk: number;
   def: number;
+  /** ATK and DEF "become" these (the latest set wins), before every gain and loss is added. */
+  atkSet: number | null;
+  defSet: number | null;
   /** Added to the Level. */
   levelDelta: number;
   /** The Level becomes this, before levelDelta of later modifiers. */
@@ -156,7 +209,7 @@ export interface Modifier {
 export const UNTIL = ['end_of_turn', 'end_of_battle_phase', 'next_standby_phase', 'while_on_field'] as const;
 export type Until = (typeof UNTIL)[number];
 
-/** An activated effect waiting to resolve. Layer 2 has no responses, so the chain never holds more than one link. */
+/** An activated effect waiting to resolve. */
 export interface ChainLink {
   player: Seat;
   card: string;
@@ -164,7 +217,41 @@ export interface ChainLink {
   targets: string[];
   /** The effect chosen on activation when the text offers several ("Activate 1 of these effects"), as the judge worded it. */
   choice: string | null;
+  /** The event it was activated for: what set off a trigger, or what a response responds to; else null. */
+  cause: Happening | null;
 }
+
+/**
+ * Something that happened that triggers and responses watch for. `player` controlled `card` when it happened (for a
+ * phase, the turn player). `group` counts resolved chain links, so code can tell what happened last.
+ */
+export type Happening =
+  | { event: 'summoned'; card: string; player: Seat; how: SummonKind; group: number }
+  | { event: 'attack_declared'; card: string; player: Seat; target: string | null; group: number }
+  | { event: 'attacked'; card: string; player: Seat; attacker: string; group: number }
+  | { event: 'destroyed_by_battle'; card: string; player: Seat; group: number }
+  | { event: 'battle_damage'; card: string; player: Seat; amount: number; group: number }
+  | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number };
+
+/** What happens once a sequence of triggers, responses and chains is over. */
+export type Then = { do: 'open' } | { do: 'damage' } | { do: 'endTurn'; discard: string[] };
+
+/**
+ * Where the duel is in the timing of effects (docs/chains.md).
+ * - `open`: the turn player acts.
+ * - `triggers`: triggers from what just happened go on the chain, turn player's first (mandatory before optional).
+ *   `handled` holds `card:effect` keys already activated or set aside, `passed` the players who declined the rest.
+ * - `respond`: a response window. `priority` may activate a fast effect or pass; two passes in a row close it.
+ *   `actor` is the player whose action gave `priority` the window. `cause` is the event the chain answers.
+ * - `resolve`: the chain resolves, last link first.
+ * - `continue`: the sequence is over; `then` happens next (the attack's damage, or the end of the turn).
+ */
+export type DuelStep =
+  | { at: 'open' }
+  | { at: 'triggers'; cause: Happening | null; then: Then; handled: string[]; passed: Seat[] }
+  | { at: 'respond'; cause: Happening | null; then: Then; priority: Seat; actor: Seat; passed: boolean }
+  | { at: 'resolve'; then: Then }
+  | { at: 'continue'; then: Then };
 
 /** A card on the field. */
 export interface FieldCard {
@@ -176,6 +263,8 @@ export interface FieldCard {
   /** Last turn its position changed, by a change of position or a Flip Summon. */
   positionChangedTurn: number | null;
   attackedTurn: number | null;
+  /** How and on which turn it was last Summoned; null if it was Set and not flipped since. */
+  summoned: { how: SummonKind; turn: number } | null;
 }
 
 export type Zones = (FieldCard | null)[];
@@ -208,6 +297,13 @@ export interface DuelState {
   normalSummonLimit: number;
   modifiers: Modifier[];
   chain: ChainLink[];
+  step: DuelStep;
+  /** Events since the last triggers were put on the chain, for triggers to watch. */
+  happened: Happening[];
+  /** Chain links resolved so far in the duel, the `group` of new happenings. */
+  resolvedLinks: number;
+  /** The attack being made, from its declaration until damage is done. */
+  attack: { attacker: string; target: string | null } | null;
   /** Effects used this turn, for once-per-turn clauses. */
   usedThisTurn: { card: string; code: number; effect: number }[];
   /**
@@ -244,6 +340,8 @@ export type Intent =
   | { type: 'endTurn'; discard: string[] }
   /** Activates effect `effect` (an index into the card's effect sheet). `zone` is where a Spell/Trap from the hand goes. */
   | { type: 'activate'; card: string; effect: number; zone: number | null }
+  /** Declines to respond, or to activate optional triggers. */
+  | { type: 'pass' }
   | { type: 'surrender' };
 
 /** Where an op sends a card. Deck places shuffle the Deck, except the top and bottom. */
@@ -259,10 +357,11 @@ export type Op =
   | { op: 'special_summon'; card: string; controller: Seat; position: Position }
   | { op: 'destroy'; cards: string[] }
   | { op: 'change_lp'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
-  | { op: 'modify_stats'; card: string; atk: number; def: number; level_delta: number; level_set: number | null; until: Until }
+  | { op: 'modify_stats'; card: string; atk: number; def: number; atk_set: number | null; def_set: number | null; level_delta: number; level_set: number | null; until: Until }
   | { op: 'change_position'; card: string; position: Position }
   | { op: 'draw'; player: Seat; count: number }
   | { op: 'extra_normal_summon'; player: Seat }
+  | { op: 'negate_attack' }
   | { op: 'declare_targets'; cards: string[] }
   | { op: 'choose_effect'; choice: string };
 
@@ -340,12 +439,21 @@ export type DuelEvent =
   | { type: 'positionChanged'; player: Seat; card: string; position: Position }
   | { type: 'attackDeclared'; player: Seat; attacker: string; target: string | null }
   | { type: 'flippedByAttack'; card: string }
-  | { type: 'battleDamage'; player: Seat; amount: number }
+  /** `by` is the monster that inflicted it. */
+  | { type: 'battleDamage'; player: Seat; amount: number; by: string }
+  /** The attack is over. `replay`: its target left, so the attacker may attack again. */
+  | { type: 'attackEnded'; replay: boolean }
   | { type: 'destroyedByBattle'; cards: string[] }
   | { type: 'discarded'; player: Seat; cards: string[] }
   | { type: 'judged'; record: JudgeRecord }
   /** A Spell/Trap from the hand goes face-up to `zone`; a Set one flips face-up; a monster's effect leaves it where it is. */
-  | { type: 'effectActivated'; player: Seat; card: string; effect: number; zone: number | null }
+  | { type: 'effectActivated'; player: Seat; card: string; effect: number; zone: number | null; cause: Happening | null }
+  /** Triggers from what just happened go on the chain next, then a response window if needed, then `then`. */
+  | { type: 'checkpoint'; cause: Happening | null; then: Then }
+  /** Every trigger is on the chain or set aside. */
+  | { type: 'triggersDone' }
+  /** The player declined to respond, or to activate their optional triggers. */
+  | { type: 'passed'; player: Seat }
   | { type: 'targeted'; cards: string[] }
   | { type: 'effectChosen'; choice: string }
   | { type: 'moved'; card: string; owner: Seat; from: Place; to: Destination }
@@ -383,6 +491,11 @@ export interface PlayerView {
   players: [PlayerSideView, PlayerSideView];
   /** Activated effects waiting to resolve, oldest first. */
   chain: { player: Seat; card: CardView; effect: number; targets: string[]; choice: string | null }[];
+  /**
+   * Who the duel waits on while triggers go on the chain or a response window is open, or null. `cause` says what the
+   * window answers ("Axe Raider's attack"). The other player sees the same, whether or not the player can respond.
+   */
+  waiting: { player: Seat; for: 'respond' | 'triggers'; cause: string | null } | null;
   actions: LegalAction[];
 }
 
@@ -393,7 +506,23 @@ export interface PlayerView {
 export type LogEvent =
   | Exclude<
       DuelEvent,
-      { type: 'duelStarted' | 'intent' | 'monsterSet' | 'spellTrapSet' | 'attackDeclared' | 'judged' | 'moved' | 'deckShuffled' | 'appealed' | 'sheetUpdated' }
+      {
+        type:
+          | 'duelStarted'
+          | 'intent'
+          | 'monsterSet'
+          | 'spellTrapSet'
+          | 'attackDeclared'
+          | 'judged'
+          | 'moved'
+          | 'deckShuffled'
+          | 'appealed'
+          | 'sheetUpdated'
+          | 'checkpoint'
+          | 'triggersDone'
+          | 'passed'
+          | 'attackEnded'
+      }
     >
   | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number }
   | (Omit<Extract<DuelEvent, { type: 'moved' }>, 'card'> & { card: string | null })
@@ -418,7 +547,8 @@ export interface LogEntry {
  */
 export type DuelUpdate =
   | { type: 'sync'; view: PlayerView; log: LogEntry[]; judging: JudgingView | null }
-  | { type: 'steps'; steps: { entry: LogEntry; view: PlayerView }[] }
+  /** `entry` is null for a step nobody sees in the log that still changes the board (a pass). */
+  | { type: 'steps'; steps: { entry: LogEntry | null; view: PlayerView }[] }
   /** The judge started, asked a player something, got an answer, or finished (null). */
   | { type: 'judging'; judging: JudgingView | null };
 
@@ -492,4 +622,6 @@ export type LegalAction =
    * it isn't in the hand). `text` is the effect's wording, for the menu.
    */
   | { type: 'activate'; card: string; effect: number; zones: number[] | null; text: string }
+  /** Pass in a response window, or decline your optional triggers. */
+  | { type: 'pass' }
   | { type: 'surrender' };

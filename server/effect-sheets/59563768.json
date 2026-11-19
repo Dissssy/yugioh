@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "This card gains 400 ATK for each face-up Level 2 monster you control.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

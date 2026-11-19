@@ -12,7 +12,16 @@
       "cost": "",
       "effect": "It gains ATK equal to the total ATK of all Level 2 or lower monsters you currently control.",
       "targets": null,
-      "respondsTo": null,
+      "when": {
+        "event": "summoned",
+        "self": true,
+        "filter": null,
+        "how": [
+          "special"
+        ],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     }

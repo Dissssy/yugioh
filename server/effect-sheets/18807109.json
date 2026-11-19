@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Activate this card by targeting 1 monster your opponent controls; it cannot attack or change its battle position.",
       "targets": "1 monster your opponent controls",
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +25,7 @@
       "cost": "",
       "effect": "The targeted monster cannot attack or change its battle position.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -38,7 +38,7 @@
       "cost": "",
       "effect": "When that monster is destroyed, destroy this card.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

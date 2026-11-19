@@ -5,6 +5,7 @@ import {
   replay,
   startDuel,
   logFor,
+  nextStep,
   viewFor,
   type CardData,
   type DuelEvent,
@@ -60,7 +61,7 @@ const effect = (kind: SheetEffect['kind'], opt: SheetEffect['opt'] = 'none'): Sh
   cost: '',
   effect: `${kind} effect`,
   targets: null,
-  respondsTo: null,
+  when: null,
   script: null,
   status: 'unverified',
 });
@@ -116,9 +117,19 @@ class Table {
   play(seat: Seat, intent: Intent) {
     const d = decide(this.state, seat, intent);
     if (!d.ok) throw new Error(d.error);
-    this.events.push(...d.events);
+    return this.push(...d.events);
+  }
+  /** Adds events, then does what the server would on its own: code-only steps, and passes for players with nothing to activate. */
+  push(...events: DuelEvent[]) {
+    this.events.push(...events);
     this.state = replay(this.events);
-    return this;
+    for (;;) {
+      const next = nextStep(this.state);
+      if (next?.kind === 'events') this.events.push(...next.events);
+      else if (next?.kind === 'wait' && next.autoPass) this.events.push({ type: 'passed', player: next.player });
+      else return this;
+      this.state = replay(this.events);
+    }
   }
   refuse(seat: Seat, intent: Intent) {
     const d = decide(this.state, seat, intent);
@@ -346,10 +357,7 @@ describe('activating effects', () => {
       t.state = replay(t.events);
     }
   }
-  const resolve = (t: Table) => {
-    t.events.push({ type: 'linkResolved' });
-    t.state = replay(t.events);
-  };
+  const resolve = (t: Table) => t.push({ type: 'linkResolved' });
 
   it('offers Normal and Quick-Play Spells from the hand, but not Continuous ones yet', () => {
     const t = new Table(stacked([8, 9, 12, 1, 1, ...filler(35)], filler(40, 2)));
@@ -363,7 +371,7 @@ describe('activating effects', () => {
     expect(t.refuse(0, { type: 'activate', card: 'a0', effect: 0, zone: null })).toMatch(/Spell & Trap Zone/);
     t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 2 });
     expect(t.state.players[0].spellTraps[2]).toMatchObject({ id: 'a0', faceUp: true });
-    expect(t.state.chain).toEqual([{ player: 0, card: 'a0', effect: 0, targets: [], choice: null }]);
+    expect(t.state.chain).toEqual([{ player: 0, card: 'a0', effect: 0, targets: [], choice: null, cause: null }]);
     expect(legalActions(t.state, 0)).toEqual([{ type: 'surrender' }]);
     expect(t.refuse(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 0 })).toMatch(/resolve/);
     resolve(t);
@@ -438,7 +446,7 @@ describe('activating effects', () => {
     expect(refused({ op: 'destroy', cards: ['a1'] })).toMatch(/not on the field/);
     expect(refused({ op: 'destroy', cards: ['zz'] })).toMatch(/no card/);
     expect(refused({ op: 'change_lp', player: 0, amount: 9000, kind: 'cost' })).toMatch(/more than/);
-    expect(refused({ op: 'modify_stats', card: 'a1', atk: 500, def: 0, level_delta: 0, level_set: null, until: 'end_of_turn' })).toMatch(/not on the field/);
+    expect(refused({ op: 'modify_stats', card: 'a1', atk: 500, def: 0, atk_set: null, def_set: null, level_delta: 0, level_set: null, until: 'end_of_turn' })).toMatch(/not on the field/);
     expect(refused({ op: 'declare_targets', cards: ['a1'] })).toMatch(/activated/);
     expect(refused({ op: 'special_summon', card: 'ax0', controller: 0, position: 'attack' })).toMatch(/Extra Deck/);
   });
@@ -460,8 +468,8 @@ describe('activating effects', () => {
     const t = new Table(stacked([5, 1, 1, 1, 1, ...filler(35)], filler(40, 2)));
     t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
     ops(t, [
-      { op: 'modify_stats', card: 'a0', atk: 700, def: 0, level_delta: 0, level_set: null, until: 'end_of_turn' },
-      { op: 'modify_stats', card: 'a0', atk: 0, def: 0, level_delta: 0, level_set: 3, until: 'while_on_field' },
+      { op: 'modify_stats', card: 'a0', atk: 700, def: 0, atk_set: null, def_set: null, level_delta: 0, level_set: null, until: 'end_of_turn' },
+      { op: 'modify_stats', card: 'a0', atk: 0, def: 0, atk_set: null, def_set: null, level_delta: 0, level_set: 3, until: 'while_on_field' },
     ]);
     expect(viewFor(t.state, 1).players[0].monsters[0]!.stats).toEqual({ atk: 1500, def: 2000, level: 3 });
     t.play(0, { type: 'endTurn', discard: [] });

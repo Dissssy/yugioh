@@ -38,13 +38,19 @@ export function useDuel(duelId: string, pace: (event: LogEvent, waiting: number)
         setShown((s) => s && { ...s, cue: null });
         return;
       }
-      // Chat changes nothing on the board, so it only joins the log, without interrupting what the player is doing.
-      if (step.entry.event.type === 'chatted') {
-        setShown((s) => s && { ...s, log: [...s.log, step.entry] });
+      const entry = step.entry;
+      // A step with no log entry (a pass) only changes what the board offers; it takes no time.
+      if (!entry) {
+        setShown((s) => ({ view: step.view, prev: s?.view ?? null, log: s?.log ?? [], cue: null }));
         return playNext();
       }
-      setShown((s) => ({ view: step.view, prev: s?.view ?? null, log: [...(s?.log ?? []), step.entry], cue: step.entry }));
-      timer = setTimeout(playNext, paceRef.current(step.entry.event, queue.length));
+      // Chat changes nothing on the board, so it only joins the log, without interrupting what the player is doing.
+      if (entry.event.type === 'chatted') {
+        setShown((s) => s && { ...s, log: [...s.log, entry] });
+        return playNext();
+      }
+      setShown((s) => ({ view: step.view, prev: s?.view ?? null, log: [...(s?.log ?? []), entry], cue: entry }));
+      timer = setTimeout(playNext, paceRef.current(entry.event, queue.length));
     };
 
     const source = new EventSource(`/api/duels/${duelId}/stream`);
