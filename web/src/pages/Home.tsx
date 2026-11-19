@@ -40,7 +40,7 @@ export function Home({ me }: { me: Me }) {
       return (
         <Dashboard title={`Hi ${user.username}`}>
           <NewChallenge />
-          {user.isAdmin && <PlayClaude />}
+          {user.role === 'superAdmin' && <PlayClaude />}
         </Dashboard>
       );
     }

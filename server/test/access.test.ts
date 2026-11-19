@@ -29,12 +29,12 @@ describe('accounts and approval', () => {
     expect((await visitor.json(`${h.baseUrl}/api/admin/users`)).status).toBe(403);
   });
 
-  it('approves the admin automatically, but only with a verified email', async () => {
+  it('makes the ADMIN_EMAIL account the approved super admin, but only with a verified email', async () => {
     const unverified = await login({ sub: 'fake-admin', email: ADMIN_EMAIL, email_verified: false });
-    expect(await me(unverified)).toMatchObject({ kind: 'user', user: { status: 'pending', isAdmin: false } });
+    expect(await me(unverified)).toMatchObject({ kind: 'user', user: { status: 'pending', role: 'player' } });
 
     admin = await login({ sub: 'admin', email: ADMIN_EMAIL.toUpperCase(), email_verified: true });
-    expect(await me(admin)).toMatchObject({ kind: 'user', user: { status: 'approved', isAdmin: true } });
+    expect(await me(admin)).toMatchObject({ kind: 'user', user: { status: 'approved', role: 'superAdmin' } });
   });
 
   it('puts new accounts in pending until the admin approves them', async () => {
@@ -65,7 +65,44 @@ describe('accounts and approval', () => {
       method: 'POST',
       body: JSON.stringify({ status: 'rejected' }),
     });
-    expect(demote.status).toBe(404);
+    expect(demote.status).toBe(409);
+  });
+
+  it('lets the super admin make admins, who approve players and edit rulings but make no admins', async () => {
+    const { body: list } = await admin.json<AdminUser[]>(`${h.baseUrl}/api/admin/users`);
+    const id = (email: string) => list.find((u) => u.email === email)!.id;
+    const self = await me(admin);
+    const superId = self.kind === 'user' ? self.user.id : -1;
+    const setRole = (b: Browser, user: number, role: string) =>
+      b.json<AdminUser>(`${h.baseUrl}/api/admin/users/${user}/role`, { method: 'POST', body: JSON.stringify({ role }) });
+    const setStatus = (b: Browser, user: number, status: string) =>
+      b.json<AdminUser>(`${h.baseUrl}/api/admin/users/${user}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+
+    // A pending account can't be made an admin, nor can the super admin be demoted.
+    const newcomer = await login({ sub: 'newcomer', email: 'n@example.com', email_verified: true });
+    const newcomerId = (await admin.json<AdminUser[]>(`${h.baseUrl}/api/admin/users`)).body.find((u) => u.email === 'n@example.com')!.id;
+    expect((await setRole(admin, newcomerId, 'admin')).status).toBe(409);
+    expect((await setRole(admin, superId, 'player')).status).toBe(409);
+
+    expect((await setRole(admin, id('p@example.com'), 'admin')).body.role).toBe('admin');
+    expect(await me(player)).toMatchObject({ user: { role: 'admin' } });
+    // The admin keeps the role across logins.
+    player = await login({ sub: 'player', email: 'p@example.com', email_verified: true });
+    expect(await me(player)).toMatchObject({ user: { role: 'admin' } });
+
+    // An admin approves players and reads rulings and logs, but can't make admins, change admins or play Claude.
+    expect((await setStatus(player, newcomerId, 'approved')).body.status).toBe('approved');
+    expect(await me(newcomer)).toMatchObject({ user: { status: 'approved' } });
+    expect((await player.json(`${h.baseUrl}/api/admin/rulings`)).status).toBe(200);
+    expect((await player.json(`${h.baseUrl}/api/admin/duels`)).status).toBe(200);
+    expect((await setRole(player, newcomerId, 'admin')).status).toBe(403);
+    expect((await setStatus(player, superId, 'rejected')).status).toBe(409);
+    expect((await player.json(`${h.baseUrl}/api/admin/duels/ai`, { method: 'POST', body: '{"deckId":1,"aiDeckId":1}' })).status).toBe(403);
+    // An admin's status can't change until they are a player again.
+    expect((await setStatus(admin, id('p@example.com'), 'rejected')).status).toBe(409);
+
+    expect((await setRole(admin, id('p@example.com'), 'player')).body.role).toBe('player');
+    expect((await player.json(`${h.baseUrl}/api/admin/users`)).status).toBe(403);
   });
 
   it('gives each account a random username and keeps its email private', async () => {

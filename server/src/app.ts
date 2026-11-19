@@ -5,8 +5,8 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
-import type { AdminDuels, Me, RulingCard, UserSettings } from '@yugioh/shared';
-import { findUserBySub, listUsers, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
+import { isAdmin, type AdminDuels, type Me, type RulingCard, type UserSettings } from '@yugioh/shared';
+import { findUserBySub, listUsers, setRole, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import { duelCosts } from './costs.ts';
 import type { Db } from './db/client.ts';
@@ -88,8 +88,14 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
 
   function requireAdmin(_req: Request, res: Response, next: NextFunction) {
     const v = viewer(res);
-    if (v.kind === 'user' && v.user.isAdmin) return next();
+    if (v.kind === 'user' && isAdmin(v.user.role)) return next();
     res.status(403).json({ error: 'admin_required' });
+  }
+
+  function requireSuperAdmin(_req: Request, res: Response, next: NextFunction) {
+    const v = viewer(res);
+    if (v.kind === 'user' && v.user.role === 'superAdmin') return next();
+    res.status(403).json({ error: 'super_admin_required' });
   }
 
   app.get('/api/me', (_req, res) => {
@@ -132,7 +138,18 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     const body = statusBody.safeParse(req.body);
     if (!id.success || !body.success) return void res.status(400).json({ error: 'bad_request' });
     const user = await setStatus(db, id.data, body.data.status);
-    if (!user) return void res.status(404).json({ error: 'not_found' });
+    if (!user) return void res.status(409).json({ error: "Only a player's status can change. Take away an admin's admin first." });
+    res.json(user);
+  });
+
+  // Only the super admin makes admins, and only of approved accounts.
+  const roleBody = z.object({ role: z.enum(['player', 'admin']) });
+  app.post('/api/admin/users/:id/role', requireSuperAdmin, async (req, res) => {
+    const id = z.coerce.number().int().safeParse(req.params.id);
+    const body = roleBody.safeParse(req.body);
+    if (!id.success || !body.success) return void res.status(400).json({ error: 'bad_request' });
+    const user = await setRole(db, id.data, body.data.role);
+    if (!user) return void res.status(409).json({ error: 'Only approved accounts can be made admins, and the super admin stays one.' });
     res.json(user);
   });
 
@@ -142,9 +159,9 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     duels.onAiSeat = (id, seat) => void opponents.attach(id, seat).catch((error: unknown) => console.error(`AI opponent in duel ${id} didn't start:`, error));
   }
 
-  // A duel against the AI opponent (docs/ai-opponent.md): the admin picks their deck and Claude's.
+  // A duel against the AI opponent (docs/ai-opponent.md): the super admin picks their deck and Claude's.
   const aiDuelBody = z.object({ deckId: z.number().int(), aiDeckId: z.number().int() });
-  app.post('/api/admin/duels/ai', requireAdmin, async (req, res) => {
+  app.post('/api/admin/duels/ai', requireSuperAdmin, async (req, res) => {
     const v = viewer(res);
     if (v.kind !== 'user') return;
     if (!ai.opponent) return void res.status(503).json({ error: "Playing against Claude needs an Anthropic API key, and this server has none." });

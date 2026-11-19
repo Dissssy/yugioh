@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EffectSheet } from '@yugioh/engine';
-import type { AccountStatus, AdminDuels, AdminUser, RulingCard } from '@yugioh/shared';
+import { isAdmin, type AccountStatus, type AdminDuels, type AdminUser, type Me, type Role, type RulingCard } from '@yugioh/shared';
 import { useState } from 'react';
 import { api, errorText } from '../api.ts';
 import { formatDate } from './Home.tsx';
@@ -8,10 +8,13 @@ import { Loading, Notice } from './Notice.tsx';
 
 const order: Record<AccountStatus, number> = { pending: 0, approved: 1, rejected: 2 };
 
-export function Admin() {
+const roleName: Record<Role, string> = { player: 'player', admin: 'admin', superAdmin: 'super admin' };
+
+export function Admin({ me }: { me: Me }) {
+  if (me.kind !== 'user' || !isAdmin(me.user.role)) return <Notice title="Admins only" tone="error">Only admins can see this page.</Notice>;
   return (
     <>
-      <Accounts />
+      <Accounts superAdmin={me.user.role === 'superAdmin'} />
       <Rulings />
       <RecentDuels />
     </>
@@ -163,16 +166,25 @@ function RulingEditor({ card }: { card: RulingCard }) {
   );
 }
 
-function Accounts() {
+/** Accounts waiting for approval and everyone else. Admins approve and reject players; the super admin also makes admins. */
+function Accounts({ superAdmin }: { superAdmin: boolean }) {
   const queryClient = useQueryClient();
   const users = useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<AdminUser[]>('/admin/users') });
+  const onSuccess = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: number; status: AccountStatus }) =>
       api<AdminUser>(`/admin/users/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
+    onSuccess,
   });
+  const setRole = useMutation({
+    mutationFn: ({ id, role }: { id: number; role: Exclude<Role, 'superAdmin'> }) =>
+      api<AdminUser>(`/admin/users/${id}/role`, { method: 'POST', body: JSON.stringify({ role }) }),
+    onSuccess,
+  });
+  const busy = setStatus.isPending || setRole.isPending;
+  const failed = setStatus.error ?? setRole.error;
 
-  if (users.isError) return <Notice title="Admins only" tone="error">Only the admin can see this page.</Notice>;
+  if (users.isError) return <Failed what="accounts" error={users.error} />;
   if (!users.data) return <Loading />;
 
   const sorted = [...users.data].sort((a, b) => order[a.status] - order[b.status]);
@@ -183,7 +195,7 @@ function Accounts() {
         <h1>Accounts</h1>
         <span className={`pill${pending ? ' waiting' : ''}`}>{pending ? `${pending} waiting for approval` : 'No one waiting'}</span>
       </div>
-      {setStatus.isError && <p className="error">{errorText(setStatus.error)}</p>}
+      {failed && <p className="error">{errorText(failed)}</p>}
       <div className="table-scroll">
         <table>
           <thead>
@@ -195,21 +207,32 @@ function Accounts() {
                 <td><strong>{user.username}</strong></td>
                 <td className="muted">{user.email}</td>
                 <td className="muted">{formatDate(user.createdAt)}</td>
-                <td><span className={`pill ${user.isAdmin ? 'admin' : user.status}`}>{user.isAdmin ? 'admin' : user.status}</span></td>
+                <td>
+                  <span className={`pill ${isAdmin(user.role) ? 'admin' : user.status}`}>{isAdmin(user.role) ? roleName[user.role] : user.status}</span>
+                </td>
                 <td className="cell-actions">
-                  {!user.isAdmin &&
+                  {user.role === 'player' &&
                     (['approved', 'rejected'] as const)
                       .filter((s) => s !== user.status)
                       .map((status) => (
                         <button
                           key={status}
                           className={status === 'approved' ? 'primary' : 'quiet'}
-                          disabled={setStatus.isPending}
+                          disabled={busy}
                           onClick={() => setStatus.mutate({ id: user.id, status })}
                         >
                           {status === 'approved' ? 'Approve' : 'Reject'}
                         </button>
                       ))}
+                  {superAdmin && user.status === 'approved' && user.role !== 'superAdmin' && (
+                    <button
+                      className="quiet"
+                      disabled={busy}
+                      onClick={() => setRole.mutate({ id: user.id, role: user.role === 'admin' ? 'player' : 'admin' })}
+                    >
+                      {user.role === 'admin' ? 'Remove admin' : 'Make admin'}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

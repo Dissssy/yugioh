@@ -5,11 +5,20 @@ import type { UserSettings } from './settings.ts';
 
 export type AccountStatus = 'pending' | 'approved' | 'rejected';
 
+/**
+ * What an account may do beyond playing. The super admin is the account whose verified email is ADMIN_EMAIL, and only
+ * it can make other accounts admins. Admins approve accounts, read duel logs and edit rulings.
+ */
+export type Role = 'player' | 'admin' | 'superAdmin';
+
+/** Whether a role opens the admin page. */
+export const isAdmin = (role: Role) => role !== 'player';
+
 export interface User {
   id: number;
   username: string;
   status: AccountStatus;
-  isAdmin: boolean;
+  role: Role;
   createdAt: string;
 }
 

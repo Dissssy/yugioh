@@ -10,11 +10,14 @@ As of 2026-11-18. This is the website shell that sits outside the duel engine: l
 | Guest | Someone who accepted a challenge link without logging in, under a name they chose. Sees and plays their duels and can accept other challenge links, like an account. Can't create challenges or build decks. |
 | Pending account | Logged in through Auth0, waiting for the admin. Can look but not play. |
 | Approved account | Everything, including creating challenges. |
-| Admin | Approves or rejects accounts. The account whose **verified** email equals `ADMIN_EMAIL` is the admin and is always approved. |
+| Admin | Approves or rejects players, reads every duel's full log and costs, and edits rulings. Made an admin by the super admin, and only once approved. |
+| Super admin | Everything an admin can do, plus making approved accounts admins (and players again) and playing against Claude. The account whose **verified** email equals `ADMIN_EMAIL` is the super admin on every login and is always approved; it can't be demoted from the admin page. |
+
+An account's role is the `users.role` column: `player`, `admin` or `superAdmin`. An admin's status can't be changed while they are an admin, so one admin can't lock out another; the super admin takes the role away first.
 
 ## Names
 
-Other people only ever see an account's **username**, never its email. A new account gets a random one built from Yu-Gi-Oh words, like `Mystic_Kuriboh_4821`, and can change it on the account page (the menu under the name at the top right) as often as it likes. Usernames are 3 to 32 letters, digits, `_` or `-`, and unique regardless of case. Only the admin sees emails, on the accounts page, so they can tell who is asking to join.
+Other people only ever see an account's **username**, never its email. A new account gets a random one built from Yu-Gi-Oh words, like `Mystic_Kuriboh_4821`, and can change it on the account page (the menu under the name at the top right) as often as it likes. Usernames are 3 to 32 letters, digits, `_` or `-`, and unique regardless of case. Only admins see emails, on the accounts page, so they can tell who is asking to join.
 
 Guests pick any name, so wherever other players see it, it reads `<name> (guest)`, which keeps a guest from passing as an account. A duel keeps the names the players had when it started.
 
@@ -35,7 +38,7 @@ Animation speed and reduce motion stay per browser, since they depend on the dev
 ## How it works
 
 - **Login:** [express-openid-connect](https://github.com/auth0/express-openid-connect), Auth0's library for server-rendered apps. The session is an encrypted cookie on the site's own domain, so the API and the duel event streams authenticate with the same cookie and the browser never handles tokens.
-- **Accounts:** on each login the server creates or refreshes the `users` row keyed by Auth0's `sub`. New rows start `pending` with a random username. Only `sub` and the email are read from the login; the email is used for the admin check and shown only to the admin.
+- **Accounts:** on each login the server creates or refreshes the `users` row keyed by Auth0's `sub`. New rows start `pending` with a random username. Only `sub` and the email are read from the login; the email is used for the super admin check and shown only to admins.
 - **Guests:** a `guests` row (random token and name) and a signed `guest` cookie holding the token. The row is checked on every request, so deleting it ends the guest's access at once. Duel seats are `user:<id>` or `guest:<id>`.
 - **Layout:** npm workspaces. `server/` (Express 5, Drizzle ORM, Postgres), `web/` (React, Vite, React Router, TanStack Query), `shared/` (types used by both). The server runs TypeScript directly with Node's built-in type stripping, so it has no build step. In production it also serves the built web app from `web/dist`.
 
