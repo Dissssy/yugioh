@@ -14,6 +14,7 @@ import {
   feasibleOptions,
   fits,
   locate,
+  monsterZonesFor,
   scriptOf,
   statsOf,
   targetable,
@@ -131,7 +132,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         return `${list(cards.map((id) => shown(id, before)))} ${step.to === 'banished' ? 'was' : 'went'} ${where}.`;
       }
       case 'special_summon': {
-        const free = state.players[seat].monsters.filter((z) => z === null).length;
+        const free = monsterZonesFor(state, seat, false).length;
         const cards = await select(step.cards, 'Special Summon', free);
         for (const id of cards.slice(0, free)) {
           const position =

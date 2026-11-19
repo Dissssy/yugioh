@@ -1,4 +1,4 @@
-import type { CardView, FieldCardView, PlayerSideView, Seat } from '@yugioh/engine';
+import { MONSTER_ZONES, type CardView, type FieldCardView, type PlayerSideView, type Seat } from '@yugioh/engine';
 import { motion } from 'motion/react';
 import type { KeyboardEvent } from 'react';
 import { CardFace, dataOf, idOf } from './Card.tsx';
@@ -39,7 +39,7 @@ export function Field(props: FieldProps) {
     const indexed = zones.map((z, i) => [z, i] as const);
     return mine ? indexed : indexed.reverse();
   };
-  const monsters = order(side.monsters).map(([z, i]) => <Zone key={`m${i}`} row="m" index={i} card={z} {...props} />);
+  const monsters = order(side.monsters.slice(0, MONSTER_ZONES)).map(([z, i]) => <Zone key={`m${i}`} row="m" index={i} card={z} {...props} />);
   const spellTraps = order(side.spellTraps).map(([z, i]) => <Zone key={`s${i}`} row="s" index={i} card={z} {...props} />);
 
   const fieldZone = <div className="zone field-zone"><span className="zone-label">Field</span></div>;
@@ -106,9 +106,24 @@ export function Field(props: FieldProps) {
   );
 }
 
-function Zone({ row, index, card, seat, mine, marks, zoneState, onZone, onCard, onCardPress }: FieldProps & { row: Row; index: number; card: FieldCardView | null }) {
+/**
+ * The two Extra Monster Zones, in the middle of the table between both fields. Each is shared: it shows whichever
+ * player's monster is in it, and is the viewer's own while empty. The left one, as the viewer sees it, is the viewer's
+ * zone 5 and the opponent's zone 6.
+ */
+export function ExtraMonsterZone({ side, mine, foe }: { side: 'left' | 'right'; mine: FieldProps; foe: FieldProps }) {
+  const foeIndex = side === 'left' ? 6 : 5;
+  const props = foe.side.monsters[foeIndex] ? foe : mine;
+  const index = props === foe ? foeIndex : side === 'left' ? 5 : 6;
+  return <Zone row="m" index={index} card={props.side.monsters[index] ?? null} {...props} />;
+}
+
+function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, onCard, onCardPress }: FieldProps & { row: Row; index: number; card: FieldCardView | null }) {
   const state = zoneState(row, index);
-  const label = `${mine ? 'Your' : "Opponent's"} ${row === 'm' ? 'Monster' : 'Spell & Trap'} Zone ${index + 1}`;
+  const extra = row === 'm' && index >= MONSTER_ZONES;
+  const label = extra
+    ? `Extra Monster Zone${card ? (mine ? ', yours' : ", your opponent's") : ''}`
+    : `${mine ? 'Your' : "Opponent's"} ${row === 'm' ? 'Monster' : 'Spell & Trap'} Zone ${index + 1}`;
   const pick = state
     ? (e: React.SyntheticEvent<HTMLElement>) => {
         e.stopPropagation();
@@ -117,7 +132,7 @@ function Zone({ row, index, card, seat, mine, marks, zoneState, onZone, onCard, 
     : undefined;
   return (
     <div
-      className={`zone${state ? ` open${mine ? '' : ' foe'}` : ''}${state === 'over' ? ' over' : ''}`}
+      className={`zone${extra ? ' extra-zone' : ''}${extra && turned && !mine ? ' turned' : ''}${state ? ` open${mine ? '' : ' foe'}` : ''}${state === 'over' ? ' over' : ''}`}
       data-drop={dropKey(seat, row, index)}
       aria-label={label}
       onClickCapture={pick}

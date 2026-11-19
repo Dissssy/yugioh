@@ -14,7 +14,7 @@ import { CardTooltipProvider } from './CardTooltip.tsx';
 import { ChoiceBar, ChoiceProvider, pileKey, useBoardChoice, type PileKind } from './choice.tsx';
 import { cueMs, playCue } from './cues.ts';
 import { ChatInput, DuelLog, type Contest } from './DuelLog.tsx';
-import { dropKey, Field, type Row } from './Field.tsx';
+import { dropKey, ExtraMonsterZone, Field, type FieldProps, type Row } from './Field.tsx';
 import { FoeHand, OwnHand, type HandDrag } from './Hand.tsx';
 import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
 import { LpPlate } from './LpPlate.tsx';
@@ -453,6 +453,29 @@ export function Board({ duelId }: { duelId: string }) {
     return attack?.direct ? (over === `lp:${foe}` ? 'over' : 'open') : null;
   };
 
+  const foeField: FieldProps = {
+    seat: foe,
+    side: view.players[foe],
+    mine: false,
+    turned: opponentCards === 'faceThem',
+    marks,
+    zoneState: (row, zone) => zoneState(foe, row, zone),
+    onZone: (row, zone) => clickZone(foe, row, zone),
+    onCard: () => undefined,
+    onPile: (place) => setPile(pileKey(foe, place)),
+  };
+  const myField: FieldProps = {
+    seat: me,
+    side: view.players[me],
+    mine: true,
+    marks,
+    zoneState: (row, zone) => zoneState(me, row, zone),
+    onZone: (row, zone) => clickZone(me, row, zone),
+    onCard: clickOwn,
+    onCardPress: pressOwn,
+    onPile: (place) => setPile(pileKey(me, place)),
+  };
+
   const yourTurn = view.turnPlayer === me && !view.result && !view.start;
   const enterBattle = has('enterBattle');
   const enterMain2 = has('enterMain2');
@@ -479,17 +502,7 @@ export function Board({ duelId }: { duelId: string }) {
                       <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={!view.start && view.turnPlayer === foe} target={lpTarget()} />
                       <FoeHand seat={foe} count={view.players[foe].hand.length} />
                     </div>
-                    <Field
-                      seat={foe}
-                      side={view.players[foe]}
-                      mine={false}
-                      turned={opponentCards === 'faceThem'}
-                      marks={marks}
-                      zoneState={(row, zone) => zoneState(foe, row, zone)}
-                      onZone={(row, zone) => clickZone(foe, row, zone)}
-                      onCard={() => undefined}
-                      onPile={(place) => setPile(pileKey(foe, place))}
-                    />
+                    <Field {...foeField} />
                     <PhaseStrip
                       turn={view.turn}
                       turnLabel={view.start ? 'Deciding who goes first' : yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`}
@@ -500,27 +513,12 @@ export function Board({ duelId }: { duelId: string }) {
                         ...(enterMain2 && { main2: () => start(enterMain2) }),
                         ...(endTurn && { end: () => start(endTurn) }),
                       }}
-                      prompt={
-                        prompt || choiceBar || judgeNote || respondNote || chainNote ? (
-                          <>
-                            {chainNote}
-                            {prompt || choiceBar || judgeNote || respondNote}
-                          </>
-                        ) : null
-                      }
+                      extraZones={[<ExtraMonsterZone key="left" side="left" mine={myField} foe={foeField} />, <ExtraMonsterZone key="right" side="right" mine={myField} foe={foeField} />]}
+                      chain={chainNote || null}
+                      prompt={prompt || choiceBar || judgeNote || respondNote || null}
                       endTurn={endTurn && !choosing ? () => start(endTurn) : null}
                     />
-                    <Field
-                      seat={me}
-                      side={view.players[me]}
-                      mine
-                      marks={marks}
-                      zoneState={(row, zone) => zoneState(me, row, zone)}
-                      onZone={(row, zone) => clickZone(me, row, zone)}
-                      onCard={clickOwn}
-                      onCardPress={pressOwn}
-                      onPile={(place) => setPile(pileKey(me, place))}
-                    />
+                    <Field {...myField} />
                     <div className="hand-row own-row">
                       <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={!view.start && view.turnPlayer === me} />
                       <OwnHand duelId={duelId} seat={me} cards={view.players[me].hand} marks={marks} onCard={clickOwn} drag={handDrag} held={held} />

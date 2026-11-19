@@ -12,9 +12,9 @@ const phases: { phase: Phase; short: string; name: string }[] = [
 ];
 
 /**
- * The strip between the two fields: whose turn it is, the phases with the current one lit, and the turn's
- * buttons. Phases you can move to now are buttons. While a choice is being made, its instruction takes the
- * phases' place.
+ * The row between the two fields. On the left, whose turn it is, the phases with the current one lit, and the turn's
+ * buttons; phases you can move to now are buttons. In the middle the two Extra Monster Zones, with the chain between
+ * them. On the right, what the duel is waiting for: a choice to make, a question, or whom it waits on.
  */
 export function PhaseStrip({
   turn,
@@ -22,6 +22,8 @@ export function PhaseStrip({
   yours,
   phase,
   goTo,
+  extraZones,
+  chain,
   prompt,
   endTurn,
 }: {
@@ -31,15 +33,19 @@ export function PhaseStrip({
   phase: Phase;
   /** Phases you may move to now, and what moving there does. */
   goTo: Partial<Record<Phase, () => void>>;
+  /** The left and right Extra Monster Zones, as the viewer sees them. */
+  extraZones: [ReactNode, ReactNode];
+  chain: ReactNode;
   prompt: ReactNode;
   endTurn: (() => void) | null;
 }) {
   return (
     <div className={`phase-strip${yours ? ' yours' : ''}`}>
-      <span className="turn-label">
-        {turn > 0 && `Turn ${turn} · `}<strong>{turnLabel}</strong>
-      </span>
-      {prompt ?? (
+      <div className="strip-turn">
+        <span className="turn-label">
+          {turn > 0 && `Turn ${turn} · `}
+          <strong>{turnLabel}</strong>
+        </span>
         <ol className="phases" aria-label="Phases">
           {phases.map((p) => {
             const go = goTo[p.phase];
@@ -60,8 +66,12 @@ export function PhaseStrip({
             );
           })}
         </ol>
-      )}
-      <span className="strip-actions">{endTurn && <button onClick={endTurn}>End turn</button>}</span>
+        {endTurn && <button onClick={endTurn}>End turn</button>}
+      </div>
+      {extraZones[0]}
+      <div className="strip-chain">{chain}</div>
+      {extraZones[1]}
+      <div className="strip-prompt">{prompt}</div>
     </div>
   );
 }

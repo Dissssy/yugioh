@@ -1,5 +1,5 @@
 export * from './types.ts';
-export { evolve, replay, other, levelOf, locate, statsOf, type Location } from './state.ts';
+export { acrossTable, evolve, replay, other, levelOf, locate, monsterZoneFree, monsterZonesFor, statsOf, type Location } from './state.ts';
 export { cardOf, decide, legalActions, startDuel, tributesFor, type Decision, type DuelSetup } from './rules.ts';
 export { describeCause, nextStep, pendingTriggers, triggerEvent, whenMatches, type Next, type PendingTrigger } from './chain.ts';
 export { applyOp, type OpContext, type OpResult } from './ops.ts';

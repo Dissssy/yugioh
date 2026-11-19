@@ -2,8 +2,8 @@
 // model can act on. Nothing here decides what a card's text means; it only refuses what the board can't allow.
 
 import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
-import { locate, other, statsOf } from './state.ts';
-import { MONSTER_ZONES, type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
+import { locate, monsterZonesFor, other, statsOf } from './state.ts';
+import { type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
 
 export type OpResult = { ok: true; events: DuelEvent[] } | { ok: false; error: string };
 
@@ -65,10 +65,9 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(card.kind === 'monster', `${card.name} is not a monster.`);
       check(at.zone !== 'monsters', `${card.name} is already on the field.`);
       check(at.zone !== 'spellTraps', `${card.name} is in a Spell & Trap Zone.`);
-      check(!card.extraDeck, 'Extra Deck monsters are summoned by their own procedures, not by this op.');
-      const zones = state.players[op.controller].monsters;
-      const zone = zones.indexOf(null);
-      check(zone >= 0 && zone < MONSTER_ZONES, 'That player has no empty Monster Zone.');
+      check(at.zone !== 'extra', 'Monsters in the Extra Deck are Summoned by their own procedures, not by this op.');
+      const zone = monsterZonesFor(state, op.controller, false)[0];
+      check(zone !== undefined, 'That player has no empty Main Monster Zone.');
       run.emit({ type: 'specialSummoned', player: op.controller, card: op.card, zone, position: op.position });
       if (at.zone === 'deck') shuffle(run, at.seat, ctx, null);
       return;

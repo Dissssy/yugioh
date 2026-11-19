@@ -2,6 +2,7 @@
 
 import { produce } from 'immer';
 import {
+  EXTRA_MONSTER_ZONES,
   MONSTER_ZONES,
   SPELL_TRAP_ZONES,
   STARTING_LP,
@@ -18,6 +19,27 @@ import {
 
 export const other = (seat: Seat): Seat => (seat === 0 ? 1 : 0);
 
+/** An Extra Monster Zone as the player across the table numbers it: one player's left is the other's right. */
+export const acrossTable = (zone: number) => (zone === 5 ? 6 : 5);
+
+/** Whether a Monster Zone of `seat` is empty. An Extra Monster Zone must also be empty on the other side. */
+export function monsterZoneFree(state: DuelState, seat: Seat, zone: number): boolean {
+  if (state.players[seat].monsters[zone] !== null) return false;
+  return zone < MONSTER_ZONES || state.players[other(seat)].monsters[acrossTable(zone)] === null;
+}
+
+/**
+ * The empty zones a monster may be put in: a Main Monster Zone, or for a monster Summoned from the Extra Deck also an
+ * empty Extra Monster Zone, as long as the player doesn't already have a monster in the other one (each player may
+ * use only one).
+ */
+export function monsterZonesFor(state: DuelState, seat: Seat, fromExtraDeck: boolean): number[] {
+  const main = [...Array(MONSTER_ZONES).keys()].filter((z) => monsterZoneFree(state, seat, z));
+  const monsters = state.players[seat].monsters;
+  if (!fromExtraDeck || EXTRA_MONSTER_ZONES.some((z) => monsters[z] !== null)) return main;
+  return [...main, ...EXTRA_MONSTER_ZONES.filter((z) => monsterZoneFree(state, seat, z))];
+}
+
 export function replay(events: readonly DuelEvent[]): DuelState {
   const [start, ...rest] = events;
   if (start?.type !== 'duelStarted') throw new Error('A duel log must begin with duelStarted');
@@ -30,7 +52,7 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     lp: STARTING_LP,
     deck: [...p.deck],
     hand: [],
-    monsters: Array(MONSTER_ZONES).fill(null),
+    monsters: Array(MONSTER_ZONES + EXTRA_MONSTER_ZONES.length).fill(null),
     spellTraps: Array(SPELL_TRAP_ZONES).fill(null),
     graveyard: [],
     banished: [],

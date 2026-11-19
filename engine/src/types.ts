@@ -330,7 +330,14 @@ export interface DuelResult {
   reason: 'lp' | 'deckOut' | 'surrender';
 }
 
+/**
+ * Each player's `monsters` holds the five Main Monster Zones (0 to 4), then the two Extra Monster Zones: 5 on the
+ * player's left and 6 on their right. The Extra Monster Zones are shared, so a player's 5 is the opponent's 6 (see
+ * `acrossTable`): a card sits in the array of the player who controls it, and the same zone in the other player's
+ * array is then empty.
+ */
 export const MONSTER_ZONES = 5;
+export const EXTRA_MONSTER_ZONES = [5, 6] as const;
 export const SPELL_TRAP_ZONES = 5;
 export const STARTING_LP = 8000;
 export const OPENING_HAND = 5;

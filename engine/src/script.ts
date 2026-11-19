@@ -2,7 +2,7 @@
 // Code decides these exactly, so an activation a script rules out is never offered.
 
 import { cardOf } from './rules.ts';
-import { levelOf, locate, statsOf } from './state.ts';
+import { levelOf, locate, monsterZonesFor, statsOf } from './state.ts';
 import type { CardFilter, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
@@ -78,7 +78,7 @@ export function describeFilter(f: CardFilter): string {
   return words.join(' ');
 }
 
-const freeMonsterZones = (state: DuelState, seat: Seat) => state.players[seat].monsters.filter((z) => z === null).length;
+const freeMonsterZones = (state: DuelState, seat: Seat) => monsterZonesFor(state, seat, false).length;
 
 /** Why a step couldn't do what it must on this board, or null. A `choose` with min 0 ("you can") and steps on targets need nothing here. */
 function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): string | null {
