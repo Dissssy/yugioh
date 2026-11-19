@@ -509,6 +509,7 @@ export function Board({ duelId }: { duelId: string }) {
               <JudgePrompt
                 key={judging.prompt.id}
                 prompt={judging.prompt}
+                you={me}
                 pending={answer.isPending}
                 error={answer.isError ? errorText(answer.error) : null}
                 onAnswer={(picks) => answer.mutate({ prompt: judging.prompt!.id, picks })}

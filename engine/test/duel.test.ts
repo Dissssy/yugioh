@@ -14,6 +14,7 @@ import {
   applyOp,
   type DuelState,
   type Intent,
+  type JudgeRecord,
   type Seat,
 } from '../src/index.ts';
 
@@ -376,6 +377,43 @@ describe('activating effects', () => {
     expect(t.refuse(0, { type: 'activate', card: 'a1', effect: 0, zone: null })).toMatch(/can't be activated/);
     t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
     expect(legalActions(t.state, 0).filter((a) => a.type === 'activate').map((a) => a.card)).toEqual(['a1', 'a0']);
+  });
+
+  it('stops offering an activation ruled illegal until the board changes', () => {
+    const t = new Table(stacked([9, 8, 1, 1, 1, ...filler(35)], filler(40, 2)));
+    const record = (fields: Partial<JudgeRecord>): DuelEvent => ({
+      type: 'judged',
+      record: { stage: 'activation', player: 0, card: 'a0', effect: 0, model: 'test', promptVersion: 'test', stateHash: '', transcript: [], legal: false, summary: 'There is no monster in your GY.', ops: [], error: null, ...fields },
+    });
+    const offered = () => legalActions(t.state, 0).filter((a) => a.type === 'activate').map((a) => a.card);
+    const push = (...events: DuelEvent[]) => {
+      t.events.push(...events);
+      t.state = replay(t.events);
+    };
+
+    // A failed judge call isn't a ruling.
+    push(record({ error: 'timeout', summary: 'The judge could not rule on this activation, so it was not activated.' }));
+    expect(offered()).toEqual(['a0', 'a1']);
+
+    push(record({}));
+    expect(offered()).toEqual(['a1']);
+    expect(t.refuse(0, { type: 'activate', card: 'a0', effect: 0, zone: 2 })).toMatch(/already ruled .* There is no monster in your GY\./);
+    // Another refused activation and an upheld appeal leave the board as it was.
+    const appealed = (card: string, verdict: 'upheld' | 'overturned'): DuelEvent => ({
+      type: 'appealed',
+      appeal: { judged: 7, decision: { stage: 'activation', player: 0, card, effect: 0, legal: false }, by: 0, note: '', model: 'test', verdict, explanation: '', ruling: `${card} is legal.` },
+    });
+    push(record({ card: 'a1' }), appealed('a1', 'upheld'));
+    expect(offered()).toEqual([]);
+    expect(legalActions(t.state, 1).length).toBeGreaterThan(0);
+
+    // An overturned refusal lifts it for that card only, and binds the next try to the appeal's ruling.
+    push(appealed('a0', 'overturned'));
+    expect(offered()).toEqual(['a0']);
+    expect(t.state.rulings.find((r) => r.card === 'a0')).toMatchObject({ legal: true, summary: 'a0 is legal.' });
+    push(record({}));
+    t.play(0, { type: 'normalSummon', card: 'a2', tributes: [], zone: 0 });
+    expect(offered()).toEqual(['a0', 'a1']);
   });
 
   it('records the effect chosen on activation for the resolution', () => {

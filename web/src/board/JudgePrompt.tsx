@@ -1,4 +1,4 @@
-import type { Place, PromptView } from '@yugioh/engine';
+import type { Place, PromptView, Seat } from '@yugioh/engine';
 import { useState } from 'react';
 import { CardFace } from './Card.tsx';
 import { useCardHover } from './CardTooltip.tsx';
@@ -13,11 +13,29 @@ const placeName: Record<Place, string> = {
   extra: 'Extra Deck',
 };
 
+/** Where an option is: "Your Field, zone 2" for a card on the field, else the place's name. */
+function where(c: PromptView['cards'][number], you: Seat) {
+  if (c.zone === null) return placeName[c.place];
+  return `${c.seat === you ? 'Your' : "Opponent's"} ${c.place === 'monsters' ? 'Monster' : 'Spell & Trap'} Zone ${c.zone + 1}`;
+}
+
 /**
  * A question from the judge (`ask_player`): pick cards or choices, between `min` and `max` of them. It can be tucked
  * away to look at the board, but the duel waits for the answer.
  */
-export function JudgePrompt({ prompt, onAnswer, pending, error }: { prompt: PromptView; onAnswer: (picks: string[]) => void; pending: boolean; error: string | null }) {
+export function JudgePrompt({
+  prompt,
+  you,
+  onAnswer,
+  pending,
+  error,
+}: {
+  prompt: PromptView;
+  you: Seat;
+  onAnswer: (picks: string[]) => void;
+  pending: boolean;
+  error: string | null;
+}) {
   const [picks, setPicks] = useState<string[]>([]);
   const [tucked, setTucked] = useState(false);
   const hover = useCardHover();
@@ -46,18 +64,21 @@ export function JudgePrompt({ prompt, onAnswer, pending, error }: { prompt: Prom
         </div>
         {prompt.cards.length > 0 && (
           <div className="sheet-grid">
-            {prompt.cards.map((c) => (
-              <button
-                key={c.id}
-                className={`pick-card${picks.includes(c.id) ? ' picked' : ''}`}
-                aria-pressed={picks.includes(c.id)}
-                onClick={() => toggle(c.id)}
-                {...hover(c.card)}
-              >
-                <CardFace card={c.card} size="full" />
-                <span className="pick-place">{placeName[c.place]}</span>
-              </button>
-            ))}
+            {prompt.cards.map((c) => {
+              const card = 'hidden' in c.card ? null : c.card.card;
+              return (
+                <button
+                  key={c.pick}
+                  className={`pick-card${picks.includes(c.pick) ? ' picked' : ''}`}
+                  aria-pressed={picks.includes(c.pick)}
+                  onClick={() => toggle(c.pick)}
+                  {...hover(card)}
+                >
+                  <CardFace card={card} size="full" />
+                  <span className="pick-place">{where(c, you)}</span>
+                </button>
+              );
+            })}
           </div>
         )}
         {prompt.choices.length > 0 && (

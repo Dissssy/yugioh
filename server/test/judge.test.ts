@@ -110,10 +110,10 @@ describe('the judge loop', () => {
     const { state, link } = activated();
     const { model, sent } = scripted([
       [{ name: 'ask_player', input: { player: 0, prompt: 'Choose 1 card to discard.', cards: ['a1', 'a2'], choices: [], min: 1, max: 1 } }],
-      [{ name: 'move', input: { card: 'a2', to: 'graveyard' } }, { name: 'declare_targets', input: { cards: ['a9'] } }],
-      [{ name: 'finish', input: { legal: true, summary: 'Monster Reincarnation targets Dark Blade.' } }],
+      [{ name: 'move', input: { card: 'a2', to: 'graveyard' } }, { name: 'ask_player', input: { player: 0, prompt: 'Choose a monster in your GY.', cards: ['a9'], choices: [], min: 1, max: 1 } }],
+      [{ name: 'declare_targets', input: { cards: ['a9'] } }, { name: 'finish', input: { legal: true, summary: 'Monster Reincarnation targets Dark Blade.' } }],
     ]);
-    const d = deps(model, [['a2']]);
+    const d = deps(model, [['a2'], ['a9']]);
     const { record, events } = await judge({ stage: 'activation', state, link }, d);
     expect(d.questions[0]).toMatchObject({ player: 0, cards: [{ id: 'a1', place: 'hand' }, { id: 'a2', place: 'hand' }], min: 1, max: 1 });
     expect(results(sent[1]!)).toEqual([{ error: false, content: '{"picked":["a2"]}' }]);
@@ -131,9 +131,10 @@ describe('the judge loop', () => {
     const { state, link } = activated();
     const { model, sent } = scripted([
       [{ name: 'move', input: { card: 'a9', to: 'graveyard' } }, { name: 'finish', input: { legal: true, summary: 'Done.' } }],
-      [{ name: 'move', input: { card: 'a1', to: 'graveyard' } }, { name: 'declare_targets', input: { cards: ['a9'] } }, { name: 'finish', input: { legal: true, summary: 'Done.' } }],
+      [{ name: 'move', input: { card: 'a1', to: 'graveyard' } }, { name: 'ask_player', input: { player: 0, prompt: 'Choose a monster in your GY.', cards: ['a9'], choices: [], min: 1, max: 1 } }],
+      [{ name: 'declare_targets', input: { cards: ['a9'] } }, { name: 'finish', input: { legal: true, summary: 'Done.' } }],
     ]);
-    const { record } = await judge({ stage: 'activation', state, link }, deps(model));
+    const { record } = await judge({ stage: 'activation', state, link }, deps(model, [['a9']]));
     expect(results(sent[1]!)).toEqual([
       { error: true, content: 'Dark Blade is already there.' },
       { error: true, content: 'Skipped: an earlier call in this turn was refused.' },
@@ -147,14 +148,63 @@ describe('the judge loop', () => {
     const { model, sent } = scripted([
       [{ name: 'ask_player', input: { player: 0, prompt: 'Activate it?', cards: [], choices: ['Yes'], min: 1, max: 1 } }],
       [{ name: 'finish', input: { legal: true, summary: 'Targets Dark Blade.' } }],
-      [{ name: 'move', input: { card: 'a1', to: 'graveyard' } }, { name: 'finish', input: { legal: true, summary: 'Targets Dark Blade.' } }],
+      [{ name: 'move', input: { card: 'a1', to: 'graveyard' } }, { name: 'ask_player', input: { player: 0, prompt: 'Choose a monster in your GY.', cards: ['a9'], choices: [], min: 1, max: 1 } }, { name: 'finish', input: { legal: true, summary: 'Targets Dark Blade.' } }],
       [{ name: 'declare_targets', input: { cards: ['a9'] } }, { name: 'finish', input: { legal: true, summary: 'Targets Dark Blade.' } }],
     ]);
-    const { record } = await judge({ stage: 'activation', state, link }, deps(model));
+    const { record } = await judge({ stage: 'activation', state, link }, deps(model, [['a9']]));
     expect(results(sent[1]!)[0]!.content).toMatch(/one choice/);
     expect(results(sent[2]!)[0]!.content).toMatch(/cost \("Discard 1 card"\)/);
-    expect(results(sent[3]!)[1]!.content).toMatch(/haven't declared targets/);
+    expect(results(sent[3]!)[2]!.content).toMatch(/haven't declared targets/);
     expect(record).toMatchObject({ legal: true, error: null });
+  });
+
+  it('holds an activation to an appeal that overturned its refusal', async () => {
+    const { state, link } = activated();
+    const { model, sent } = scripted([
+      [{ name: 'finish', input: { legal: false, summary: 'No Warrior in the GY.' } }],
+      [{ name: 'finish', input: { legal: false, summary: 'No Warrior in the GY.' } }],
+    ]);
+    const { record } = await judge({ stage: 'activation', state, link, appealRuling: 'Dark Blade is a legal target.' }, deps(model));
+    expect(sent[0]!.messages[0]!.content).toContain('An appeal already ruled this activation legal on this board, and that ruling binds: Dark Blade is a legal target.');
+    expect(results(sent[1]!)[0]!.content).toMatch(/^An appeal already ruled this activation legal/);
+    expect(record).toMatchObject({ legal: false, error: 'No finish within 16 turns.' });
+  });
+
+  it('lets players choose targets only from cards that fit before the cost was paid', async () => {
+    const { state, link } = activated();
+    const { model, sent } = scripted([
+      [{ name: 'move', input: { card: 'a1', to: 'graveyard' } }, { name: 'ask_player', input: { player: 0, prompt: 'Choose a monster in your GY.', cards: ['a1', 'a9'], choices: [], min: 1, max: 1 } }],
+      [{ name: 'declare_targets', input: { cards: ['a0'] } }],
+      [{ name: 'declare_targets', input: { cards: ['a9'] } }],
+      [{ name: 'finish', input: { legal: false, summary: 'No target.' } }],
+      [{ name: 'finish', input: { legal: false, summary: 'No target.' } }],
+    ]);
+    const { record, events } = await judge({ stage: 'activation', state, link }, deps(model));
+    expect(results(sent[1]!)[1]!.content).toMatch(/a1 was used to pay this activation's cost/);
+    expect(results(sent[2]!)[0]!.content).toMatch(/a0 is the card being activated/);
+    expect(results(sent[3]!)[0]!.content).toMatch(/didn't pick a9/);
+    expect(record).toMatchObject({ legal: false, summary: 'No target.' });
+    expect(events).toEqual([]);
+  });
+
+  it('offers a face-down card on the field without letting the asking player see what it is', async () => {
+    const { state, link } = activated();
+    const set = evolve(state, { type: 'monsterSet', player: 1, card: 'b0', zone: 2 });
+    const { model } = scripted([
+      [{ name: 'ask_player', input: { player: 0, prompt: 'Pick one.', cards: ['b0', 'b1'], choices: [], min: 1, max: 1 } }],
+      [{ name: 'ask_player', input: { player: 0, prompt: 'Pick one.', cards: ['b0', 'a9'], choices: [], min: 1, max: 1 } }],
+      [{ name: 'finish', input: { legal: false, summary: 'No.' } }],
+    ]);
+    const d = deps(model, [['b0']]);
+    await judge({ stage: 'activation', state: set, link }, d);
+    expect(d.questions).toEqual([
+      expect.objectContaining({
+        cards: [
+          { id: 'b0', place: 'monsters', seat: 1, zone: 2, hidden: true },
+          { id: 'a9', place: 'graveyard', seat: 0, zone: null, hidden: false },
+        ],
+      }),
+    ]);
   });
 
   it("refuses a summary or question that names a card a player can't see", async () => {
@@ -215,7 +265,7 @@ describe('the eval suite', () => {
     const sheets = await loadSheets(data);
     for (const c of CASES) {
       const state = buildBoard(c, data, sheets);
-      const actions = legalActions(state, 0);
+      const actions = legalActions(state, c.seat ?? 0);
       const offered = actions.some((a) => a.type === 'activate' && a.effect === (c.effect ?? 0) && state.cards[state.instances[a.card]!.code]!.name === c.activate);
       expect(offered, c.name).toBe(true);
     }
@@ -235,6 +285,7 @@ describe('the eval suite', () => {
     ]);
     expect(await runCase(rush, state, model)).toMatchObject({ name: rush.name, passed: true, detail: '+700.' });
     const lazy = scripted([
+      [{ name: 'ask_player', input: { player: 0, prompt: 'Choose a target.', cards: [monster], choices: [], min: 1, max: 1 } }],
       [{ name: 'declare_targets', input: { cards: [monster] } }, { name: 'finish', input: { legal: true, summary: 'Fine.' } }],
       [{ name: 'finish', input: { legal: true, summary: 'Nothing.' } }],
     ]);

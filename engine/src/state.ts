@@ -45,6 +45,7 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     modifiers: [],
     chain: [],
     usedThisTurn: [],
+    rulings: [],
     result: null,
   };
 }
@@ -55,9 +56,27 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'duelStarted':
         throw new Error('duelStarted can only be the first event');
       case 'intent':
-      case 'judged':
-      case 'appealed':
         return;
+      case 'judged': {
+        const r = event.record;
+        // A failed call isn't a ruling, so the player may try again. A legal activation changes the board anyway.
+        if (r.stage === 'activation' && !r.legal && r.error === null) {
+          s.rulings.push({ player: r.player, card: r.card, effect: r.effect, legal: false, summary: r.summary });
+        }
+        return;
+      }
+      case 'appealed': {
+        // An overturned refusal binds the next try on this board: the judge must rule it legal.
+        const { verdict, decision: d, ruling } = event.appeal;
+        if (verdict !== 'overturned' || d.stage !== 'activation' || d.legal) return;
+        const standing = s.rulings.find((r) => !r.legal && r.player === d.player && r.card === d.card && r.effect === d.effect);
+        if (standing) Object.assign(standing, { legal: true, summary: ruling });
+        return;
+      }
+    }
+    // Every other event changes the board, so earlier rulings no longer apply to it.
+    if (s.rulings.length > 0) s.rulings = [];
+    switch (event.type) {
       case 'turnStarted':
         s.turn = event.turn;
         s.turnPlayer = event.player;
