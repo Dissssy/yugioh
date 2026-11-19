@@ -3,5 +3,12 @@
   "textHash": "022868cc1c1bbf96fb29ad8155547d483c1562ff8e1ba7c01afb05c3046d16e9",
   "model": "claude-opus-5-5",
   "effects": [],
-  "materials": "1 Tuner + 1 or more non-Tuner monsters"
+  "materials": {
+    "summon": "synchro",
+    "tuner": null,
+    "nonTuners": {
+      "min": 1,
+      "max": null
+    }
+  }
 }

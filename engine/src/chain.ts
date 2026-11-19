@@ -4,7 +4,7 @@
 
 import { cardOf, continuation, legalActions, onceOk, ruledIllegal } from './rules.ts';
 import { fits, scriptProblem } from './script.ts';
-import { locate } from './state.ts';
+import { locate, summonMatches, summonName } from './state.ts';
 import type { DuelEvent, DuelState, Happening, Seat, When } from './types.ts';
 
 /** Whether an event is the one an effect of `card` (controlled by `seat`) waits for. */
@@ -14,7 +14,7 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
     return whenMatches(state, when, { event: 'attacked', card: h.target, player: h.player === 0 ? 1 : 0, attacker: h.card, group: h.group }, card, seat);
   }
   if (h.event === 'phase' || when.event !== h.event) return false;
-  if (h.event === 'summoned' && when.how.length > 0 && !when.how.includes(h.how)) return false;
+  if (h.event === 'summoned' && !summonMatches(h.how, when.how)) return false;
   if (when.self && h.card !== card) return false;
   return !when.filter || fits(state, h.card, when.filter, seat);
 }
@@ -122,7 +122,7 @@ export function describeCause(state: DuelState, cause: Happening | null): string
   const name = (id: string) => cardOf(state, id).name;
   switch (cause.event) {
     case 'summoned':
-      return `the ${cause.how === 'normal' ? 'Normal' : cause.how === 'flip' ? 'Flip' : 'Special'} Summon of ${name(cause.card)}`;
+      return `the ${summonName[cause.how]} Summon of ${name(cause.card)}`;
     case 'attack_declared':
       return `${name(cause.card)}'s attack${cause.target ? ` on ${locate(state, cause.target)?.zone === 'monsters' && !isFaceDown(state, cause.target) ? name(cause.target) : 'a face-down monster'}` : ' directly'}`;
     case 'phase':

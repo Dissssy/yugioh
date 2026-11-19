@@ -16,6 +16,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   drew: 450,
   tributed: 450,
   normalSummoned: 550,
+  extraSummoned: 700,
   monsterSet: 400,
   spellTrapSet: 400,
   flipSummoned: 500,
@@ -164,7 +165,8 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
         if (el) glow(el, { scale: [1, 1.1, 1], filter: ['brightness(1)', 'brightness(1.6)', 'brightness(1)'] }, { duration: s });
       }
       return;
-    case 'specialSummoned': {
+    case 'specialSummoned':
+    case 'extraSummoned': {
       const el = slot(e.player, 'm', e.zone);
       if (!el) return;
       void animate(el, { scale: [1.4, 1], opacity: [0, 1] }, { duration: s * 0.6, ease: 'easeIn' });

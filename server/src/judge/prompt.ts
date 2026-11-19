@@ -1,6 +1,6 @@
 // What the judge reads: a fixed rules reference (cached), then per request the board and the effect at hand.
 
-import { cardOf, levelOf, MONSTER_ZONES, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Happening, type Seat } from '@yugioh/engine';
+import { cardOf, levelOf, MONSTER_ZONES, summonName, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Happening, type Seat } from '@yugioh/engine';
 
 export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs every generic rule: turns, phases, summons, battle, damage, LP, zones, once-per-turn counting. Your only job is to apply one card effect at a time exactly as its text says, using tools. Every tool call is checked by code against the board; a refused call comes back as an error that you can correct.
 
@@ -128,7 +128,7 @@ function describeHappening(state: DuelState, h: Happening): string {
   const label = (id: string) => `${id} ${cardOf(state, id).name}`;
   switch (h.event) {
     case 'summoned':
-      return `player ${h.player} ${h.how === 'normal' ? 'Normal' : h.how === 'flip' ? 'Flip' : 'Special'} Summoned ${label(h.card)}`;
+      return `player ${h.player} ${summonName[h.how]} Summoned ${label(h.card)}`;
     case 'attack_declared':
       return `player ${h.player}'s ${label(h.card)} declared an attack ${h.target ? `on ${label(h.target)}` : 'directly'}`;
     case 'attacked':

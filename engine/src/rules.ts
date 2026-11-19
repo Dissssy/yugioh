@@ -2,7 +2,7 @@
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
 import { scriptOf, scriptProblem } from './script.ts';
-import { evolve, locate, monsterZoneFree, onField, other, statsOf } from './state.ts';
+import { evolve, locate, monsterZoneFree, monsterZonesFor, onField, other, statsOf } from './state.ts';
 import {
   HAND_LIMIT,
   HANDS,
@@ -18,6 +18,7 @@ import {
   type Happening,
   type Intent,
   type LegalAction,
+  type Materials,
   type Seat,
   type Then,
 } from './types.ts';
@@ -183,6 +184,10 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
           actions.push({ type: 'setSpellTrap', card: id, zones: freeZones(p.spellTraps) });
         }
       }
+      for (const id of p.extra) {
+        const action = extraSummonAction(state, seat, id);
+        if (action) actions.push(action);
+      }
       for (const m of monsters) {
         if (canFlipSummon(state, m)) actions.push({ type: 'flipSummon', card: m.id });
         else if (canChangePosition(state, m)) actions.push({ type: 'changePosition', card: m.id });
@@ -200,6 +205,70 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
   }
   actions.push({ type: 'surrender' });
   return actions;
+}
+
+// ---------------------------------------------------------------------------
+// Summoning from the Extra Deck. Synchro and Xyz Summons are generic rules, so code checks them from the materials on
+// the monster's sheet, with no judge.
+
+type ExtraSummon = Extract<LegalAction, { type: 'extraSummon' }>;
+
+/** A Synchro Summon of `id` the player can make now with the monsters they control, or null. */
+function extraSummonAction(state: DuelState, seat: Seat, id: string): ExtraSummon | null {
+  const card = cardOf(state, id);
+  const materials = state.sheets[card.code]?.materials;
+  if (materials?.summon !== 'synchro' || card.level === null) return null;
+  const options = synchroMaterials(state, seat, materials, card.level).flatMap((set) => {
+    const zones = zonesAfterLeaving(state, seat, set);
+    return zones.length > 0 ? [{ materials: set, zones }] : [];
+  });
+  return options.length > 0 ? { type: 'extraSummon', card: id, how: 'synchro', options } : null;
+}
+
+/**
+ * Every set of materials for a Synchro Monster of `level`: one face-up Tuner (the one named, if any) and enough face-up
+ * non-Tuners, whose current Levels add up exactly. Each set lists the Tuner first, then the rest in field order.
+ */
+function synchroMaterials(state: DuelState, seat: Seat, materials: Extract<Materials, { summon: 'synchro' }>, level: number): string[][] {
+  const faceUp = ownMonsters(state, seat).filter((m) => m.faceUp && statsOf(state, m.id).level !== null);
+  const isTuner = (id: string) => /\bTuner\b/.test(cardOf(state, id).type);
+  const levelOf = (id: string) => statsOf(state, id).level!;
+  const tuners = faceUp.filter((m) => isTuner(m.id) && (materials.tuner === null || cardOf(state, m.id).name === materials.tuner));
+  const others = faceUp.filter((m) => !isTuner(m.id)).map((m) => m.id);
+  const { min, max } = materials.nonTuners;
+  const sets: string[][] = [];
+  for (const tuner of tuners) {
+    const need = level - levelOf(tuner.id);
+    for (let mask = 1; mask < 1 << others.length; mask++) {
+      const picked = others.filter((_, i) => mask & (1 << i));
+      if (picked.length < min || (max !== null && picked.length > max)) continue;
+      if (picked.reduce((sum, id) => sum + levelOf(id), 0) === need) sets.push([tuner.id, ...picked]);
+    }
+  }
+  return sets;
+}
+
+/** The zones a monster from the Extra Deck may go to once these monsters have left the field. */
+function zonesAfterLeaving(state: DuelState, seat: Seat, leaving: string[]): number[] {
+  const players = state.players.map((p) => ({ ...p, monsters: p.monsters.map((m) => (m && leaving.includes(m.id) ? null : m)) })) as DuelState['players'];
+  return monsterZonesFor({ ...state, players }, seat, true);
+}
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id));
+
+function extraSummon(run: Run, seat: Seat, intent: Extract<Intent, { type: 'extraSummon' }>) {
+  const state = run.state;
+  check(isMainPhase(state), 'You can only Summon in a Main Phase.');
+  check(state.players[seat].extra.includes(intent.card), 'That card is not in your Extra Deck.');
+  const action = extraSummonAction(state, seat, intent.card);
+  check(action, `You can't Summon ${cardOf(state, intent.card).name} now.`);
+  check(new Set(intent.materials).size === intent.materials.length, 'Each material must be a different monster.');
+  const option = action.options.find((o) => sameSet(o.materials, intent.materials));
+  check(option, `Those monsters aren't materials for ${cardOf(state, intent.card).name}.`);
+  check(option.zones.includes(intent.zone), 'Choose an empty Monster Zone it can go to.');
+  check(intent.position === 'attack' || intent.position === 'defense', 'Choose Attack or Defense Position.');
+  run.emit({ type: 'extraSummoned', player: seat, card: intent.card, how: action.how, materials: intent.materials, zone: intent.zone, position: intent.position });
+  run.emit({ type: 'checkpoint', cause: run.state.happened.at(-1)!, then: { do: 'open' } });
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +442,9 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
       if (intent.type === 'normalSummon') run.emit({ type: 'checkpoint', cause: run.state.happened.at(-1)!, then: { do: 'open' } });
       return;
     }
+    case 'extraSummon':
+      extraSummon(run, seat, intent);
+      return;
     case 'setSpellTrap': {
       check(isMainPhase(state), 'You can only Set cards in a Main Phase.');
       check(p.hand.includes(intent.card), 'That card is not in your hand.');

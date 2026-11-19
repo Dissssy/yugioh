@@ -37,5 +37,12 @@
       "status": "unverified"
     }
   ],
-  "materials": "1 Tuner + 1 or more non-Tuner monsters"
+  "materials": {
+    "summon": "synchro",
+    "tuner": null,
+    "nonTuners": {
+      "min": 1,
+      "max": null
+    }
+  }
 }

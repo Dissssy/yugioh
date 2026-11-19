@@ -19,7 +19,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { DESTINATIONS, UNTIL, type CardData, type CardFilter, type ModelUsage, type EffectSheet, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
+import { DESTINATIONS, UNTIL, type CardData, type CardFilter, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
 import { cards, decks, effectSheets, sheetReports, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
@@ -61,7 +61,7 @@ const selection = z.union([
 
 const player = z.enum(['you', 'opponent']);
 const statValue = z.object({ of: z.enum(['self', 'targets']), stat: z.enum(['atk', 'def']), original: z.boolean(), times: z.number() }) satisfies z.ZodType<StatValue>;
-const summonKind = z.enum(['normal', 'flip', 'special']);
+const summonKind = z.enum(['normal', 'flip', 'special', 'synchro', 'xyz']);
 const phase = z.enum(['draw', 'standby', 'main1', 'battle', 'main2', 'end']);
 const step = z.union([
   z.object({ do: z.literal('destroy'), cards: selection }),
@@ -107,6 +107,11 @@ const when = z.object({
   canMiss: z.boolean(),
 }) satisfies z.ZodType<When>;
 
+const materials = z.union([
+  z.object({ summon: z.literal('synchro'), tuner: z.string().nullable(), nonTuners: z.object({ min: z.number().int().min(1), max: z.number().int().min(1).nullable() }) }),
+  z.object({ summon: z.literal('xyz'), level: z.number().int().min(1), count: z.number().int().min(2) }),
+]) satisfies z.ZodType<Materials>;
+
 const sheetEffect = z.object({
   kind: z.enum(['activation', 'ignition', 'trigger', 'quick', 'continuous', 'flip', 'condition']),
   speed: z.union([z.literal(1), z.literal(2), z.literal(3)]),
@@ -143,7 +148,7 @@ export const sheetSchema = z.object({
   textHash: z.string(),
   model: z.string(),
   effects: z.array(sheetEffect),
-  materials: z.string().nullable(),
+  materials: materials.nullable(),
 }) satisfies z.ZodType<EffectSheet>;
 
 /** Sheets for the given cards, keyed by passcode. A card without a current sheet acts as if it had no effects. */
@@ -267,13 +272,13 @@ List the card's effects in the order they appear in the text. For each:
 - targets: what it targets, as worded, or null if it doesn't target.
 - when: a JSON string naming the event the effect needs, as data code checks (see "When" below), or null. Every trigger has one: it is what makes the trigger fire ("When this card is Normal Summoned", "If this card is destroyed by battle"). A Spell/Trap or quick effect that is activated in response to an event has one too ("When an opponent's monster declares an attack", "When your opponent Normal Summons a monster"). Effects that need no event have null.
 - script: a JSON string holding the effect as structured data that code runs exactly, with no judge. Write one only when the whole effect, its activation conditions, cost and targets fit the vocabulary below exactly; otherwise null, and a judge applies the text. A script that is almost right is worse than none: code trusts it completely. Only "activation", "ignition", "quick" and "trigger" effects get scripts; others null.
-materials: an Extra Deck monster's materials as worded, else null. Normal Monsters (flavour text) have no effects: return an empty list.
+materials: a JSON string with an Extra Deck monster's materials as data code checks, else null. A Synchro Monster: {"summon": "synchro", "tuner": null, "nonTuners": {"min": 1, "max": null}} for "1 Tuner + 1 or more non-Tuner monsters"; "tuner" is the Tuner's name when the text names one ("Junk Synchron" + ...), and nonTuners gives how many ("1 or more" is min 1, max null; "2 non-Tuner monsters" is min 2, max 2). An Xyz Monster: {"summon": "xyz", "level": 4, "count": 2} for "2 Level 4 monsters". Normal Monsters (flavour text) have no effects: return an empty list.
 
 # Scripts
 
 "You" is the player activating the effect. Code already handles phases, once-per-turn clauses, spell speed and the event in "when", so a script says only what the card itself adds.
 
-- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n} needs at least n cards that fit ("While there are 5 or more monsters in your GY", "If you control a Synchro Monster"). {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special"; [] for any Summon).
+- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n} needs at least n cards that fit ("While there are 5 or more monsters in your GY", "If you control a Synchro Monster"). {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon).
 - cost: steps paid on activation, in order ("Discard 1 card" is a move to graveyard of 1 card chosen from your hand; "Pay 500 LP" is change_lp kind cost; "Tribute this card" is a move of self to graveyard).
 - targets: {"filter", "min", "max", "event"} for "target 1 ..." ("up to 3" is min 1 max 3), or null. The player picks them on activation, after paying the cost; resolution steps reach them with {"from": "targets"}, and a target that no longer fits the filter isn't affected. event true for "target that monster", where the target is the card the "when" event happened to (Trap Hole); else false.
 - options: what the effect does. One option (label "") unless the text says "activate 1 of these effects", then one per bullet with the bullet's wording as label; the player picks one on activation.
@@ -313,7 +318,7 @@ Filters ({"side", "place", "kinds", "types", "races", "attributes", "faceUp", "p
 - event: "summoned" (a monster is Summoned), "attack_declared" (a monster declares an attack; the event's card is the attacker), "attacked" (a monster is targeted for an attack: "When this card is targeted for an attack"; the event's card is the target), "destroyed_by_battle", "battle_damage" (a monster inflicts battle damage to its controller's opponent), or "activated" (a card or effect is activated, as for Counter Traps). An event outside this list (sent to the GY by an effect, flipped, targeted, leaves the field, a phase starts): when null, and the effect never fires; say so in its window.
 - self: true when it must happen to this card ("When this card is Normal Summoned", "If this card inflicts battle damage").
 - filter: the card it happens to must fit this filter (with self, for "When this face-up Attack Position card is targeted for an attack": faceUp true, position "attack") as it is after the event ("When your opponent Normal Summons a monster with 1000 or more ATK": side "opponent", place "monsters", atk {"min": 1000, "max": null}; "When an opponent's monster declares an attack": side "opponent", place "monsters"); null for any card. "you" and "opponent" are from this card's controller's view.
-- how: for "summoned", which Summons count: any of "normal" (a Tribute Summon is one), "flip", "special"; [] for "Summoned" with no kind.
+- how: for "summoned", which Summons count: any of "normal" (a Tribute Summon is one), "flip", "special" (any Special Summon, Synchro and Xyz Summons included), "synchro", "xyz"; [] for "Summoned" with no kind. "If this card is Synchro Summoned" is ["synchro"].
 - from: for a trigger, where this card is when it fires: "field" (face-up on the field), "hand" or "graveyard" ("When this card is destroyed by battle and sent to the GY" is "graveyard"). For other effects "field".
 - canMiss: true only for an optional trigger worded "When ...: You can" (it misses the timing unless its event was the last thing to happen); false for "If ..." and for mandatory triggers.
 
@@ -402,7 +407,9 @@ export async function compileSheets(db: Db, options: { force?: boolean; names?: 
       if (problem) log(`${row.name}: effect ${i}'s script is invalid, so the judge will apply it (${problem})`);
       return { ...base, script: checked.success && !problem ? checked.data : null };
     });
-    const sheet: EffectSheet = { code: row.id, textHash: row.textHash, model: COMPILE_MODEL, effects, materials: parsed.data.materials };
+    const materialsChecked = parsed.data.materials === null ? null : materials.safeParse(parseJson(parsed.data.materials));
+    if (materialsChecked && !materialsChecked.success) log(`${row.name}: its materials are invalid, so it can't be Summoned (${z.prettifyError(materialsChecked.error)})`);
+    const sheet: EffectSheet = { code: row.id, textHash: row.textHash, model: COMPILE_MODEL, effects, materials: materialsChecked?.success ? materialsChecked.data : null };
     await saveSheet(db, sheet, 'compiled');
     log(`${row.name}: written`);
   }

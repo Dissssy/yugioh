@@ -228,6 +228,14 @@ export const CASES: EvalCase[] = [
     legal: false,
   },
   {
+    name: 'synchro blast wave destroys a target once a synchro monster is out',
+    board: [{ hand: ['Synchro Blast Wave'], monsters: ['Junk Warrior'] }, { monsters: ['Sonic Chick'] }],
+    activate: 'Synchro Blast Wave',
+    picks: [['Sonic Chick']],
+    legal: true,
+    check: (b) => expectAt(b, 'Sonic Chick', '1:gy'),
+  },
+  {
     name: 'poison of the old man inflicts 800 when chosen',
     board: [{ hand: ['Poison of the Old Man'] }, {}],
     activate: 'Poison of the Old Man',

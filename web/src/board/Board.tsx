@@ -1,6 +1,6 @@
 import './board.css';
 import { useMutation } from '@tanstack/react-query';
-import type { Intent, LegalAction, PlayerView, Seat } from '@yugioh/engine';
+import type { Intent, LegalAction, PlayerView, Position, Seat } from '@yugioh/engine';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -32,6 +32,7 @@ type ActivateFromHand = Activate & { zones: number[] };
 /** An action that puts a card from the hand into a zone the player picks. */
 type Placeable = Summon | Extract<LegalAction, { type: 'setSpellTrap' }> | ActivateFromHand;
 type Attack = Extract<LegalAction, { type: 'attack' }>;
+type ExtraSummon = Extract<LegalAction, { type: 'extraSummon' }>;
 type PlaceIntent = Extract<Intent, { type: Placeable['type'] }>;
 
 const isPlaceable = (a: LegalAction): a is Placeable =>
@@ -49,6 +50,9 @@ type Mode =
   /** `keep` is the monster in the chosen zone, which must be one of the tributes. */
   | { kind: 'tributes'; action: Summon; zone: number; chosen: string[]; keep: string | null }
   | { kind: 'target'; action: Attack }
+  /** Picking the materials for a Synchro or Xyz Summon on the board, then (if it may go to several) its zone. */
+  | { kind: 'materials'; action: ExtraSummon; position: Position; chosen: string[] }
+  | { kind: 'extraZone'; action: ExtraSummon; position: Position; materials: string[]; zones: number[] }
   | { kind: 'discard'; count: number; chosen: string[] };
 
 /** A drag in progress: a hand card toward a zone, or an attacker's arrow toward a target. */
@@ -162,6 +166,10 @@ export function Board({ duelId }: { duelId: string }) {
   const myHand = view.players[me].hand.map((c) => idOf(c)!);
 
   const myMonsters = view.players[me].monsters;
+  const extraName = (id: string) => {
+    const c = view.players[me].extra.find((h) => idOf(h) === id);
+    return (c && dataOf(c)?.name) ?? 'the monster';
+  };
   const cardName = (id: string) => {
     const c = view.players[me].hand.find((h) => idOf(h) === id);
     return (c && dataOf(c)?.name) ?? 'the card';
@@ -240,6 +248,13 @@ export function Board({ duelId }: { duelId: string }) {
       }
       return setMode({ ...mode, chosen });
     }
+    if (mode.kind === 'materials' && (mode.chosen.includes(id) || materialFits(mode, id))) {
+      const chosen = toggle(mode.chosen, id);
+      const option = mode.action.options.find((o) => o.materials.length === chosen.length && o.materials.every((m) => chosen.includes(m)));
+      if (!option) return setMode({ ...mode, chosen });
+      if (option.zones.length === 1) return summonFromExtra(mode.action, mode.position, chosen, option.zones[0]!);
+      return setMode({ kind: 'extraZone', action: mode.action, position: mode.position, materials: chosen, zones: option.zones });
+    }
     if (mode.kind === 'discard' && myHand.includes(id)) {
       const chosen = toggle(mode.chosen, id);
       if (chosen.length === mode.count) return send.mutate({ type: 'endTurn', discard: chosen });
@@ -249,6 +264,15 @@ export function Board({ duelId }: { duelId: string }) {
     setMode(actionsFor(id).length > 0 ? { kind: 'menu', id, anchor } : idle);
   }
 
+  /** Whether a monster can join the materials picked so far: some set of materials holds them all and it. */
+  function materialFits(m: Extract<Mode, { kind: 'materials' }>, id: string) {
+    return m.action.options.some((o) => o.materials.includes(id) && m.chosen.every((c) => o.materials.includes(c)));
+  }
+
+  function summonFromExtra(action: ExtraSummon, position: Position, materials: string[], zone: number) {
+    send.mutate({ type: 'extraSummon', card: action.card, materials, zone, position });
+  }
+
   /** Whether a zone can be picked now, by click or drop. */
   function zoneState(seat: Seat, row: Row, zone: number): 'open' | 'over' | null {
     let open = false;
@@ -256,7 +280,7 @@ export function Board({ duelId }: { duelId: string }) {
     if (seat === me && mode.kind === 'place' && mode.zone === zone && fitsZone(mode.options, row, zone).length > 0) return 'over';
     if (seat === me) {
       const options = drag?.kind === 'card' ? placeables(drag.id) : mode.kind === 'zone' ? [mode.action] : [];
-      open = fitsZone(options, row, zone).length > 0;
+      open = fitsZone(options, row, zone).length > 0 || (mode.kind === 'extraZone' && row === 'm' && mode.zones.includes(zone));
     } else if (row === 'm') {
       const attack = drag?.kind === 'aim' ? drag.action : mode.kind === 'target' ? mode.action : null;
       open = attack?.targets.includes(zone) ?? false;
@@ -266,6 +290,7 @@ export function Board({ duelId }: { duelId: string }) {
 
   function clickZone(seat: Seat, row: Row, zone: number) {
     if (seat === me && mode.kind === 'zone' && fitsZone([mode.action], row, zone).length > 0) place(mode.action, zone);
+    if (seat === me && mode.kind === 'extraZone' && row === 'm' && mode.zones.includes(zone)) summonFromExtra(mode.action, mode.position, mode.materials, zone);
     if (seat === foe && mode.kind === 'target' && mode.action.targets.includes(zone)) {
       send.mutate({ type: 'attack', attacker: mode.action.attacker, target: zone });
     }
@@ -324,16 +349,19 @@ export function Board({ duelId }: { duelId: string }) {
     window.addEventListener('pointerup', up);
   }
 
-  const choosing = mode.kind === 'tributes' || mode.kind === 'target' || mode.kind === 'discard' || mode.kind === 'zone';
+  const choosing = mode.kind === 'tributes' || mode.kind === 'target' || mode.kind === 'discard' || mode.kind === 'zone' || mode.kind === 'materials' || mode.kind === 'extraZone';
   const pickable = (id: string) =>
-    (mode.kind === 'tributes' && mode.action.tributeFrom.includes(id)) || (mode.kind === 'discard' && myHand.includes(id));
+    (mode.kind === 'tributes' && mode.action.tributeFrom.includes(id)) ||
+    (mode.kind === 'discard' && myHand.includes(id)) ||
+    (mode.kind === 'materials' && !mode.chosen.includes(id) && materialFits(mode, id));
   const marks: CardMarks = {
     classes: (id) =>
       id === null
         ? ''
         : [
             mode.kind === 'menu' && mode.id === id && 'selected',
-            (mode.kind === 'tributes' || mode.kind === 'discard') && mode.chosen.includes(id) && 'picked',
+            (mode.kind === 'tributes' || mode.kind === 'discard' || mode.kind === 'materials') && mode.chosen.includes(id) && 'picked',
+            mode.kind === 'extraZone' && mode.materials.includes(id) && 'picked',
             pickable(id) && 'pickable',
             mode.kind === 'target' && mode.action.attacker === id && 'selected',
             drag?.kind === 'aim' && drag.action.attacker === id && 'selected',
@@ -350,6 +378,8 @@ export function Board({ duelId }: { duelId: string }) {
       {mode.kind === 'tributes' && `Choose ${plural(mode.action.tributes - mode.chosen.length, 'monster')} to Tribute.`}
       {mode.kind === 'target' && "Choose one of your opponent's monsters to attack."}
       {mode.kind === 'zone' && `Choose a zone for ${cardName(mode.action.card)}.`}
+      {mode.kind === 'materials' && materialsPrompt(mode.action, extraName(mode.action.card))}
+      {mode.kind === 'extraZone' && `Choose a zone for ${extraName(mode.action.card)}.`}
       {mode.kind === 'discard' && `Your hand is over 6 cards. Choose ${plural(mode.count - mode.chosen.length, 'card')} to discard.`}
       <button onClick={() => setMode(idle)}>Cancel</button>
     </span>
@@ -388,7 +418,7 @@ export function Board({ duelId }: { duelId: string }) {
       case 'banished':
         return { title: `${whose} banished cards`, cards: side.banished };
       case 'extra':
-        return { title: `${whose} Extra Deck`, cards: side.extra };
+        return { title: `${whose} Extra Deck`, cards: side.extra, mine: Number(seat) === me };
       case 'deck':
         return { title: `${whose} Deck: the cards you may choose`, cards: choice?.inPile(key).map((o) => o.card) ?? [] };
     }
@@ -474,6 +504,7 @@ export function Board({ duelId }: { duelId: string }) {
     onCard: clickOwn,
     onCardPress: pressOwn,
     onPile: (place) => setPile(pileKey(me, place)),
+    extraPlayable: actions.some((a) => a.type === 'extraSummon'),
   };
 
   const yourTurn = view.turnPlayer === me && !view.result && !view.start;
@@ -603,7 +634,17 @@ export function Board({ duelId }: { duelId: string }) {
               {mode.kind === 'menu' && (
                 <ActionMenu
                   anchor={mode.anchor}
-                  items={actionsFor(mode.id).map((a) => ({ label: actionLabel(a, view), run: () => start(a) }))}
+                  items={actionsFor(mode.id).flatMap((a) =>
+                    a.type === 'extraSummon'
+                      ? (['attack', 'defense'] as const).map((position) => ({
+                          label: `${a.how === 'synchro' ? 'Synchro' : 'Xyz'} Summon in ${position === 'attack' ? 'Attack' : 'Defense'} Position`,
+                          run: () => {
+                            setPile(null);
+                            setMode({ kind: 'materials', action: a, position, chosen: [] });
+                          },
+                        }))
+                      : [{ label: actionLabel(a, view), run: () => start(a) }],
+                  )}
                   onClose={() => setMode(idle)}
                 />
               )}
@@ -616,7 +657,16 @@ export function Board({ duelId }: { duelId: string }) {
               )}
               {drag?.kind === 'aim' && <Arrows kind="aim" arrows={[drag]} />}
               {targetArrows.length > 0 && <Arrows kind="target" arrows={targetArrows} />}
-              {openPile && <PileViewer title={openPile.title} cards={openPile.cards} bar={choiceBar} onClose={() => setPile(null)} />}
+              {openPile && (
+                <PileViewer
+                  title={openPile.title}
+                  cards={openPile.cards}
+                  bar={choiceBar}
+                  onClose={() => setPile(null)}
+                  playable={'mine' in openPile && openPile.mine && !choice ? (id) => playable.has(id) : undefined}
+                  onCard={(id, anchor) => setMode({ kind: 'menu', id, anchor })}
+                />
+              )}
             </div>
           </CardTooltipProvider>
         </ChoiceProvider>
@@ -640,6 +690,11 @@ function usePreload(view: PlayerView | null, size: 'small' | 'full') {
     return () => clearTimeout(timer);
   }, [deckList, size]);
   return ready;
+}
+
+/** What a Synchro or Xyz Summon needs, while its materials are picked on the board. */
+function materialsPrompt(action: ExtraSummon, name: string) {
+  return action.how === 'synchro' ? `Choose a Tuner and non-Tuner monsters whose Levels add up to ${name}'s Level.` : `Choose the Xyz Materials for ${name}.`;
 }
 
 function actionLabel(a: LegalAction, view: PlayerView): string {

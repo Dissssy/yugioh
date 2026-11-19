@@ -44,5 +44,9 @@
       "status": "unverified"
     }
   ],
-  "materials": "2 Level 4 monsters"
+  "materials": {
+    "summon": "xyz",
+    "level": 4,
+    "count": 2
+  }
 }

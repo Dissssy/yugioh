@@ -288,6 +288,14 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         summoned(s, event.card, event.player, 'special', group);
         return;
       }
+      case 'extraSummoned': {
+        if (event.how !== 'synchro') throw new Error('Xyz Summons come with Xyz Materials (a later step)');
+        for (const id of event.materials) sendToGraveyard(s, id);
+        take(s.players[event.player].extra, event.card);
+        s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position };
+        summoned(s, event.card, event.player, event.how, group);
+        return;
+      }
       case 'destroyed':
         for (const id of event.cards) sendToGraveyard(s, id);
         return;
@@ -328,6 +336,12 @@ function summoned(s: DuelState, id: string, player: Seat, how: SummonKind, group
   onField(s, id).summoned = { how, turn: s.turn };
   s.happened.push({ event: 'summoned', card: id, player, how, group } satisfies Happening);
 }
+
+/** Whether a Summon is one of those wanted (empty for any). Synchro and Xyz Summons are Special Summons too. */
+export const summonMatches = (how: SummonKind, wanted: SummonKind[]) =>
+  wanted.length === 0 || wanted.includes(how) || (wanted.includes('special') && (how === 'synchro' || how === 'xyz'));
+
+export const summonName: Record<SummonKind, string> = { normal: 'Normal', flip: 'Flip', special: 'Special', synchro: 'Synchro', xyz: 'Xyz' };
 
 /** A card's printed Level. An Xyz Monster's number is its Rank, not a Level, so it has none. */
 export const levelOf = (card: CardData): number | null => (/\bXYZ\b/i.test(card.type) ? null : card.level);

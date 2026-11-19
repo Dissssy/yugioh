@@ -17,7 +17,7 @@
         "self": true,
         "filter": null,
         "how": [
-          "special"
+          "synchro"
         ],
         "from": "field",
         "canMiss": false
@@ -26,5 +26,12 @@
       "status": "unverified"
     }
   ],
-  "materials": "\"Junk Synchron\" + 1 or more non-Tuner monsters"
+  "materials": {
+    "summon": "synchro",
+    "tuner": "Junk Synchron",
+    "nonTuners": {
+      "min": 1,
+      "max": null
+    }
+  }
 }

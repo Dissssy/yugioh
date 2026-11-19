@@ -279,6 +279,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
     }
     case 'specialSummoned':
       return `${who(event.player)} Special Summoned ${name(event.card)} in ${event.position} position`;
+    case 'extraSummoned':
+      return `${who(event.player)} ${event.how === 'synchro' ? 'Synchro' : 'Xyz'} Summoned ${name(event.card)} in ${event.position} position, using ${names(event.materials)}`;
     case 'destroyed':
       return `${names(event.cards)} destroyed`;
     case 'lpChanged':

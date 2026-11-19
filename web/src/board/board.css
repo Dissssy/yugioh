@@ -42,6 +42,7 @@ main:has(.duel) { max-width: none; padding: 0; }
   perspective: 800px;
 }
 .zone.pile, .zone.field-zone { border-style: dashed; background: none; }
+.zone.pile.playable .fx { box-shadow: 0 0 0 2px var(--glow), 0 0 10px 1px var(--glow); }
 .zone-label { position: absolute; font-size: 0.75em; color: var(--muted); }
 .pile-count {
   position: absolute;
@@ -293,6 +294,7 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
 .sheet-bar { display: flex; margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .sheet-card { padding: 0; border-radius: 8px; }
 .sheet-card.pickable { cursor: pointer; box-shadow: 0 0 0 3px var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+.sheet-card.playable { cursor: pointer; box-shadow: 0 0 0 2px var(--glow), 0 0 12px 2px var(--glow); }
 .sheet-card.picked { cursor: pointer; box-shadow: 0 0 0 3px var(--danger), 0 0 14px 3px var(--danger); }
 .sheet.choosing .sheet-card:not(.pickable, .picked) { opacity: 0.4; }
 .duel-log li.ruling { color: var(--fg); border-left: 3px solid var(--gold); }

@@ -56,8 +56,20 @@ export interface SheetEffect {
   status: 'unverified' | 'verified' | 'flagged';
 }
 
-/** How a monster was Summoned. A Tribute Summon is a Normal Summon. */
-export type SummonKind = 'normal' | 'flip' | 'special';
+/**
+ * How a monster was Summoned. A Tribute Summon is a Normal Summon. Synchro and Xyz Summons are Special Summons too, so
+ * `special` in a `when` or a condition also matches them (see `summonMatches`).
+ */
+export type SummonKind = 'normal' | 'flip' | 'special' | 'synchro' | 'xyz';
+
+/**
+ * How an Extra Deck monster is Summoned, as data code checks. Synchro: exactly one face-up Tuner (`tuner` names the one
+ * it needs, or null for any) and `nonTuners` face-up non-Tuner monsters, whose current Levels add up to this card's
+ * Level; they go to the GY. Xyz: `count` face-up monsters of current Level `level`, attached to it as materials.
+ */
+export type Materials =
+  | { summon: 'synchro'; tuner: string | null; nonTuners: { min: number; max: number | null } }
+  | { summon: 'xyz'; level: number; count: number };
 
 /** The event an effect waits for (see `SheetEffect.when`). */
 export interface When {
@@ -181,8 +193,8 @@ export interface EffectSheet {
   /** Who wrote it: the compiling model, or "admin" for a hand edit. */
   model: string;
   effects: SheetEffect[];
-  /** Extra Deck materials as worded on the card, or null. */
-  materials: string | null;
+  /** How an Extra Deck monster is Summoned, or null for any other card. */
+  materials: Materials | null;
 }
 
 export const HANDS = ['rock', 'paper', 'scissors'] as const;
@@ -354,6 +366,8 @@ export type Intent =
   | { type: 'attack'; attacker: string; target: number | 'direct' }
   | { type: 'enterMain2' }
   | { type: 'endTurn'; discard: string[] }
+  /** Synchro or Xyz Summons `card` from the Extra Deck with these materials, into `zone`. */
+  | { type: 'extraSummon'; card: string; materials: string[]; zone: number; position: Position }
   /** Activates effect `effect` (an index into the card's effect sheet). `zone` is where a Spell/Trap from the hand goes. */
   | { type: 'activate'; card: string; effect: number; zone: number | null }
   /** Declines to respond, or to activate optional triggers. */
@@ -483,6 +497,8 @@ export type DuelEvent =
   | { type: 'moved'; card: string; owner: Seat; from: Place; to: Destination }
   | { type: 'deckShuffled'; player: Seat; order: string[] }
   | { type: 'specialSummoned'; player: Seat; card: string; zone: number; position: Position }
+  /** A Synchro or Xyz Summon from the Extra Deck. Synchro materials go to the GY; Xyz materials are attached to it. */
+  | { type: 'extraSummoned'; player: Seat; card: string; how: 'synchro' | 'xyz'; materials: string[]; zone: number; position: Position }
   | { type: 'destroyed'; cards: string[] }
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
@@ -651,6 +667,8 @@ export type LegalAction =
   | { type: 'attack'; attacker: string; targets: number[]; direct: boolean }
   | { type: 'enterMain2' }
   | { type: 'endTurn'; discard: number }
+  /** Summoning `card` from the Extra Deck: each option is a set of materials and the zones it may then go to. */
+  | { type: 'extraSummon'; card: string; how: 'synchro' | 'xyz'; options: { materials: string[]; zones: number[] }[] }
   /**
    * Activating effect `effect` of the card (an index into its sheet). Only the generic rules are checked here; the judge
    * decides the rest when the player tries. `zones` are the Spell & Trap Zones a card from the hand may go to (null if

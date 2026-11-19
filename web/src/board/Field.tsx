@@ -21,6 +21,8 @@ export interface FieldProps {
   onCardPress?: (id: string, e: React.PointerEvent<HTMLElement>) => void;
   /** Opens a pile's viewer. */
   onPile: (place: PileKind) => void;
+  /** Whether a card in your Extra Deck can be Summoned now, which makes the pile glow. */
+  extraPlayable?: boolean;
 }
 
 export type Row = 'm' | 's';
@@ -34,7 +36,7 @@ export const dropKey = (seat: Seat, row: Row, index: number) => `${seat}:${row}:
  * each column faces the zone across from it.
  */
 export function Field(props: FieldProps) {
-  const { seat, side, mine, turned, onPile } = props;
+  const { seat, side, mine, turned, onPile, extraPlayable } = props;
   const order = (zones: (FieldCardView | null)[]) => {
     const indexed = zones.map((z, i) => [z, i] as const);
     return mine ? indexed : indexed.reverse();
@@ -81,6 +83,7 @@ export function Field(props: FieldProps) {
       top={side.extra.length > 0 ? { hidden: true } : null}
       count={side.extra.length}
       options={options('extra')}
+      playable={extraPlayable}
       onOpen={mine ? () => onPile('extra') : undefined}
     />
   );
@@ -215,6 +218,7 @@ function Pile({
   top,
   count,
   options,
+  playable,
   onOpen,
   extra,
 }: {
@@ -224,6 +228,7 @@ function Pile({
   count: number;
   /** How many of the cards the judge offers are in this pile. */
   options: number;
+  playable?: boolean;
   onOpen?: () => void;
   extra?: React.ReactNode;
 }) {
@@ -239,7 +244,7 @@ function Pile({
     <div className="fx" data-pile={pile} />
   );
   return (
-    <div className={`zone pile${options > 0 ? ' pickable' : ''}`}>
+    <div className={`zone pile${options > 0 ? ' pickable' : ''}${playable ? ' playable' : ''}`}>
       {onOpen ? (
         <button className="plain pile-button" onClick={onOpen} aria-label={`${label}, ${count} cards${options > 0 ? `, ${options} to choose from` : ''}`}>
           {face}

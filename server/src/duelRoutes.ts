@@ -18,6 +18,7 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('normalSummon'), card: id, tributes: z.array(id).max(3), zone: z.number().int().min(0).max(4) }),
   z.object({ type: z.literal('setMonster'), card: id, tributes: z.array(id).max(3), zone: z.number().int().min(0).max(4) }),
   z.object({ type: z.literal('setSpellTrap'), card: id, zone: z.number().int().min(0).max(4) }),
+  z.object({ type: z.literal('extraSummon'), card: id, materials: z.array(id).min(1).max(7), zone: z.number().int().min(0).max(6), position: z.enum(['attack', 'defense']) }),
   z.object({ type: z.literal('flipSummon'), card: id }),
   z.object({ type: z.literal('changePosition'), card: id }),
   z.object({ type: z.literal('enterBattle') }),

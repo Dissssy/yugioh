@@ -2,7 +2,7 @@
 // Code decides these exactly, so an activation a script rules out is never offered.
 
 import { cardOf } from './rules.ts';
-import { levelOf, locate, monsterZonesFor, statsOf } from './state.ts';
+import { levelOf, locate, monsterZonesFor, statsOf, summonMatches, summonName } from './state.ts';
 import type { CardFilter, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
@@ -126,8 +126,8 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
     if (c.if === 'summoned_this_turn') {
       const at = locate(state, card);
       const summoned = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.summoned : null;
-      if (!summoned || summoned.turn !== state.turn || (c.how.length > 0 && !c.how.includes(summoned.how))) {
-        return `It needs this card to have been ${c.how.length ? `${c.how.map((h) => (h === 'normal' ? 'Normal' : h === 'flip' ? 'Flip' : 'Special')).join(' or ')} ` : ''}Summoned this turn.`;
+      if (!summoned || summoned.turn !== state.turn || !summonMatches(summoned.how, c.how)) {
+        return `It needs this card to have been ${c.how.length ? `${c.how.map((h) => summonName[h]).join(' or ')} ` : ''}Summoned this turn.`;
       }
     }
   }

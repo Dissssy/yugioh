@@ -17,6 +17,9 @@ import {
   type Intent,
   type JudgeRecord,
   type Seat,
+  type SummonKind,
+  evolve,
+  pendingTriggers,
   cardsFitting,
   monsterZoneFree,
   monsterZonesFor,
@@ -49,6 +52,10 @@ const cards: Record<number, CardData> = {
   10: { ...monster(10, 'Exiled Force', 4, 1000, 1000), type: 'Effect Monster' },
   11: { ...spell(11, 'Reinforce Truth'), type: 'Trap Card', kind: 'trap' },
   12: { ...spell(12, 'Banner of Courage'), race: 'Continuous' },
+  13: { ...monster(13, 'Junk Synchron', 3, 1300, 500), type: 'Tuner Monster' },
+  14: { ...monster(14, 'Speed Warrior', 2, 900, 400), type: 'Effect Monster' },
+  15: { ...monster(15, 'Gaia Knight, the Force of Earth', 6, 2600, 800), type: 'Synchro Monster', extraDeck: true },
+  16: { ...monster(16, 'Tune Warrior', 3, 1600, 200), type: 'Normal Tuner Monster' },
 };
 
 function spell(code: number, name: string): CardData {
@@ -75,6 +82,8 @@ const sheets: Record<number, EffectSheet> = {
   10: sheet(10, effect('ignition', 'soft')),
   11: sheet(11, effect('activation')),
   12: sheet(12, effect('activation')),
+  7: { ...sheet(7), materials: { summon: 'synchro', tuner: 'Junk Synchron', nonTuners: { min: 1, max: null } } },
+  15: { ...sheet(15), materials: { summon: 'synchro', tuner: null, nonTuners: { min: 1, max: null } } },
 };
 
 /**
@@ -95,7 +104,7 @@ function stacked(deck0: number[], deck1: number[]): DuelEvent[] {
       sheets,
       instances,
       players: [
-        { name: 'Yusei', deck: ids('a', 0, deck0), extra: ids('ax', 0, [7]) },
+        { name: 'Yusei', deck: ids('a', 0, deck0), extra: ids('ax', 0, [7, 15]) },
         { name: 'Yuma', deck: ids('b', 1, deck1), extra: [] },
       ],
     },
@@ -311,6 +320,55 @@ describe('Extra Monster Zones', () => {
     t.play(0, { type: 'normalSummon', card: 'a0', tributes: ['ax0', 'a1'], zone: 0 });
     expect(t.state.players[0].graveyard).toEqual(['ax0', 'a1']);
     expect(monsterZonesFor(t.state, 0, true)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});
+
+describe('Synchro Summons', () => {
+  /** Yusei's monsters put on the field directly, on his turn 3 (so they could attack). */
+  function board(codes: number[]) {
+    const t = new Table(stacked([...codes, ...filler(40 - codes.length)], filler(40, 2)));
+    codes.forEach((_, i) => t.push({ type: 'specialSummoned', player: 0, card: `a${i}`, zone: i, position: 'attack' }));
+    t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
+    return t;
+  }
+  const synchro = (t: Table, card: string) => legalActions(t.state, 0).find((a) => a.type === 'extraSummon' && a.card === card);
+
+  it('offers a Synchro Monster whose Level the Tuner and non-Tuners add up to, with the zones it may go to', () => {
+    const t = board([13, 14, 1]);
+    // Junk Synchron (3) + Speed Warrior (2) = Junk Warrior (5). Nothing adds up to Gaia Knight's 6 with one Tuner.
+    expect(synchro(t, 'ax0')).toEqual({ type: 'extraSummon', card: 'ax0', how: 'synchro', options: [{ materials: ['a0', 'a1'], zones: [0, 1, 3, 4, 5, 6] }] });
+    expect(synchro(t, 'ax1')).toBeUndefined();
+    // 3 + 4 = 7 and 3 + 2 + 4 = 9 make nothing either; Levels count as they are now.
+    t.push({ type: 'statsModified', modifier: { card: 'a2', player: 0, atk: 0, def: 0, atkSet: null, defSet: null, levelDelta: -1, levelSet: null, until: 'end_of_turn', turn: 3 } });
+    expect(synchro(t, 'ax1')).toMatchObject({ options: [{ materials: ['a0', 'a2'] }] });
+  });
+
+  it('needs the named Tuner, and never uses a Tuner as a non-Tuner', () => {
+    const t = board([16, 14, 13]);
+    // Tune Warrior isn't Junk Synchron; Junk Synchron with Tune Warrior is two Tuners.
+    expect(synchro(t, 'ax0')).toMatchObject({ options: [{ materials: ['a2', 'a1'] }] });
+    expect(synchro(t, 'ax1')).toBeUndefined();
+  });
+
+  it('sends the materials to the GY and puts the monster where the player chose, without using the Normal Summon', () => {
+    const t = board([13, 14]);
+    expect(t.refuse(0, { type: 'extraSummon', card: 'ax0', materials: ['a0'], zone: 5, position: 'attack' })).toMatch(/aren't materials/);
+    expect(t.refuse(0, { type: 'extraSummon', card: 'ax0', materials: ['a0', 'a1'], zone: 7, position: 'attack' })).toBe('Choose an empty Monster Zone it can go to.');
+    t.play(0, { type: 'extraSummon', card: 'ax0', materials: ['a1', 'a0'], zone: 6, position: 'defense' });
+    expect(t.state.players[0].graveyard).toEqual(['a1', 'a0']);
+    expect(t.state.players[0].monsters[6]).toMatchObject({ id: 'ax0', faceUp: true, position: 'defense', summoned: { how: 'synchro', turn: 3 } });
+    expect(t.state.players[0].extra).toEqual(['ax1']);
+    expect(t.state.normalSummons).toBe(0);
+    expect(logFor(t.events, 1).at(-1)?.text).toBe('Yusei Synchro Summoned Junk Warrior in defense position, using Speed Warrior, Junk Synchron');
+  });
+
+  it('is a Special Summon for triggers: "Synchro Summoned" and "Special Summoned" fire, "Normal Summoned" does not', () => {
+    const trigger = (how: SummonKind[]) => ({ ...effect('trigger'), when: { event: 'summoned', self: true, filter: null, how, from: 'field', canMiss: false } as const });
+    const t = board([13, 14]);
+    const before = { ...t.state, sheets: { ...t.state.sheets, 7: { ...t.state.sheets[7]!, effects: [trigger(['synchro']), trigger(['special']), trigger(['normal'])] } } };
+    const events = decide(before, 0, { type: 'extraSummon', card: 'ax0', materials: ['a0', 'a1'], zone: 0, position: 'attack' });
+    const state = events.ok ? events.events.slice(1).reduce(evolve, before) : before;
+    expect(pendingTriggers(state).map((p) => p.effect)).toEqual([0, 1]);
   });
 });
 
