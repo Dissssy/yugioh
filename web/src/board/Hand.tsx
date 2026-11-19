@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { dropCentre } from './aim.tsx';
 import { CardFace, dataOf, idOf } from './Card.tsx';
 import { useCardHover } from './CardTooltip.tsx';
+import { useChoice } from './choice.tsx';
 import { CARD_ASPECT, CARD_HEIGHT_IN_ZONE, useBoardLook, type CardMarks } from './look.ts';
 
 const spring = { type: 'spring', stiffness: 420, damping: 32 } as const;
@@ -149,6 +150,10 @@ function HandCard({
   const { zone, imageSize } = useBoardLook();
   const hover = useCardHover();
   const tip = hover(data);
+  const choice = useChoice();
+  const picking = choice?.state(id) ?? null;
+  // Clicking picks the card while the judge offers it, and otherwise opens its menu.
+  const click = (el: HTMLElement) => (picking ? choice!.toggle(id) : onCard(id, el));
   // The card leans into the direction it's dragged, and settles when it slows down.
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -179,7 +184,7 @@ function HandCard({
       drag
       dragMomentum={false}
       tabIndex={0}
-      className={`hand-card slot ${marks.classes(id)}${heldAt ? ' held' : ''}`}
+      className={`hand-card slot ${marks.classes(id)} ${picking ?? ''}${heldAt ? ' held' : ''}`}
       style={{ marginLeft: place.marginLeft, x, y }}
       animate={{ scale: heldAt ? 1.08 : 1 }}
       transition={spring}
@@ -202,13 +207,14 @@ function HandCard({
         setTimeout(() => (dragged.current = false), 0);
         if (!drag.end(id, at(info.point))) glide(0, 0);
       }}
-      onClick={(e) => !dragged.current && onCard(id, e.currentTarget)}
+      onClick={(e) => !dragged.current && click(e.currentTarget)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') onCard(id, e.currentTarget);
+        if (e.key === 'Enter') click(e.currentTarget);
         if (e.key === 'ArrowLeft') onStep(-1);
         if (e.key === 'ArrowRight') onStep(1);
       }}
       aria-label={`${data.name}, in your hand`}
+      aria-pressed={picking ? picking === 'picked' : undefined}
     >
       <motion.div style={{ rotate: lean }}>
         <motion.div
