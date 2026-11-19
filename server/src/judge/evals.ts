@@ -50,8 +50,10 @@ interface Side {
 
 export interface EvalCase {
   name: string;
-  /** Player 0 is on turn, in Main Phase 1 of turn 3. */
+  /** The activating player is on turn, in Main Phase 1 of turn 3. */
   board: [Side, Side];
+  /** The player who activates (default 0). */
+  seat?: Seat;
   activate: string;
   /** Which of the card's effects to activate, by its index in the sheet (default 0). */
   effect?: number;
@@ -176,6 +178,18 @@ export const CASES: EvalCase[] = [
     activate: 'The Warrior Returning Alive',
     legal: true,
     check: (b) => all(expectAt(b, 'Speed Warrior', '0:hand'), expectAt(b, 'Sonic Chick', '0:gy')),
+  },
+  {
+    name: 'the warrior returning alive works for the second player',
+    board: [
+      { hand: ['Sonic Chick'], gy: ['Speed Warrior', 'Junk Synchron'], monsters: ['Axe Raider'], set: ['Trap Hole'] },
+      { hand: ['The Warrior Returning Alive', 'Sonic Chick'], gy: ['Exiled Force', 'Twister'], setMonsters: ['Mystic Tomato'] },
+    ],
+    seat: 1,
+    activate: 'The Warrior Returning Alive',
+    legal: true,
+    picks: [['Exiled Force']],
+    check: (b) => all(expectAt(b, 'Exiled Force', '1:hand'), expectAt(b, 'Speed Warrior', '0:gy')),
   },
   {
     name: 'synchro blast wave needs a synchro monster',
@@ -473,7 +487,7 @@ export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: 
       events.push({ type: 'effectActivated', player: seat, card: id, effect: 0, zone: zones[seat]![1]++ }, { type: 'linkResolved' });
     }
   }
-  events.push({ type: 'turnStarted', player: 0, turn: 3 }, { type: 'phaseChanged', phase: 'main1' });
+  events.push({ type: 'turnStarted', player: c.seat ?? 0, turn: 3 }, { type: 'phaseChanged', phase: 'main1' });
   return replay(events);
 }
 
@@ -487,11 +501,11 @@ export interface EvalResult {
 
 /** Runs one case: the activation check, then (if legal) the resolution, answering questions from `picks`. */
 export async function runCase(c: EvalCase, state: DuelState, model: ModelCall): Promise<EvalResult> {
-  const id = [...state.players[0].hand, ...state.players[0].monsters.flatMap((m) => (m ? [m.id] : [])), ...state.players[0].spellTraps.flatMap((m) => (m ? [m.id] : []))].find(
-    (x) => cardOf(state, x).name === c.activate,
-  )!;
-  const zone = state.players[0].hand.includes(id) ? state.players[0].spellTraps.indexOf(null) : null;
-  const intent = decide(state, 0, { type: 'activate', card: id, effect: c.effect ?? 0, zone });
+  const seat = c.seat ?? 0;
+  const p = state.players[seat];
+  const id = [...p.hand, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((m) => (m ? [m.id] : []))].find((x) => cardOf(state, x).name === c.activate)!;
+  const zone = p.hand.includes(id) ? p.spellTraps.indexOf(null) : null;
+  const intent = decide(state, seat, { type: 'activate', card: id, effect: c.effect ?? 0, zone });
   if (!intent.ok) return { name: c.name, passed: false, detail: `code refused the activation: ${intent.error}`, records: [] };
   const picks = [...(c.picks ?? [])];
   const unmatched: string[] = [];

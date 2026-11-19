@@ -399,13 +399,18 @@ describe('activating effects', () => {
     expect(offered()).toEqual(['a1']);
     expect(t.refuse(0, { type: 'activate', card: 'a0', effect: 0, zone: 2 })).toMatch(/already ruled .* There is no monster in your GY\./);
     // Another refused activation and an upheld appeal leave the board as it was.
-    push(record({ card: 'a1' }), { type: 'appealed', appeal: { judged: 7, by: 0, note: '', model: 'test', verdict: 'upheld', explanation: '', ruling: '' } });
+    const appealed = (card: string, verdict: 'upheld' | 'overturned'): DuelEvent => ({
+      type: 'appealed',
+      appeal: { judged: 7, decision: { stage: 'activation', player: 0, card, effect: 0, legal: false }, by: 0, note: '', model: 'test', verdict, explanation: '', ruling: `${card} is legal.` },
+    });
+    push(record({ card: 'a1' }), appealed('a1', 'upheld'));
     expect(offered()).toEqual([]);
     expect(legalActions(t.state, 1).length).toBeGreaterThan(0);
 
-    // An overturned ruling lifts it, and so does any change to the board.
-    push({ type: 'appealed', appeal: { judged: 7, by: 0, note: '', model: 'test', verdict: 'overturned', explanation: '', ruling: '' } });
-    expect(offered()).toEqual(['a0', 'a1']);
+    // An overturned refusal lifts it for that card only, and binds the next try to the appeal's ruling.
+    push(appealed('a0', 'overturned'));
+    expect(offered()).toEqual(['a0']);
+    expect(t.state.rulings.find((r) => r.card === 'a0')).toMatchObject({ legal: true, summary: 'a0 is legal.' });
     push(record({}));
     t.play(0, { type: 'normalSummon', card: 'a2', tributes: [], zone: 0 });
     expect(offered()).toEqual(['a0', 'a1']);

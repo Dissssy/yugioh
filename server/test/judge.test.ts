@@ -158,6 +158,18 @@ describe('the judge loop', () => {
     expect(record).toMatchObject({ legal: true, error: null });
   });
 
+  it('holds an activation to an appeal that overturned its refusal', async () => {
+    const { state, link } = activated();
+    const { model, sent } = scripted([
+      [{ name: 'finish', input: { legal: false, summary: 'No Warrior in the GY.' } }],
+      [{ name: 'finish', input: { legal: false, summary: 'No Warrior in the GY.' } }],
+    ]);
+    const { record } = await judge({ stage: 'activation', state, link, appealRuling: 'Dark Blade is a legal target.' }, deps(model));
+    expect(sent[0]!.messages[0]!.content).toContain('An appeal already ruled this activation legal on this board, and that ruling binds: Dark Blade is a legal target.');
+    expect(results(sent[1]!)[0]!.content).toMatch(/^An appeal already ruled this activation legal/);
+    expect(record).toMatchObject({ legal: false, error: 'No finish within 16 turns.' });
+  });
+
   it('lets players choose targets only from cards that fit before the cost was paid', async () => {
     const { state, link } = activated();
     const { model, sent } = scripted([
@@ -253,7 +265,7 @@ describe('the eval suite', () => {
     const sheets = await loadSheets(data);
     for (const c of CASES) {
       const state = buildBoard(c, data, sheets);
-      const actions = legalActions(state, 0);
+      const actions = legalActions(state, c.seat ?? 0);
       const offered = actions.some((a) => a.type === 'activate' && a.effect === (c.effect ?? 0) && state.cards[state.instances[a.card]!.code]!.name === c.activate);
       expect(offered, c.name).toBe(true);
     }

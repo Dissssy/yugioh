@@ -98,8 +98,9 @@ export function describeEffect(state: DuelState, link: ChainLink): string {
   ].join('\n');
 }
 
-export function activationRequest(state: DuelState, link: ChainLink): string {
-  return `${describeState(state, link.card)}\n\n# Request: check an activation\nPlayer ${link.player} is activating this effect.\n${describeEffect(state, link)}`;
+export function activationRequest(state: DuelState, link: ChainLink, appealRuling: string | null): string {
+  const appeal = appealRuling ? `\nAn appeal already ruled this activation legal on this board, and that ruling binds: ${appealRuling} Pay its cost and declare its targets.` : '';
+  return `${describeState(state, link.card)}\n\n# Request: check an activation\nPlayer ${link.player} is activating this effect.${appeal}\n${describeEffect(state, link)}`;
 }
 
 export function resolutionRequest(state: DuelState, link: ChainLink): string {

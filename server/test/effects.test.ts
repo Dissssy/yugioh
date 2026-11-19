@@ -198,6 +198,36 @@ describe('a card effect', () => {
     expect(after.actions.some((a) => a.type === 'activate' && a.card === returning)).toBe(true);
     mine.close();
   });
+
+  it('binds the next try of a refused activation to the appeal that overturned the refusal', async () => {
+    const requests: string[] = [];
+    const refuse: ModelCall = async (params) => {
+      if (params.messages.length === 1) requests.push(params.messages[0]!.content as string);
+      return tools(params.model, [{ name: 'finish', input: { legal: false, summary: 'There is no Warrior in your GY.' } }]);
+    };
+    h.setModel(refuse);
+    const mine = new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
+    await mine.update();
+    const activate = () =>
+      guest.json(`${h.baseUrl}/api/duels/${duel.id}/intents`, { method: 'POST', body: JSON.stringify({ type: 'activate', card: returning, effect: 0, zone: null }) });
+    expect((await activate()).status).toBe(204);
+    const refused = await until(mine, (u) => entries(u).find((e) => e.event.type === 'judged'));
+
+    h.setModel(async (params) =>
+      message(params.model, [{ type: 'text', text: JSON.stringify({ verdict: 'overturned', explanation: 'A Warrior is in the GY.', ruling: 'Exiled Force is a legal target.' }) }], 'end_turn'),
+    );
+    const contest = await guest.json(`${h.baseUrl}/api/duels/${duel.id}/contest`, { method: 'POST', body: JSON.stringify({ seq: refused.seq, note: 'There is a Warrior.' }) });
+    expect(contest.status).toBe(202);
+    await until(mine, (u) => entries(u).find((e) => e.event.type === 'appealed'));
+
+    // The judge is asked again, told the appeal binds, and its refusal is turned back.
+    h.setModel(refuse);
+    expect((await activate()).status).toBe(204);
+    const retried = await until(mine, (u) => entries(u).find((e) => e.event.type === 'judged'));
+    expect(requests.at(-1)).toContain('that ruling binds: Exiled Force is a legal target.');
+    expect(retried.event).toMatchObject({ legal: false, failed: true });
+    mine.close();
+  });
 });
 
 async function login() {

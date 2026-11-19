@@ -219,7 +219,9 @@ export class Duels {
   private async activate(duel: LiveDuel, events: DuelEvent[]) {
     const [intent, ...activation] = events;
     const scratch = activation.reduce(evolve, duel.state);
-    const { record, events: costs } = await this.runJudge(duel, 'activation', scratch, scratch.chain.at(-1)!);
+    const link = scratch.chain.at(-1)!;
+    const overturned = duel.state.rulings.find((r) => r.legal && r.player === link.player && r.card === link.card && r.effect === link.effect);
+    const { record, events: costs } = await this.runJudge(duel, 'activation', scratch, link, overturned?.summary ?? null);
     const judged: DuelEvent = { type: 'judged', record };
     await this.commit(duel, record.legal ? [intent!, judged, ...activation, ...costs] : [intent!, judged]);
     if (record.legal) await this.resolveChain(duel);
@@ -234,12 +236,12 @@ export class Duels {
     }
   }
 
-  private async runJudge(duel: LiveDuel, stage: 'activation' | 'resolution', state: DuelState, link: ChainLink) {
+  private async runJudge(duel: LiveDuel, stage: 'activation' | 'resolution', state: DuelState, link: ChainLink, appealRuling: string | null = null) {
     duel.judging = { stage, link, question: null };
     this.broadcastJudging(duel);
     try {
       return await judge(
-        { stage, state, link },
+        { stage, state, link, appealRuling },
         {
           model: this.ai.judge!,
           random: secureRandom,

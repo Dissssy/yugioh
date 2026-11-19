@@ -217,7 +217,7 @@ function activatableEffects(state: DuelState, seat: Seat, id: string): Extract<L
 }
 
 const ruledIllegal = (state: DuelState, seat: Seat, id: string, effect: number) =>
-  state.ruledIllegal.find((r) => r.player === seat && r.card === id && r.effect === effect);
+  state.rulings.find((r) => !r.legal && r.player === seat && r.card === id && r.effect === effect);
 
 function onceOk(state: DuelState, id: string, code: number, effect: number, opt: 'none' | 'soft' | 'hard') {
   if (opt === 'soft') return !state.usedThisTurn.some((u) => u.card === id && u.effect === effect);

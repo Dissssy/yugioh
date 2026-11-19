@@ -130,10 +130,12 @@ export interface DuelState {
   /** Effects used this turn, for once-per-turn clauses. */
   usedThisTurn: { card: string; code: number; effect: number }[];
   /**
-   * Activations the judge ruled illegal on the board as it is now. Code refuses them without asking the judge again,
-   * until any event changes the board; another illegal ruling or an upheld appeal changes nothing.
+   * Rulings on activations that stand for the board as it is now, until any event changes it (another illegal ruling
+   * or an appeal changes nothing). An activation the judge ruled illegal is refused without asking it again
+   * (`legal` false, the judge's summary); once an appeal overturns that, the next try must be ruled legal (`legal`
+   * true, the appeal's ruling, which the judge is given).
    */
-  ruledIllegal: { player: Seat; card: string; effect: number; summary: string }[];
+  rulings: { player: Seat; card: string; effect: number; legal: boolean; summary: string }[];
   result: DuelResult | null;
 }
 
@@ -208,6 +210,8 @@ export interface JudgeRecord {
 export interface AppealRecord {
   /** Event index of the contested `judged` event. */
   judged: number;
+  /** Which decision that was. */
+  decision: Pick<JudgeRecord, 'stage' | 'player' | 'card' | 'effect' | 'legal'>;
   by: Seat;
   note: string;
   model: string;

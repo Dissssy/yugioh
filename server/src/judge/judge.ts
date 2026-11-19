@@ -64,6 +64,8 @@ export interface JudgeCall {
   /** The board the judge works on: for an activation, with the card already activated. */
   state: DuelState;
   link: ChainLink;
+  /** For an activation an appeal ruled legal on this board after the judge refused it: the appeal's ruling, which binds. */
+  appealRuling?: string | null;
 }
 
 export interface JudgeOutcome {
@@ -78,7 +80,7 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
   const events: DuelEvent[] = [];
   const ops: Op[] = [];
   const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: stage === 'activation' ? activationRequest(scratch, link) : resolutionRequest(scratch, link) },
+    { role: 'user', content: stage === 'activation' ? activationRequest(scratch, link, call.appealRuling ?? null) : resolutionRequest(scratch, link) },
   ];
   const record = (fields: Pick<JudgeRecord, 'legal' | 'summary' | 'error'>): JudgeRecord => ({
     stage,
@@ -141,7 +143,9 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
           const leak = parsed.success ? hiddenNameIn(scratch, parsed.data.summary, [0, 1]) : null;
           if (!parsed.success) refused = reply(c.id, 'Invalid input.', true);
           else if (!parsed.data.summary.trim()) refused = reply(c.id, 'Write a one-sentence summary.', true);
-          else if (stage === 'activation' && !parsed.data.legal && ops.length > 0) {
+          else if (stage === 'activation' && !parsed.data.legal && call.appealRuling) {
+            refused = reply(c.id, `An appeal already ruled this activation legal on this board: ${call.appealRuling} Pay its cost and declare its targets, then finish with legal true.`, true);
+          } else if (stage === 'activation' && !parsed.data.legal && ops.length > 0) {
             refused = reply(c.id, 'An illegal activation makes no changes. The ops you made will be discarded; call finish again to confirm.', true);
             scratch = call.state;
             events.length = 0;

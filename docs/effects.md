@@ -46,6 +46,8 @@ Model settings: `claude-haiku-5-5`, thinking disabled with effort `high` (the "r
 
 **A refused activation isn't judged twice on the same board.** Once the judge rules an activation illegal, code refuses that card's effect for that player without a model call, and the board stops offering it, until any event changes the board: a draw, a summon, a phase change, a cost paid, anything but another refused activation or an upheld appeal. The rulings live in the duel state (`ruledIllegal`), so they are rebuilt from the log on a restart. Because any change counts, the key holds every hidden detail the judge sees (hands, Deck order), and nothing the player isn't shown changes the board without an event. A judge call that failed isn't a ruling, so the player may try again; an appeal that overturns a ruling lifts it too.
 
+**An overturned refusal binds.** When an appeal overturns the judge's refusal of an activation, and nothing on the board has changed since, the next try of that activation gives the judge the appeal's ruling, and code refuses to let it rule the activation illegal again. Any change to the board ends this, as it ends a standing refusal.
+
 **Every decision is stored** as a `judged` event with the model, the prompt version (a hash of the rules reference and tools), a hash of the board it saw, the whole transcript, the ops, and the summary. Players see only the stage, outcome and summary.
 
 **Limits.** Each duel may use 300 judge calls (an activation and its resolution are two) and 10 appeals; set `JUDGE_CALLS_PER_DUEL` and `APPEALS_PER_DUEL` to change them. Without `ANTHROPIC_API_KEY` the server runs, and activating an effect answers 503.
