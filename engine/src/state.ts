@@ -357,27 +357,6 @@ export const summonName: Record<SummonKind, string> = { normal: 'Normal', flip: 
 /** A card's printed Level. An Xyz Monster's number is its Rank, not a Level, so it has none. */
 export const levelOf = (card: CardData): number | null => (/\bXYZ\b/i.test(card.type) ? null : card.level);
 
-/** A face-up monster's ATK, DEF and Level after modifiers. Level modifiers apply in order; a set Level overrides earlier ones. */
-export function statsOf(state: DuelState, id: string): { atk: number; def: number; level: number | null } {
-  const card = state.cards[state.instances[id]!.code]!;
-  // "Becomes" sets the base (the latest wins); every gain and loss is added on top, whenever it was applied.
-  let atk = card.atk ?? 0;
-  let def = card.def ?? 0;
-  let atkDelta = 0;
-  let defDelta = 0;
-  let level = levelOf(card);
-  for (const m of state.modifiers) {
-    if (m.card !== id) continue;
-    if (m.atkSet !== null) atk = m.atkSet;
-    if (m.defSet !== null) def = m.defSet;
-    atkDelta += m.atk;
-    defDelta += m.def;
-    if (m.levelSet !== null) level = m.levelSet;
-    if (level !== null) level = Math.max(1, level + m.levelDelta);
-  }
-  return { atk: Math.max(0, atk + atkDelta), def: Math.max(0, def + defDelta), level };
-}
-
 function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
   return {
     id,

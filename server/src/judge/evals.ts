@@ -478,6 +478,13 @@ export const CASES: EvalCase[] = [
     check: (b) => (b.monster('Number 39: Utopia')?.atk === 3100 ? null : `Utopia has ATK ${b.monster('Number 39: Utopia')?.atk}`),
   },
   {
+    name: 'banner of courage stays on the field and gives 200 ATK only in your battle phase',
+    board: [{ hand: ['Banner of Courage'], monsters: ['Axe Raider'] }, {}],
+    activate: 'Banner of Courage',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Banner of Courage', '0:spellTraps'), b.monster('Axe Raider')?.atk === 1700 ? null : `Axe Raider has ATK ${b.monster('Axe Raider')?.atk} in Main Phase 1`),
+  },
+  {
     name: 'xyz effect needs an xyz summon',
     board: [{ set: ['Xyz Effect'] }, { monsters: ['Axe Raider'] }],
     activate: 'Xyz Effect',

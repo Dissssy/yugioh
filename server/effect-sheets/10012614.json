@@ -25,6 +25,7 @@
         ],
         "unapplied": null
       },
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -38,6 +39,39 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "atk": 200,
+        "def": 0,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": [
+          {
+            "if": "turn",
+            "whose": "you"
+          },
+          {
+            "if": "phase",
+            "phases": [
+              "battle"
+            ]
+          }
+        ]
+      },
       "status": "unverified"
     }
   ],

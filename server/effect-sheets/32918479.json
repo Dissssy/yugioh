@@ -21,6 +21,7 @@
         "canMiss": false
       },
       "script": null,
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -34,6 +35,7 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": null,
       "status": "unverified"
     }
   ],

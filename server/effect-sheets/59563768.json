@@ -14,6 +14,31 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 400,
+        "def": 0,
+        "per": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": true,
+          "position": null,
+          "level": {
+            "min": 2,
+            "max": 2
+          },
+          "atk": null,
+          "def": null
+        },
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
       "status": "unverified"
     }
   ],

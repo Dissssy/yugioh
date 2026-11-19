@@ -2,7 +2,8 @@
 
 import { waitingFor } from './chain.ts';
 import { legalActions, normalSummonUsed } from './rules.ts';
-import { evolve, locate, replay, statsOf } from './state.ts';
+import { statsOf } from './continuous.ts';
+import { evolve, locate, replay } from './state.ts';
 import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, LogEntry, LogEvent, Phase, Place, PlayerView, Seat, StartView } from './types.ts';
 
 export function viewFor(state: DuelState, seat: Seat): PlayerView {

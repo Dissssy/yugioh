@@ -19,6 +19,9 @@ import {
   type Seat,
   type SummonKind,
   type Script,
+  type CardFilter,
+  type Continuous,
+  statsOf,
   scriptProblem,
   evolve,
   pendingTriggers,
@@ -60,6 +63,9 @@ const cards: Record<number, CardData> = {
   16: { ...monster(16, 'Tune Warrior', 3, 1600, 200), type: 'Normal Tuner Monster' },
   17: { ...monster(17, 'Number 39: Utopia', 4, 2500, 2000), type: 'XYZ Monster', extraDeck: true },
   18: { ...monster(18, 'Grenosaurus', 3, 2000, 1900), type: 'XYZ Monster', extraDeck: true },
+  19: { ...monster(19, 'Tenshin', 2, 800, 100), type: 'Effect Monster' },
+  20: { ...monster(20, 'Shine Knight', 3, 400, 1900), type: 'Effect Monster' },
+  21: { ...monster(21, 'Gachi Gachi Gantetsu', 2, 500, 1800), type: 'XYZ Monster', extraDeck: true },
 };
 
 function spell(code: number, name: string): CardData {
@@ -77,8 +83,12 @@ const effect = (kind: SheetEffect['kind'], opt: SheetEffect['opt'] = 'none'): Sh
   targets: null,
   when: null,
   script: null,
+  continuous: null,
   status: 'unverified',
 });
+/** Face-up monsters on the field that fit, for continuous effects. */
+const filter = (f: Partial<CardFilter>): CardFilter => ({ side: 'either', place: 'monsters', kinds: [], types: [], races: [], attributes: [], faceUp: true, position: null, level: null, atk: null, def: null, ...f });
+const aura = (c: Partial<Continuous>): Continuous => ({ apply: 'stats', to: 'self', atk: 0, def: 0, per: null, levelDelta: 0, levelSet: null, while: [], ...c });
 const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null });
 const detachSelf = { do: 'detach', cards: { from: 'self' }, count: 1 } as const;
 const scripted = (script: Partial<Script>): Pick<SheetEffect, 'script'> => ({ script: { conditions: [], cost: [], targets: null, options: [], unapplied: null, ...script } });
@@ -87,7 +97,10 @@ const sheets: Record<number, EffectSheet> = {
   9: sheet(9, effect('activation')),
   10: sheet(10, effect('ignition', 'soft')),
   11: sheet(11, effect('activation')),
-  12: sheet(12, effect('activation')),
+  12: sheet(12, effect('activation'), { ...effect('continuous'), continuous: aura({ to: filter({ side: 'you' }), atk: 200, while: [{ if: 'turn', whose: 'you' }, { if: 'phase', phases: ['battle'] }] }) }),
+  19: sheet(19, { ...effect('continuous'), continuous: aura({ to: 'self', atk: 400, per: filter({ side: 'you', level: { min: 2, max: 2 } }) }) }),
+  20: sheet(20, { ...effect('continuous'), continuous: aura({ to: 'self', levelSet: 4, while: [{ if: 'position', position: 'defense' }] }) }),
+  21: { ...sheet(21, { ...effect('continuous'), continuous: aura({ to: filter({ side: 'you' }), atk: 200, def: 200, per: 'materials' }) }), materials: { summon: 'xyz', level: 2, count: 2 } },
   7: { ...sheet(7), materials: { summon: 'synchro', tuner: 'Junk Synchron', nonTuners: { min: 1, max: null } } },
   15: { ...sheet(15), materials: { summon: 'synchro', tuner: null, nonTuners: { min: 1, max: null } } },
   17: {
@@ -131,7 +144,7 @@ function stacked(deck0: number[], deck1: number[]): DuelEvent[] {
       sheets,
       instances,
       players: [
-        { name: 'Yusei', deck: ids('a', 0, deck0), extra: ids('ax', 0, [7, 15, 17, 18]) },
+        { name: 'Yusei', deck: ids('a', 0, deck0), extra: ids('ax', 0, [7, 15, 17, 18, 21]) },
         { name: 'Yuma', deck: ids('b', 1, deck1), extra: [] },
       ],
     },
@@ -384,7 +397,7 @@ describe('Synchro Summons', () => {
     t.play(0, { type: 'extraSummon', card: 'ax0', materials: ['a1', 'a0'], zone: 6, position: 'defense' });
     expect(t.state.players[0].graveyard).toEqual(['a1', 'a0']);
     expect(t.state.players[0].monsters[6]).toMatchObject({ id: 'ax0', faceUp: true, position: 'defense', summoned: { how: 'synchro', turn: 3 } });
-    expect(t.state.players[0].extra).toEqual(['ax1', 'ax2', 'ax3']);
+    expect(t.state.players[0].extra).toEqual(['ax1', 'ax2', 'ax3', 'ax4']);
     expect(t.state.normalSummons).toBe(0);
     expect(logFor(t.events, 1).at(-1)?.text).toBe('Yusei Synchro Summoned Junk Warrior in defense position, using Speed Warrior, Junk Synchron');
   });
@@ -455,6 +468,53 @@ describe('Xyz Summons', () => {
     expect(t.state.players[1].graveyard).toEqual(['b0']);
     expect(t.state.happened).toContainEqual(expect.objectContaining({ event: 'battle_destroying', card: 'ax3', target: 'b0' }));
     expect(pendingTriggers(t.state)).toMatchObject([{ card: 'ax3', effect: 0 }]);
+  });
+});
+
+describe('continuous effects', () => {
+  /** Yusei's monsters on the field on his turn 3, put there directly in the positions given. */
+  function board(codes: number[], defense: number[] = []) {
+    const t = new Table(stacked([...codes, ...filler(40 - codes.length)], filler(40, 2)));
+    codes.forEach((_, i) => t.push({ type: 'specialSummoned', player: 0, card: `a${i}`, zone: i, position: defense.includes(i) ? 'defense' : 'attack' }));
+    t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
+    return t;
+  }
+
+  it('keep a Continuous Spell on the field, applying while its condition holds', () => {
+    const t = new Table(stacked([12, 1, ...filler(38)], filler(40, 2)));
+    t.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 0 }).play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 1 }).push({ type: 'linkResolved' });
+    expect(t.state.players[0].spellTraps[1]).toMatchObject({ id: 'a0', faceUp: true });
+    expect(statsOf(t.state, 'a1').atk).toBe(1700);
+    t.play(0, { type: 'enterBattle' });
+    expect(statsOf(t.state, 'a1').atk).toBe(1900);
+    expect(viewFor(t.state, 1).players[0].monsters[0]!.stats).toEqual({ atk: 1900, def: 1150, level: 4 });
+    t.play(0, { type: 'enterMain2' });
+    expect(statsOf(t.state, 'a1').atk).toBe(1700);
+  });
+
+  it('count cards by their current Level, and change a Level while a position holds', () => {
+    const t = board([19, 19, 20], [2]);
+    // Each Tenshin counts both face-up Level 2 monsters, itself included; Shine Knight is Level 4 in Defense Position.
+    expect(statsOf(t.state, 'a0')).toEqual({ atk: 1600, def: 100, level: 2 });
+    expect(statsOf(t.state, 'a2').level).toBe(4);
+    t.play(0, { type: 'changePosition', card: 'a2' });
+    expect(statsOf(t.state, 'a2').level).toBe(3);
+    t.push({ type: 'statsModified', modifier: { card: 'a2', player: 0, atk: 0, def: 0, atkSet: null, defSet: null, levelDelta: -1, levelSet: null, until: 'end_of_turn', turn: 3 } });
+    expect(statsOf(t.state, 'a0').atk).toBe(2000);
+  });
+
+  it('scale with Xyz Materials, and stop when the card leaves the field', () => {
+    const t = board([19, 19, 1]);
+    t.play(0, { type: 'extraSummon', card: 'ax4', materials: ['a0', 'a1'], zone: 0, position: 'defense' });
+    expect(statsOf(t.state, 'a2')).toMatchObject({ atk: 2100, def: 1550 });
+    expect(statsOf(t.state, 'ax4')).toMatchObject({ atk: 900, def: 2200 });
+    const r = applyOp(t.state, { op: 'detach', card: 'a0' }, { player: 0, stage: 'resolution', random: () => 0 });
+    t.push(...(r.ok ? r.events : []));
+    expect(statsOf(t.state, 'a2').atk).toBe(1900);
+    const d = applyOp(t.state, { op: 'destroy', cards: ['ax4'] }, { player: 0, stage: 'resolution', random: () => 0 });
+    t.push(...(d.ok ? d.events : []));
+    expect(statsOf(t.state, 'a2').atk).toBe(1700);
   });
 });
 
@@ -598,10 +658,10 @@ describe('activating effects', () => {
   }
   const resolve = (t: Table) => t.push({ type: 'linkResolved' });
 
-  it('offers Normal and Quick-Play Spells from the hand, but not Continuous ones yet', () => {
+  it('offers Normal, Quick-Play and Continuous Spells from the hand', () => {
     const t = new Table(stacked([8, 9, 12, 1, 1, ...filler(35)], filler(40, 2)));
     const offered = legalActions(t.state, 0).filter((a) => a.type === 'activate').map((a) => a.card);
-    expect(offered).toEqual(['a0', 'a1']);
+    expect(offered).toEqual(['a0', 'a1', 'a2']);
     expect(legalActions(t.state, 1).some((a) => a.type === 'activate')).toBe(false);
   });
 

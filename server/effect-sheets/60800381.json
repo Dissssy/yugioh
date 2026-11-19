@@ -23,6 +23,7 @@
         "canMiss": false
       },
       "script": null,
+      "continuous": null,
       "status": "unverified"
     }
   ],

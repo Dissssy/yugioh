@@ -19,7 +19,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { DESTINATIONS, UNTIL, type CardData, type CardFilter, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
+import { DESTINATIONS, UNTIL, type CardData, type CardFilter, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
 import { cards, decks, effectSheets, sheetReports, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
@@ -84,21 +84,34 @@ const step = z.union([
   z.object({ do: z.literal('detach'), cards: selection, count: z.number().int() }),
 ]) satisfies z.ZodType<Step>;
 
-const script = z.object({
-  conditions: z.array(
-    z.union([
-      z.object({ if: z.literal('count'), filter: cardFilter, min: z.number().int() }),
+const condition = z.union([
+      z.object({ if: z.literal('count'), filter: cardFilter, min: z.number().int(), max: z.number().int().nullable() }),
+      z.object({ if: z.literal('turn'), whose: z.enum(['you', 'opponent']) }),
+      z.object({ if: z.literal('position'), position: z.enum(['attack', 'defense']) }),
       z.object({ if: z.literal('before_battle_phase') }),
       z.object({ if: z.literal('phase'), phases: z.array(phase) }),
       z.object({ if: z.literal('summoned_this_turn'), how: z.array(summonKind) }),
       z.object({ if: z.literal('materials'), min: z.number().int().nullable(), max: z.number().int().nullable() }),
-    ]),
-  ),
+]) satisfies z.ZodType<Condition>;
+
+const script = z.object({
+  conditions: z.array(condition),
   cost: z.array(step),
   targets: z.object({ filter: cardFilter, min: z.number().int(), max: z.number().int(), event: z.boolean() }).nullable(),
   options: z.array(z.object({ label: z.string(), steps: z.array(step) })),
   unapplied: z.string().nullable(),
 }) satisfies z.ZodType<Script>;
+
+const continuous = z.object({
+  apply: z.literal('stats'),
+  to: z.union([z.literal('self'), cardFilter]),
+  atk: z.number().int(),
+  def: z.number().int(),
+  per: z.union([cardFilter, z.literal('materials')]).nullable(),
+  levelDelta: z.number().int(),
+  levelSet: z.number().int().nullable(),
+  while: z.array(condition),
+}) satisfies z.ZodType<Continuous>;
 
 const when = z.object({
   event: z.enum(['summoned', 'attack_declared', 'attacked', 'destroyed_by_battle', 'battle_destroying', 'battle_damage', 'activated']),
@@ -125,6 +138,7 @@ const sheetEffect = z.object({
   targets: z.string().nullable(),
   when: when.nullable(),
   script: script.nullable(),
+  continuous: continuous.nullable(),
   status: z.enum(['unverified', 'verified', 'flagged']),
 }) satisfies z.ZodType<SheetEffect>;
 
@@ -133,7 +147,7 @@ const sheetEffect = z.object({
  * their schemas have more unions than structured outputs accept.
  */
 const compiled = z.object({
-  effects: z.array(sheetEffect.omit({ speed: true, status: true }).extend({ when: z.string().nullable(), script: z.string().nullable() })),
+  effects: z.array(sheetEffect.omit({ speed: true, status: true }).extend({ when: z.string().nullable(), script: z.string().nullable(), continuous: z.string().nullable() })),
   materials: z.string().nullable(),
 });
 
@@ -273,6 +287,7 @@ List the card's effects in the order they appear in the text. For each:
 - effect: what the effect does, as worded on the card.
 - targets: what it targets, as worded, or null if it doesn't target.
 - when: a JSON string naming the event the effect needs, as data code checks (see "When" below), or null. Every trigger has one: it is what makes the trigger fire ("When this card is Normal Summoned", "If this card is destroyed by battle"). A Spell/Trap or quick effect that is activated in response to an event has one too ("When an opponent's monster declares an attack", "When your opponent Normal Summons a monster"). Effects that need no event have null.
+- continuous: for a "continuous" effect, a JSON string with what it does as data code applies at all times (see "Continuous effects" below), or null when it doesn't fit that vocabulary exactly (a judge can't apply an always-on effect, so it then does nothing until someone writes it). null for every other kind.
 - script: a JSON string holding the effect as structured data that code runs exactly, with no judge. Write one only when the whole effect, its activation conditions, cost and targets fit the vocabulary below exactly; otherwise null, and a judge applies the text. A script that is almost right is worse than none: code trusts it completely. Only "activation", "ignition", "quick" and "trigger" effects get scripts; others null.
 materials: a JSON string with an Extra Deck monster's materials as data code checks, else null. A Synchro Monster: {"summon": "synchro", "tuner": null, "nonTuners": {"min": 1, "max": null}} for "1 Tuner + 1 or more non-Tuner monsters"; "tuner" is the Tuner's name when the text names one ("Junk Synchron" + ...), and nonTuners gives how many ("1 or more" is min 1, max null; "2 non-Tuner monsters" is min 2, max 2). An Xyz Monster: {"summon": "xyz", "level": 4, "count": 2} for "2 Level 4 monsters". Normal Monsters (flavour text) have no effects: return an empty list.
 
@@ -280,11 +295,15 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 
 "You" is the player activating the effect. Code already handles phases, once-per-turn clauses, spell speed and the event in "when", so a script says only what the card itself adds.
 
-- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n} needs at least n cards that fit ("While there are 5 or more monsters in your GY", "If you control a Synchro Monster"). {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon). {"if": "materials", "min": n | null, "max": n | null} needs this Xyz Monster to have that many Xyz Materials ("while this card has no Xyz Material": min null, max 0).
+- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n, "max": n | null} needs at least min and at most max cards that fit ("While there are 5 or more monsters in your GY": min 5, max null; "If you control a Synchro Monster": min 1; "while you have 1 or less cards in your hand": min 0, max 1). {"if": "turn", "whose": "you" | "opponent"} for "during your turn" ("during your Battle Phase" is this plus a phase condition). {"if": "position", "position": "attack" | "defense"} for "while this card is in face-up Defense Position". {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon). {"if": "materials", "min": n | null, "max": n | null} needs this Xyz Monster to have that many Xyz Materials ("while this card has no Xyz Material": min null, max 0).
 - cost: steps paid on activation, in order ("Discard 1 card" is a move to graveyard of 1 card chosen from your hand; "Pay 500 LP" is change_lp kind cost; "Tribute this card" is a move of self to graveyard).
 - targets: {"filter", "min", "max", "event"} for "target 1 ..." ("up to 3" is min 1 max 3), or null. The player picks them on activation, after paying the cost; resolution steps reach them with {"from": "targets"}, and a target that no longer fits the filter isn't affected. event true for "target that monster", where the target is the card the "when" event happened to (Trap Hole); else false.
 - options: what the effect does. One option (label "") unless the text says "activate 1 of these effects", then one per bullet with the bullet's wording as label; the player picks one on activation.
 - unapplied: a part of the text no step can express, typically a lingering restriction ("You cannot conduct your Battle Phase this turn", "your opponent cannot declare an attack this turn"), in the card's words; the effect resolves without it and says so. Use it only for such a side clause. If the main thing the effect does can't be expressed, the script is null.
+
+# Continuous effects
+
+{"apply": "stats", "to", "atk", "def", "per", "levelDelta", "levelSet", "while"}: while this card is face-up on the field and every "while" condition holds (the conditions above, with "you" as this card's controller), the monsters in "to" gain atk and def (negative for a loss) and their Level changes by levelDelta, or becomes levelSet (else null). "to" is "self" or a filter of the face-up monsters it applies to. "per" multiplies atk and def: null for a flat amount, a filter to count cards ("for each face-up Level 2 monster you control", counting this card too if it fits), or "materials" for "for each Xyz Material attached to this card". Examples: "All monsters you control gain 200 ATK during your Battle Phase only": to {"side": "you", "place": "monsters", "faceUp": true, ...}, atk 200, while [{"if": "turn", "whose": "you"}, {"if": "phase", "phases": ["battle"]}]. "This card is Level 4 while in face-up Defense Position": to "self", levelSet 4, while [{"if": "position", "position": "defense"}].
 
 Steps (each "cards" is a selection):
 - {"do": "destroy", "cards"}: destroy cards on the field.
@@ -399,7 +418,16 @@ export async function compileSheets(db: Db, options: { force?: boolean; names?: 
       // A trigger without a readable event would never fire, so its whole sheet entry is kept but logged.
       const whenChecked = e.when === null ? null : when.safeParse(parseJson(e.when));
       if (whenChecked && !whenChecked.success) log(`${row.name}: effect ${i}'s when is invalid (${z.prettifyError(whenChecked.error)})`);
-      const base = { ...e, speed, when: whenChecked?.success ? whenChecked.data : null, status: 'unverified' as const };
+      const continuousChecked = e.continuous === null ? null : continuous.safeParse(parseJson(e.continuous));
+      const continuousProblem = !continuousChecked ? null : !continuousChecked.success ? z.prettifyError(continuousChecked.error) : e.kind !== 'continuous' ? `a ${e.kind} effect can't have a continuous part` : null;
+      if (continuousProblem) log(`${row.name}: effect ${i}'s continuous part is invalid, so it does nothing (${continuousProblem})`);
+      const base = {
+        ...e,
+        speed,
+        when: whenChecked?.success ? whenChecked.data : null,
+        continuous: continuousChecked?.success && !continuousProblem ? continuousChecked.data : null,
+        status: 'unverified' as const,
+      };
       if (e.script === null) return { ...base, script: null };
       const checked = script.safeParse(parseJson(e.script));
       const problem = !checked.success

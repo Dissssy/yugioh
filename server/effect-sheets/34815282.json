@@ -14,6 +14,7 @@
       "targets": "1 face-up monster on the field with more than 1000 original ATK that has a Level",
       "when": null,
       "script": null,
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -27,6 +28,7 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": null,
       "status": "unverified"
     }
   ],

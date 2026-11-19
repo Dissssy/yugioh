@@ -48,6 +48,8 @@ export interface SheetEffect {
   when: When | null;
   /** The effect as data that code runs exactly, with no judge, or null when the judge applies it (see docs/effects.md). */
   script: Script | null;
+  /** For a `continuous` effect: what it does as data, applied by code while the card is face-up on the field; else null. */
+  continuous: Continuous | null;
   /**
    * `unverified` as compiled; `verified` once a person checked it (the compiler then never overwrites the sheet);
    * `flagged` after a player reported the card or an appeal overturned its script, so its script is set aside and the
@@ -116,8 +118,12 @@ export interface Script {
 }
 
 export type Condition =
-  /** At least `min` cards fit `filter`. */
-  | { if: 'count'; filter: CardFilter; min: number }
+  /** At least `min` and at most `max` (null: no bound) cards fit `filter`. */
+  | { if: 'count'; filter: CardFilter; min: number; max: number | null }
+  /** It is this player's turn ("during your Battle Phase" is this and a `phase`). */
+  | { if: 'turn'; whose: 'you' | 'opponent' }
+  /** This card is face-up in this battle position ("while in face-up Defense Position"). */
+  | { if: 'position'; position: Position }
   /** The activating player hasn't conducted their Battle Phase this turn. */
   | { if: 'before_battle_phase' }
   /** It is one of these phases. For an ignition effect this replaces the Main Phase it otherwise needs (Speed Warrior). */
@@ -143,6 +149,27 @@ export type Step =
   | { do: 'negate_attack' }
   /** Detaches `count` Xyz Materials from an Xyz Monster the selection picks (only those with that many can be picked). */
   | { do: 'detach'; cards: Selection; count: number };
+
+/**
+ * A continuous effect: it applies, with no activation, while its card is face-up on the field and every `while`
+ * condition holds ("you" is the card's controller). Code derives it on each read (see continuous.ts), so nothing is
+ * stored and nothing can go stale.
+ * - `stats`: the cards in `to` gain `atk`/`def` (times the count of `per`: the cards that fit it, or this card's Xyz
+ *   Materials), and their Level changes by `levelDelta` or becomes `levelSet`.
+ */
+export type Continuous = {
+  apply: 'stats';
+  to: Affected;
+  atk: number;
+  def: number;
+  per: CardFilter | 'materials' | null;
+  levelDelta: number;
+  levelSet: number | null;
+  while: Condition[];
+};
+
+/** The cards a continuous effect applies to: this card, or face-up monsters that fit a filter. */
+export type Affected = 'self' | CardFilter;
 
 /**
  * A stat read from a card when the step resolves: `self` or the first target still there. `original` is the printed

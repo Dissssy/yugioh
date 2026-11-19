@@ -25,6 +25,7 @@
         ],
         "unapplied": null
       },
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -79,6 +80,7 @@
         ],
         "unapplied": null
       },
+      "continuous": null,
       "status": "unverified"
     }
   ],

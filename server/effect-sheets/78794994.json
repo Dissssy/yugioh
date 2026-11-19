@@ -14,6 +14,7 @@
       "targets": "1 monster in either player's Graveyard",
       "when": null,
       "script": null,
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -27,6 +28,7 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": null,
       "status": "unverified"
     }
   ],

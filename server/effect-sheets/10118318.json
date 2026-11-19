@@ -60,6 +60,7 @@
         ],
         "unapplied": "You cannot conduct your Battle Phase the turn you activate this card."
       },
+      "continuous": null,
       "status": "unverified"
     }
   ],

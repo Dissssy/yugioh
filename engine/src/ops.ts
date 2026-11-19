@@ -2,7 +2,8 @@
 // model can act on. Nothing here decides what a card's text means; it only refuses what the board can't allow.
 
 import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
-import { locate, monsterZonesFor, other, statsOf } from './state.ts';
+import { statsOf } from './continuous.ts';
+import { locate, monsterZonesFor, other } from './state.ts';
 import { type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
 
 export type OpResult = { ok: true; events: DuelEvent[] } | { ok: false; error: string };

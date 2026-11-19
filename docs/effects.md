@@ -41,6 +41,10 @@ Most effects are fixed: what The Warrior Returning Alive needs ("a Warrior monst
 
 Opus writes the scripts when it compiles a sheet, only where the whole effect fits the vocabulary; anything else gets `script: null` and the judge. Structured outputs can't hold the script schema (too many unions), so the model returns each script as JSON text and the compiler checks it with the same Zod schema; a script that doesn't check is dropped with a log line, leaving that effect to the judge.
 
+## Continuous effects
+
+An always-on effect can't be a judge call, so a `continuous` sheet entry carries `continuous`: data that code applies whenever its card is face-up on the field (`Continuous` in `engine/src/types.ts`, applied in `engine/src/continuous.ts`). Nothing is stored. Every read of a monster's stats (`statsOf`, `levelNow`) derives what is in force from the board as it is, so an effect stops the moment its card leaves or its `while` conditions fail, and it can't go stale. A Spell or Trap applies only once its activation has resolved. So far the vocabulary has one kind, `stats`: the cards in `to` (`self`, or face-up monsters that fit a filter) gain ATK/DEF, optionally once per card that fits `per` or per Xyz Material, and their Level changes or becomes a number. Conditions are the script conditions plus `turn` ("during your turn") and `position` ("while in face-up Defense Position"). Level is worked out apart from ATK and DEF, so an effect that counts monsters of a Level (Tenshin) never needs its own ATK. Opus writes `continuous` when it compiles a sheet, as JSON text checked like scripts; a continuous effect without it does nothing.
+
 ## Reports: when a script is wrong
 
 A player who thinks a card is ruled wrongly pins the card's details (right-click or Shift) and uses **Report a ruling problem**, saying what the game did and what it should have done (`POST /api/duels/:id/report`; up to 5 per player per duel, only for cards they can see). An appeal that overturns a scripted ruling does the same on its own, with the appeal's `ruling` as the note. Either way, at once and in every duel:

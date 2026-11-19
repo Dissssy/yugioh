@@ -31,7 +31,7 @@ const sheets: Record<number, EffectSheet> = {
     textHash: '',
     model: 'test',
     materials: null,
-    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, status: 'unverified' }],
+    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, continuous: null, status: 'unverified' }],
   },
 };
 

@@ -2,7 +2,8 @@
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
 import { scriptOf, scriptProblem } from './script.ts';
-import { evolve, locate, monsterZoneFree, monsterZonesFor, onField, other, statsOf } from './state.ts';
+import { levelNow, statsOf } from './continuous.ts';
+import { evolve, locate, monsterZoneFree, monsterZonesFor, onField, other } from './state.ts';
 import {
   HAND_LIMIT,
   HANDS,
@@ -228,7 +229,7 @@ function extraSummonAction(state: DuelState, seat: Seat, id: string): ExtraSummo
 
 /** Every set of `count` face-up monsters the player controls whose current Level is the Xyz Monster's. */
 function xyzMaterials(state: DuelState, seat: Seat, materials: Extract<Materials, { summon: 'xyz' }>): string[][] {
-  const fitting = ownMonsters(state, seat).filter((m) => m.faceUp && statsOf(state, m.id).level === materials.level).map((m) => m.id);
+  const fitting = ownMonsters(state, seat).filter((m) => m.faceUp && levelNow(state, m.id) === materials.level).map((m) => m.id);
   const sets: string[][] = [];
   const pick = (from: number, chosen: string[]) => {
     if (chosen.length === materials.count) return void sets.push(chosen);
@@ -243,9 +244,9 @@ function xyzMaterials(state: DuelState, seat: Seat, materials: Extract<Materials
  * non-Tuners, whose current Levels add up exactly. Each set lists the Tuner first, then the rest in field order.
  */
 function synchroMaterials(state: DuelState, seat: Seat, materials: Extract<Materials, { summon: 'synchro' }>, level: number): string[][] {
-  const faceUp = ownMonsters(state, seat).filter((m) => m.faceUp && statsOf(state, m.id).level !== null);
+  const faceUp = ownMonsters(state, seat).filter((m) => m.faceUp && levelNow(state, m.id) !== null);
   const isTuner = (id: string) => /\bTuner\b/.test(cardOf(state, id).type);
-  const levelOf = (id: string) => statsOf(state, id).level!;
+  const levelOf = (id: string) => levelNow(state, id)!;
   const tuners = faceUp.filter((m) => isTuner(m.id) && (materials.tuner === null || cardOf(state, m.id).name === materials.tuner));
   const others = faceUp.filter((m) => !isTuner(m.id)).map((m) => m.id);
   const { min, max } = materials.nonTuners;
@@ -290,8 +291,8 @@ function extraSummon(run: Run, seat: Seat, intent: Extract<Intent, { type: 'extr
 // effect needs (`when`). A scripted effect's own conditions are checked here too (script.ts); for any other effect
 // they are the judge's call. Triggers go on the chain in their own step (chain.ts).
 
-/** Spell/Trap properties that can be activated. Continuous, Equip and Field cards need continuous effects (a later layer). */
-const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play'];
+/** Spell/Trap properties that can be activated. Equip cards and Continuous Traps, which tie themselves to a monster, come later. */
+const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play', 'Continuous'];
 const ACTIVATABLE_TRAPS = ['Normal'];
 
 type Activate = Extract<LegalAction, { type: 'activate' }>;
@@ -319,9 +320,8 @@ function candidates(state: DuelState, seat: Seat, id: string): Candidate[] {
   // In a chain, a response must be at least as fast as the link it answers, and never Spell Speed 1.
   const minSpeed = window ? Math.max(2, ...state.chain.map((l) => speedOf(state, l))) : 1;
   const p = state.players[seat];
-  // A Spell/Trap with a continuous effect stays on the field doing something (Swords of Revealing Light); that needs
-  // continuous effects, which arrive in a later layer.
-  const lingers = card.kind !== 'monster' && sheet.effects.some((e) => e.kind === 'continuous');
+  // A Normal Spell/Trap that stays on the field doing something (Swords of Revealing Light) comes later.
+  const lingers = card.kind !== 'monster' && card.race === 'Normal' && sheet.effects.some((e) => e.kind === 'continuous');
   const result: Candidate[] = [];
   sheet.effects.forEach((effect, index) => {
     if (lingers || effect.speed < minSpeed) return;

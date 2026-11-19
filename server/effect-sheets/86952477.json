@@ -14,6 +14,21 @@
       "targets": null,
       "when": null,
       "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 0,
+        "def": 0,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": 4,
+        "while": [
+          {
+            "if": "position",
+            "position": "defense"
+          }
+        ]
+      },
       "status": "unverified"
     }
   ],

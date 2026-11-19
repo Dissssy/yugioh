@@ -2,8 +2,9 @@
 // Code decides these exactly, so an activation a script rules out is never offered.
 
 import { cardOf } from './rules.ts';
-import { levelOf, locate, monsterZonesFor, statsOf, summonMatches, summonName } from './state.ts';
-import type { CardFilter, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
+import { levelNow, statsOf } from './continuous.ts';
+import { levelOf, locate, monsterZonesFor, summonMatches, summonName } from './state.ts';
+import type { CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
 export function scriptOf(state: DuelState, card: string, effect: number): Script | null {
@@ -38,8 +39,13 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   if (!filter.types.every((t) => words.includes(t.toLowerCase()))) return false;
   if (filter.races.length && !filter.races.some((r) => r.toLowerCase() === card.race.toLowerCase())) return false;
   if (filter.attributes.length && !filter.attributes.some((a) => a.toUpperCase() === card.attribute)) return false;
-  const stats = at.zone === 'monsters' ? statsOf(state, id) : { atk: card.atk, def: card.def, level: levelOf(card) };
-  return inRange(stats.level, filter.level) && inRange(stats.atk, filter.atk) && inRange(stats.def, filter.def);
+  // Current stats on the field, printed ones elsewhere. ATK and DEF are only worked out when the filter asks, since an
+  // effect that counts monsters by Level (Tenshin) changes ATK itself.
+  const monster = at.zone === 'monsters';
+  if (filter.level && !inRange(monster ? levelNow(state, id) : levelOf(card), filter.level)) return false;
+  if (!filter.atk && !filter.def) return true;
+  const stats = monster ? statsOf(state, id) : { atk: card.atk, def: card.def };
+  return inRange(stats.atk, filter.atk) && inRange(stats.def, filter.def);
 }
 
 /** Every card that fits, except `except` (the card being activated). */
@@ -123,6 +129,39 @@ export function targetable(state: DuelState, script: Script, seat: Seat, card: s
 
 const phaseNames = { draw: 'Draw Phase', standby: 'Standby Phase', main1: 'Main Phase 1', battle: 'Battle Phase', main2: 'Main Phase 2', end: 'End Phase' };
 
+/** Why a condition doesn't hold for player `seat` and their card `card`, or null if it does. */
+export function conditionProblem(state: DuelState, c: Condition, seat: Seat, card: string): string | null {
+  switch (c.if) {
+    case 'before_battle_phase':
+      return state.turnPlayer === seat && (state.phase === 'battle' || state.phase === 'main2' || state.phase === 'end') ? 'It can only be activated before you conduct your Battle Phase.' : null;
+    case 'count': {
+      const n = cardsFitting(state, c.filter, seat, card).length;
+      if (n < c.min) return `It needs ${c.min === 1 ? 'a' : `at least ${c.min} of:`} ${describeFilter(c.filter)}.`;
+      return c.max !== null && n > c.max ? `It needs ${c.max === 0 ? 'no' : `at most ${c.max} of:`} ${describeFilter(c.filter)}.` : null;
+    }
+    case 'phase':
+      return c.phases.includes(state.phase) ? null : `It can only be activated during the ${c.phases.map((p) => phaseNames[p]).join(' or ')}.`;
+    case 'turn':
+      return (state.turnPlayer === seat) === (c.whose === 'you') ? null : `It only applies during ${c.whose === 'you' ? 'your' : "your opponent's"} turn.`;
+    case 'position': {
+      const at = locate(state, card);
+      const m = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]! : null;
+      return m?.faceUp && m.position === c.position ? null : `It needs this card to be in face-up ${c.position === 'attack' ? 'Attack' : 'Defense'} Position.`;
+    }
+    case 'materials': {
+      const n = materialsOf(state, card).length;
+      if ((c.min === null || n >= c.min) && (c.max === null || n <= c.max)) return null;
+      return c.max === 0 ? 'It needs this card to have no Xyz Material.' : `It needs this card to have ${c.min ?? 0}${c.max === null ? ' or more' : ` to ${c.max}`} Xyz Materials.`;
+    }
+    case 'summoned_this_turn': {
+      const at = locate(state, card);
+      const summoned = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.summoned : null;
+      if (summoned && summoned.turn === state.turn && summonMatches(summoned.how, c.how)) return null;
+      return `It needs this card to have been ${c.how.length ? `${c.how.map((h) => summonName[h]).join(' or ')} ` : ''}Summoned this turn.`;
+    }
+  }
+}
+
 /**
  * Why a scripted activation is illegal on this board, or null if it is legal (or the effect has no script). Judged
  * before the cost is paid: a card the cost will use can't also be one of its targets. `cause` is the event it is
@@ -132,26 +171,8 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
   const script = scriptOf(state, card, effect);
   if (!script) return null;
   for (const c of script.conditions) {
-    if (c.if === 'before_battle_phase' && state.turnPlayer === seat && (state.phase === 'battle' || state.phase === 'main2' || state.phase === 'end')) {
-      return 'It can only be activated before you conduct your Battle Phase.';
-    }
-    if (c.if === 'count' && cardsFitting(state, c.filter, seat, card).length < c.min) {
-      return `It needs ${c.min === 1 ? 'a' : `at least ${c.min} of:`} ${describeFilter(c.filter)}.`;
-    }
-    if (c.if === 'phase' && !c.phases.includes(state.phase)) return `It can only be activated during the ${c.phases.map((p) => phaseNames[p]).join(' or ')}.`;
-    if (c.if === 'materials') {
-      const n = materialsOf(state, card).length;
-      if ((c.min !== null && n < c.min) || (c.max !== null && n > c.max)) {
-        return c.max === 0 ? 'It needs this card to have no Xyz Material.' : `It needs this card to have ${c.min ?? 0}${c.max === null ? ' or more' : ` to ${c.max}`} Xyz Materials.`;
-      }
-    }
-    if (c.if === 'summoned_this_turn') {
-      const at = locate(state, card);
-      const summoned = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.summoned : null;
-      if (!summoned || summoned.turn !== state.turn || !summonMatches(summoned.how, c.how)) {
-        return `It needs this card to have been ${c.how.length ? `${c.how.map((h) => summonName[h]).join(' or ')} ` : ''}Summoned this turn.`;
-      }
-    }
+    const problem = conditionProblem(state, c, seat, card);
+    if (problem) return problem;
   }
   const costCards = new Set<string>();
   let costCount = 0;

@@ -21,6 +21,7 @@
         "canMiss": true
       },
       "script": null,
+      "continuous": null,
       "status": "unverified"
     }
   ],

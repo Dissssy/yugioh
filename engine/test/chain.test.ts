@@ -83,6 +83,7 @@ const effect = (e: Partial<SheetEffect> & Pick<SheetEffect, 'kind'>): SheetEffec
   targets: null,
   when: null,
   script: null,
+  continuous: null,
   status: 'unverified',
   ...e,
 });

@@ -44,6 +44,7 @@
           }
         ]
       },
+      "continuous": null,
       "status": "unverified"
     },
     {
@@ -88,6 +89,7 @@
           }
         ]
       },
+      "continuous": null,
       "status": "unverified"
     }
   ],
