@@ -13,13 +13,21 @@ main:has(.duel) { max-width: none; padding: 0; }
   inset: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-rows: auto minmax(0, 1fr);
   background: var(--bg);
   overflow: hidden;
 }
 .duel-loading { display: grid; place-items: center; height: 100%; color: var(--muted); }
 
 /* Table */
+.duel > .table { grid-column: 1; grid-row: 1 / -1; }
+.duel > .duel-bar { grid-column: 2; grid-row: 1; }
+.duel > .panel { grid-column: 2; grid-row: 2; }
 .table {
+  /* Presses on the table are taps, drags and long presses on cards; never a page scroll, zoom or the browser's own menu. */
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
   position: relative;
   min-height: 0;
   padding: 8px 12px;
@@ -139,7 +147,8 @@ main:has(.duel) { max-width: none; padding: 0; }
   background: color-mix(in srgb, var(--fg) 5%, transparent);
 }
 .phase-strip.yours { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.strip-turn { grid-column: 1 / 3; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 6px; padding: 0 10px; min-width: 0; }
+.strip-turn { grid-column: 1 / 3; display: flex; padding: 0 10px; min-width: 0; }
+.turn-controls { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 6px; min-width: 0; }
 .turn-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .strip-chain { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .strip-prompt { grid-column: 6 / 8; display: flex; align-items: center; padding: 0 10px; min-width: 0; }
@@ -208,6 +217,8 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
 .card-tooltip {
   z-index: 50;
   width: 320px;
+  max-width: calc(100vw - 16px);
+  box-sizing: border-box;
   max-height: 80vh;
   overflow: auto;
   padding: 10px;
@@ -327,3 +338,30 @@ form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit
 .chain-list span { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chain-list .mine { border-color: var(--accent); }
 .chain-list .theirs { border-color: var(--danger); }
+
+/* A compact board: the turn controls and what the duel is waiting for move to a bar above the log. */
+.duel-bar { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--fg) 5%, transparent); }
+.duel-bar.yours { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.duel-bar .turn-controls { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 6px 10px; }
+.duel-bar .turn-controls button:last-child:not(.phase) { margin-left: auto; }
+.bar-prompt > * { flex-wrap: wrap; }
+.bar-prompt .choice-text { -webkit-line-clamp: 4; }
+
+/* Tight zones: Life Points plates a zone wide beside the hands, and smaller labels. */
+.duel.tight .lp-plate { min-width: 0; width: var(--zone); box-sizing: border-box; padding: 2px 4px; border-radius: 6px; }
+.duel.tight .lp-name { display: none; }
+.duel.tight .lp { font-size: 0.9em; text-align: center; }
+.duel.tight .lp-label { display: none; }
+.duel.tight .lp-delta { right: auto; left: 100%; font-size: 1em; }
+.duel.tight .own-row .lp-plate { top: calc(var(--zone) * 0.2); }
+.duel.tight .zone-label { font-size: 0.6em; }
+.duel.tight .pile-count { padding: 0 4px; font-size: 0.6em; white-space: nowrap; }
+.duel.tight .banished-chip, .duel.tight .pile-options { font-size: 0.55em; }
+.duel.tight .chain-list { font-size: 0.65em; }
+
+/* A portrait screen: the board across the full width, then the bar, then the log and chat. */
+.duel.stacked { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
+.duel.stacked > * { grid-column: 1; grid-row: auto; }
+.duel.stacked .table { padding: 4px; }
+.duel.stacked .duel-bar { border-left: 0; }
+.duel.stacked .panel { border-left: 0; border-top: 1px solid var(--line); padding: 8px 12px; }
