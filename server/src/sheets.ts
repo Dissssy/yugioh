@@ -57,6 +57,7 @@ const selection = z.union([
     rank: z.object({ stat: z.enum(['atk', 'def', 'level']), order: z.enum(['lowest', 'highest']) }).nullable(),
   }),
   z.object({ from: z.literal('all'), filter: cardFilter }),
+  z.object({ from: z.literal('battling'), filter: cardFilter }),
 ]) satisfies z.ZodType<Selection>;
 
 const player = z.enum(['you', 'opponent']);
@@ -87,6 +88,8 @@ const step = z.union([
   z.object({ do: z.literal('negate_activation'), destroy: z.boolean() }),
   z.object({ do: z.literal('negate_effects'), cards: selection }),
   z.object({ do: z.literal('set_again') }),
+  z.object({ do: z.literal('add_counters'), cards: selection, counter: z.enum(['spell']), count: z.number().int().min(1), max: z.number().int().min(1).nullable() }),
+  z.object({ do: z.literal('remove_counters'), cards: selection, counter: z.enum(['spell']), count: z.number().int().min(1) }),
 ]) satisfies z.ZodType<Step>;
 
 const condition = z.union([
@@ -125,12 +128,13 @@ const continuous = z.union([
 ]) satisfies z.ZodType<Continuous>;
 
 const when = z.object({
-  event: z.enum(['summoned', 'attack_declared', 'attacked', 'destroyed_by_battle', 'battle_destroying', 'battle_damage', 'activated']),
+  event: z.enum(['summoned', 'attack_declared', 'attacked', 'destroyed_by_battle', 'destroyed_by_effect', 'battle_destroying', 'battle_damage', 'activated', 'damage_step_start', 'end_phase']),
   self: z.boolean(),
   filter: cardFilter.nullable(),
   how: z.array(summonKind),
   from: z.enum(['field', 'hand', 'graveyard']),
   canMiss: z.boolean(),
+  by: z.enum(['you', 'opponent']).nullable(),
 }) satisfies z.ZodType<When>;
 
 const materials = z.union([
@@ -335,6 +339,8 @@ Steps (each "cards" is a selection):
 - {"do": "negate_activation", "destroy"}: "negate the activation" of what this effect answers (its when is "activated"); destroy true for "and if you do, destroy it" or "destroy that monster".
 - {"do": "negate_effects", "cards"}: "but it has its effects negated" / "their effects are negated" on the monsters selected (after a special_summon of the targets, {"from": "targets"} still reaches them).
 - {"do": "set_again"}: "Set this card face-down instead of sending it to the GY".
+- {"do": "add_counters", "cards", "counter", "count", "max"}: "place 1 Spell Counter on it (max. 1)": counter "spell", max 1 (null for no limit).
+- {"do": "remove_counters", "cards", "counter", "count"}: "remove 1 Spell Counter from this card", usually in cost.
 - {"do": "link", "cards"}: equip this card to the monster the selection picks ("Equip this card to 1 face-up monster": targets that monster, then link {"from": "targets"}), or tie a Continuous Trap to its target or to the monster it Special Summoned (special_summon {"from": "targets"}, then link {"from": "targets"}). An Equip Spell or a Continuous Trap that works through its monster goes to the GY if it resolves without being linked.
 - {"do": "forbid", "player", "what"}: for the rest of this turn that player can't "declare_attack" ("your opponent cannot declare an attack this turn") or can't conduct their "battle_phase" ("you cannot conduct your Battle Phase the turn you activate this card"; pair it with the before_battle_phase condition). Such a restriction is a step, not unapplied.
 - {"do": "detach", "cards", "count"}: detach count Xyz Materials from an Xyz Monster the selection picks. "Detach 1 Xyz Material from this card" (usually a cost): cards {"from": "self"}, count 1. "Detach 1 Xyz Material from a monster you control": a choose selection of face-up Xyz monsters you control.
@@ -343,6 +349,7 @@ Selections:
 - {"from": "self"}: the card being activated.
 - {"from": "targets"}: the declared targets.
 - {"from": "choose", "filter", "min", "max", "rank"}: the activating player picks min to max cards that fit, when the effect resolves (or when the cost is paid). Use min 0 for "you can". rank {"stat": "atk" | "def" | "level", "order": "lowest" | "highest"} restricts the pick to those tied for that extreme ("the monster with the lowest ATK (your choice, if tied)"), else null. Every choose with min 1 or more must have enough cards that fit for the activation to be legal, which is how "Special Summon 1 ... from your Deck" needs a match in the Deck.
+- {"from": "battling", "filter"}: the monster battling this card, if it fits ("if this card attacks a face-up Defense Position monster: destroy that monster" is a destroy step on {"from": "battling"} with faceUp true, position "defense"; the effect doesn't fire without one).
 - {"from": "all", "filter"}: every card that fits ("destroy all face-up monsters your opponent controls"); the activation needs at least one.
 
 Filters ({"side", "place", "kinds", "types", "races", "attributes", "faceUp", "position", "level", "atk", "def"}; empty lists and nulls don't restrict):
@@ -358,12 +365,13 @@ Filters ({"side", "place", "kinds", "types", "races", "attributes", "faceUp", "p
 
 # When
 
-{"event", "self", "filter", "how", "from", "canMiss"}, every property required:
-- event: "summoned" (a monster is Summoned), "attack_declared" (a monster declares an attack; the event's card is the attacker), "attacked" (a monster is targeted for an attack: "When this card is targeted for an attack"; the event's card is the target), "destroyed_by_battle", "battle_destroying" (a monster destroys another by battle: "When this card destroys a monster by battle"; the event's card is the destroyer, so self is true), "battle_damage" (a monster inflicts battle damage to its controller's opponent), or "activated" (a card or effect is activated: "When a Trap Card is activated", "When a monster effect is activated"; the event's card is the one whose activation it is, and the filter says which: kinds ["trap"], or kinds ["monster"] with place "any"). An event outside this list (sent to the GY by an effect, flipped, targeted, leaves the field, a phase starts): when null, and the effect never fires; say so in its window.
+{"event", "self", "filter", "how", "from", "canMiss", "by"}, every property required:
+- event: "summoned" (a monster is Summoned), "attack_declared" (a monster declares an attack; the event's card is the attacker), "attacked" (a monster is targeted for an attack: "When this card is targeted for an attack"; the event's card is the target), "destroyed_by_battle", "battle_destroying" (a monster destroys another by battle: "When this card destroys a monster by battle"; the event's card is the destroyer, so self is true), "battle_damage" (a monster inflicts battle damage to its controller's opponent),, "activated" (a card or effect is activated: "When a Trap Card is activated", "When a monster effect is activated"; the event's card is the one whose activation it is, and the filter says which: kinds ["trap"], or kinds ["monster"] with place "any"), "destroyed_by_effect" (a card on the field is destroyed by a card effect: "If this face-up card is destroyed by your opponent's card effect"; the filter is checked as the card was on the field, only its side and faceUp), "damage_step_start" (the start of the Damage Step; the event's card is the attacker, so "if this card attacks" is self true) or "end_phase" (the End Phase starts: "During the End Phase"; self false, filter null; "of the turn this card was Summoned" is a summoned_this_turn condition). An event outside this list (sent to the GY by an effect, flipped, targeted, leaves the field): when null, and the effect never fires; say so in its window.
 - self: true when it must happen to this card ("When this card is Normal Summoned", "If this card inflicts battle damage").
 - filter: the card it happens to must fit this filter (with self, for "When this face-up Attack Position card is targeted for an attack": faceUp true, position "attack") as it is after the event ("When your opponent Normal Summons a monster with 1000 or more ATK": side "opponent", place "monsters", atk {"min": 1000, "max": null}; "When an opponent's monster declares an attack": side "opponent", place "monsters"); null for any card. "you" and "opponent" are from this card's controller's view.
 - how: for "summoned", which Summons count: any of "normal" (a Tribute Summon is one), "flip", "special" (any Special Summon, Synchro and Xyz Summons included), "synchro", "xyz"; [] for "Summoned" with no kind. "If this card is Synchro Summoned" is ["synchro"].
 - from: for a trigger, where this card is when it fires: "field" (face-up on the field), "hand" or "graveyard" ("When this card is destroyed by battle and sent to the GY" is "graveyard"). For other effects "field".
+- by: for "destroyed_by_effect", whose card effect it must be: "you", "opponent" ("by your opponent's card effect"), or null for anyone's. null for other events.
 - canMiss: true only for an optional trigger worded "When ...: You can" (it misses the timing unless its event was the last thing to happen); false for "If ..." and for mandatory triggers.
 
 Examples:

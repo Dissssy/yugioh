@@ -59,7 +59,8 @@
           "synchro"
         ],
         "from": "field",
-        "canMiss": false
+        "canMiss": false,
+        "by": null
       },
       "script": {
         "conditions": [],

@@ -16,6 +16,7 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
       faceUp: c.faceUp,
       stats: monsters && c.faceUp ? statsOf(state, c.id) : null,
       materials: c.materials.map(shown),
+      spellCounters: c.counters.spell ?? 0,
     };
   const deckList = [
     ...new Set(Object.values(state.instances).filter((i) => i.owner === seat).map((i) => i.code)),
@@ -308,6 +309,10 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'effectsNegated':
       return `${name(event.card)} has its effects negated`;
     case 'setAgain':
+      return null;
+    case 'countersChanged':
+      return `${name(event.card)} ${event.delta > 0 ? 'gets' : 'loses'} ${Math.abs(event.delta)} ${event.counter === 'spell' ? 'Spell Counter' : 'counter'}${Math.abs(event.delta) === 1 ? '' : 's'}`;
+    case 'damageStepStarted':
       return null;
     case 'linked':
       return `${name(event.card)} ${state.cards[state.instances[event.card]!.code]!.race === 'Equip' ? 'equipped to' : 'tied to'} ${name(event.to)}`;

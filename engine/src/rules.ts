@@ -547,7 +547,7 @@ function attack(run: Run, seat: Seat, attackerId: string, target: number | 'dire
   }
   run.emit({ type: 'attackDeclared', player: seat, attacker: attacker.id, target: target === 'direct' ? null : foeMonsters[target]!.id });
   // Triggers and responses to the attack come first (Mirror Force); damage follows once they are done (damage below).
-  run.emit({ type: 'checkpoint', cause: run.state.happened.find((h) => h.event === 'attack_declared')!, then: { do: 'damage' } });
+  run.emit({ type: 'checkpoint', cause: run.state.happened.find((h) => h.event === 'attack_declared')!, then: { do: 'damage_step' } });
 }
 
 // ---------------------------------------------------------------------------
@@ -556,31 +556,57 @@ function attack(run: Run, seat: Seat, attackerId: string, target: number | 'dire
 /** The events that come once a sequence is over: the attack's damage, or the end of the turn. */
 export function continuation(state: DuelState, then: Then): DuelEvent[] {
   const run = new Run(state);
-  if (then.do === 'damage') damage(run);
+  if (then.do === 'damage_step') damageStep(run);
+  else if (then.do === 'damage') damage(run);
   else if (then.do === 'endTurn') endTurn(run, then.discard);
   return run.events;
 }
 
+/** The attacking monster, if it is still on its controller's field face-up in Attack Position. */
+function stillAttacking(state: DuelState, id: string): boolean {
+  const at = locate(state, id);
+  const m = at?.zone === 'monsters' && at.seat === state.turnPlayer ? state.players[at.seat].monsters[at.index]! : null;
+  return !!m && m.faceUp && m.position === 'attack';
+}
+
+/** Whether the attack's target is still the opponent's monster. */
+const targetStands = (state: DuelState, target: string) => {
+  const at = locate(state, target);
+  return at?.zone === 'monsters' && at.seat === other(state.turnPlayer);
+};
+
 /**
- * The attack's damage, if it still stands. An attacker that left the field or changed position stops attacking. A
- * target that left, or a direct attack whose defender now has a monster, is a replay: the attack ends and the
- * monster may attack again. Triggers from the battle (Magna Drago) follow.
+ * The attack enters the Damage Step, if it still stands. An attacker that left the field or changed position stops
+ * attacking. A target that left, or a direct attack whose defender now has a monster, is a replay: the attack ends and
+ * the monster may attack again. Triggers at the start of the Damage Step (Zubaba Knight) come before damage.
+ */
+function damageStep(run: Run) {
+  const state = run.state;
+  // An attack an effect negated is already over.
+  if (!state.attack) return run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
+  const { attacker, target } = state.attack;
+  const foeMonsters = state.players[other(state.turnPlayer)].monsters;
+  if (!stillAttacking(state, attacker)) run.emit({ type: 'attackEnded', replay: false });
+  else if (target === null ? foeMonsters.some((m) => m !== null) : !targetStands(state, target)) run.emit({ type: 'attackEnded', replay: true });
+  else {
+    run.emit({ type: 'damageStepStarted' });
+    return run.emit({ type: 'checkpoint', cause: null, then: { do: 'damage' } });
+  }
+  run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
+}
+
+/**
+ * The attack's damage. If the attacker or its target left the field during the Damage Step, the attack just ends.
+ * Triggers from the battle (Magna Drago) follow.
  */
 function damage(run: Run) {
   const state = run.state;
   const seat = state.turnPlayer;
   const foe = other(seat);
-  // An attack an effect negated is already over.
   if (!state.attack) return run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
   const { attacker: attackerId, target } = state.attack;
-  const at = locate(state, attackerId);
-  const attacker = at?.zone === 'monsters' && at.seat === seat ? state.players[seat].monsters[at.index]! : null;
-  const targetAt = target === null ? null : locate(state, target);
-  const foeMonsters = state.players[foe].monsters;
-  if (!attacker || !attacker.faceUp || attacker.position !== 'attack') run.emit({ type: 'attackEnded', replay: false });
-  else if (target === null ? foeMonsters.some((m) => m !== null) : targetAt?.zone !== 'monsters' || targetAt.seat !== foe) {
-    run.emit({ type: 'attackEnded', replay: true });
-  } else {
+  if (!stillAttacking(state, attackerId) || (target !== null && !targetStands(state, target))) run.emit({ type: 'attackEnded', replay: false });
+  else {
     const atk = statsOf(state, attackerId).atk;
     if (target === null) run.emit({ type: 'battleDamage', player: foe, amount: atk, by: attackerId });
     else battle(run, attackerId, atk, target);
@@ -644,7 +670,7 @@ function endTurn(run: Run, chosen: string[]) {
   const kept = chosen.filter((id) => hand.includes(id));
   const discard = [...kept, ...hand.filter((id) => !kept.includes(id)).reverse()].slice(0, excess);
   const expiring = selfDestructing(state);
-  if (expiring.length > 0) run.emit({ type: 'destroyed', cards: expiring });
+  for (const id of expiring) run.emit({ type: 'destroyed', cards: [id], by: locate(state, id)!.seat });
   if (discard.length > 0) run.emit({ type: 'discarded', player: seat, cards: discard });
   beginTurn(run, other(seat), state.turn + 1);
 }

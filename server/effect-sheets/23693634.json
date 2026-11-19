@@ -57,7 +57,8 @@
         "filter": null,
         "how": [],
         "from": "graveyard",
-        "canMiss": true
+        "canMiss": true,
+        "by": null
       },
       "script": null,
       "continuous": null,

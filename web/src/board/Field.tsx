@@ -144,6 +144,11 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
       role={pick ? 'button' : undefined}
     >
       {card && card.materials.length > 0 && <Materials cards={card.materials} />}
+      {card && card.spellCounters > 0 && (
+        <span className="counters-chip" aria-label={`${card.spellCounters} Spell Counter${card.spellCounters === 1 ? '' : 's'}`} title="Spell Counters">
+          {card.spellCounters}
+        </span>
+      )}
       {card && (
         <FieldCard
           view={card}

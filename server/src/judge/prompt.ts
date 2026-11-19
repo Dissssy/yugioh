@@ -69,9 +69,10 @@ export function describeState(state: DuelState, activating: string | null = null
   const fieldCard = (zone: 'monsters' | 'spellTraps', index: number, c: FieldCard) => {
     const activated = c.placedTurn < state.turn ? `Set on turn ${c.placedTurn}, flipped face-up because it is being activated now` : 'placed from the hand, face-up because it is being activated now';
     const face = c.id === activating && zone === 'spellTraps' ? activated : c.faceUp ? 'face-up' : 'face-down';
-    if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face}${c.linked ? `, linked to ${label(c.linked)}` : ''})`;
+    const counters = c.counters.spell ? `, ${c.counters.spell} Spell Counter${c.counters.spell === 1 ? '' : 's'}` : '';
+    if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face}${c.linked ? `, linked to ${label(c.linked)}` : ''}${counters})`;
     const s = statsOf(state, c.id);
-    return `[${index}${index >= MONSTER_ZONES ? ', Extra Monster Zone' : ''}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''}${c.materials.length ? `, Xyz Materials attached: ${c.materials.map(label).join('; ')}` : ''})`;
+    return `[${index}${index >= MONSTER_ZONES ? ', Extra Monster Zone' : ''}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''}${c.materials.length ? `, Xyz Materials attached: ${c.materials.map(label).join('; ')}` : ''}${counters})`;
   };
   const phase = { draw: 'Draw Phase', standby: 'Standby Phase', main1: 'Main Phase 1', battle: 'Battle Phase', main2: 'Main Phase 2', end: 'End Phase' };
   lines.push(`Turn ${state.turn}: player ${state.turnPlayer}'s turn, ${phase[state.phase]}. Normal Summons/Sets used this turn: ${state.normalSummons} of ${state.normalSummonLimit}.`);
@@ -146,6 +147,10 @@ function describeHappening(state: DuelState, h: Happening): string {
       return `player ${h.player} activated ${label(h.card)} (chain link ${h.link + 1})`;
     case 'phase':
       return `the start of player ${h.player}'s ${h.phase === 'battle' ? 'Battle Phase' : 'End Phase'}`;
+    case 'destroyed_by_effect':
+      return `player ${h.player}'s ${h.faceUp ? 'face-up' : 'face-down'} ${label(h.card)} was destroyed by player ${h.by}'s card effect`;
+    case 'damage_step_start':
+      return `the Damage Step of player ${h.player}'s ${label(h.card)}'s attack ${h.target ? `on ${label(h.target)}` : 'directly'} started`;
   }
 }
 

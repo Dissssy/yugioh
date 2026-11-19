@@ -20,9 +20,31 @@
           "normal"
         ],
         "from": "field",
-        "canMiss": false
+        "canMiss": false,
+        "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "add_counters",
+                "cards": {
+                  "from": "self"
+                },
+                "counter": "spell",
+                "count": 1,
+                "max": 1
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     },
@@ -36,7 +58,55 @@
       "effect": "Have 1 face-up monster you control gain 500 ATK, until the End Phase.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "remove_counters",
+            "cards": {
+              "from": "self"
+            },
+            "counter": "spell",
+            "count": 1
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "modify_stats",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "place": "monsters",
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "faceUp": true,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null
+                },
+                "atk": 500,
+                "def": 0,
+                "levelDelta": 0,
+                "levelSet": null,
+                "until": "end_of_turn"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

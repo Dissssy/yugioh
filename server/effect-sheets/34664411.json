@@ -84,8 +84,45 @@
       "cost": "",
       "effect": "Draw 1 card.",
       "targets": null,
-      "when": null,
-      "script": null,
+      "when": {
+        "self": true,
+        "filter": {
+          "side": "you",
+          "place": "any",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "from": "graveyard",
+        "canMiss": false,
+        "by": "opponent",
+        "event": "destroyed_by_effect"
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "draw",
+                "player": "you",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

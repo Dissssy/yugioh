@@ -77,7 +77,7 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(op.cards.length > 0, 'Name at least one card to destroy.');
       check(new Set(op.cards).size === op.cards.length, 'Each card may be named once.');
       for (const id of op.cards) onField(state, id);
-      run.emit({ type: 'destroyed', cards: op.cards });
+      run.emit({ type: 'destroyed', cards: op.cards, by: ctx.player });
       return;
     }
     case 'change_lp': {
@@ -164,6 +164,23 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       const target = onField(state, op.card);
       check(target.at.zone === 'monsters' && target.card.faceUp, 'Only a face-up monster has its effects negated this way.');
       run.emit({ type: 'effectsNegated', card: op.card });
+      return;
+    }
+    case 'add_counters': {
+      check(Number.isInteger(op.count) && op.count > 0, 'count must be a positive whole number.');
+      const target = onField(state, op.card);
+      check(target.card.faceUp, 'Counters go on face-up cards.');
+      const now = target.card.counters[op.counter] ?? 0;
+      const delta = Math.min(op.count, (op.max ?? Infinity) - now);
+      check(delta > 0, `${cardOf(state, op.card).name} can't hold more of those counters.`);
+      run.emit({ type: 'countersChanged', card: op.card, counter: op.counter, delta });
+      return;
+    }
+    case 'remove_counters': {
+      check(Number.isInteger(op.count) && op.count > 0, 'count must be a positive whole number.');
+      const target = onField(state, op.card);
+      check((target.card.counters[op.counter] ?? 0) >= op.count, `${cardOf(state, op.card).name} doesn't have ${op.count} of those counters.`);
+      run.emit({ type: 'countersChanged', card: op.card, counter: op.counter, delta: -op.count });
       return;
     }
     case 'set_again': {

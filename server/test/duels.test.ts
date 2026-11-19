@@ -159,7 +159,7 @@ describe('a challenge link played by a guest', () => {
     if (otherUpdate.type !== 'steps') throw new Error('expected steps');
     const other = otherUpdate.steps.at(-1)!.view;
     expect(view.players[view.you].monsters[0]).toMatchObject({ faceUp: false, card: { id: (set as { card: string }).card } });
-    expect(other.players[view.you].monsters[0]).toEqual({ card: { hidden: true }, position: 'defense', faceUp: false, stats: null, materials: [] });
+    expect(other.players[view.you].monsters[0]).toEqual({ card: { hidden: true }, position: 'defense', faceUp: false, stats: null, materials: [], spellCounters: 0 });
     expect(otherUpdate.steps.map((s) => s.entry?.text)).toEqual([expect.stringMatching(/Set a monster$/)]);
     expect(JSON.stringify(otherUpdate)).not.toContain((set as { card: string }).card);
 

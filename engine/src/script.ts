@@ -97,6 +97,10 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): st
   if (!('cards' in step)) return null;
   const sel = step.cards;
   if (step.do === 'special_summon' && freeMonsterZones(state, seat) === 0) return 'You have no free Monster Zone to Special Summon into.';
+  if (step.do === 'remove_counters' && selected(state, sel, seat, card).every((id) => (onFieldCard(state, id)?.counters[step.counter] ?? 0) < step.count)) {
+    return `There aren't ${step.count} ${step.counter === 'spell' ? 'Spell Counter' : 'counter'}${step.count === 1 ? '' : 's'} to remove.`;
+  }
+  if (sel.from === 'battling' && battling(state, sel.filter, seat, card).length === 0) return `This card isn't battling a ${describeFilter(sel.filter)}.`;
   if (sel.from === 'all' && cardsFitting(state, sel.filter, seat, card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
   if (sel.from === 'choose' && chooseFrom(state, sel, seat, card).length < sel.min) {
     return sel.min === 1 ? `There is no ${describeFilter(sel.filter)}.` : `There are fewer than ${sel.min} of: ${describeFilter(sel.filter)}.`;
@@ -104,11 +108,38 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): st
   return null;
 }
 
+/** The monster battling this card, if it fits the filter. */
+export function battling(state: DuelState, filter: CardFilter, seat: Seat, card: string): string[] {
+  const a = state.attack;
+  const other = a?.attacker === card ? a.target : a?.target === card ? a.attacker : null;
+  return other && locate(state, other)?.zone === 'monsters' && fits(state, other, filter, seat) ? [other] : [];
+}
+
+/** The cards a selection that needs no choice picks; for `choose`, every card it could pick. */
+function selected(state: DuelState, sel: Selection, seat: Seat, card: string): string[] {
+  switch (sel.from) {
+    case 'self':
+      return [card];
+    case 'targets':
+      return [];
+    case 'choose':
+      return chooseFrom(state, sel, seat, card);
+    case 'all':
+      return cardsFitting(state, sel.filter, seat, card);
+    case 'battling':
+      return battling(state, sel.filter, seat, card);
+  }
+}
+
+const onFieldCard = (state: DuelState, id: string) => {
+  const at = locate(state, id);
+  return at?.zone === 'monsters' || at?.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
+};
+
 /** The Xyz Monsters a detach step may take its materials from: those its selection allows that have enough. */
 export function detachFrom(state: DuelState, step: Extract<Step, { do: 'detach' }>, seat: Seat, card: string): string[] {
   const sel = step.cards;
-  const ids = sel.from === 'self' ? [card] : sel.from === 'choose' ? chooseFrom(state, sel, seat, card) : sel.from === 'all' ? cardsFitting(state, sel.filter, seat, card) : [];
-  return ids.filter((id) => materialsOf(state, id).length >= step.count);
+  return selected(state, sel, seat, card).filter((id) => materialsOf(state, id).length >= step.count);
 }
 
 /** The Xyz Materials attached to a monster on the field (none for any other card). */

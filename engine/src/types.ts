@@ -78,10 +78,22 @@ export interface When {
   /**
    * `summoned`: a monster is Summoned. `attack_declared`: a monster declares an attack (the event's card is the
    * attacker). `attacked`: a monster is targeted for an attack (the event's card is the target). `destroyed_by_battle`: a monster is destroyed by battle. `battle_damage`: a monster inflicts battle
-   * damage to its controller's opponent. `battle_destroying`: a monster destroys another by battle (the event's card is the one that destroyed it: "When this card destroys a monster by battle"). `activated`: a card or effect is activated (Counter Traps); not offered until
-   * negation arrives.
+   * damage to its controller's opponent. `battle_destroying`: a monster destroys another by battle (the event's card is the one that destroyed it: "When this card destroys a monster by battle"). `activated`: a card or effect is activated (Counter Traps).
+   * `destroyed_by_effect`: a card on the field is destroyed by a card effect; the filter is checked against the card as
+   * it was on the field, for its side and whether it was face-up. `damage_step_start`: the start of the Damage Step (the
+   * event's card is the attacker). `end_phase`: the End Phase starts.
    */
-  event: 'summoned' | 'attack_declared' | 'attacked' | 'destroyed_by_battle' | 'battle_destroying' | 'battle_damage' | 'activated';
+  event:
+    | 'summoned'
+    | 'attack_declared'
+    | 'attacked'
+    | 'destroyed_by_battle'
+    | 'destroyed_by_effect'
+    | 'battle_destroying'
+    | 'battle_damage'
+    | 'activated'
+    | 'damage_step_start'
+    | 'end_phase';
   /** Only when it happens to this card itself ("When this card is Normal Summoned"). */
   self: boolean;
   /** The card it happens to must fit this as it is after the event ("this face-up Attack Position card"); null for any card. */
@@ -95,6 +107,8 @@ export interface When {
    * happened during the last chain link to resolve). "If ..." triggers and mandatory ones never miss.
    */
   canMiss: boolean;
+  /** For `destroyed_by_effect`: whose card effect it must be ("by your opponent's card effect"); null for anyone's. */
+  by: 'you' | 'opponent' | null;
 }
 
 /**
@@ -134,6 +148,9 @@ export type Condition =
   | { if: 'materials'; min: number | null; max: number | null };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
+/** Kinds of counters. The starter decks only use Spell Counters. */
+export type Counter = 'spell';
+
 export type Step =
   | { do: 'destroy'; cards: Selection }
   | { do: 'move'; cards: Selection; to: Destination }
@@ -160,6 +177,10 @@ export type Step =
   | { do: 'negate_effects'; cards: Selection }
   /** This card is Set face-down again instead of going to the GY when it resolves (Scrap-Iron Scarecrow). */
   | { do: 'set_again' }
+  /** Places counters on each card selected, up to `max` on a card (null: no limit). */
+  | { do: 'add_counters'; cards: Selection; counter: Counter; count: number; max: number | null }
+  /** Removes counters from the card selected (a cost: "remove 1 Spell Counter from this card"). */
+  | { do: 'remove_counters'; cards: Selection; counter: Counter; count: number }
   /** For the rest of this turn, that player can't declare attacks, or can't conduct their Battle Phase. */
   | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden };
 
@@ -217,7 +238,9 @@ export type Selection =
   | { from: 'self' }
   | { from: 'targets' }
   | { from: 'choose'; filter: CardFilter; min: number; max: number; rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null }
-  | { from: 'all'; filter: CardFilter };
+  | { from: 'all'; filter: CardFilter }
+  /** The monster battling this card, if it fits ("At the start of the Damage Step, if this card attacks a face-up Defense Position monster: destroy that monster"). */
+  | { from: 'battling'; filter: CardFilter };
 
 /** Cards that fit a description such as "1 face-up Warrior monster your opponent controls". Empty lists and nulls don't restrict. */
 export interface CardFilter {
@@ -312,10 +335,15 @@ export type Happening =
   | { event: 'battle_damage'; card: string; player: Seat; amount: number; group: number }
   /** A card or effect was activated: chain link `link` (from 0). Only responses watch for it, never triggers. */
   | { event: 'activated'; card: string; player: Seat; link: number; group: number }
+  /** `by`: the player whose card effect destroyed it; `player`: who controlled it; `faceUp`: whether it was face-up. */
+  | { event: 'destroyed_by_effect'; card: string; player: Seat; by: Seat; faceUp: boolean; group: number }
+  /** The Damage Step of `card`'s attack starts; `target` is the monster it attacks, null for a direct attack. */
+  | { event: 'damage_step_start'; card: string; player: Seat; target: string | null; group: number }
   | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number };
 
 /** What happens once a sequence of triggers, responses and chains is over. */
-export type Then = { do: 'open' } | { do: 'damage' } | { do: 'endTurn'; discard: string[] };
+/** `damage_step`: the attack's Damage Step starts; `damage`: its damage calculation. */
+export type Then = { do: 'open' } | { do: 'damage_step' } | { do: 'damage' } | { do: 'endTurn'; discard: string[] };
 
 /**
  * Where the duel is: deciding who goes first, or in the timing of effects (docs/chains.md).
@@ -359,6 +387,8 @@ export interface FieldCard {
   linked: string | null;
   /** Its effects are negated while it stays face-up on the field ("but it has its effects negated"). */
   effectsNegated: boolean;
+  /** Counters on it, by kind. */
+  counters: Partial<Record<Counter, number>>;
 }
 
 export type Zones = (FieldCard | null)[];
@@ -480,6 +510,8 @@ export type Op =
   | { op: 'negate_effects'; card: string }
   /** Sets the card being resolved face-down again instead of sending it to the GY. */
   | { op: 'set_again' }
+  | { op: 'add_counters'; card: string; counter: Counter; count: number; max: number | null }
+  | { op: 'remove_counters'; card: string; counter: Counter; count: number }
   | { op: 'declare_targets'; cards: string[] }
   | { op: 'choose_effect'; choice: string };
 
@@ -584,7 +616,8 @@ export type DuelEvent =
   | { type: 'specialSummoned'; player: Seat; card: string; zone: number; position: Position }
   /** A Synchro or Xyz Summon from the Extra Deck. Synchro materials go to the GY; Xyz materials are attached to it. */
   | { type: 'extraSummoned'; player: Seat; card: string; how: 'synchro' | 'xyz'; materials: string[]; zone: number; position: Position }
-  | { type: 'destroyed'; cards: string[] }
+  /** `by`: the player whose card effect destroyed them. */
+  | { type: 'destroyed'; cards: string[]; by: Seat }
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
   | { type: 'forbidden'; player: Seat; what: Forbidden }
@@ -592,6 +625,9 @@ export type DuelEvent =
   | { type: 'activationNegated'; link: number; card: string }
   | { type: 'effectsNegated'; card: string }
   | { type: 'setAgain' }
+  | { type: 'countersChanged'; card: string; counter: Counter; delta: number }
+  /** The attack moves into its Damage Step. */
+  | { type: 'damageStepStarted' }
   | { type: 'normalSummonGranted'; player: Seat }
   /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
   | { type: 'linkResolved' }
@@ -734,6 +770,8 @@ export interface FieldCardView {
   stats: { atk: number; def: number; level: number | null } | null;
   /** Its Xyz Materials, which both players can see. */
   materials: CardView[];
+  /** Spell Counters on it. */
+  spellCounters: number;
 }
 
 export interface PlayerSideView {

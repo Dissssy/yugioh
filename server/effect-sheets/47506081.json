@@ -18,7 +18,8 @@
         "filter": null,
         "how": [],
         "from": "field",
-        "canMiss": true
+        "canMiss": true,
+        "by": null
       },
       "script": {
         "conditions": [],

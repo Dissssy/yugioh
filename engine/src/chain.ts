@@ -13,7 +13,16 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
   if (when.event === 'attacked' && h.event === 'attack_declared' && h.target) {
     return whenMatches(state, when, { event: 'attacked', card: h.target, player: h.player === 0 ? 1 : 0, attacker: h.card, group: h.group }, card, seat);
   }
-  if (h.event === 'phase' || when.event !== h.event) return false;
+  if (h.event === 'phase') return when.event === 'end_phase' && h.phase === 'end';
+  if (when.event !== h.event) return false;
+  // A destroyed card is checked as it was on the field: whose it was, and whether it was face-up.
+  if (h.event === 'destroyed_by_effect') {
+    const mine = h.player === seat;
+    const f = when.filter;
+    if (when.by && (h.by === seat) !== (when.by === 'you')) return false;
+    if (when.self && h.card !== card) return false;
+    return !f || ((f.side === 'either' || mine === (f.side === 'you')) && (f.faceUp === null || f.faceUp === h.faceUp));
+  }
   if (h.event === 'summoned' && !summonMatches(h.how, when.how)) return false;
   if (when.self && h.card !== card) return false;
   return !when.filter || fits(state, h.card, when.filter, seat);
@@ -144,6 +153,10 @@ export function describeCause(state: DuelState, cause: Happening | null): string
       return `the battle damage ${name(cause.card)} inflicted`;
     case 'activated':
       return `the activation of ${name(cause.card)}`;
+    case 'destroyed_by_effect':
+      return `the destruction of ${name(cause.card)}`;
+    case 'damage_step_start':
+      return `the start of the Damage Step`;
   }
 }
 

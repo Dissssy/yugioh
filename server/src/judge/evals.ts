@@ -20,6 +20,7 @@ import {
   evolve,
   locate,
   nextStep,
+  triggerEvent,
   replay,
   statsOf,
   type CardData,
@@ -62,12 +63,14 @@ export interface EvalCase {
   board: [Side, Side];
   /**
    * What happens first, each by the player named, given card IDs by name: an activation here is ruled on but doesn't
-   * resolve, and code then does what it does on its own (passes for a player with nothing to activate, battle steps).
+   * resolve, and then the duel goes on by itself as the server runs it (passes for a player with nothing to activate,
+   * battle steps, mandatory triggers and the chains they start) until a player must act.
    */
   before?: (id: (name: string) => string) => [Seat, Intent][];
   /** The player who activates (default 0). */
   seat?: Seat;
-  activate: string;
+  /** The card to activate; without one, the case checks the board once `before` is over (a mandatory trigger). */
+  activate?: string;
   /** Which of the card's effects to activate, by its index in the sheet (default 0). */
   effect?: number;
   /** Names or choices to pick, one list per question, in order (`before` first). Unlisted questions get the first options. */
@@ -611,6 +614,57 @@ export const CASES: EvalCase[] = [
     check: (b) => all(expectAt(b, 'Speed Warrior', '1:monsters'), expectAt(b, 'Tenshin', '1:monsters'), b.monster('Tenshin')?.effectsNegated ? null : 'Tenshin is not negated'),
   },
   {
+    name: 'zubaba knight destroys a face-up defense position monster it attacks',
+    board: [{ monsters: ['Zubaba Knight'] }, { defense: ['Spirit of the Harp'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Zubaba Knight'), target: 0 }],
+    ],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Spirit of the Harp', '1:gy'), b.lp(1) === 8000 ? null : `LP is ${b.lp(1)}`),
+  },
+  {
+    name: 'majestic mech senku goes to the gy in the end phase of its summon turn',
+    board: [{ hand: ['Majestic Mech - Senku'] }, {}],
+    before: (id) => [
+      [0, { type: 'normalSummon', card: id('Majestic Mech - Senku'), tributes: [], zone: 0 }],
+      [0, { type: 'endTurn', discard: [] }],
+    ],
+    legal: true,
+    check: (b) => expectAt(b, 'Majestic Mech - Senku', '0:gy'),
+  },
+  {
+    name: 'frequency magician spends its spell counter for 500 atk',
+    board: [{ hand: ['Frequency Magician'], monsters: ['Axe Raider'] }, {}],
+    before: (id) => [[0, { type: 'normalSummon', card: id('Frequency Magician'), tributes: [], zone: 1 }]],
+    activate: 'Frequency Magician',
+    effect: 1,
+    picks: [['Axe Raider']],
+    legal: true,
+    check: (b) => all(b.monster('Axe Raider')?.atk === 2200 ? null : `Axe Raider has ${b.monster('Axe Raider')?.atk} ATK`, b.monster('Frequency Magician')?.counters.spell === 0 ? null : 'the counter is still there'),
+  },
+  {
+    name: 'frequency magician needs a spell counter',
+    board: [{ monsters: ['Frequency Magician', 'Axe Raider'] }, {}],
+    activate: 'Frequency Magician',
+    effect: 1,
+    legal: false,
+  },
+  {
+    name: "lucky iron axe draws when the opponent's effect destroys it",
+    board: [{ monsters: ['Axe Raider'], hand: ['Lucky Iron Axe'], deck: ['Dark Blade'] }, { set: ['Raigeki Break'], hand: ['Twister'] }],
+    before: (id) => [
+      [0, { type: 'activate', card: id('Lucky Iron Axe'), effect: 0, zone: 0 }],
+      [1, { type: 'pass' }],
+      [0, { type: 'enterBattle' }],
+    ],
+    seat: 1,
+    activate: 'Raigeki Break',
+    picks: [['Axe Raider'], ['Twister'], ['Lucky Iron Axe']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Lucky Iron Axe', '0:gy'), expectAt(b, 'Dark Blade', '0:hand')),
+  },
+  {
     name: 'xyz effect needs an xyz summon',
     board: [{ set: ['Xyz Effect'] }, { monsters: ['Axe Raider'] }],
     activate: 'Xyz Effect',
@@ -748,6 +802,10 @@ export async function runCase(c: EvalCase, board: DuelState, model: ModelCall | 
   };
   const deps = { model, ask, random: Math.random };
   const state = await playBefore(c, board, deps);
+  if (!c.activate) {
+    const problem = unmatched[0] ?? c.check?.(new Board(state)) ?? null;
+    return { name: c.name, passed: problem === null, detail: problem ?? 'the board is as expected', records: [] };
+  }
   const p = state.players[seat];
   const id = [...p.hand, ...p.graveyard, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((m) => (m ? [m.id] : []))].find(
     (x) => cardOf(state, x).name === c.activate,
@@ -765,10 +823,14 @@ export async function runCase(c: EvalCase, board: DuelState, model: ModelCall | 
   if (checked.record.legal !== c.legal) return result(false, `ruled ${checked.record.legal ? 'legal' : 'illegal'}: ${checked.record.summary}`);
   if (!c.legal) return result(true, checked.record.summary);
   scratch = checked.events.reduce(evolve, scratch);
+  // Nobody responds: the chain resolves.
+  while (scratch.step.at === 'respond') scratch = evolve(scratch, { type: 'passed', player: scratch.step.priority });
   const resolved = await rule({ stage: 'resolution', state: scratch, link: scratch.chain.at(-1)! }, deps);
   records.push(resolved.record);
   if (resolved.record.error) return result(false, `judge failed resolving: ${resolved.record.error}`);
-  const after = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, scratch);
+  const resolvedState = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, scratch);
+  // With the chain over, what it set off follows (Lucky Iron Axe's draw); a chain still building is checked as it is.
+  const after = resolvedState.chain.length ? resolvedState : await settle(resolvedState, deps);
   if (picks.length) unmatched.push(`the judge never asked for ${JSON.stringify(picks[0])}`);
   const problem = unmatched[0] ?? c.check?.(new Board(after)) ?? null;
   return result(problem === null, problem ?? resolved.record.summary);
@@ -787,14 +849,26 @@ async function playBefore(c: EvalCase, board: DuelState, deps: Parameters<typeof
     if (!d.ok) throw new Error(`${c.name}: ${d.error}`);
     state = d.events.reduce(evolve, state);
     if (intent.type === 'activate') state = (await rule({ stage: 'activation', state, link: state.chain.at(-1)! }, deps)).events.reduce(evolve, state);
-    for (;;) {
-      const next = nextStep(state);
-      if (next?.kind === 'events') state = next.events.reduce(evolve, state);
-      else if (next?.kind === 'wait' && next.autoPass) state = evolve(state, { type: 'passed', player: next.player });
-      else break;
-    }
+    state = await settle(state, deps);
   }
   return state;
+}
+
+/** Goes on with the duel as the server would, until a player must act. */
+async function settle(from: DuelState, deps: Parameters<typeof rule>[1]): Promise<DuelState> {
+  let state = from;
+  for (;;) {
+    const next = nextStep(state);
+    if (next?.kind === 'events') state = next.events.reduce(evolve, state);
+    else if (next?.kind === 'wait' && next.autoPass) state = evolve(state, { type: 'passed', player: next.player });
+    else if (next?.kind === 'trigger') {
+      state = triggerEvent(next.trigger).reduce(evolve, state);
+      state = (await rule({ stage: 'activation', state, link: state.chain.at(-1)! }, deps)).events.reduce(evolve, state);
+    } else if (next?.kind === 'resolve') {
+      const resolved = await rule({ stage: 'resolution', state, link: state.chain.at(-1)! }, deps);
+      state = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, state);
+    } else return state;
+  }
 }
 
 /** Runs the matching cases `repeat` times; each round runs its cases in parallel. Returns one list per round. */

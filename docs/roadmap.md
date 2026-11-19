@@ -60,6 +60,7 @@ The biggest step: ten monsters and a dozen Spells and Traps in the two decks nee
 - **Phase triggers:** `when` on a phase ("During the End Phase of the turn this card was Summoned", Majestic Mech - Senku; Swords' countdown).
 - **Leaving the field:** "When this card leaves the field" and "If this card is destroyed by your opponent's card effect" (Birthright, Limit Reverse, Symbols of Duty, Lucky Iron Axe, Miniaturize).
 - **Counters:** Spell Counters (Frequency Magician), with ops to place and remove them.
+- **Built 2026-11-19.** New `when` events: `end_phase` (the End Phase's checkpoint is a happening triggers see), `damage_step_start` (an attack that still stands enters its Damage Step before damage; a target that leaves after that just ends the attack, no replay) and `destroyed_by_effect` (`destroyed` events name whose effect it was; `When.by` says whose it must be, and the filter is checked against the card as it was on the field). The selection `battling` is "the monster battling this card". `FieldCard.counters` holds counters by kind, with the steps and ops `add_counters` (with a max) and `remove_counters`; both players see Spell Counters on the board. Scripted: Majestic Mech - Senku's End Phase, Zubaba Knight, Frequency Magician (both effects) and Lucky Iron Axe's draw, each with an eval case. Eval cases with no activation check what mandatory triggers did, and every case now lets the chain and its triggers finish. The judge's smallest tools are no longer strict, as the API allows 20 strict tools. Still to do: Gachi Gachi Gantetsu's "detach instead of being destroyed", and Senku's draw (judged) doesn't check "by a direct attack".
 
 ## 7. Rollback (architecture layer 6)
 
@@ -82,6 +83,6 @@ What each card that doesn't fully work yet waits on. Every other effect in the t
 | 3 Xyz | Number 39: Utopia, Grenosaurus, Gachi Gachi Gantetsu (Summon), Xyz Energy, Xyz Effect, Reinforced Space |
 | 4 Continuous | Banner of Courage, Tenshin, Blade Knight, Shine Knight, Sonic Chick, Marauding Captain (lock), Gachi Gachi Gantetsu, Colossal Fighter, Lucky Iron Axe, Synchro Boost, Symbols of Duty, Swords of Revealing Light, Spellbinding Circle, Miniaturize, Birthright, Limit Reverse, Threatening Roar, Reinforce Truth (restriction) |
 | 5 Negation | Seven Tools of the Bandit, Divine Wrath, Scrap-Iron Scarecrow, Junk Synchron and Speed Bird ("effects negated") |
-| 6 Timing | Zubaba Knight, Majestic Mech - Senku (End Phase), Frequency Magician |
+| 6 Timing | Zubaba Knight, Majestic Mech - Senku (End Phase), Frequency Magician, Lucky Iron Axe (draw), Gachi Gachi Gantetsu (detach instead) |
 
 Each card is checked off when it has an eval case and a person has marked its sheet verified.

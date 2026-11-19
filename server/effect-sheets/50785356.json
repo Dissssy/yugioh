@@ -21,7 +21,8 @@
           "special"
         ],
         "from": "field",
-        "canMiss": true
+        "canMiss": true,
+        "by": null
       },
       "script": null,
       "continuous": null,

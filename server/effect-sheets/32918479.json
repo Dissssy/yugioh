@@ -18,7 +18,8 @@
         "filter": null,
         "how": [],
         "from": "field",
-        "canMiss": false
+        "canMiss": false,
+        "by": null
       },
       "script": null,
       "continuous": null,
@@ -33,8 +34,40 @@
       "cost": "",
       "effect": "Send it to the Graveyard.",
       "targets": null,
-      "when": null,
-      "script": null,
+      "when": {
+        "self": false,
+        "filter": null,
+        "how": [],
+        "from": "field",
+        "canMiss": false,
+        "by": null,
+        "event": "end_phase"
+      },
+      "script": {
+        "conditions": [
+          {
+            "if": "summoned_this_turn",
+            "how": []
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "self"
+                },
+                "to": "graveyard"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

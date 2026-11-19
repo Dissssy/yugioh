@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto';
 import {
   applyOp,
+  battling,
   cardOf,
   chooseFrom,
   cardsFitting,
@@ -31,6 +32,8 @@ import {
 } from '@yugioh/engine';
 import { checkQuestion, judge, type JudgeCall, type JudgeDeps, type JudgeOutcome, type ModelCall } from './judge.ts';
 import type { AskPlayer } from './tools.ts';
+
+const counterName = (counter: 'spell', count: number) => `${count} ${counter === 'spell' ? 'Spell Counter' : 'counter'}${count === 1 ? '' : 's'}`;
 
 /** The `model` of a ruling made by a script. */
 export const SCRIPT = 'script';
@@ -97,6 +100,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     if (sel.from === 'self') return locate(state, self) ? [self] : [];
     if (sel.from === 'targets') return link.targets.filter((id) => summonedHere.has(id) || (script.targets && fits(state, id, script.targets.filter, seat)));
     if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, self);
+    if (sel.from === 'battling') return battling(state, sel.filter, seat, self);
     const options = chooseFrom(state, sel, seat, self);
     const max = Math.min(sel.max, options.length, limit);
     if (max === 0) return [];
@@ -231,6 +235,23 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       case 'set_again':
         apply({ op: 'set_again' });
         return `${name} will be Set again.`;
+      case 'add_counters': {
+        const counted: string[] = [];
+        for (const id of await select(step.cards, 'place counters on')) {
+          const at = locate(state, id);
+          const c = at && (at.zone === 'monsters' || at.zone === 'spellTraps') ? state.players[at.seat][at.zone][at.index]! : null;
+          if (!c?.faceUp || (step.max !== null && (c.counters[step.counter] ?? 0) >= step.max)) continue;
+          apply({ op: 'add_counters', card: id, counter: step.counter, count: step.count, max: step.max });
+          counted.push(id);
+        }
+        return counted.length ? `${list(counted.map((id) => shown(id, before)))} got ${counterName(step.counter, step.count)}.` : null;
+      }
+      case 'remove_counters': {
+        const [id] = await select(step.cards, 'remove counters from', 1);
+        if (!id) return null;
+        apply({ op: 'remove_counters', card: id, counter: step.counter, count: step.count });
+        return `${counterName(step.counter, step.count)} removed from ${shown(id, before)}.`;
+      }
       case 'forbid': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
         apply({ op: 'forbid', player, what: step.what });

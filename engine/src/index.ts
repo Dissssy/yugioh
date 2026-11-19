@@ -5,4 +5,4 @@ export { describeCause, nextStep, pendingTriggers, triggerEvent, whenMatches, ty
 export { applyOp, type OpContext, type OpResult } from './ops.ts';
 export { entryFor, logFor, reviewLog, viewFor, visibleTo } from './view.ts';
 export { inForce, levelNow, statsOf, type InForce } from './continuous.ts';
-export { cardsFitting, chooseFrom, conditionProblem, describeFilter, detachFrom, materialsOf, feasibleOptions, fits, scriptOf, scriptProblem, targetable } from './script.ts';
+export { battling, cardsFitting, chooseFrom, conditionProblem, describeFilter, detachFrom, materialsOf, feasibleOptions, fits, scriptOf, scriptProblem, targetable } from './script.ts';

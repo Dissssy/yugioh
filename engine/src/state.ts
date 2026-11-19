@@ -142,6 +142,8 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
     switch (event.type) {
       case 'checkpoint':
         s.step = { at: 'triggers', cause: event.cause, then: event.then, handled: [], passed: [] };
+        // A phase starting is something triggers can wait for too ("During the End Phase").
+        if (event.cause?.event === 'phase') s.happened.push(event.cause);
         return;
       case 'triggersDone': {
         const step = s.step;
@@ -315,7 +317,21 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         return;
       }
       case 'destroyed':
-        for (const id of event.cards) sendToGraveyard(s, id);
+        for (const id of event.cards) {
+          const at = locate(s, id);
+          if (!at || (at.zone !== 'monsters' && at.zone !== 'spellTraps')) continue;
+          const faceUp = s.players[at.seat][at.zone][at.index]!.faceUp;
+          sendToGraveyard(s, id);
+          s.happened.push({ event: 'destroyed_by_effect', card: id, player: at.seat, by: event.by, faceUp, group });
+        }
+        return;
+      case 'countersChanged': {
+        const counters = onField(s, event.card).counters;
+        counters[event.counter] = (counters[event.counter] ?? 0) + event.delta;
+        return;
+      }
+      case 'damageStepStarted':
+        s.happened.push({ event: 'damage_step_start', card: s.attack!.attacker, player: s.turnPlayer, target: s.attack!.target, group });
         return;
       case 'lpChanged': {
         const p = s.players[event.player];
@@ -400,6 +416,7 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     activatedTurn: null,
     linked: null,
     effectsNegated: false,
+    counters: {},
   };
 }
 
