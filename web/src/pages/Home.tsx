@@ -1,5 +1,5 @@
 import type { Me } from '@yugioh/shared';
-import { Duels, NewChallenge } from './Duels.tsx';
+import { Duels, NewChallenge, PlayClaude } from './Duels.tsx';
 import { Notice } from './Notice.tsx';
 
 export const formatDate = (iso: string) =>
@@ -40,6 +40,7 @@ export function Home({ me }: { me: Me }) {
       return (
         <Dashboard title={`Hi ${user.username}`}>
           <NewChallenge />
+          {user.isAdmin && <PlayClaude />}
         </Dashboard>
       );
     }

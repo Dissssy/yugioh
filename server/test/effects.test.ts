@@ -257,7 +257,7 @@ describe('a card effect the judge rules on', () => {
     const { body: list } = await admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`);
     // Per call: Haiku 5.5 1000 input, 5000 cache read, 100 output = $0.0002; Opus 5.5 the same = $0.007.
     const expected = responses['claude-haiku-5-5']! * 0.0002 + responses['claude-opus-5-5']! * 0.007;
-    expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 5, appeals: 2, cost: expect.closeTo(expected, 10) });
+    expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 5, appeals: 2, aiCalls: 0, cost: expect.closeTo(expected, 10) });
     expect(list.totalCost).toBeCloseTo(expected, 10);
     const report = await admin.fetch(`${h.baseUrl}/api/admin/duels/${duel.id}/report`);
     expect(await report.text()).toContain(`Estimated API cost: $${expected.toFixed(4)}`);
@@ -305,7 +305,7 @@ describe('a scripted card effect', () => {
     ]);
     // It called no model, so the admin sees no cost for this duel.
     const { body: list } = await s.admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`);
-    expect(list.duels.find((d) => d.id === s.duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, cost: 0 });
+    expect(list.duels.find((d) => d.id === s.duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, aiCalls: 0, cost: 0 });
     mine.close();
   });
 

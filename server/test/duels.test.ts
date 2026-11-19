@@ -226,7 +226,7 @@ describe('a challenge link played by a guest', () => {
     expect(body.events[0]!.event.type).toBe('duelStarted');
     expect(body.events.at(-1)!.event.type).toBe('chatted');
     const { body: list } = await admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`);
-    expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, cost: 0 });
+    expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, aiCalls: 0, cost: 0 });
   });
 
   it("tells the admin why the duel list failed, so the page shows the reason instead of hiding the list", async () => {
