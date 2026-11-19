@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { AdminUser, Me, User } from '@yugioh/shared';
+import type { AdminUser, Me, User, UserSettings } from '@yugioh/shared';
 import { ADMIN_EMAIL, Browser, startHarness, type Harness } from './harness.ts';
 
 let h: Harness;
@@ -70,7 +70,7 @@ describe('accounts and approval', () => {
 
   it('gives each account a random username and keeps its email private', async () => {
     const self = await me(player);
-    expect(self).toEqual({ kind: 'user', user: expect.not.objectContaining({ email: expect.anything() }) });
+    expect(self).toEqual({ kind: 'user', user: expect.not.objectContaining({ email: expect.anything() }), settings: expect.anything() });
     const user = (self as Extract<Me, { kind: 'user' }>).user;
     expect(user.username).toMatch(/^[A-Za-z]+_[A-Za-z]+_\d{1,4}$/);
     // Logging in again keeps the username.
@@ -92,6 +92,21 @@ describe('accounts and approval', () => {
     // Changing only the case of your own name is fine.
     expect((await rename(admin, 'ETHAN')).body.username).toBe('ETHAN');
     expect((await new Browser().json(`${h.baseUrl}/api/me/username`, { method: 'POST', body: '{"username":"Joey"}' })).status).toBe(401);
+  });
+
+  it("keeps each account's settings, starting from the defaults", async () => {
+    const change = (b: Browser, body: unknown) =>
+      b.json<UserSettings>(`${h.baseUrl}/api/me/settings`, { method: 'PATCH', body: JSON.stringify(body) });
+
+    expect(await me(player)).toMatchObject({ settings: { opponentCards: 'faceThem' } });
+    expect((await change(player, { opponentCards: 'faceYou' })).body).toEqual({ opponentCards: 'faceYou' });
+    expect(await me(player)).toMatchObject({ settings: { opponentCards: 'faceYou' } });
+    // Another account's settings are its own.
+    expect(await me(admin)).toMatchObject({ settings: { opponentCards: 'faceThem' } });
+
+    expect(await change(player, { opponentCards: 'sideways' })).toMatchObject({ status: 400, body: { error: 'invalid_settings' } });
+    expect(await change(player, { volume: 11 })).toMatchObject({ status: 400 });
+    expect((await change(new Browser(), { opponentCards: 'faceYou' })).status).toBe(401);
   });
 
   it('logs out', async () => {

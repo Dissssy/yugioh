@@ -260,3 +260,5 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
 form.report-ruling { display: flex; flex-direction: column; gap: 6px; }
 form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .report-ruling .report-actions { display: flex; justify-content: flex-end; gap: 6px; }
+/* The opponent's cards point at them, as across a real table, unless the viewer's settings say otherwise. */
+.field.turned .card { rotate: 180deg; }

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { EffectSheet } from '@yugioh/engine';
+import type { UserSettings } from '@yugioh/shared';
 import { boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
@@ -14,6 +15,8 @@ export const users = pgTable(
     username: text('username').notNull(),
     status: accountStatus('status').notNull().default('pending'),
     isAdmin: boolean('is_admin').notNull().default(false),
+    /** Only the settings the account has changed; the rest take the defaults in @yugioh/shared. */
+    settings: jsonb('settings').$type<Partial<UserSettings>>().notNull().default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   // Usernames are unique regardless of case, so `Yugi` and `yugi` can't both exist.
