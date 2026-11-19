@@ -131,7 +131,7 @@ describe('the judge loop', () => {
     const { state, link } = activated();
     const { model, sent } = scripted([
       [{ name: 'move', input: { card: 'a9', to: 'graveyard' } }, { name: 'finish', input: { legal: true, summary: 'Done.' } }],
-      [{ name: 'move', input: { card: 'a1', to: 'graveyard' } }, { name: 'finish', input: { legal: true, summary: 'Done.' } }],
+      [{ name: 'move', input: { card: 'a1', to: 'graveyard' } }, { name: 'declare_targets', input: { cards: ['a9'] } }, { name: 'finish', input: { legal: true, summary: 'Done.' } }],
     ]);
     const { record } = await judge({ stage: 'activation', state, link }, deps(model));
     expect(results(sent[1]!)).toEqual([
@@ -139,7 +139,22 @@ describe('the judge loop', () => {
       { error: true, content: 'Skipped: an earlier call in this turn was refused.' },
     ]);
     expect(record.legal).toBe(true);
-    expect(record.ops).toEqual([{ op: 'move', card: 'a1', to: 'graveyard' }]);
+    expect(record.ops).toEqual([{ op: 'move', card: 'a1', to: 'graveyard' }, { op: 'declare_targets', cards: ['a9'] }]);
+  });
+
+  it('refuses to rule an activation legal before its cost is paid and its targets declared', async () => {
+    const { state, link } = activated();
+    const { model, sent } = scripted([
+      [{ name: 'ask_player', input: { player: 0, prompt: 'Activate it?', cards: [], choices: ['Yes'], min: 1, max: 1 } }],
+      [{ name: 'finish', input: { legal: true, summary: 'Targets Dark Blade.' } }],
+      [{ name: 'move', input: { card: 'a1', to: 'graveyard' } }, { name: 'finish', input: { legal: true, summary: 'Targets Dark Blade.' } }],
+      [{ name: 'declare_targets', input: { cards: ['a9'] } }, { name: 'finish', input: { legal: true, summary: 'Targets Dark Blade.' } }],
+    ]);
+    const { record } = await judge({ stage: 'activation', state, link }, deps(model));
+    expect(results(sent[1]!)[0]!.content).toMatch(/one choice/);
+    expect(results(sent[2]!)[0]!.content).toMatch(/cost \("Discard 1 card"\)/);
+    expect(results(sent[3]!)[1]!.content).toMatch(/haven't declared targets/);
+    expect(record).toMatchObject({ legal: true, error: null });
   });
 
   it("refuses a summary or question that names a card a player can't see", async () => {
@@ -201,7 +216,7 @@ describe('the eval suite', () => {
     for (const c of CASES) {
       const state = buildBoard(c, data, sheets);
       const actions = legalActions(state, 0);
-      const offered = actions.some((a) => a.type === 'activate' && state.cards[state.instances[a.card]!.code]!.name === c.activate);
+      const offered = actions.some((a) => a.type === 'activate' && a.effect === (c.effect ?? 0) && state.cards[state.instances[a.card]!.code]!.name === c.activate);
       expect(offered, c.name).toBe(true);
     }
     expect(CASES.length).toBeGreaterThanOrEqual(20);
@@ -218,8 +233,11 @@ describe('the eval suite', () => {
       [{ name: 'declare_targets', input: { cards: [monster] } }, { name: 'finish', input: { legal: true, summary: 'Targeting it.' } }],
       [{ name: 'modify_stats', input: { card: monster, atk: 700, def: 0, level_delta: 0, level_set: null, until: 'end_of_turn' } }, { name: 'finish', input: { legal: true, summary: '+700.' } }],
     ]);
-    expect(await runCase(rush, state, model)).toEqual({ name: rush.name, passed: true, detail: '+700.' });
-    const lazy = scripted([[{ name: 'finish', input: { legal: true, summary: 'Fine.' } }], [{ name: 'finish', input: { legal: true, summary: 'Nothing.' } }]]);
+    expect(await runCase(rush, state, model)).toMatchObject({ name: rush.name, passed: true, detail: '+700.' });
+    const lazy = scripted([
+      [{ name: 'declare_targets', input: { cards: [monster] } }, { name: 'finish', input: { legal: true, summary: 'Fine.' } }],
+      [{ name: 'finish', input: { legal: true, summary: 'Nothing.' } }],
+    ]);
     expect(await runCase(rush, state, lazy.model)).toMatchObject({ passed: false, detail: 'ATK 900' });
   });
 });
@@ -237,5 +255,20 @@ describe('effect sheets', () => {
     expect(Object.keys(loaded).map(Number).sort()).toEqual(starter.map((c) => c.id).sort());
     expect((await listSheetCodes()).length).toBe(starter.length);
     for (const c of starter) expect(loaded[c.id]!.textHash).toBe(textHash(c.desc));
+  });
+
+  it('gives each effect the spell speed its kind and card type have', async () => {
+    const fixture = JSON.parse(await readFile(new URL('./fixtures/cardinfo.json', import.meta.url), 'utf8')) as {
+      data: { id: number; name: string; desc: string; type: string; race: string }[];
+    };
+    const data = Object.fromEntries(fixture.data.map((c) => [c.id, { ...cards[1]!, code: c.id, name: c.name, text: c.desc }]));
+    const loaded = await loadSheets(data);
+    for (const c of fixture.data) {
+      for (const [i, e] of (loaded[c.id]?.effects ?? []).entries()) {
+        const activation = c.race === 'Counter' ? 3 : c.type.includes('Trap') || c.race === 'Quick-Play' ? 2 : 1;
+        const expected = { activation, quick: 2, ignition: 1, trigger: 1, flip: 1, continuous: 1, condition: 1 }[e.kind];
+        expect(e.speed, `${c.name} effect ${i} (${e.kind})`).toBe(expected);
+      }
+    }
   });
 });

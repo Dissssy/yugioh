@@ -1,12 +1,17 @@
 // The judge's eval suite: hand-written boards, an activation, and the expected outcome. Runs against the real
-// model, so it costs a little (Haiku 5.5, a few cents for the whole suite) and needs ANTHROPIC_API_KEY and a
-// database with the cards imported. Run it after any change to the rules reference, the tools or the model settings:
+// model, so it costs a little (Haiku 5.5) and needs ANTHROPIC_API_KEY and a database with the cards imported.
+// Run it after any change to the rules reference, the tools, the model settings or the effect sheets:
 //
-//   npm run judge:eval            all cases
-//   npm run judge:eval -- vortex  cases whose name contains "vortex"
+//   npm run judge:eval                        every case once
+//   npm run judge:eval -- vortex              cases whose name contains "vortex"
+//   npm run judge:eval -- --repeat 5          every case 5 times, reporting each case's pass rate
 //
-// Each verified ruling (layer 6) becomes another case here.
+// Each run writes a summary and the full judge transcripts of every failed attempt to server/eval-runs/<time>/.
+// The iteration loop is in docs/effects.md. Each verified ruling (layer 6) becomes another case here.
 
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 import Anthropic from '@anthropic-ai/sdk';
 import { inArray } from 'drizzle-orm';
 import {
@@ -18,13 +23,14 @@ import {
   type CardData,
   type DuelEvent,
   type DuelState,
+  type JudgeRecord,
   type Seat,
 } from '@yugioh/engine';
 import { toCardData } from '../cards.ts';
 import type { Db } from '../db/client.ts';
 import { cards } from '../db/schema.ts';
 import { loadSheets } from '../sheets.ts';
-import { judge, type ModelCall, type Question } from './judge.ts';
+import { judge, PROMPT_VERSION, type ModelCall, type Question } from './judge.ts';
 
 /** One side of a board, by card name. Field monsters are face-up in Attack Position unless listed under `setMonsters`. */
 interface Side {
@@ -47,6 +53,8 @@ export interface EvalCase {
   /** Player 0 is on turn, in Main Phase 1 of turn 3. */
   board: [Side, Side];
   activate: string;
+  /** Which of the card's effects to activate, by its index in the sheet (default 0). */
+  effect?: number;
   /** Names or choices to pick, one list per question, in order. Unlisted questions get the first options. */
   picks?: string[][];
   legal: boolean;
@@ -243,6 +251,170 @@ export const CASES: EvalCase[] = [
     legal: true,
     check: (b) => all(expectAt(b, 'Speed Warrior', '1:gy'), expectAt(b, 'Twister', '0:gy')),
   },
+  {
+    name: 'raigeki break needs a card to discard',
+    board: [{ set: ['Raigeki Break'] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Raigeki Break',
+    legal: false,
+  },
+  {
+    name: 'poison of the old man gains 1200 when chosen',
+    board: [{ hand: ['Poison of the Old Man'] }, {}],
+    activate: 'Poison of the Old Man',
+    picks: [['1200']],
+    legal: true,
+    check: (b) => (b.lp(0) === 9200 && b.lp(1) === 8000 ? null : `LP ${b.lp(0)} / ${b.lp(1)}`),
+  },
+  {
+    name: 'twister can destroy your own face-up spell',
+    board: [{ hand: ['Twister'], faceUp: ['Banner of Courage'] }, {}],
+    activate: 'Twister',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Banner of Courage', '0:gy'), b.lp(0) === 7500 ? null : `LP ${b.lp(0)}, expected 7500`),
+  },
+  {
+    name: 'rush recklessly can target an opponent monster',
+    board: [{ hand: ['Rush Recklessly'] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Rush Recklessly',
+    legal: true,
+    check: (b) => (b.monster('Speed Warrior')?.atk === 1600 ? null : `ATK ${b.monster('Speed Warrior')?.atk}`),
+  },
+  {
+    name: 'lightning vortex needs a face-up opponent monster',
+    board: [{ hand: ['Lightning Vortex', 'Twister'] }, { setMonsters: ['Mystic Tomato'] }],
+    activate: 'Lightning Vortex',
+    legal: false,
+  },
+  {
+    name: 'smashing ground needs a face-up opponent monster',
+    board: [{ hand: ['Smashing Ground'] }, { setMonsters: ['Ganbara Knight'] }],
+    activate: 'Smashing Ground',
+    legal: false,
+  },
+  {
+    name: 'smashing ground lets you choose between tied DEF',
+    board: [{ hand: ['Smashing Ground'] }, { defense: ['Renge, Gatekeeper of Dark World', 'Charcoal Inpachi'], monsters: ['Axe Raider'] }],
+    activate: 'Smashing Ground',
+    picks: [['Charcoal Inpachi']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Charcoal Inpachi', '1:gy'), expectAt(b, 'Renge, Gatekeeper of Dark World', '1:monsters')),
+  },
+  {
+    name: 'fissure lets you choose between tied ATK',
+    board: [{ hand: ['Fissure'] }, { monsters: ['Charcoal Inpachi', 'Renge, Gatekeeper of Dark World', 'Axe Raider'] }],
+    activate: 'Fissure',
+    picks: [['Renge, Gatekeeper of Dark World']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Renge, Gatekeeper of Dark World', '1:gy'), expectAt(b, 'Charcoal Inpachi', '1:monsters')),
+  },
+  {
+    name: 'exiled force needs another monster to target',
+    board: [{ monsters: ['Exiled Force'] }, {}],
+    activate: 'Exiled Force',
+    legal: false,
+  },
+  {
+    name: 'harmonic waves makes an opponent monster level 4',
+    board: [{ hand: ['Harmonic Waves'] }, { monsters: ['Sonic Chick'] }],
+    activate: 'Harmonic Waves',
+    legal: true,
+    check: (b) => (b.monster('Sonic Chick')?.level === 4 ? null : `Level ${b.monster('Sonic Chick')?.level}`),
+  },
+  {
+    name: 'harmonic waves needs a face-up monster',
+    board: [{ hand: ['Harmonic Waves'], setMonsters: ['Junk Synchron'] }, {}],
+    activate: 'Harmonic Waves',
+    legal: false,
+  },
+  {
+    name: 'xyz energy needs an xyz material to detach',
+    board: [{ hand: ['Xyz Energy'], monsters: ['Axe Raider'] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Xyz Energy',
+    legal: false,
+  },
+  {
+    name: 'dust tornado destroys an opponent spell or trap',
+    board: [{ set: ['Dust Tornado'] }, { set: ['Mirror Force'] }],
+    activate: 'Dust Tornado',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Mirror Force', '1:gy'), expectAt(b, 'Dust Tornado', '0:gy')),
+  },
+  {
+    name: 'dust tornado cannot target your own cards',
+    board: [{ set: ['Dust Tornado', 'Trap Hole'] }, {}],
+    activate: 'Dust Tornado',
+    legal: false,
+  },
+  {
+    name: 'shield spear gives 400 ATK and DEF',
+    board: [{ set: ['Shield Spear'], monsters: ['Speed Warrior'] }, {}],
+    activate: 'Shield Spear',
+    legal: true,
+    check: (b) => {
+      const m = b.monster('Speed Warrior');
+      return m?.atk === 1300 && m.def === 800 ? null : `ATK/DEF ${m?.atk}/${m?.def}`;
+    },
+  },
+  {
+    name: 'threatening roar can be activated on your own turn',
+    board: [{ set: ['Threatening Roar'] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Threatening Roar',
+    legal: true,
+    check: (b) => expectAt(b, 'Threatening Roar', '0:gy'),
+  },
+  {
+    name: 'backup soldier returns up to 3 non-effect monsters',
+    board: [{ set: ['Backup Soldier'], gy: ['Renge, Gatekeeper of Dark World', 'Atlantean Pikeman', 'Axe Raider', 'Sonic Chick', 'Speed Warrior'] }, {}],
+    activate: 'Backup Soldier',
+    picks: [['Renge, Gatekeeper of Dark World', 'Atlantean Pikeman']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Renge, Gatekeeper of Dark World', '0:hand'), expectAt(b, 'Atlantean Pikeman', '0:hand'), expectAt(b, 'Axe Raider', '0:gy'), expectAt(b, 'Sonic Chick', '0:gy')),
+  },
+  {
+    name: 'reinforce truth needs a level 2 or lower warrior in the deck',
+    board: [{ set: ['Reinforce Truth'], deck: ['Axe Raider', 'Dark Blade'] }, {}],
+    activate: 'Reinforce Truth',
+    legal: false,
+  },
+  {
+    name: 'mirror force needs an attack',
+    board: [{ set: ['Mirror Force'] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Mirror Force',
+    legal: false,
+  },
+  {
+    name: 'scrap-iron scarecrow needs an attack',
+    board: [{ set: ['Scrap-Iron Scarecrow'] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Scrap-Iron Scarecrow',
+    legal: false,
+  },
+  {
+    name: 'trap hole needs a summon',
+    board: [{ set: ['Trap Hole'] }, { monsters: ['Axe Raider'] }],
+    activate: 'Trap Hole',
+    legal: false,
+  },
+  {
+    name: 'xyz effect needs an xyz summon',
+    board: [{ set: ['Xyz Effect'] }, { monsters: ['Axe Raider'] }],
+    activate: 'Xyz Effect',
+    legal: false,
+  },
+
+
+  {
+    name: 'speed warrior doubles ATK only in the battle phase',
+    board: [{ monsters: ['Speed Warrior'] }, {}],
+    activate: 'Speed Warrior',
+    legal: false,
+  },
+  {
+    name: 'frequency magician needs a spell counter',
+    board: [{ monsters: ['Frequency Magician', 'Axe Raider'] }, {}],
+    activate: 'Frequency Magician',
+    effect: 1,
+    legal: false,
+  },
 ];
 
 /** Builds a case's board: every listed card is put in place from its owner's Deck. */
@@ -309,6 +481,8 @@ export interface EvalResult {
   name: string;
   passed: boolean;
   detail: string;
+  /** The judge calls made: the activation check, then the resolution if it ran. */
+  records: JudgeRecord[];
 }
 
 /** Runs one case: the activation check, then (if legal) the resolution, answering questions from `picks`. */
@@ -317,8 +491,8 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall): 
     (x) => cardOf(state, x).name === c.activate,
   )!;
   const zone = state.players[0].hand.includes(id) ? state.players[0].spellTraps.indexOf(null) : null;
-  const intent = decide(state, 0, { type: 'activate', card: id, effect: 0, zone });
-  if (!intent.ok) return { name: c.name, passed: false, detail: `code refused the activation: ${intent.error}` };
+  const intent = decide(state, 0, { type: 'activate', card: id, effect: c.effect ?? 0, zone });
+  if (!intent.ok) return { name: c.name, passed: false, detail: `code refused the activation: ${intent.error}`, records: [] };
   const picks = [...(c.picks ?? [])];
   const unmatched: string[] = [];
   // A pick names a card, or a phrase found in one of the judge's choices (its wording varies between runs).
@@ -334,39 +508,79 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall): 
   const deps = { model, ask, random: Math.random };
   let scratch = intent.events.slice(1).reduce(evolve, state);
   const checked = await judge({ stage: 'activation', state: scratch, link: scratch.chain.at(-1)! }, deps);
-  if (checked.record.error) return { name: c.name, passed: false, detail: `judge failed: ${checked.record.error}` };
-  if (unmatched.length) return { name: c.name, passed: false, detail: unmatched[0]! };
-  if (checked.record.legal !== c.legal) return { name: c.name, passed: false, detail: `ruled ${checked.record.legal ? 'legal' : 'illegal'}: ${checked.record.summary}` };
-  if (!c.legal) return { name: c.name, passed: true, detail: checked.record.summary };
+  const records = [checked.record];
+  const result = (passed: boolean, detail: string): EvalResult => ({ name: c.name, passed, detail, records });
+  if (checked.record.error) return result(false, `judge failed: ${checked.record.error}`);
+  if (unmatched.length) return result(false, unmatched[0]!);
+  if (checked.record.legal !== c.legal) return result(false, `ruled ${checked.record.legal ? 'legal' : 'illegal'}: ${checked.record.summary}`);
+  if (!c.legal) return result(true, checked.record.summary);
   scratch = checked.events.reduce(evolve, scratch);
   const resolved = await judge({ stage: 'resolution', state: scratch, link: scratch.chain.at(-1)! }, deps);
-  if (resolved.record.error) return { name: c.name, passed: false, detail: `judge failed resolving: ${resolved.record.error}` };
+  records.push(resolved.record);
+  if (resolved.record.error) return result(false, `judge failed resolving: ${resolved.record.error}`);
   const after = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, scratch);
   if (picks.length) unmatched.push(`the judge never asked for ${JSON.stringify(picks[0])}`);
   const problem = unmatched[0] ?? c.check?.(new Board(after)) ?? null;
-  return { name: c.name, passed: problem === null, detail: problem ?? resolved.record.summary };
+  return result(problem === null, problem ?? resolved.record.summary);
 }
 
-export async function runEvals(db: Db, model: ModelCall, filter = ''): Promise<EvalResult[]> {
+/** Runs the matching cases `repeat` times; each round runs its cases in parallel. Returns one list per round. */
+export async function runEvals(db: Db, model: ModelCall, filter = '', repeat = 1): Promise<EvalResult[][]> {
   const cases = CASES.filter((c) => c.name.includes(filter));
   const names = [...new Set(cases.flatMap((c) => [...c.board.flatMap((s) => Object.values(s).flat() as string[]), 'Sonic Chick']))];
   const rows = await db.select().from(cards).where(inArray(cards.name, names));
   const data = Object.fromEntries(rows.map((r) => [r.id, toCardData(r)]));
   const sheets = await loadSheets(data);
-  return Promise.all(cases.map((c) => runCase(c, buildBoard(c, data, sheets), model)));
+  const rounds: EvalResult[][] = [];
+  for (let i = 0; i < repeat; i++) rounds.push(await Promise.all(cases.map((c) => runCase(c, buildBoard(c, data, sheets), model))));
+  return rounds;
 }
 
 if (import.meta.main) {
+  const { values, positionals } = parseArgs({ allowPositionals: true, options: { repeat: { type: 'string', default: '1' } } });
+  const repeat = Number(values.repeat);
+  if (!Number.isInteger(repeat) || repeat < 1) throw new Error('--repeat takes a whole number of at least 1.');
   if (!process.env.ANTHROPIC_API_KEY) {
     console.error('ANTHROPIC_API_KEY is not set; the evals call the real model.');
     process.exit(1);
   }
+  const filter = positionals[0] ?? '';
   const { connect } = await import('../db/client.ts');
   const db = connect(process.env.DATABASE_URL ?? '');
   const client = new Anthropic();
-  const results = await runEvals(db, (p) => client.messages.create(p), process.argv[2] ?? '');
-  for (const r of results) console.log(`${r.passed ? 'PASS' : 'FAIL'}  ${r.name}\n      ${r.detail}`);
-  console.log(`\n${results.filter((r) => r.passed).length} of ${results.length} passed`);
-  if (results.some((r) => !r.passed)) process.exitCode = 1;
+  const usage = { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 };
+  const model: ModelCall = async (p) => {
+    const m = await client.messages.create(p);
+    usage.input += m.usage.input_tokens;
+    usage.cacheWrite += m.usage.cache_creation_input_tokens ?? 0;
+    usage.cacheRead += m.usage.cache_read_input_tokens ?? 0;
+    usage.output += m.usage.output_tokens;
+    return m;
+  };
+  const rounds = await runEvals(db, model, filter, repeat);
   await db.$client.end();
+
+  const dir = join('eval-runs', new Date().toISOString().replace(/[:.]/g, '-'));
+  await mkdir(dir, { recursive: true });
+  const byCase = new Map<string, EvalResult[]>();
+  for (const round of rounds) for (const r of round) byCase.set(r.name, [...(byCase.get(r.name) ?? []), r]);
+  const slug = (name: string) => name.replace(/[^a-z0-9]+/gi, '-');
+  for (const [name, runs] of byCase) {
+    const passes = runs.filter((r) => r.passed).length;
+    console.log(`${passes === runs.length ? 'PASS' : 'FAIL'}  ${repeat > 1 ? `${passes}/${runs.length}  ` : ''}${name}`);
+    for (const [i, r] of runs.entries()) {
+      if (r.passed && repeat > 1) continue;
+      console.log(`      ${repeat > 1 ? `#${i + 1} ` : ''}${r.detail}`);
+      if (!r.passed) await writeFile(join(dir, `${slug(name)}-${i + 1}.json`), `${JSON.stringify(r, null, 2)}\n`);
+    }
+  }
+  const all = rounds.flat();
+  const passed = all.filter((r) => r.passed).length;
+  // Haiku 5.5 per million tokens (2026-11): $0.10 input, $0.125 cache write, $0.01 cache read, $0.50 output.
+  const cost = (usage.input * 0.1 + usage.cacheWrite * 0.125 + usage.cacheRead * 0.01 + usage.output * 0.5) / 1e6;
+  const rates = Object.fromEntries([...byCase].map(([name, runs]) => [name, runs.filter((r) => r.passed).length / runs.length]));
+  const summary = { promptVersion: PROMPT_VERSION, filter, repeat, passed, total: all.length, usage, cost: Number(cost.toFixed(4)), cases: rates };
+  await writeFile(join(dir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`);
+  console.log(`\n${passed} of ${all.length} passed (prompt ${PROMPT_VERSION}, about $${cost.toFixed(3)}). Results and failed transcripts: server/${dir}/`);
+  if (passed < all.length) process.exitCode = 1;
 }

@@ -6,7 +6,7 @@
   "effects": [
     {
       "kind": "activation",
-      "speed": 1,
+      "speed": 2,
       "mandatory": false,
       "opt": "none",
       "window": "Either player's turn (layer 2: your own Main or Battle Phase)",

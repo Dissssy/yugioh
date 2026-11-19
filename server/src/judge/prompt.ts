@@ -16,7 +16,7 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 
 # Reading card text
 
-- A colon (:) ends an activation condition or cost; a semicolon (;) separates the cost or targeting from the effect. Text before the semicolon that sends, discards, tributes, detaches or pays is a cost; it is paid on activation even if the effect later does nothing. Targets are chosen on activation.
+- A colon (:) ends an activation condition or cost; a semicolon (;) separates the cost or targeting from the effect. Text before the semicolon that sends, discards, tributes, detaches or pays is a cost; it is paid on activation even if the effect later does nothing. Targets are chosen on activation. In "X to target ..." (Exiled Force: "Tribute this card to target 1 monster on the field"), X is a cost too.
 - "and if you do" makes the second part depend on the first succeeding; "also" and "then" do not ("then" happens after, in sequence).
 - "Destroy" uses destroy (not move to the GY). "Send to the GY", "discard", "Tribute" as a cost use move to graveyard. "Banish" uses move to banished. "Add to hand" uses move to hand. "Return to the Deck" uses move to deck_shuffled unless the text says top or bottom.
 - "Special Summon" uses special_summon. Monsters can't be Special Summoned from the Extra Deck by effects in this version; Synchro and Xyz summons are their own procedures.

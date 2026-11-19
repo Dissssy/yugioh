@@ -6,7 +6,7 @@
   "effects": [
     {
       "kind": "activation",
-      "speed": 1,
+      "speed": 2,
       "mandatory": false,
       "opt": "none",
       "window": "When an opponent's monster declares an attack",

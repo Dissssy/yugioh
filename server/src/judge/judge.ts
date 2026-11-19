@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import type Anthropic from '@anthropic-ai/sdk';
 import {
   applyOp,
+  cardOf,
   evolve,
   locate,
   visibleTo,
@@ -80,6 +81,9 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
     ops,
     ...fields,
   });
+  const sheetEffect = sheetEffectOf(call.state, link);
+  /** True while the effect has a cost and no op has paid anything (choosing targets or an effect pays nothing). */
+  const unpaid = (done: Op[]) => sheetEffect.cost.trim() !== '' && !done.some((o) => o.op !== 'declare_targets' && o.op !== 'choose_effect');
   const failed = (error: string): JudgeOutcome => ({
     record: record({
       legal: stage === 'resolution',
@@ -130,7 +134,11 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
             events.length = 0;
             ops.length = 0;
           } else if (leak) refused = reply(c.id, `The summary names ${leak}, which a player can't see. Rephrase it without naming hidden cards.`, true);
-          else {
+          else if (stage === 'activation' && parsed.data.legal && unpaid(ops)) {
+            refused = reply(c.id, `This activation has a cost ("${sheetEffect.cost}") and you haven't paid it. Pay it with ops, or call finish with legal false if it can't be paid.`, true);
+          } else if (stage === 'activation' && parsed.data.legal && sheetEffect.targets && !ops.some((o) => o.op === 'declare_targets')) {
+            refused = reply(c.id, `This effect targets (${sheetEffect.targets}) and you haven't declared targets. Declare them, or call finish with legal false if there is no legal target.`, true);
+          } else {
             done = { legal: stage === 'resolution' ? true : parsed.data.legal, summary: parsed.data.summary.trim() };
             reply(c.id, 'Done.');
           }
@@ -181,11 +189,17 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
   }
 }
 
+/** The sheet entry of the effect being judged. */
+function sheetEffectOf(state: DuelState, link: ChainLink) {
+  return state.sheets[cardOf(state, link.card).code]!.effects[link.effect]!;
+}
+
 /** Checks an ask_player call: real options, sensible counts, and a prompt that names nothing the player can't see. */
 function checkQuestion(state: DuelState, q: AskPlayer): Question | { error: string } {
   const p = q.player;
   if (q.cards.length === 0 && q.choices.length === 0) return { error: 'Give at least one card or choice.' };
   if (q.cards.length > 0 && q.choices.length > 0) return { error: 'Ask for cards or for choices, not both in one question.' };
+  if (q.cards.length === 0 && q.choices.length === 1) return { error: 'A question with one choice offers no choice. Go ahead without asking.' };
   const count = q.cards.length + q.choices.length;
   if (q.min < 0 || q.max < Math.max(1, q.min) || q.min > count) return { error: `min and max must satisfy 0 <= min <= max, min <= ${count}, max >= 1.` };
   if (new Set(q.cards).size !== q.cards.length || new Set(q.choices).size !== q.choices.length) return { error: 'Each option may appear once.' };
