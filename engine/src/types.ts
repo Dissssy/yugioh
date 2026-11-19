@@ -596,6 +596,27 @@ export interface AppealRecord {
   usage: ModelUsage[];
 }
 
+/**
+ * One model call by the AI opponent (docs/ai-opponent.md): what it was offered, what it picked and why. Changes
+ * nothing on the board and is never shown to players; the admin's full log and cost list read it.
+ */
+export interface AiRecord {
+  player: Seat;
+  model: string;
+  /** The numbered options it was offered, as their text. */
+  options: string[];
+  /** The options it picked, by index into `options`; empty if the call failed. */
+  picks: number[];
+  reason: string;
+  /** Its note to itself for the next call. */
+  note: string;
+  /** The board moved on while it thought, so its answer was thrown away. */
+  stale: boolean;
+  /** Set when the call failed or the answer didn't fit; a safe default was played instead. */
+  error: string | null;
+  usage: ModelUsage[];
+}
+
 /** Everything that happens is one of these. The duel's state is the fold of its events. */
 export type DuelEvent =
   | {
@@ -673,7 +694,8 @@ export type DuelEvent =
   | { type: 'sheetUpdated'; code: number; sheet: EffectSheet | null }
   | { type: 'duelEnded'; result: DuelResult }
   /** A player's chat message. It changes nothing on the board and never reaches the judge. */
-  | { type: 'chatted'; player: Seat; text: string };
+  | { type: 'chatted'; player: Seat; text: string }
+  | { type: 'aiDecided'; record: AiRecord };
 
 export interface StartingPlayer {
   name: string;
@@ -739,6 +761,7 @@ export type LogEvent =
           | 'triggersDone'
           | 'passed'
           | 'attackEnded'
+          | 'aiDecided'
       }
     >
   | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number }

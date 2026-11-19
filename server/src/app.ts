@@ -14,6 +14,7 @@ import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
 import { matchReport, reportText } from './matchReport.ts';
+import { Opponents } from './opponent/opponent.ts';
 import { editSheet, resolveReport, rulingCards } from './rulings.ts';
 import { username } from './usernames.ts';
 import { userKey, viewerOf, type Viewer } from './viewer.ts';
@@ -136,10 +137,27 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
   });
 
   const duels = new Duels(db, ai, random, config.RESPONSE_FLOOR_MS);
+  if (ai.opponent) {
+    const opponents = new Opponents(duels, db, ai.opponent, config.RESPONSE_FLOOR_MS, random);
+    duels.onAiSeat = (id, seat) => void opponents.attach(id, seat).catch((error: unknown) => console.error(`AI opponent in duel ${id} didn't start:`, error));
+  }
+
+  // A duel against the AI opponent (docs/ai-opponent.md): the admin picks their deck and Claude's.
+  const aiDuelBody = z.object({ deckId: z.number().int(), aiDeckId: z.number().int() });
+  app.post('/api/admin/duels/ai', requireAdmin, async (req, res) => {
+    const v = viewer(res);
+    if (v.kind !== 'user') return;
+    if (!ai.opponent) return void res.status(503).json({ error: "Playing against Claude needs an Anthropic API key, and this server has none." });
+    const body = aiDuelBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'Pick a deck for each side.' });
+    const id = await duels.createAgainstAi(v.user.id, userKey(v.user.id), v.user.username, body.data.deckId, body.data.aiDeckId);
+    if (!id) return void res.status(404).json({ error: 'deck_not_found' });
+    res.status(201).json(await duels.summarize((await duels.find(id))!, userKey(v.user.id), false));
+  });
 
   app.get('/api/admin/duels', requireAdmin, async (_req, res) => {
     const { total, byDuel } = await duelCosts(db);
-    const none = { judgeCalls: 0, appeals: 0, cost: 0 };
+    const none = { judgeCalls: 0, appeals: 0, aiCalls: 0, cost: 0 };
     const list = await Promise.all((await duels.recent()).map(async (row) => ({ ...(await duels.summarize(row, null, false)), ...(byDuel.get(row.id) ?? none) })));
     res.json({ totalCost: total, duels: list } satisfies AdminDuels);
   });

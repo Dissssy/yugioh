@@ -31,7 +31,7 @@ function Failed({ what, error }: { what: string; error: Error }) {
 const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`;
 
 /**
- * Everyone's latest duels, each with what its judge calls and appeals cost and its full log for review: every card,
+ * Everyone's latest duels, each with what its judge calls, appeals and AI opponent calls cost and its full log for review: every card,
  * intent, ruling, appeal and chat message.
  */
 function RecentDuels() {
@@ -42,13 +42,13 @@ function RecentDuels() {
     <section className="box admin">
       <div className="page-head">
         <h1>Duels</h1>
-        <span className="pill">{usd(duels.data.totalCost)} spent on the judge so far</span>
+        <span className="pill">{usd(duels.data.totalCost)} spent on models so far</span>
       </div>
-      <p className="muted">Costs are estimated from the tokens each judge call and appeal used, at Anthropic's list prices.</p>
+      <p className="muted">Costs are estimated from the tokens each judge call, appeal and AI opponent call used, at Anthropic's list prices.</p>
       <div className="table-scroll">
         <table>
           <thead>
-            <tr><th>Duel</th><th>Created</th><th>Status</th><th>Decks</th><th>Judge calls</th><th>Appeals</th><th>Cost</th><th /></tr>
+            <tr><th>Duel</th><th>Created</th><th>Status</th><th>Decks</th><th>Judge calls</th><th>Appeals</th><th>AI calls</th><th>Cost</th><th /></tr>
           </thead>
           <tbody>
             {duels.data.duels.map((duel) => (
@@ -59,6 +59,7 @@ function RecentDuels() {
                 <td className="muted">{duel.createdBy}: {duel.decks[0]} vs {duel.decks[1] ?? '…'}</td>
                 <td>{duel.judgeCalls}</td>
                 <td>{duel.appeals}</td>
+                <td>{duel.aiCalls}</td>
                 <td><strong>{usd(duel.cost)}</strong></td>
                 <td className="cell-actions">
                   <a href={`/api/admin/duels/${duel.id}/report`} target="_blank" rel="noreferrer">Full log</a>{' '}

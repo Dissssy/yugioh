@@ -91,6 +91,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         throw new Error('duelStarted can only be the first event');
       case 'intent':
       case 'chatted':
+      case 'aiDecided':
         return;
       case 'orderChosen':
         // The opening hands are dealt next, then turn 1 starts.

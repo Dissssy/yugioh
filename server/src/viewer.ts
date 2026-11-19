@@ -8,6 +8,9 @@ export const viewerOf = (res: Response) => res.locals.viewer as Viewer;
 
 export const userKey = (id: number) => `user:${id}`;
 export const guestKey = (id: number) => `guest:${id}`;
+/** A seat played by the AI opponent (server/src/opponent/). The admin's duels against Claude use `ai:claude`. */
+export const aiKey = (name: string) => `ai:${name}`;
+export const isAiKey = (key: string | null) => key?.startsWith('ai:') ?? false;
 
 /** Approved accounts and guests can play; everyone else can't. */
 export function playerKey(viewer: Viewer): string | null {

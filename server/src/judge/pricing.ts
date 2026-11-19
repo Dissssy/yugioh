@@ -24,6 +24,7 @@ const PRICES: Record<string, Pricing> = {
     rates: { input: 0.1, cacheWrite: 0.125, cacheRead: 0.01, output: 0.5 },
     long: { above: 100_000, rates: { input: 0.5, cacheWrite: 0.625, cacheRead: 0.05, output: 2.5 } },
   },
+  'claude-sonnet-5-5': { rates: { input: 2, cacheWrite: 2.5, cacheRead: 0.1, output: 10 } },
   'claude-opus-5-5': { rates: { input: 4, cacheWrite: 5, cacheRead: 0.2, output: 20 } },
 };
 
@@ -38,6 +39,9 @@ export function usageOf(model: string, message: Anthropic.Message): ModelUsage {
     output: u.output_tokens,
   };
 }
+
+/** Whether pricing.ts knows the model, so its calls can be counted. */
+export const isPriced = (model: string) => model in PRICES;
 
 /** The cost in US dollars of some API calls. A model without a price here is an error, so a new model can't go uncounted. */
 export function costOf(calls: ModelUsage[]): number {

@@ -79,14 +79,54 @@ export function NewChallenge() {
   );
 }
 
-/** The decks as a set of tiles; the chosen one is lit. */
-export function DeckPicker({ value, onChange }: { value: number | null; onChange: (id: number) => void }) {
+/** The admin's duel against Claude (docs/ai-opponent.md): their deck and Claude's, and it starts at once. */
+export function PlayClaude() {
+  const decks = useDecks();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [deckId, setDeckId] = useState<number | null>(null);
+  const [aiDeckId, setAiDeckId] = useState<number | null>(null);
+  const create = useMutation({
+    mutationFn: (body: { deckId: number; aiDeckId: number }) => api<DuelSummary>('/admin/duels/ai', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: (duel) => {
+      void queryClient.invalidateQueries({ queryKey: ['duels'] });
+      void navigate(`/duel/${duel.id}`);
+    },
+  });
+  const first = decks.data?.[0]?.id ?? null;
+  const mine = deckId ?? first;
+  const claude = aiDeckId ?? first;
+  if (!first) return null;
+  return (
+    <section className="box">
+      <h2>Play against Claude</h2>
+      <p className="muted small">Admin only. Claude plays its seat from what that seat can see, one move at a time.</p>
+      <h3 className="small">Your deck</h3>
+      <DeckPicker name="deck-you" value={mine} onChange={setDeckId} />
+      <h3 className="small">Claude's deck</h3>
+      <DeckPicker name="deck-claude" value={claude} onChange={setAiDeckId} />
+      <div className="actions">
+        <button
+          className="primary"
+          onClick={() => mine !== null && claude !== null && create.mutate({ deckId: mine, aiDeckId: claude })}
+          disabled={create.isPending || mine === null || claude === null}
+        >
+          Start the duel
+        </button>
+        {create.isError && <span className="error">{errorText(create.error)}</span>}
+      </div>
+    </section>
+  );
+}
+
+/** The decks as a set of tiles; the chosen one is lit. `name` groups the radio buttons when a page has two pickers. */
+export function DeckPicker({ value, onChange, name = 'deck' }: { value: number | null; onChange: (id: number) => void; name?: string }) {
   const decks = useDecks();
   return (
     <div className="deck-picker" role="radiogroup" aria-label="Deck">
       {decks.data?.map((d) => (
         <label key={d.id} className={`deck-choice${d.id === value ? ' chosen' : ''}`}>
-          <input type="radio" name="deck" checked={d.id === value} onChange={() => onChange(d.id)} />
+          <input type="radio" name={name} checked={d.id === value} onChange={() => onChange(d.id)} />
           <span className="deck-stack" aria-hidden>
             <span className="card back" />
             <span className="card back" />

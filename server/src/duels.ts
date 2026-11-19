@@ -21,6 +21,7 @@ import {
   viewFor,
   visibleTo,
   type ChainLink,
+  type AiRecord,
   type AppealRecord,
   type DuelEvent,
   type DuelState,
@@ -39,6 +40,7 @@ import { appeal } from './judge/appeal.ts';
 import type { ModelCall, Question } from './judge/judge.ts';
 import { rule, SCRIPT } from './judge/script.ts';
 import { flagScripts, loadSheets } from './sheets.ts';
+import { aiKey, isAiKey } from './viewer.ts';
 
 type MatchRow = typeof matches.$inferSelect;
 
@@ -79,12 +81,26 @@ export interface Ai {
   judgeCalls: number;
   /** Contests allowed per duel, for both players together. */
   appeals: number;
+  /** The AI opponent's model, or null when the server has no API key (docs/ai-opponent.md). */
+  opponent: OpponentModel | null;
+}
+
+export interface OpponentModel {
+  call: ModelCall;
+  /** Which model it plays with (AI_OPPONENT_MODEL). */
+  model: string;
+  /** Model calls allowed per duel (AI_CALLS_PER_DUEL). */
+  calls: number;
+  /** The least time between two of its moves, so players can follow the board. */
+  paceMs: number;
 }
 
 /** A random float in [0, 1) from the system's secure generator, for shuffles and response timing. */
 const secureRandom = () => randomInt(2 ** 47) / 2 ** 47;
 
 export class Duels {
+  /** Called once for each AI seat of a duel that is loaded and still going, so the AI opponent can start playing it. */
+  onAiSeat: ((id: string, seat: Seat) => void) | null = null;
   private live = new Map<string, Promise<LiveDuel>>();
   private db: Db;
   private ai: Ai;
@@ -105,6 +121,14 @@ export class Duels {
     if (!(await this.db.query.decks.findFirst({ where: eq(decks.id, deckId) }))) return null;
     const id = randomBytes(12).toString('base64url');
     await this.db.insert(matches).values({ id, createdBy: userId, seat0: seatKey, deck0: deckId });
+    return id;
+  }
+
+  /** A duel against the AI opponent: the player takes seat 0 and the AI seat 1, and it starts at once. */
+  async createAgainstAi(userId: number, seatKey: string, name: string, deckId: number, aiDeckId: number): Promise<string | null> {
+    const id = await this.create(userId, seatKey, deckId);
+    if (!id || !(await this.db.query.decks.findFirst({ where: eq(decks.id, aiDeckId) }))) return null;
+    await this.join(id, aiDeckId, name, async () => ({ key: aiKey('claude'), name: 'Claude' }));
     return id;
   }
 
@@ -212,6 +236,9 @@ export class Duels {
         }
         // Whatever the duel was doing when the server stopped (resolving a chain, waiting out a window) carries on.
         void this.enqueue(live, () => this.advance(live));
+        if (!live.state.result) {
+          for (const seat of [0, 1] as const) if (isAiKey(seat === 0 ? row.seat0 : row.seat1)) queueMicrotask(() => this.onAiSeat?.(id, seat));
+        }
         return live;
       })();
       duel.catch(() => this.live.delete(id));
@@ -466,6 +493,17 @@ export class Duels {
     if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
     await this.commit(duel, [{ type: 'chatted', player: seat, text }]);
     return { ok: true };
+  }
+
+  /** Stores one of the AI opponent's model calls in the duel's log, where only the admin's full log shows it. */
+  async recordAi(id: string, record: AiRecord) {
+    await this.commit(await this.load(id), [{ type: 'aiDecided', record }]);
+  }
+
+  /** How many model calls the AI opponent in `seat` has made in a duel, and its latest note to itself. */
+  async aiHistory(id: string, seat: Seat): Promise<{ calls: number; note: string }> {
+    const records = (await this.load(id)).events.flatMap((e) => (e.type === 'aiDecided' && e.record.player === seat ? [e.record] : []));
+    return { calls: records.length, note: records.at(-1)?.note ?? '' };
   }
 
   /** Stores events, applies them, and sends each seat the steps. Commits happen one at a time, in call order. */

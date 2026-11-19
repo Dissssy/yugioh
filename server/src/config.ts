@@ -18,6 +18,10 @@ const env = z.object({
   JUDGE_CALLS_PER_DUEL: z.coerce.number().int().positive().default(300),
   /** Contests per duel, both players together. */
   APPEALS_PER_DUEL: z.coerce.number().int().nonnegative().default(10),
+  /** The model the AI opponent plays with (docs/ai-opponent.md). It must have a price in judge/pricing.ts. */
+  AI_OPPONENT_MODEL: z.string().min(1).default('claude-haiku-5-5'),
+  /** Model calls the AI opponent may make per duel; at the limit it surrenders. */
+  AI_CALLS_PER_DUEL: z.coerce.number().int().positive().default(400),
   /**
    * How long a response window stays open, at least, before the server passes for a player who has nothing to
    * activate, so the speed of a pass reveals nothing. A random extra of up to half as long is added.

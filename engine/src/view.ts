@@ -145,6 +145,12 @@ function reviewText(state: DuelState, event: DuelEvent): string {
       const note = a.note ? ` with the note "${a.note}"` : '';
       return `Appeal (${a.model}) by ${who(a.by)} of ruling #${a.judged}${note}: ${a.verdict}. ${a.explanation} | Correct ruling: ${a.ruling}`;
     }
+    case 'aiDecided': {
+      const a = event.record;
+      const picked = a.picks.map((i) => `${i + 1}. ${a.options[i]}`).join('; ') || 'nothing';
+      const flags = [a.stale && 'STALE, not played', a.error && `Error: ${a.error}`].filter(Boolean).join(' | ');
+      return `AI (${a.model}) for ${who(a.player)} picked ${picked} of ${a.options.length}. ${a.reason} | Note: ${a.note}${flags ? ` | ${flags}` : ''}`;
+    }
     default:
       return describe(state, event)!;
   }
@@ -173,6 +179,7 @@ function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat): LogEvent 
     case 'triggersDone':
     case 'passed':
     case 'attackEnded':
+    case 'aiDecided':
       return null;
     case 'moved': {
       // A card moving between places this player can't see (Deck to hand, say) stays anonymous.
