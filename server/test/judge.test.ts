@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { decide, evolve, fits, legalActions, replay, scriptProblem, type CardData, type CardFilter, type DuelEvent, type DuelState, type EffectSheet, type Script, type Seat } from '@yugioh/engine';
 import { rule } from '../src/judge/script.ts';
 import { judge, type JudgeDeps, type ModelCall, type Question } from '../src/judge/judge.ts';
-import { listSheetCodes, loadSheets, textHash } from '../src/sheets.ts';
+import { listSheetCodes, readSheetFiles, textHash } from '../src/sheets.ts';
 import { buildBoard, CASES, runCase } from '../src/judge/evals.ts';
 
 const monster = (code: number, name: string, atk: number): CardData => ({
@@ -29,10 +29,9 @@ const sheets: Record<number, EffectSheet> = {
   3: {
     code: 3,
     textHash: '',
-    verified: true,
     model: 'test',
     materials: null,
-    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', respondsTo: null, script: null }],
+    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', respondsTo: null, script: null, status: 'unverified' }],
   },
 };
 
@@ -330,7 +329,7 @@ describe('a scripted effect', () => {
 describe('the eval suite', () => {
   it('runs every scripted case offline, and builds every other case on a board where code accepts the activation', async () => {
     const data = await fixtureCards();
-    const sheets = await loadSheets(data);
+    const sheets = await readSheetFiles(data);
     let scripted = 0;
     for (const c of CASES) {
       const state = buildBoard(c, data, sheets);
@@ -353,7 +352,7 @@ describe('the eval suite', () => {
 
   it('scores a case from the judge calls and the board after', async () => {
     const data = await fixtureCards();
-    const sheets = await loadSheets(data);
+    const sheets = await readSheetFiles(data);
     const rush = CASES.find((c) => c.name === 'rush recklessly gives 700 ATK')!;
     // Without its script, so the judge rules on it.
     for (const sheet of Object.values(sheets)) sheet.effects = sheet.effects.map((e) => ({ ...e, script: null }));
@@ -383,7 +382,7 @@ describe('effect sheets', () => {
       (c) => c.frameType !== 'normal' && c.card_sets?.some((s) => /^Starter Deck: (Yu-Gi-Oh! 5D's|Dawn of the Xyz)$/.test(s.set_name)),
     );
     const data = Object.fromEntries(starter.map((c) => [c.id, { ...cards[1]!, code: c.id, name: c.name, text: c.desc }]));
-    const loaded = await loadSheets(data);
+    const loaded = await readSheetFiles(data);
     expect(Object.keys(loaded).map(Number).sort()).toEqual(starter.map((c) => c.id).sort());
     expect((await listSheetCodes()).length).toBe(starter.length);
     for (const c of starter) expect(loaded[c.id]!.textHash).toBe(textHash(c.desc));
@@ -394,7 +393,7 @@ describe('effect sheets', () => {
       data: { id: number; name: string; desc: string; type: string; race: string }[];
     };
     const data = Object.fromEntries(fixture.data.map((c) => [c.id, { ...cards[1]!, code: c.id, name: c.name, text: c.desc }]));
-    const loaded = await loadSheets(data);
+    const loaded = await readSheetFiles(data);
     for (const c of fixture.data) {
       for (const [i, e] of (loaded[c.id]?.effects ?? []).entries()) {
         const activation = c.race === 'Counter' ? 3 : c.type.includes('Trap') || c.race === 'Quick-Play' ? 2 : 1;

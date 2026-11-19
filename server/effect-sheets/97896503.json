@@ -1,7 +1,6 @@
 {
   "code": 97896503,
   "textHash": "ef4e4c553d971c55aefd183668ea4b502a652a49ea06195ba74afa0d504fbc46",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Destroy that monster.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

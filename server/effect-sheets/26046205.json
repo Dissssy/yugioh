@@ -1,7 +1,6 @@
 {
   "code": 26046205,
   "textHash": "0bf661a61bbec931e7d5587ff6cbe4815abe31a4e1da5280730301f5873c99d4",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Draw 1 card.",
       "targets": null,
       "respondsTo": "attack",
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

@@ -1,9 +1,13 @@
-// Effect sheets: each card's effects, read once from its text by a strong model and stored as reviewable JSON files
-// in server/effect-sheets/<passcode>.json. A duel copies the sheets of its cards into its first event.
+// Effect sheets: each card's effects, read once from its text by a strong model. They live in the database, where
+// the compiler, players' reports and the admin change them, with every version kept (see docs/effects.md). A duel
+// copies its cards' sheets into its first event, and a change during the duel joins its log as `sheetUpdated`.
 //
-// `npm run sheets:compile` writes a sheet for every premade-deck card with an effect that has none, or whose text
-// changed since (errata), using the Message Batches API. `-- --force` rewrites them all, and card names after it
-// limit the run to those cards (`-- --force "Twister"`). A sheet marked `verified` is never overwritten.
+//   npm run sheets:compile                    sheets for premade-deck cards that have none or whose text changed
+//   npm run sheets:compile -- --force [names] recompile all of them, or only the named cards
+//   npm run sheets:import [-- --force]        load server/effect-sheets/*.json into the database (missing ones only)
+//   npm run sheets:export                     write every sheet in the database to server/effect-sheets/
+//
+// A sheet with a verified effect is never recompiled.
 
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -13,11 +17,11 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { setTimeout as sleep } from 'node:timers/promises';
 import Anthropic from '@anthropic-ai/sdk';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { DESTINATIONS, UNTIL, type CardData, type CardFilter, type ModelUsage, type EffectSheet, type Script, type Selection, type SheetEffect, type Step } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
-import { cards, decks } from './db/schema.ts';
+import { cards, decks, effectSheets, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
 import { strictSchema } from './judge/tools.ts';
 
@@ -95,13 +99,17 @@ const sheetEffect = z.object({
   targets: z.string().nullable(),
   respondsTo: z.enum(['attack', 'summon', 'activation']).nullable(),
   script: script.nullable(),
+  status: z.enum(['unverified', 'verified', 'flagged']),
 }) satisfies z.ZodType<SheetEffect>;
 
 /**
  * What the compiling model returns for one card. Each script comes back as JSON text and is checked here: its schema
  * has more unions than structured outputs accept.
  */
-const compiled = z.object({ effects: z.array(sheetEffect.omit({ speed: true }).extend({ script: z.string().nullable() })), materials: z.string().nullable() });
+const compiled = z.object({
+  effects: z.array(sheetEffect.omit({ speed: true, status: true }).extend({ script: z.string().nullable() })),
+  materials: z.string().nullable(),
+});
 
 /** An effect's spell speed follows from its kind and the card's type, so code sets it rather than the model. */
 export function speedOf(kind: SheetEffect['kind'], card: { type: string; race: string }): SheetEffect['speed'] {
@@ -110,36 +118,95 @@ export function speedOf(kind: SheetEffect['kind'], card: { type: string; race: s
   return card.race === 'Counter' ? 3 : card.type.includes('Trap') || card.race === 'Quick-Play' ? 2 : 1;
 }
 
-const sheetFile = z.object({
-  effects: z.array(sheetEffect),
-  materials: z.string().nullable(),
+/** A whole sheet, as stored and as the admin edits it. */
+export const sheetSchema = z.object({
   code: z.number().int(),
   textHash: z.string(),
-  verified: z.boolean(),
   model: z.string(),
+  effects: z.array(sheetEffect),
+  materials: z.string().nullable(),
 }) satisfies z.ZodType<EffectSheet>;
 
-const sheetPath = (code: number, dir: string) => join(dir, `${code}.json`);
-
-async function readSheet(code: number, dir: string): Promise<EffectSheet | null> {
-  const path = sheetPath(code, dir);
-  if (!existsSync(path)) return null;
-  return sheetFile.parse(JSON.parse(await readFile(path, 'utf8')));
+/** Sheets for the given cards, keyed by passcode. A card without a current sheet acts as if it had no effects. */
+export async function loadSheets(db: Db, cardData: Record<number, CardData>): Promise<Record<number, EffectSheet>> {
+  const codes = Object.keys(cardData).map(Number);
+  const rows = codes.length ? await db.select().from(effectSheets).where(inArray(effectSheets.code, codes)) : [];
+  return current(cardData, rows.map((r) => r.sheet));
 }
 
-/** Sheets for the given cards, keyed by passcode. A card without a current sheet acts as if it had no effects. */
-export async function loadSheets(cardData: Record<number, CardData>, dir = SHEET_DIR): Promise<Record<number, EffectSheet>> {
-  const sheets: Record<number, EffectSheet> = {};
-  for (const card of Object.values(cardData)) {
-    const sheet = await readSheet(card.code, dir);
-    if (!sheet) continue;
+/** The sheets that match their card's text. */
+function current(cardData: Record<number, CardData>, sheets: EffectSheet[]): Record<number, EffectSheet> {
+  const result: Record<number, EffectSheet> = {};
+  for (const sheet of sheets) {
+    const card = cardData[sheet.code];
+    if (!card) continue;
     if (sheet.textHash !== textHash(card.text)) {
       console.warn(`Effect sheet for ${card.name} (${card.code}) is out of date; run npm run sheets:compile.`);
       continue;
     }
-    sheets[card.code] = sheet;
+    result[sheet.code] = sheet;
   }
-  return sheets;
+  return result;
+}
+
+/** Stores a new version of a sheet and keeps the old ones. */
+export async function saveSheet(db: Db, sheet: EffectSheet, reason: string): Promise<void> {
+  const checked = sheetSchema.parse(sheet);
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(effectSheets)
+      .values({ code: checked.code, sheet: checked })
+      .onConflictDoUpdate({ target: effectSheets.code, set: { sheet: checked, updatedAt: new Date() } });
+    await tx.insert(sheetRevisions).values({ code: checked.code, sheet: checked, reason });
+  });
+}
+
+/** A card's sheet now, if it has one. */
+export async function sheetOf(db: Db, code: number): Promise<EffectSheet | null> {
+  return (await db.query.effectSheets.findFirst({ where: eq(effectSheets.code, code) }))?.sheet ?? null;
+}
+
+/** Sets aside every script on a card's sheet, so the judge rules on it from now on. Returns the new sheet, or null if it had no script to set aside. */
+export async function flagScripts(db: Db, code: number, reason: string): Promise<EffectSheet | null> {
+  const sheet = await sheetOf(db, code);
+  if (!sheet?.effects.some((e) => e.script && e.status !== 'flagged')) return null;
+  const flagged = { ...sheet, effects: sheet.effects.map((e) => (e.script ? { ...e, status: 'flagged' as const } : e)) };
+  await saveSheet(db, flagged, reason);
+  return flagged;
+}
+
+const sheetPath = (code: number, dir: string) => join(dir, `${code}.json`);
+
+/** The sheet files in `dir` that match the given cards' text, for tests and `sheets:import`. */
+export async function readSheetFiles(cardData: Record<number, CardData>, dir = SHEET_DIR): Promise<Record<number, EffectSheet>> {
+  const sheets: EffectSheet[] = [];
+  for (const code of Object.keys(cardData).map(Number)) {
+    if (existsSync(sheetPath(code, dir))) sheets.push(sheetSchema.parse(JSON.parse(await readFile(sheetPath(code, dir), 'utf8'))));
+  }
+  return current(cardData, sheets);
+}
+
+/** Loads the sheet files into the database: those it lacks, or with `force` all of them. Returns how many. */
+export async function importSheetFiles(db: Db, options: { dir?: string; force?: boolean } = {}): Promise<number> {
+  const { dir = SHEET_DIR, force = false } = options;
+  const codes = await listSheetCodes(dir);
+  const rows = codes.length ? await db.select().from(cards).where(inArray(cards.id, codes)) : [];
+  const files = await readSheetFiles(Object.fromEntries(rows.map((r) => [r.id, { code: r.id, name: r.name, text: r.text } as CardData])), dir);
+  const have = new Set((await db.select({ code: effectSheets.code }).from(effectSheets)).map((r) => r.code));
+  let n = 0;
+  for (const sheet of Object.values(files)) {
+    if (!force && have.has(sheet.code)) continue;
+    await saveSheet(db, sheet, 'imported');
+    n++;
+  }
+  return n;
+}
+
+/** Writes every sheet in the database to `dir`, one file per card. */
+export async function exportSheetFiles(db: Db, dir = SHEET_DIR): Promise<number> {
+  const rows = await db.select().from(effectSheets);
+  for (const { sheet } of rows) await writeFile(sheetPath(sheet.code, dir), `${JSON.stringify(sheet, null, 2)}\n`);
+  return rows.length;
 }
 
 const compilePrompt = () => `You turn one Yu-Gi-Oh! card's official text into an effect sheet for a duel engine. Code runs the generic rules (phases, summons, battle, chain, once-per-turn counting); a runtime judge reads your sheet and the card text to apply each effect. Be exact about the card's own wording.
@@ -200,7 +267,7 @@ The script's JSON Schema (every property is required; use null or [] where the t
 ${JSON.stringify(strictSchema(script))}`;
 
 /** Premade-deck cards with text that need a new sheet, or only those named in `names` if any. */
-async function cardsToCompile(db: Db, dir: string, force: boolean, names: string[]) {
+async function cardsToCompile(db: Db, force: boolean, names: string[]) {
   const all = await db.select({ main: decks.main, extra: decks.extra }).from(decks);
   const ids = [...new Set(all.flatMap((d) => [...d.main, ...d.extra]))];
   const rows = ids.length ? await db.select().from(cards).where(inArray(cards.id, ids)) : [];
@@ -208,17 +275,17 @@ async function cardsToCompile(db: Db, dir: string, force: boolean, names: string
   for (const row of rows) {
     if (row.frameType === 'normal') continue;
     if (names.length && !names.includes(row.name)) continue;
-    const sheet = await readSheet(row.id, dir);
-    if (sheet?.verified) continue;
+    const sheet = await sheetOf(db, row.id);
+    if (sheet?.effects.some((e) => e.status === 'verified')) continue;
     if (!force && sheet?.textHash === row.textHash) continue;
     todo.push(row);
   }
   return todo;
 }
 
-export async function compileSheets(db: Db, options: { dir?: string; force?: boolean; names?: string[]; log?: (m: string) => void; client?: Anthropic }) {
-  const { dir = SHEET_DIR, force = false, names = [], log = () => {} } = options;
-  const todo = await cardsToCompile(db, dir, force, names);
+export async function compileSheets(db: Db, options: { force?: boolean; names?: string[]; log?: (m: string) => void; client?: Anthropic }) {
+  const { force = false, names = [], log = () => {} } = options;
+  const todo = await cardsToCompile(db, force, names);
   if (todo.length === 0) return log('Every sheet is up to date.');
   log(`Compiling ${todo.length} effect sheets with ${COMPILE_MODEL}…`);
   const client = options.client ?? new Anthropic();
@@ -259,7 +326,7 @@ export async function compileSheets(db: Db, options: { dir?: string; force?: boo
     }
     const effects = parsed.data.effects.map((e, i): SheetEffect => {
       const speed = speedOf(e.kind, row);
-      if (e.script === null) return { ...e, speed, script: null };
+      if (e.script === null) return { ...e, speed, script: null, status: 'unverified' };
       const checked = script.safeParse(parseJson(e.script));
       const problem = !checked.success
         ? z.prettifyError(checked.error)
@@ -267,10 +334,10 @@ export async function compileSheets(db: Db, options: { dir?: string; force?: boo
           ? `a ${e.kind} effect can't have a script`
           : null;
       if (problem) log(`${row.name}: effect ${i}'s script is invalid, so the judge will apply it (${problem})`);
-      return { ...e, speed, script: checked.success && !problem ? checked.data : null };
+      return { ...e, speed, script: checked.success && !problem ? checked.data : null, status: 'unverified' };
     });
-    const sheet: EffectSheet = { code: row.id, textHash: row.textHash, verified: false, model: COMPILE_MODEL, effects, materials: parsed.data.materials };
-    await writeFile(sheetPath(row.id, dir), `${JSON.stringify(sheet, null, 2)}\n`);
+    const sheet: EffectSheet = { code: row.id, textHash: row.textHash, model: COMPILE_MODEL, effects, materials: parsed.data.materials };
+    await saveSheet(db, sheet, 'compiled');
     log(`${row.name}: written`);
   }
   // The Batches API charges half the listed prices.
@@ -285,7 +352,7 @@ function parseJson(text: string): unknown {
   }
 }
 
-/** All sheet files, for tests and reviews. */
+/** The passcodes of all sheet files. */
 export async function listSheetCodes(dir = SHEET_DIR): Promise<number[]> {
   return (await readdir(dir)).filter((f) => f.endsWith('.json')).map((f) => Number(f.slice(0, -5)));
 }
@@ -294,6 +361,10 @@ if (import.meta.main) {
   const { connect } = await import('./db/client.ts');
   const db = connect(process.env.DATABASE_URL ?? '');
   const { values, positionals } = parseArgs({ allowPositionals: true, options: { force: { type: 'boolean', default: false } } });
-  await compileSheets(db, { force: values.force, names: positionals, log: console.log });
+  const [command, ...names] = positionals;
+  if (command === 'compile') await compileSheets(db, { force: values.force, names, log: console.log });
+  else if (command === 'import') console.log(`Imported ${await importSheetFiles(db, { force: values.force })} sheets.`);
+  else if (command === 'export') console.log(`Exported ${await exportSheetFiles(db)} sheets to ${SHEET_DIR}.`);
+  else console.error('Usage: node src/sheets.ts compile|import|export [--force] [card names]');
   await db.$client.end();
 }

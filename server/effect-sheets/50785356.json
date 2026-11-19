@@ -1,7 +1,6 @@
 {
   "code": 50785356,
   "textHash": "ea64c461ab0ae9c53d4b6f385728519f0349afde3cd5746a72d45940e5cb17c8",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Target 1 face-up monster you control; it becomes Level 3.",
       "targets": "1 face-up monster you control",
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

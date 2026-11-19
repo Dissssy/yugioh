@@ -1,7 +1,6 @@
 {
   "code": 86174055,
   "textHash": "231eb229c93ee1bd8bdf47ffe409bd72242ea0d622be6e8f01c97316e8bb6e73",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Special Summon them, but their effects are negated.",
       "targets": "2 Level 2 monsters in your Graveyard",
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

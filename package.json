@@ -18,6 +18,8 @@
     "db:migrate": "npm run db:migrate -w server",
     "cards:import": "npm run cards:import -w server --",
     "sheets:compile": "npm run sheets:compile -w server --",
+    "sheets:import": "npm run sheets:import -w server --",
+    "sheets:export": "npm run sheets:export -w server --",
     "judge:eval": "npm run judge:eval -w server --",
     "duel:report": "npm run duel:report -w server --"
   },

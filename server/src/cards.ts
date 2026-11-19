@@ -14,6 +14,7 @@ import { z } from 'zod';
 import type { CardData } from '@yugioh/engine';
 import type { Db, Tx } from './db/client.ts';
 import { cardImports, cards, decks } from './db/schema.ts';
+import { importSheetFiles } from './sheets.ts';
 
 export const YGOPRODECK_API = 'https://db.ygoprodeck.com/api/v7';
 
@@ -70,6 +71,9 @@ export async function syncCards(db: Db, options: SyncOptions) {
     log(`Imported ${all.length} cards.`);
   }
   await downloadDeckImages(db, options.imageDir, options.imageGapMs ?? 100, log);
+  // A new database starts with the effect sheets kept in the repository.
+  const imported = await importSheetFiles(db);
+  if (imported) log(`Imported ${imported} effect sheets from server/effect-sheets/.`);
 }
 
 async function getJson(url: string): Promise<unknown> {

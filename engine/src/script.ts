@@ -5,9 +5,10 @@ import { cardOf } from './rules.ts';
 import { levelOf, locate, statsOf } from './state.ts';
 import type { CardFilter, DuelState, Range, Script, Seat, Selection, Step } from './types.ts';
 
-/** The script of a card's effect, if it has one. */
+/** The script of a card's effect, if it has one that hasn't been flagged. */
 export function scriptOf(state: DuelState, card: string, effect: number): Script | null {
-  return state.sheets[cardOf(state, card).code]?.effects[effect]?.script ?? null;
+  const e = state.sheets[cardOf(state, card).code]?.effects[effect];
+  return e?.status === 'flagged' ? null : (e?.script ?? null);
 }
 
 const inRange = (value: number | null, range: Range | null) =>

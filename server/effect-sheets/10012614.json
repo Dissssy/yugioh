@@ -1,7 +1,6 @@
 {
   "code": 10012614,
   "textHash": "7a4483b22c2732e6680d5fd269b61677568cccda38274b5741ae684b20f5046e",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -25,7 +24,8 @@
           }
         ],
         "unapplied": null
-      }
+      },
+      "status": "unverified"
     },
     {
       "kind": "continuous",
@@ -37,7 +37,8 @@
       "effect": "All monsters you control gain 200 ATK during your Battle Phase only.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

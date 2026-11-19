@@ -1,7 +1,6 @@
 {
   "code": 61032879,
   "textHash": "d4b7c0c21d1bfb08862234b8368bb18274347b01ba2ff351d47e156375dc9f53",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -25,7 +24,8 @@
           }
         ],
         "unapplied": null
-      }
+      },
+      "status": "unverified"
     },
     {
       "kind": "trigger",
@@ -37,7 +37,8 @@
       "effect": "Inflict 500 damage to your opponent.",
       "targets": null,
       "respondsTo": "summon",
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

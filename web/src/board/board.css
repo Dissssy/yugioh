@@ -256,3 +256,7 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
 .stats-badge { position: absolute; bottom: 2px; left: 50%; translate: -50% 0; padding: 0 6px; border-radius: 999px; font-size: 0.7em; font-weight: 700; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--bg) 88%, transparent); pointer-events: none; white-space: nowrap; }
 .stats-badge .up { color: #2f9e44; }
 .stats-badge .down { color: var(--danger); }
+.report-ruling { margin-top: 8px; font-size: 0.85em; }
+form.report-ruling { display: flex; flex-direction: column; gap: 6px; }
+form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.report-ruling .report-actions { display: flex; justify-content: flex-end; gap: 6px; }

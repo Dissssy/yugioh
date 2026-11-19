@@ -1,7 +1,6 @@
 {
   "code": 72302403,
   "textHash": "21fa0db1c2623e482f72ec7a35cf1a1a11519aed7f3e69ab048f4195ac93cad2",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "This card remains on the field, but you must destroy it during the End Phase of your opponent's 3rd turn.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "activation",
@@ -26,7 +26,8 @@
       "effect": "When this card is activated: If your opponent controls a face-down monster, flip all monsters they control face-up.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "continuous",
@@ -38,7 +39,8 @@
       "effect": "Your opponent's monsters cannot declare an attack.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

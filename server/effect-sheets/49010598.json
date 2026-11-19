@@ -1,7 +1,6 @@
 {
   "code": 49010598,
   "textHash": "ed44ee8a8641eeb0cb189555d93d4c97db700578fe5e67a7f25c13c7a07cf7d6",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Negate the activation, and if you do, destroy that monster.",
       "targets": null,
       "respondsTo": "activation",
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

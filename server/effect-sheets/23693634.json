@@ -1,7 +1,6 @@
 {
   "code": 23693634,
   "textHash": "5c219eba32bbcb0a70867286d75f14c3e21fdd2438c95fcecba50a19f0e79b1f",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "This card gains 100 ATK for every Warrior-Type monster in any Graveyard.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "trigger",
@@ -26,7 +26,8 @@
       "effect": "Special Summon that target.",
       "targets": "1 Warrior-Type monster in either Graveyard",
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": "1 Tuner + 1 or more non-Tuner monsters"

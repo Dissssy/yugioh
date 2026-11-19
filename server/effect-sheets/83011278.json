@@ -1,7 +1,6 @@
 {
   "code": 83011278,
   "textHash": "7eac7c45f2970b85ab9da6e8a86417d29f42c095ff00db7b73935c6eac6fccba",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Special Summon 1 DARK monster with 1500 or less ATK from your Deck, in face-up Attack Position.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

@@ -1,7 +1,6 @@
 {
   "code": 32918479,
   "textHash": "941ff4c958e846a88890750ef83c9f872b10e4c445cb04c49cb54098db782c50",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Draw 1 card.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "trigger",
@@ -26,7 +26,8 @@
       "effect": "Send it to the Graveyard.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

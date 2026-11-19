@@ -1,7 +1,6 @@
 {
   "code": 36361633,
   "textHash": "a4352fff84e77137eec971f55adc4e0b13929deda845c949693a95368390f969",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Your opponent cannot declare an attack this turn.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

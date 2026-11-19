@@ -1,7 +1,6 @@
 {
   "code": 18807109,
   "textHash": "4d38cc0b29ea627d5b1d50eb09efaa27d47181dc87b7edae96a772b2ff2762b7",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Activate this card by targeting 1 monster your opponent controls; it cannot attack or change its battle position.",
       "targets": "1 monster your opponent controls",
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "continuous",
@@ -26,7 +26,8 @@
       "effect": "The targeted monster cannot attack or change its battle position.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "continuous",
@@ -38,7 +39,8 @@
       "effect": "When that monster is destroyed, destroy this card.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

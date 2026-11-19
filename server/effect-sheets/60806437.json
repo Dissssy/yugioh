@@ -1,7 +1,6 @@
 {
   "code": 60806437,
   "textHash": "d070732b3eb899a0bbf27db3e3c1ec6dcf94a499e8ea2b0fd88e00b503aecd20",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "You can Special Summon 1 FIRE monster with 1500 or less ATK from your Deck, in face-up Attack Position.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

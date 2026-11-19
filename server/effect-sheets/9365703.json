@@ -1,7 +1,6 @@
 {
   "code": 9365703,
   "textHash": "e1599bf5eb8f73ec949868cc5d5ed61bb0832741075b013377640aa42e577631",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Make its ATK become double its original ATK, until the end of the Battle Phase.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

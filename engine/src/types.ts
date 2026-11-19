@@ -47,6 +47,12 @@ export interface SheetEffect {
   respondsTo: 'attack' | 'summon' | 'activation' | null;
   /** The effect as data that code runs exactly, with no judge, or null when the judge applies it (see docs/effects.md). */
   script: Script | null;
+  /**
+   * `unverified` as compiled; `verified` once a person checked it (the compiler then never overwrites the sheet);
+   * `flagged` after a player reported the card or an appeal overturned its script, so its script is set aside and the
+   * judge rules on it until someone fixes or restores it.
+   */
+  status: 'unverified' | 'verified' | 'flagged';
 }
 
 /**
@@ -122,8 +128,7 @@ export interface EffectSheet {
   code: number;
   /** sha256 of the card text the sheet was made from; a sheet whose hash no longer matches is ignored. */
   textHash: string;
-  /** Made by `model`; set to true by a person who checked it, after which the compiler never overwrites it. */
-  verified: boolean;
+  /** Who wrote it: the compiling model, or "admin" for a hand edit. */
   model: string;
   effects: SheetEffect[];
   /** Extra Deck materials as worded on the card, or null. */
@@ -353,6 +358,8 @@ export type DuelEvent =
   /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
   | { type: 'linkResolved' }
   | { type: 'appealed'; appeal: AppealRecord }
+  /** A card's sheet changed while the duel was going (a report flagged it, or it was fixed); null if it no longer has one. */
+  | { type: 'sheetUpdated'; code: number; sheet: EffectSheet | null }
   | { type: 'duelEnded'; result: DuelResult }
   /** A player's chat message. It changes nothing on the board and never reaches the judge. */
   | { type: 'chatted'; player: Seat; text: string };
@@ -386,7 +393,7 @@ export interface PlayerView {
 export type LogEvent =
   | Exclude<
       DuelEvent,
-      { type: 'duelStarted' | 'intent' | 'monsterSet' | 'spellTrapSet' | 'attackDeclared' | 'judged' | 'moved' | 'deckShuffled' | 'appealed' }
+      { type: 'duelStarted' | 'intent' | 'monsterSet' | 'spellTrapSet' | 'attackDeclared' | 'judged' | 'moved' | 'deckShuffled' | 'appealed' | 'sheetUpdated' }
     >
   | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number }
   | (Omit<Extract<DuelEvent, { type: 'moved' }>, 'card'> & { card: string | null })

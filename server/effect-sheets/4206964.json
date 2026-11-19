@@ -1,7 +1,6 @@
 {
   "code": 4206964,
   "textHash": "a5001d10074bce1a7fe580c433eb407728ea1cef6b67be85c03e56d94651895c",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Target that monster; destroy that target.",
       "targets": "the Normal or Flip Summoned monster with 1000 or more ATK",
       "respondsTo": "summon",
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

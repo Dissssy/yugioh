@@ -1,7 +1,6 @@
 {
   "code": 2460565,
   "textHash": "35dc7ddf66d0a8db064febcda8e597dbc473f17cf0451ad34059d9d1066bda99",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Your opponent cannot target Warrior monsters for attacks, except this one.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "trigger",
@@ -26,7 +26,8 @@
       "effect": "You can Special Summon 1 Level 4 or lower monster from your hand.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

@@ -1,7 +1,6 @@
 {
   "code": 11224934,
   "textHash": "12cc1272ff21cbc7698a165398bf9c129ca2dd3312d8f51f37ef1a72055c1275",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Each face-up Xyz Monster you control gains 300 ATK for each Xyz Material attached to it, until the End Phase.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

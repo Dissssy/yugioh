@@ -62,8 +62,9 @@ const effect = (kind: SheetEffect['kind'], opt: SheetEffect['opt'] = 'none'): Sh
   targets: null,
   respondsTo: null,
   script: null,
+  status: 'unverified',
 });
-const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', verified: true, model: 'test', effects, materials: null });
+const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null });
 const sheets: Record<number, EffectSheet> = {
   8: sheet(8, effect('activation')),
   9: sheet(9, effect('activation')),

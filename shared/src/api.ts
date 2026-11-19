@@ -1,4 +1,4 @@
-import type { CardData } from '@yugioh/engine';
+import type { CardData, EffectSheet } from '@yugioh/engine';
 
 // JSON shapes exchanged between the web client and the server.
 
@@ -68,4 +68,24 @@ export interface DuelCost {
 export interface AdminDuels {
   totalCost: number;
   duels: (DuelSummary & DuelCost)[];
+}
+
+/** A player's report that a card is ruled wrongly, or an appeal that overturned one of its scripted rulings. */
+export interface SheetReport {
+  id: number;
+  matchId: string;
+  /** How many events the duel had when the report was made. */
+  seq: number;
+  from: 'player' | 'appeal';
+  note: string;
+  createdAt: string;
+}
+
+/** A card whose rulings need the admin: it has open reports, or scripts set aside for the judge. */
+export interface RulingCard {
+  code: number;
+  name: string;
+  text: string;
+  sheet: EffectSheet | null;
+  reports: SheetReport[];
 }

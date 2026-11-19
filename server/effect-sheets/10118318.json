@@ -1,7 +1,6 @@
 {
   "code": 10118318,
   "textHash": "5694ddfbc33576db21e8507adcef372febb0f283a834dae8214e4d5212911753",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -60,7 +59,8 @@
           }
         ],
         "unapplied": "You cannot conduct your Battle Phase the turn you activate this card."
-      }
+      },
+      "status": "unverified"
     }
   ],
   "materials": null

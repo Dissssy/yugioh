@@ -1,7 +1,6 @@
 {
   "code": 36750412,
   "textHash": "938e399c67ca6490b3abb3802dea5a9e48a974c61d7944969373983fc25e6f06",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "It gains 200 ATK.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

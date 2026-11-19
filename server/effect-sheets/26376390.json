@@ -1,7 +1,6 @@
 {
   "code": 26376390,
   "textHash": "132802c527494f606e116ccb57577ddaf471794ece38bc60fec0a2469cda0078",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "This card's ATK/DEF become equal to that monster's original ATK/DEF.",
       "targets": "1 face-up monster your opponent controls",
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

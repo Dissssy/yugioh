@@ -1,7 +1,6 @@
 {
   "code": 59563768,
   "textHash": "b5924b277846fcb8475b1c2b60bc7b3e4ee05f8e534b08aa92f6258fc38c64b9",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "This card gains 400 ATK for each face-up Level 2 monster you control.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

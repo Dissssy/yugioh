@@ -1,7 +1,6 @@
 {
   "code": 56120475,
   "textHash": "a113e83eef2b35a45a44e3ee3877cf067048c6537292a8015b143e37a8ae7a2a",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Destroy the attacking monster.",
       "targets": "the attacking monster",
       "respondsTo": "attack",
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

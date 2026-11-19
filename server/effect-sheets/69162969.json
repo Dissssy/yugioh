@@ -1,7 +1,6 @@
 {
   "code": 69162969,
   "textHash": "3fbb558c92940627c7e985a5ed195dd9c04cfbc05fedfd9844c90fbe23160fdc",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -69,7 +68,8 @@
           }
         ],
         "unapplied": null
-      }
+      },
+      "status": "unverified"
     }
   ],
   "materials": null

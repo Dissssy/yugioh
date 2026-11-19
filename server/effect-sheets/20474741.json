@@ -1,7 +1,6 @@
 {
   "code": 20474741,
   "textHash": "b3c2b1006a47b9d0ed12906193812e5b437c205aac92fbbcb15c88188512bc1e",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Special Summon 1 Level 3 monster from your hand.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

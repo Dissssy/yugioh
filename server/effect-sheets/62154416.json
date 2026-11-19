@@ -1,7 +1,6 @@
 {
   "code": 62154416,
   "textHash": "1af860159a71ed288812bbd7e3b03805be93b3e42a3e99b87edf9fca55f813fa",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Place 1 Spell Counter on it (max. 1).",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "ignition",
@@ -26,7 +26,8 @@
       "effect": "Have 1 face-up monster you control gain 500 ATK, until the End Phase.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

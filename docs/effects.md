@@ -18,13 +18,13 @@ Not yet, by design of the build order:
 
 ## Effect sheets
 
-Each card with an effect has a sheet in `server/effect-sheets/<passcode>.json`: per effect its kind (activation, ignition, trigger, quick, continuous, flip, condition), spell speed, whether a trigger is mandatory, its once-per-turn clause, window, cost, effect, targets, what it responds to and its script, plus Extra Deck materials. Code reads the kind, the once-per-turn clause, `respondsTo` and the script; the judge reads the rest next to the full card text. The spell speed follows from the kind and the card type, so the compiler sets it, not the model.
+Each card with an effect has a sheet: per effect its kind (activation, ignition, trigger, quick, continuous, flip, condition), spell speed, whether a trigger is mandatory, its once-per-turn clause, window, cost, effect, targets, what it responds to and its script, its status, plus Extra Deck materials. Code reads the kind, the once-per-turn clause, `respondsTo`, the script and its status; the judge reads the rest next to the full card text. The spell speed follows from the kind and the card type, so the compiler sets it, not the model.
 
-Sheets are files in the repository rather than database rows, so a change to one is reviewed in a pull request like code. A duel copies its cards' sheets into its first event, so replays never depend on later edits.
+Sheets are data in Postgres (`effect_sheets`), so players' reports and the admin can change them without a deploy. Every version is kept in `sheet_revisions` with why it changed ("compiled", "imported", a report, an appeal, or the admin's note). `server/effect-sheets/*.json` is the seed and backup: the card sync imports any sheet the database lacks, `npm run sheets:import -- --force` overwrites the database from the files, and `npm run sheets:export` writes the database back to them. A duel copies its cards' sheets into its first event, and a later change joins the log as a `sheetUpdated` event that players never see, so replays never depend on the database. A running duel gets the change at once; one that wasn't loaded gets it when it next loads. Finished duels keep the sheets they were played with.
 
 - Each sheet carries the sha256 of the card text it was made from. If errata changes the text, the sheet is ignored (the card acts as if it had no effects) until it is recompiled.
-- `npm run sheets:compile` writes a sheet for every premade-deck card with an effect that has none or whose text changed, using Claude Opus 5.5 with thinking through the Message Batches API (half price; it waits for the batch, usually minutes). `-- --force` recompiles all of them, and card names after it only those (`-- --force "Twister" "Fissure"`). It needs `ANTHROPIC_API_KEY` and `DATABASE_URL`. A full recompile of the 69 sheets costs about $3, and the run prints its cost.
-- A sheet with `"verified": true` has been checked by a person and is never overwritten.
+- `npm run sheets:compile` writes a sheet for every premade-deck card with an effect that has none or whose text changed, using Claude Opus 5.5 with thinking through the Message Batches API (half price; it waits for the batch, usually minutes). `-- --force` recompiles all of them, and card names after it only those (`-- --force "Twister" "Fissure"`). It needs `ANTHROPIC_API_KEY` and `DATABASE_URL`, and writes to the database (export afterwards to update the files). A full recompile of the 69 sheets costs about $3, and the run prints its cost.
+- Each effect's `status` is `unverified` (as compiled), `verified` (a person checked it) or `flagged` (its script is set aside, so the judge rules on it). A sheet with any verified effect is never recompiled.
 
 The current 69 sheets for the two starter decks were compiled by Opus on 2026-11-19 and are unverified; they match today's card text.
 - A sheet is named by the card's passcode. YGOPRODeck sometimes changes which artwork's passcode is a card's main ID (in November 2026 it did for Mystic Tomato and Number 39: Utopia). The old sheet is then never found and the card acts as if it had no effects, so rename the sheet and its `code` to the new passcode; the offline tests catch this once the fixture in `server/test/fixtures/` is refreshed.
@@ -41,7 +41,14 @@ Most effects are fixed: what The Warrior Returning Alive needs ("a Warrior monst
 
 Opus writes the scripts when it compiles a sheet, only where the whole effect fits the vocabulary; anything else gets `script: null` and the judge. Structured outputs can't hold the script schema (too many unions), so the model returns each script as JSON text and the compiler checks it with the same Zod schema; a script that doesn't check is dropped with a log line, leaving that effect to the judge.
 
-**When a script is wrong**, fix the sheet (by hand, or with a targeted recompile), add an eval case for the situation, and mark the sheet verified once a person has checked it. A won appeal on a scripted card is the signal: its `ruling` says what the right answer was.
+## Reports: when a script is wrong
+
+A player who thinks a card is ruled wrongly pins the card's details (right-click or Shift) and uses **Report a ruling problem**, saying what the game did and what it should have done (`POST /api/duels/:id/report`; up to 5 per player per duel, only for cards they can see). An appeal that overturns a scripted ruling does the same on its own, with the appeal's `ruling` as the note. Either way, at once and in every duel:
+
+- the report is stored in `sheet_reports` with the duel and its event count, so the board it was made on can be replayed from the log;
+- every script on the card is flagged, so code stops ruling on it and the judge reads the card instead (the activation may now be offered where the script refused it).
+
+Any player's report flags the card, without review: this is a small private site, and the cost of a wrong report is only some judge calls. The admin page's **Rulings** section lists every card with open reports or flagged scripts, with its text, the reports and a link to the duel log. There the admin edits the sheet as JSON (fix a script, **Restore scripts** to unflag them, or **Mark scripts verified** after checking them), saves it with a note, and closes the reports (`GET /api/admin/rulings`, `POST /api/admin/sheets/:code`, `POST /api/admin/reports/:id/resolve`). A saved sheet must match the card's current text; it reaches running duels at once. Add an eval case for the situation whenever a script was really wrong.
 
 ## The judge
 

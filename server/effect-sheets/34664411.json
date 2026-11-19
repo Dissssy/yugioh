@@ -1,7 +1,6 @@
 {
   "code": 34664411,
   "textHash": "89e952fe17580e265e5e94a5019a014233aad28465a63158b5590ffb8457cf79",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Equip this card to 1 face-up monster on the field.",
       "targets": "1 face-up monster on the field",
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "continuous",
@@ -26,7 +26,8 @@
       "effect": "The equipped monster gains 500 ATK.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "trigger",
@@ -38,7 +39,8 @@
       "effect": "Draw 1 card.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

@@ -31,6 +31,7 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
 const answerBody = z.object({ prompt: z.string(), picks: z.array(z.string()).max(60) });
 const chatBody = z.object({ text: z.string().trim().min(1).max(300) });
 const contestBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
+const reportBody = z.object({ code: z.number().int(), note: z.string().trim().min(1).max(1000) });
 
 const deckChoice = z.object({ deckId: z.number().int() });
 /** Signed-out visitors also give the name they play under as a guest. */
@@ -194,6 +195,19 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     const result = await duels.contest(row.id, p.key, body.data.seq, body.data.note);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(202).end();
+  });
+
+  // Reports that a card is ruled wrongly. Its scripts are set aside at once; the admin sees the report.
+  router.post('/duels/:id/report', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const body = reportBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    const row = await duels.find(req.params.id);
+    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    const result = await duels.report(row.id, p.key, body.data.code, body.data.note);
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.status(204).end();
   });
 
   // A chat message, which joins the duel log for both players.

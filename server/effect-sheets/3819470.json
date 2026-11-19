@@ -1,7 +1,6 @@
 {
   "code": 3819470,
   "textHash": "389b60b4fd72b976066881f5639b37c5c5e2231d9148ed945b69e19aa964848b",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Negate the activation, and if you do, destroy it.",
       "targets": null,
       "respondsTo": "activation",
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

@@ -1,7 +1,6 @@
 {
   "code": 89529919,
   "textHash": "9961b40642c50da5c45e865c5606bfb3386a92088227a801236147c459a724d6",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Choose 1 Level 4 or lower Warrior-Type monster from your Deck, except \"Field-Commander Rahz\", and place it on top of your Deck.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

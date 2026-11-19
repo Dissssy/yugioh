@@ -1,7 +1,6 @@
 {
   "code": 84013237,
   "textHash": "fc46fbfff41d3461a587d3501bde2b19d08977f2008a766ee5cbddfce2e28fca",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "negate the attack",
       "targets": null,
       "respondsTo": "attack",
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "trigger",
@@ -26,7 +26,8 @@
       "effect": "Destroy this card.",
       "targets": null,
       "respondsTo": "attack",
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": "2 Level 4 monsters"

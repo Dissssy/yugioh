@@ -1,7 +1,6 @@
 {
   "code": 5438492,
   "textHash": "5ee572f99288dcbb9184b94926e0ed6bf57149fd2850c88068023277b777673e",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Special Summon 1 EARTH Warrior-Type monster with 1500 or less ATK from your Deck, in face-up Attack Position.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

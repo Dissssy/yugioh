@@ -1,7 +1,6 @@
 {
   "code": 47506081,
   "textHash": "7d3d29d8ebe04324d5b3c2e98ea4b2b598336258eb2b84925cd23d54eed2360c",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Inflict 1000 damage to your opponent.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": "2 Level 3 monsters"

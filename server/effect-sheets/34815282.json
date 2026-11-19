@@ -1,7 +1,6 @@
 {
   "code": 34815282,
   "textHash": "c6d5351de695102c05b4b63db3fb284e2608d1936f82f77eeb7c40787e87340c",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Its Level is reduced by 1, also it loses 1000 ATK (while this card remains face-up on the field).",
       "targets": "1 face-up monster on the field with more than 1000 original ATK that has a Level",
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "continuous",
@@ -26,7 +26,8 @@
       "effect": "When that monster leaves the field, destroy this card.",
       "targets": null,
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

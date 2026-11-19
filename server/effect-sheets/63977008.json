@@ -1,7 +1,6 @@
 {
   "code": 63977008,
   "textHash": "c90d5a908f5d826dd208b0edf098e72d759a51a386f37693717f36fcf022924b",
-  "verified": false,
   "model": "claude-opus-5-5",
   "effects": [
     {
@@ -14,7 +13,8 @@
       "effect": "Special Summon that target in Defense Position, but it has its effects negated.",
       "targets": "1 Level 2 or lower monster in your Graveyard",
       "respondsTo": null,
-      "script": null
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

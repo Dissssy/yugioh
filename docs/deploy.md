@@ -38,7 +38,7 @@ The shared Postgres runs as compose project `/git/postgres` (service `db`, Docke
 
    DNS: `yugioh.p51.nl` is a CNAME to `p51.nl` in Cloudflare, not proxied, so Caddy gets its own certificate.
 
-On start the app applies database migrations, then imports cards from YGOPRODeck (about 14,700 cards and the deck images, roughly 30 seconds the first time) and repeats that sync daily. It needs outbound HTTPS for this.
+On start the app applies database migrations, then imports cards from YGOPRODeck (about 14,700 cards and the deck images, roughly 30 seconds the first time) and any effect sheet from `server/effect-sheets/` the database lacks, and repeats that sync daily. It needs outbound HTTPS for this.
 
 ## Updating
 

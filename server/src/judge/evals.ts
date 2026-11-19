@@ -591,7 +591,7 @@ export async function runEvals(db: Db, model: ModelCall, filter = '', repeat = 1
   const names = [...new Set(cases.flatMap((c) => [...c.board.flatMap((s) => Object.values(s).flat() as string[]), 'Sonic Chick']))];
   const rows = await db.select().from(cards).where(inArray(cards.name, names));
   const data = Object.fromEntries(rows.map((r) => [r.id, toCardData(r)]));
-  const sheets = await loadSheets(data);
+  const sheets = await loadSheets(db, data);
   const rounds: EvalResult[][] = [];
   for (let i = 0; i < repeat; i++) rounds.push(await Promise.all(cases.map((c) => runCase(c, buildBoard(c, data, sheets), model))));
   return rounds;
