@@ -38,6 +38,11 @@ export function useDuel(duelId: string, pace: (event: LogEvent, waiting: number)
         setShown((s) => s && { ...s, cue: null });
         return;
       }
+      // Chat changes nothing on the board, so it only joins the log, without interrupting what the player is doing.
+      if (step.entry.event.type === 'chatted') {
+        setShown((s) => s && { ...s, log: [...s.log, step.entry] });
+        return playNext();
+      }
       setShown((s) => ({ view: step.view, prev: s?.view ?? null, log: [...(s?.log ?? []), step.entry], cue: step.entry }));
       timer = setTimeout(playNext, paceRef.current(step.entry.event, queue.length));
     };

@@ -263,7 +263,9 @@ export type DuelEvent =
   /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
   | { type: 'linkResolved' }
   | { type: 'appealed'; appeal: AppealRecord }
-  | { type: 'duelEnded'; result: DuelResult };
+  | { type: 'duelEnded'; result: DuelResult }
+  /** A player's chat message. It changes nothing on the board and never reaches the judge. */
+  | { type: 'chatted'; player: Seat; text: string };
 
 export interface StartingPlayer {
   name: string;

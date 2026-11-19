@@ -44,3 +44,19 @@ Card effects arrived with layer 2; see [effects.md](effects.md) for what works a
 4. Each browser listens on `GET /api/duels/:id/stream` (Server-Sent Events). On connect it gets a `sync`: its whole view and the duel log. After every change it gets `steps`: one per visible event, each with the log entry and the board right after that event, so the board can animate events one at a time (see [duel-ui.md](duel-ui.md)). Only the last step offers actions. Moves go to `POST /api/duels/:id/intents`; a refused move answers 422 with the reason.
 
 The server is the only authority. Live duels are held in memory and rebuilt from `match_events` on first use, and each duel handles one intent at a time. That assumes a single server process, which is how the site runs today.
+
+## Chat
+
+Players can talk during a duel and after it ends. A message is a `chatted` event (`player`, `text`, at most 300 characters), so it is stored in `match_events` and appears in both players' logs in order with everything else. It changes nothing on the board, and it never reaches the judge or an appeal, which read only the board. Send one with `POST /api/duels/:id/chat` `{ text }`; it answers 204 and the message arrives on both streams.
+
+Chat doesn't wait for the judge: commits to a duel's log go through their own queue, separate from the one that runs intents and judge calls, so a message lands at once even while the judge is thinking or waiting on a player.
+
+## Reviewing a duel
+
+The admin can read any duel whole, with nothing hidden: every card by name and instance ID, every intent, each judge decision with its ops, the questions it asked and what was picked, the tool calls code refused, each appeal with its note and correct ruling, and the chat. The duel's ID is the one in its link, `/duel/<id>`.
+
+- The admin page lists the latest 50 duels, each with a **Full log** (plain text) and **JSON** link.
+- `GET /api/admin/duels/:id/report` gives the text: a header, then one line per event as `#seq time T<turn> text`. `?format=json` gives every stored event with its time, judge transcripts included.
+- On the server, `npm run duel:report -- <id>` prints the same text (add `--json` for the JSON). In production: `docker compose exec app node server/src/matchReport.ts <id>`.
+
+To have a Claude session study a duel, give it the text report (or the JSON for the judge's full reasoning) and point at the `#seq` lines in question.

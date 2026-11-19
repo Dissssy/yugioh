@@ -10,7 +10,7 @@ import { Arrows, cardCentre, dropAt, dropCentre, type Point } from './aim.tsx';
 import { dataOf, idOf, imageUrl, preloadImages } from './Card.tsx';
 import { CardTooltipProvider } from './CardTooltip.tsx';
 import { cueMs, playCue } from './cues.ts';
-import { DuelLog, type Contest } from './DuelLog.tsx';
+import { ChatInput, DuelLog, type Contest } from './DuelLog.tsx';
 import { dropKey, Field, type Row } from './Field.tsx';
 import { FoeHand, OwnHand, type HandDrag } from './Hand.tsx';
 import { JudgePrompt } from './JudgePrompt.tsx';
@@ -88,6 +88,9 @@ export function Board({ duelId }: { duelId: string }) {
   });
   const answer = useMutation({
     mutationFn: (body: { prompt: string; picks: string[] }) => api(`/duels/${duelId}/answer`, { method: 'POST', body: JSON.stringify(body) }),
+  });
+  const chat = useMutation({
+    mutationFn: (text: string) => api(`/duels/${duelId}/chat`, { method: 'POST', body: JSON.stringify({ text }) }),
   });
   const contestRuling = useMutation({
     mutationFn: (body: { seq: number; note: string }) => api(`/duels/${duelId}/contest`, { method: 'POST', body: JSON.stringify(body) }),
@@ -486,7 +489,9 @@ export function Board({ duelId }: { duelId: string }) {
               {!connected && <p className="error">Reconnecting…</p>}
               {send.isError && <p className="error">{errorText(send.error)}</p>}
               {contestRuling.isError && <p className="error">{errorText(contestRuling.error)}</p>}
+              {chat.isError && <p className="error">{errorText(chat.error)}</p>}
               <DuelLog log={log} onHighlight={setHighlight} contest={contest} />
+              <ChatInput send={chat.mutateAsync} sending={chat.isPending} />
             </aside>
 
             {mode.kind === 'menu' && (

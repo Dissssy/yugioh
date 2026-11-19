@@ -56,6 +56,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'duelStarted':
         throw new Error('duelStarted can only be the first event');
       case 'intent':
+      case 'chatted':
         return;
       case 'judged': {
         const r = event.record;

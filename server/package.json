@@ -11,7 +11,8 @@
     "db:migrate": "node --env-file-if-exists=../.env src/db/migrate.ts",
     "cards:import": "node --env-file-if-exists=../.env src/cards.ts",
     "sheets:compile": "node --env-file-if-exists=../.env src/sheets.ts",
-    "judge:eval": "node --env-file-if-exists=../.env src/judge/evals.ts"
+    "judge:eval": "node --env-file-if-exists=../.env src/judge/evals.ts",
+    "duel:report": "node --env-file-if-exists=../.env src/matchReport.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.10.0",
