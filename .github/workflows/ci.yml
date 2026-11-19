@@ -1,0 +1,29 @@
+# Type checks and the offline test suites (engine, server, web). No model calls; see judge-eval.yml for those.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: yugioh
+          POSTGRES_PASSWORD: yugioh
+          POSTGRES_DB: yugioh_test
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 2s --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

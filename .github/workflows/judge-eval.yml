@@ -1,0 +1,47 @@
+# Runs the judge's eval suite (server/src/judge/evals.ts) against the real model when a change could alter its rulings.
+# Needs the ANTHROPIC_API_KEY repository secret; each run costs a few cents of Haiku calls. Any failed case fails the job.
+name: Judge evals
+
+on:
+  pull_request:
+    paths:
+      - server/src/judge/**
+      - server/effect-sheets/**
+      - engine/src/ops.ts
+      - engine/src/rules.ts
+  workflow_dispatch:
+
+jobs:
+  eval:
+    # Pull requests from forks don't get the secret.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: yugioh
+          POSTGRES_PASSWORD: yugioh
+          POSTGRES_DB: yugioh
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 2s --health-retries 20
+    env:
+      DATABASE_URL: postgres://yugioh:yugioh@localhost:5432/yugioh
+      CARD_IMAGE_DIR: ${{ github.workspace }}/card-images
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The import also downloads the premade decks' images; keeping them spares YGOPRODeck those requests next time.
+      - uses: actions/cache@v4
+        with:
+          path: card-images
+          key: card-images-${{ github.run_id }}
+          restore-keys: card-images-
+      - run: npm run cards:import
+      - run: npm run judge:eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

@@ -179,7 +179,7 @@ export const CASES: EvalCase[] = [
     name: 'poison of the old man inflicts 800 when chosen',
     board: [{ hand: ['Poison of the Old Man'] }, {}],
     activate: 'Poison of the Old Man',
-    picks: [['Inflict 800 damage']],
+    picks: [['800']],
     legal: true,
     check: (b) => (b.lp(1) === 7200 && b.lp(0) === 8000 ? null : `LP ${b.lp(0)} / ${b.lp(1)}`),
   },
@@ -320,23 +320,28 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall): 
   const intent = decide(state, 0, { type: 'activate', card: id, effect: 0, zone });
   if (!intent.ok) return { name: c.name, passed: false, detail: `code refused the activation: ${intent.error}` };
   const picks = [...(c.picks ?? [])];
+  const unmatched: string[] = [];
+  // A pick names a card, or a phrase found in one of the judge's choices (its wording varies between runs).
   const ask = async (q: Question) => {
     const want = picks.shift() ?? [];
     const named = q.cards.filter((o) => want.includes(cardOf(state, o.id).name)).map((o) => o.id);
-    const chosen = [...named, ...q.choices.filter((x) => want.includes(x))];
-    return chosen.length >= Math.max(q.min, 1) ? chosen.slice(0, q.max) : [...q.cards.map((o) => o.id), ...q.choices].slice(0, Math.max(q.min, 1));
+    const chosen = [...named, ...q.choices.filter((x) => want.some((w) => x.toLowerCase().includes(w.toLowerCase())))];
+    if (chosen.length >= Math.max(q.min, 1)) return chosen.slice(0, q.max);
+    if (want.length) unmatched.push(`no option matched ${JSON.stringify(want)} in "${q.text}" (choices: ${JSON.stringify(q.choices)})`);
+    return [...q.cards.map((o) => o.id), ...q.choices].slice(0, Math.max(q.min, 1));
   };
   const deps = { model, ask, random: Math.random };
   let scratch = intent.events.slice(1).reduce(evolve, state);
   const checked = await judge({ stage: 'activation', state: scratch, link: scratch.chain.at(-1)! }, deps);
   if (checked.record.error) return { name: c.name, passed: false, detail: `judge failed: ${checked.record.error}` };
+  if (unmatched.length) return { name: c.name, passed: false, detail: unmatched[0]! };
   if (checked.record.legal !== c.legal) return { name: c.name, passed: false, detail: `ruled ${checked.record.legal ? 'legal' : 'illegal'}: ${checked.record.summary}` };
   if (!c.legal) return { name: c.name, passed: true, detail: checked.record.summary };
   scratch = checked.events.reduce(evolve, scratch);
   const resolved = await judge({ stage: 'resolution', state: scratch, link: scratch.chain.at(-1)! }, deps);
   if (resolved.record.error) return { name: c.name, passed: false, detail: `judge failed resolving: ${resolved.record.error}` };
   const after = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, scratch);
-  const problem = c.check?.(new Board(after)) ?? null;
+  const problem = unmatched[0] ?? c.check?.(new Board(after)) ?? null;
   return { name: c.name, passed: problem === null, detail: problem ?? resolved.record.summary };
 }
 
@@ -356,5 +361,6 @@ if (import.meta.main) {
   const results = await runEvals(db, (p) => client.messages.create(p), process.argv[2] ?? '');
   for (const r of results) console.log(`${r.passed ? 'PASS' : 'FAIL'}  ${r.name}\n      ${r.detail}`);
   console.log(`\n${results.filter((r) => r.passed).length} of ${results.length} passed`);
+  if (results.some((r) => !r.passed)) process.exitCode = 1;
   await db.$client.end();
 }
