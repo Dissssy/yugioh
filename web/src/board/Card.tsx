@@ -1,17 +1,36 @@
 import type { CardData, CardView } from '@yugioh/engine';
 
-/** A card's small image, or its back when the viewer can't see it. */
-export function CardFace({ card, faceDown = false }: { card: CardData | null; faceDown?: boolean }) {
+export type ImageSize = 'small' | 'full';
+
+export const imageUrl = (code: number, size: ImageSize) =>
+  size === 'full' ? `/card-images/${code}.jpg` : `/card-images/small/${code}.jpg`;
+
+/** A card's image, or its back when the viewer can't see it. */
+export function CardFace({ card, faceDown = false, size = 'small' }: { card: CardData | null; faceDown?: boolean; size?: ImageSize }) {
   if (!card) return <div className="card back" aria-label="Face-down card" />;
   return (
     <img
       className={`card${faceDown ? ' set' : ''}`}
-      src={`/card-images/small/${card.code}.jpg`}
+      src={imageUrl(card.code, size)}
       alt={card.name}
-      title={card.name}
+      draggable={false}
       loading="lazy"
     />
   );
+}
+
+/** Loads images ahead of time; resolves when all have loaded or failed. */
+export function preloadImages(urls: string[]): Promise<void> {
+  return Promise.all(
+    urls.map(
+      (url) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = img.onerror = () => resolve();
+          img.src = url;
+        }),
+    ),
+  ).then(() => undefined);
 }
 
 export const dataOf = (view: CardView): CardData | null => ('card' in view ? view.card : null);

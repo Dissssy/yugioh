@@ -37,7 +37,7 @@ button.quiet { border-color: var(--line); color: var(--muted); }
 
 /* Cards */
 :root { --card-w: 64px; --card-h: 93px; }
-.card { width: var(--card-w); height: var(--card-h); border-radius: 4px; display: block; object-fit: cover; }
+.card { width: var(--card-w); height: var(--card-h); border-radius: 4px; display: block; object-fit: cover; user-select: none; }
 .card.back { background: repeating-linear-gradient(45deg, #5a3b1c, #5a3b1c 6px, #6e4a24 6px, #6e4a24 12px); border: 2px solid #3a240f; box-sizing: border-box; }
 .card.empty { border: 1px dashed var(--line); box-sizing: border-box; }
 .card.set { filter: brightness(0.55) saturate(0.6); }
@@ -48,35 +48,7 @@ button.quiet { border-color: var(--line); color: var(--muted); }
 .deck-page { display: grid; grid-template-columns: 1fr 280px; gap: 16px; align-items: start; }
 .deck-page aside { position: sticky; top: 16px; }
 
-/* Duel board */
-main:has(.duel) { max-width: 1240px; }
-.duel { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
-.table { display: grid; gap: 8px; }
-.side { display: grid; gap: 8px; padding: 8px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
-.side.foe { background: color-mix(in srgb, var(--danger) 5%, transparent); }
-.player-info { display: flex; gap: 16px; align-items: baseline; }
-.lp { font-size: 1.3em; font-variant-numeric: tabular-nums; font-weight: 700; }
-.field { display: flex; gap: 16px; align-items: center; }
-.rows { display: grid; gap: 8px; }
-.zones { display: grid; grid-template-columns: repeat(5, calc(var(--card-h) + 6px)); gap: 6px; }
-.zone { height: calc(var(--card-h) + 6px); border: 1px dashed var(--line); border-radius: 6px; display: grid; place-items: center; }
-.zone.target { border: 2px solid var(--danger); cursor: crosshair; }
-.hand { display: flex; gap: 6px; min-height: var(--card-h); flex-wrap: wrap; }
-.slot { cursor: pointer; border-radius: 6px; outline-offset: 2px; }
-.slot.selected { outline: 3px solid var(--accent); }
-.slot.pickable { outline: 2px dashed var(--accent); }
-.slot.picked { outline: 3px solid var(--danger); }
-.piles { display: flex; gap: 8px; }
-.pile { display: grid; justify-items: center; gap: 2px; font-size: 0.8em; color: var(--fg); }
-.phase-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
-.panel { display: grid; gap: 12px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
-.panel .card-grid.small { --card-w: 48px; --card-h: 70px; }
-.banner { font-size: 1.4em; font-weight: 700; padding: 12px; text-align: center; border-radius: 8px; background: color-mix(in srgb, var(--accent) 15%, transparent); }
-.prompt { padding: 8px; border: 1px solid var(--accent); border-radius: 8px; }
-.prompt p { margin: 0 0 8px; }
-.log { margin: 0; padding-left: 0; list-style: none; font-size: 0.85em; color: var(--muted); max-height: 260px; overflow: auto; }
 @media (max-width: 900px) {
-  .duel, .deck-page { grid-template-columns: 1fr; }
+  .deck-page { grid-template-columns: 1fr; }
   :root { --card-w: 44px; --card-h: 64px; }
-  .field { flex-direction: column; align-items: flex-start; }
 }

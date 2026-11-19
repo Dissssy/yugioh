@@ -184,7 +184,7 @@ Built after the PC board (build step 8). Phones are portrait-first.
 ## Card images
 
 - **Two sizes are already stored** (small, about 168 px wide, and full, about 420 px). Board cards pick between them with `srcset` based on their on-screen size and pixel density, so a large monitor or a phone's sharp screen gets the full image. Tooltips and the pile viewer always use the full image.
-- **Preload both decks** when the duel opens (about 86 cards), so no card pops in blank mid-duel. A short loading screen covers it on a slow connection.
+- **Preload your own deck** when the duel opens, so no card pops in blank mid-duel. A short loading screen covers it on a slow connection. The opponent's cards load as they are revealed, because preloading them would tell your browser their decklist.
 - **Cropped artwork** (just the art, no frame) is useful for activation and summon close-ups. YGOPRODeck serves these too; the importer would download them alongside the other two sizes, under the same terms (store locally, re-host, rate limit).
 - **Card back and playmat:** our own designs, not the official card back. One standard layout for now (see Decisions).
 
@@ -217,6 +217,7 @@ PC first (see Decisions). Each step ends with a board two people can play on, an
 
 1. **Table and feel (on today's layer-1 engine).** Full-window duel screen that fits without scrolling, playmat zone layout (plain styling), phase stepper, LP plates with counting and floating damage numbers, fanned hand with hover lift and reorder, playable glow, action menu next to the clicked card, hover tooltips replacing the sidebar card, pile viewer, `srcset` and image preloading, structured turn-grouped log in the sidebar. Server sends public events with each view; the animation queue plays draw, summon, Set, flip, position change, tribute, attack, damage, destroy, turn banner and duel end. Reduced motion and speed setting.
    - Done when: a full duel plays with no sidebar buttons and every change is animated.
+   - Built 2026-11-19. Notes from building it: Motion's `Reorder` already handles the hand (including Space and arrow keys to move a card, and swallowing the click after a drag), Floating UI places the tooltip and the action menu, and Motion's newer `Reorder.Board` (dragging items between groups) is worth checking before reaching for dnd-kit in step 2. Only your own deck's images are preloaded: preloading the opponent's would reveal their decklist once custom decks exist. The queue plays bursts faster. Sound is not wired in yet: with no assets it would be code with nothing to play, so it comes with step 7.
 2. **Drag and drop.** dnd-kit, the zone parameter on summon and Set intents, drag to summon/Set, drag to attack with the arrow, the shared choosing pattern for tributes and discards.
    - Done when: every layer-1 action can be done by dragging on a PC.
 3. **Effects (with engine layer 2).** Activate from the action menu or by dragging, targeting arrows, the card picker sheet for `ask_player`, activation and resolution animations, judge rulings in the log with the Contest button and appeal result.
