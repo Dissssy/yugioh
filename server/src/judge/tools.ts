@@ -55,6 +55,10 @@ export const opTools = {
     description: 'Record the targets of the effect being activated. Only while checking an activation, after the player chose them.',
     input: z.object({ cards: z.array(card) }),
   },
+  choose_effect: {
+    description: 'Record which effect the player chose, when the text offers several ("Activate 1 of these effects"). Only while checking an activation, after the player chose. Use the wording of the choice they picked.',
+    input: z.object({ choice: z.string() }),
+  },
 } as const;
 
 export const askPlayer = z.object({

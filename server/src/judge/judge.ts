@@ -152,6 +152,11 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
           refused = reply(c.id, parsed.error, true);
           continue;
         }
+        const named = parsed.op.op === 'choose_effect' ? hiddenNameIn(scratch, parsed.op.choice, [0, 1]) : null;
+        if (named) {
+          refused = reply(c.id, `The choice names ${named}, which a player can't see. Word it without naming hidden cards.`, true);
+          continue;
+        }
         const applied = applyOp(scratch, parsed.op, { player: link.player, stage, random: deps.random });
         if (!applied.ok) {
           refused = reply(c.id, applied.error, true);

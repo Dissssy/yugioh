@@ -327,7 +327,8 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall): 
     const named = q.cards.filter((o) => want.includes(cardOf(state, o.id).name)).map((o) => o.id);
     const chosen = [...named, ...q.choices.filter((x) => want.some((w) => x.toLowerCase().includes(w.toLowerCase())))];
     if (chosen.length >= Math.max(q.min, 1)) return chosen.slice(0, q.max);
-    if (want.length) unmatched.push(`no option matched ${JSON.stringify(want)} in "${q.text}" (choices: ${JSON.stringify(q.choices)})`);
+    if (c.picks && !want.length) unmatched.push(`the judge asked more questions than the case has picks: "${q.text}"`);
+    else if (want.length) unmatched.push(`no option matched ${JSON.stringify(want)} in "${q.text}" (choices: ${JSON.stringify(q.choices)})`);
     return [...q.cards.map((o) => o.id), ...q.choices].slice(0, Math.max(q.min, 1));
   };
   const deps = { model, ask, random: Math.random };
@@ -341,6 +342,7 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall): 
   const resolved = await judge({ stage: 'resolution', state: scratch, link: scratch.chain.at(-1)! }, deps);
   if (resolved.record.error) return { name: c.name, passed: false, detail: `judge failed resolving: ${resolved.record.error}` };
   const after = [...resolved.events, { type: 'linkResolved' } as DuelEvent].reduce(evolve, scratch);
+  if (picks.length) unmatched.push(`the judge never asked for ${JSON.stringify(picks[0])}`);
   const problem = unmatched[0] ?? c.check?.(new Board(after)) ?? null;
   return { name: c.name, passed: problem === null, detail: problem ?? resolved.record.summary };
 }
