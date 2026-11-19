@@ -21,7 +21,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { DESTINATIONS, UNTIL, type CardData, type CardFilter, type ModelUsage, type EffectSheet, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
-import { cards, decks, effectSheets, sheetRevisions } from './db/schema.ts';
+import { cards, decks, effectSheets, sheetReports, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
 import { strictSchema } from './judge/tools.ts';
 
@@ -234,6 +234,18 @@ export async function importSheetFiles(db: Db, options: { dir?: string; force?: 
     n++;
   }
   return n;
+}
+
+/**
+ * Deletes every stored sheet, revision and report, so the next card sync loads the files afresh (`RESET_SHEETS`).
+ * Duels keep the sheets they started with in their logs.
+ */
+export async function resetSheets(db: Db): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.delete(sheetReports);
+    await tx.delete(sheetRevisions);
+    await tx.delete(effectSheets);
+  });
 }
 
 /** Writes every sheet in the database to `dir`, one file per card. */
