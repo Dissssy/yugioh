@@ -18,7 +18,7 @@ import { dropKey, ExtraMonsterZone, Field, type FieldProps, type Row } from './F
 import { FoeHand, OwnHand, type HandDrag } from './Hand.tsx';
 import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
 import { LpPlate } from './LpPlate.tsx';
-import { PhaseStrip } from './PhaseStrip.tsx';
+import { PhaseStrip, TurnControls } from './PhaseStrip.tsx';
 import { PileViewer } from './PileViewer.tsx';
 import { ReportRuling } from './ReportRuling.tsx';
 import { StartPanel } from './StartPanel.tsx';
@@ -568,6 +568,20 @@ export function Board({ duelId }: { duelId: string }) {
   const canSurrender = !view.result;
   const result = view.result;
   const resultText = log.findLast((e) => e.event.type === 'duelEnded')?.text;
+  const turnControls = (
+    <TurnControls
+      turn={view.turn}
+      turnLabel={view.start ? 'Deciding who goes first' : yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`}
+      phase={view.phase}
+      goTo={{
+        ...(enterBattle && { battle: () => start(enterBattle) }),
+        ...(enterMain2 && { main2: () => start(enterMain2) }),
+        ...(endTurn && { end: () => start(endTurn) }),
+      }}
+      endTurn={endTurn && !choosing ? () => start(endTurn) : null}
+    />
+  );
+  const stripPrompt = prompt || choiceBar || judgeNote || rollbackNote || replaceNote || respondNote || null;
 
   return (
     <MotionConfig reducedMotion={reduceMotion ? 'always' : 'never'}>
@@ -577,7 +591,7 @@ export function Board({ duelId }: { duelId: string }) {
             suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}
             pinnedFooter={(card) => <ReportRuling key={card.code} duelId={duelId} card={card} />}
           >
-            <div className={`duel${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
+            <div className={`duel${look.stacked ? ' stacked' : ''}${look.compact ? ' compact' : ''}${look.tight ? ' tight' : ''}${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
               <div className="table" ref={setTable}>
                 {!ready ? (
                   <div className="duel-loading">Loading cards…</div>
@@ -589,19 +603,11 @@ export function Board({ duelId }: { duelId: string }) {
                     </div>
                     <Field {...foeField} />
                     <PhaseStrip
-                      turn={view.turn}
-                      turnLabel={view.start ? 'Deciding who goes first' : yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`}
                       yours={yourTurn}
-                      phase={view.phase}
-                      goTo={{
-                        ...(enterBattle && { battle: () => start(enterBattle) }),
-                        ...(enterMain2 && { main2: () => start(enterMain2) }),
-                        ...(endTurn && { end: () => start(endTurn) }),
-                      }}
+                      controls={look.compact ? null : turnControls}
                       extraZones={[<ExtraMonsterZone key="left" side="left" mine={myField} foe={foeField} />, <ExtraMonsterZone key="right" side="right" mine={myField} foe={foeField} />]}
                       chain={chainNote || null}
-                      prompt={prompt || choiceBar || judgeNote || rollbackNote || replaceNote || respondNote || null}
-                      endTurn={endTurn && !choosing ? () => start(endTurn) : null}
+                      prompt={look.compact ? null : stripPrompt}
                     />
                     <Field {...myField} />
                     <div className="hand-row own-row">
@@ -641,6 +647,13 @@ export function Board({ duelId }: { duelId: string }) {
                 )}
               </div>
 
+              {look.compact && ready && (
+                <div className={`duel-bar${yourTurn ? ' yours' : ''}`}>
+                  {turnControls}
+                  {stripPrompt && <div className="bar-prompt">{stripPrompt}</div>}
+                </div>
+              )}
+
               <aside className="panel">
                 <div className="row panel-top">
                   <Link to="/">← Duels</Link>
@@ -674,7 +687,7 @@ export function Board({ duelId }: { duelId: string }) {
                       <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
                     </label>
                     {hasAccount && <OpponentCardsSetting />}
-                    <p className="muted small">Hold Shift over a card to zoom in. Right-click a card to pin its details. Drag cards in your hand to reorder them.</p>
+                    <p className="muted small">Hold Shift over a card to zoom in. Right-click a card, or press and hold it, to pin its details. Drag cards in your hand to reorder them.</p>
                   </div>
                 )}
                 {!connected && <p className="error">Reconnecting…</p>}

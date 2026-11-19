@@ -7,6 +7,9 @@ import { CardDetail } from './CardDetail.tsx';
 const HOVER_DELAY_MS = 250;
 /** Space between the zoomed card and the card it shows, and between it and the screen edge. */
 const ZOOM_GAP = 16;
+/** How long a touch rests on a card before its details pin open, and how far it may wander before it's a drag instead. */
+const LONG_PRESS_MS = 450;
+const LONG_PRESS_SLOP_PX = 10;
 
 interface Hover {
   card: CardData;
@@ -28,8 +31,8 @@ const TooltipContext = createContext<Bind>(() => ({}));
 export const useCardHover = () => useContext(TooltipContext);
 
 /**
- * Card details in a tooltip beside the hovered card. Right-click pins it open so long text can be
- * scrolled; Esc or a click elsewhere closes it. `suppressed` hides it while the player is choosing or dragging.
+ * Card details in a tooltip beside the hovered card. Right-click, or on a touch screen a long press, pins it open so
+ * long text can be scrolled; Esc or a click elsewhere closes it. `suppressed` hides it while the player is choosing or dragging.
  * `pinnedFooter` adds controls under a pinned card's details.
  *
  * Holding Shift zooms instead: the card under the pointer is shown as large as fits beside it, with its text,
@@ -66,6 +69,8 @@ export function CardTooltipProvider({
       return {
         'data-zoom': card.code,
         onPointerEnter: (e) => {
+          // Touch has no hover; a long press pins the details instead.
+          if (e.pointerType !== 'mouse') return;
           const el = e.currentTarget;
           clearTimeout(timer.current);
           timer.current = setTimeout(() => setHover((h) => (h?.pinned ? h : { card, el, pinned: false })), HOVER_DELAY_MS);
@@ -116,6 +121,7 @@ export function CardTooltipProvider({
       setZoom(null);
     };
     const onMove = (e: globalThis.PointerEvent) => {
+      onPressMove(e);
       pointer.current = { x: e.clientX, y: e.clientY };
       if (zoomHeld.current) zoomAtPointer();
     };
@@ -124,16 +130,55 @@ export function CardTooltipProvider({
       zoomHeld.current = false;
       setZoom(null);
     };
+    let press: ReturnType<typeof setTimeout> | undefined;
+    let pressAt: { x: number; y: number } | null = null;
+    const cancelPress = () => {
+      clearTimeout(press);
+      pressAt = null;
+    };
+    /** The click a long press ends with isn't a tap on the card (which would open its menu). */
+    const swallowClick = (e: MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+    };
     const onDown = (e: globalThis.PointerEvent) => {
+      window.removeEventListener('click', swallowClick, true);
       const floating = refs.floating.current;
       if (floating && !floating.contains(e.target as Node)) setHover((h) => (h?.pinned ? null : h));
+      // A long press pins the card under the finger, while choosing or dragging too, as Shift zooms.
+      const el = e.pointerType !== 'mouse' && e.target instanceof Element ? e.target.closest<HTMLElement>('[data-zoom]') : null;
+      const card = el && known.current.get(Number(el.dataset.zoom));
+      cancelPress();
+      if (!el || !card) return;
+      pressAt = { x: e.clientX, y: e.clientY };
+      press = setTimeout(() => {
+        pressAt = null;
+        setHover({ card, el, pinned: true });
+        window.addEventListener('click', swallowClick, { capture: true, once: true });
+      }, LONG_PRESS_MS);
+    };
+    const onPressMove = (e: globalThis.PointerEvent) => {
+      if (pressAt && Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) > LONG_PRESS_SLOP_PX) cancelPress();
+    };
+    const onUp = () => cancelPress();
+    // Touch browsers open their own menu (save image, select text) on a long press; on a card, the details are it.
+    const onContextMenu = (e: MouseEvent) => {
+      if (e.target instanceof Element && e.target.closest('[data-zoom]')) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
     window.addEventListener('pointerdown', onDown);
     window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('contextmenu', onContextMenu);
     return () => {
+      window.removeEventListener('contextmenu', onContextMenu);
+      cancelPress();
+      window.removeEventListener('click', swallowClick, true);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);

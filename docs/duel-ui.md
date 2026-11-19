@@ -44,7 +44,7 @@ Desktop, landscape:
 - **The middle row** is one zone tall. On the left: whose turn it is, the phase stepper (DP, SP, M1, BP, M2, EP) with the current phase lit, and End turn. The next phase is clickable; that replaces the separate "Battle Phase" and "Main Phase 2" buttons. In the middle, the two shared Extra Monster Zones, above the second and fourth Main Monster Zones as on the real playmat, with the chain listed between them. Each shows whichever player's monster is in it, turned like the rest of that player's cards. On the right, what the duel waits for: an instruction, the judge's question, or whom it waits on. (Built 2026-11-19 with the Extra Monster Zones; before that a 52-pixel strip held the phases and the prompt replaced them.)
 - **LP plates** sit at the corners next to each name. A change counts the number down over about half a second, flashes red for damage and green for gain, and shows the delta as a floating number.
 - **Piles** (Deck, GY, Banished, Extra) show their top card and a count. Clicking one opens a pile viewer (see "Card details").
-- **Right sidebar:** the action log, then a small settings button. On narrower windows it collapses into a drawer with an unread badge.
+- **Right sidebar:** the action log, then a small settings button. Portrait screens put it below the board instead (see "Phones and tablets").
 - **Background:** plain, with clearly drawn zone outlines so empty zones still read as places. Styling comes later (see Decisions).
 
 ## The hand
@@ -132,7 +132,7 @@ Card details move out of the sidebar into a **tooltip next to the card** (reques
 - **Pin it** with right-click to keep it open and move the mouse into it (for scrolling long text). Esc or clicking elsewhere closes it.
 - No tooltip for cards you can't see (face-down opponent cards, the opponent's hand).
 - **Zoom with Shift** (like Tabletop Simulator's alt-zoom, requested by Ethan, 2026-11-19; Shift rather than Alt because Alt opens Firefox's menu bar, and Shift no longer pins): while Shift is held, the card under the pointer is shown as tall as the screen with its text beside it. It sits beside the card on the side with more room and shrinks to fit there, so it never covers the card you point at, and it follows the pointer from card to card. Releasing Shift (or leaving the window) closes it. It replaces the tooltip while shown, and works while dragging or choosing, since you asked for it.
-- **Touch:** long-press opens the same content as a sheet from the bottom of the screen; tap outside to close.
+- **Touch:** a long press pins it, as right-click does; tap elsewhere to close (see "Phones and tablets").
 
 **Pile viewer:** clicking a GY, Banished or Extra Deck opens a sheet over the board with a grid of large cards, searchable by name. Hovering one shows the same tooltip.
 
@@ -174,14 +174,13 @@ Later (build step 7): clicking an old entry shows the board as it was then (read
 
 ## Phones and tablets
 
-Built after the PC board (build step 8). Phones are portrait-first.
+Built 2026-11-19, after Ethan's phone showed the board cut off beside the log. One board for every screen; only where things sit changes (`useBoardSize` in `look.ts` decides, `board.css` lays it out).
 
-- **Board:** the field fills the width. Card width comes from the screen width (seven columns: Field/Extra, five zones, piles), so on a 390-pixel phone a card is about 50 pixels wide, which is still a fair tap target.
-- **Hand:** a fan at the bottom, overlapping more tightly. Tap lifts a card; tap again (or tap the action that appears above it) acts. Dragging works the same as on desktop, with a short press-and-hold before a drag starts so a quick swipe doesn't pick a card up by mistake.
-- **Card details:** long-press, shown as a bottom sheet.
-- **Log:** a drawer from the right edge with an unread badge. A ruling you might want to contest also shows as a brief toast.
-- **Response bar** and choice instructions sit at the bottom above the hand, within thumb reach.
-- **Tablets and landscape phones** use the desktop layout with the log as a drawer.
+- **Portrait screens** (phones, tablets held upright) stack: the board across the full width, then a bar with the turn controls and what the duel waits for, then the log and chat. Zones are sized from the width, so on a 390-pixel phone a zone is about 50 pixels. The board takes at most 62% of the screen's height, leaving the rest to the log.
+- **Small zones** (under 110 pixels, as on a landscape phone or a 720-pixel laptop) keep the log beside the board, but the turn controls and prompts leave the middle row for a bar above the log, where they have room.
+- **Tight zones** (under 80 pixels) shrink the Life Points plates to a zone's width, showing just the number (the name is its tooltip), so they clear the hand.
+- **Playing by touch** needs no new controls: every action already works by tap. Tap a card for its menu, pick the action, then tap the lit zone or target. Dragging a hand card to a zone and dragging an attacker's arrow to a target also work with a finger (the table takes every touch, so the page never scrolls or zooms under a drag).
+- **Card details:** a long press (450 ms without moving) pins the same tooltip a right-click does, while choosing or dragging too, as Shift zoom does. Tapping elsewhere closes it. Hover tooltips and the hand's hover lift are mouse-only, since a tap would only flash them.
 
 ## Card images
 

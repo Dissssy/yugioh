@@ -190,7 +190,8 @@ function HandCard({
       transition={spring}
       whileDrag={{ scale: 1.08, zIndex: 10 }}
       onPointerEnter={(e) => {
-        onHover(true);
+        // A touch has no hover: a tap would only flash the card up.
+        if (e.pointerType === 'mouse') onHover(true);
         tip.onPointerEnter?.(e);
       }}
       onPointerLeave={() => {

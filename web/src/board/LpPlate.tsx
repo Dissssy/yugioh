@@ -33,10 +33,12 @@ export function LpPlate({
       className={`lp-plate${active ? ' active' : ''}${change !== null && change < 0 ? ' hit' : ''}${target ? ' open' : ''}${target === 'over' ? ' over' : ''}`}
       data-lp={seat}
       data-drop={`lp:${seat}`}
+      title={name}
     >
       <span className="lp-name">{name}</span>
       <span className="lp">
-        LP <motion.span>{shown}</motion.span>
+        <span className="lp-label">LP </span>
+        <motion.span>{shown}</motion.span>
       </span>
       <AnimatePresence>
         {change !== null && (
