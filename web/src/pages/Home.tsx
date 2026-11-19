@@ -1,7 +1,6 @@
 import type { Me } from '@yugioh/shared';
 import { Duels, NewChallenge } from './Duels.tsx';
 import { Notice } from './Notice.tsx';
-import { Username } from './Username.tsx';
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -29,7 +28,7 @@ export function Home({ me }: { me: Me }) {
         return (
           <Notice title="Waiting for approval">
             <p>Your account is waiting for the admin to approve it. Check back later.</p>
-            <Username user={user} />
+            <p className="muted small">Meanwhile you can pick your username from the menu under your name at the top right.</p>
           </Notice>
         );
       if (user.status === 'rejected')
@@ -41,10 +40,6 @@ export function Home({ me }: { me: Me }) {
       return (
         <Dashboard title={`Hi ${user.username}`}>
           <NewChallenge />
-          <section className="box">
-            <h2>Account</h2>
-            <Username user={user} />
-          </section>
         </Dashboard>
       );
     }

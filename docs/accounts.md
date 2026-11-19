@@ -14,7 +14,7 @@ As of 2026-11-18. This is the website shell that sits outside the duel engine: l
 
 ## Names
 
-Other people only ever see an account's **username**, never its email. A new account gets a random one built from Yu-Gi-Oh words, like `Mystic_Kuriboh_4821`, and can change it from the home page as often as it likes. Usernames are 3 to 32 letters, digits, `_` or `-`, and unique regardless of case. Only the admin sees emails, on the accounts page, so they can tell who is asking to join.
+Other people only ever see an account's **username**, never its email. A new account gets a random one built from Yu-Gi-Oh words, like `Mystic_Kuriboh_4821`, and can change it on the account page (the menu under the name at the top right) as often as it likes. Usernames are 3 to 32 letters, digits, `_` or `-`, and unique regardless of case. Only the admin sees emails, on the accounts page, so they can tell who is asking to join.
 
 Guests pick any name, so wherever other players see it, it reads `<name> (guest)`, which keeps a guest from passing as an account. A duel keeps the names the players had when it started.
 
@@ -23,6 +23,14 @@ A challenge link is the invite. Opening one signed out offers two ways in: log i
 A guest lasts while any of their duels is waiting or in progress, and for a day after their last duel finishes, so they can still see the final board. An hourly cleanup then deletes them. A guest stuck in an abandoned duel lasts as long as that duel does.
 
 If a guest logs in on the same browser to an approved account, their seats move to the account and the guest is deleted. A pending account doesn't take the seats yet; that happens on the first request after the admin approves it. A seat in a duel the account itself created stays with the guest, since one player can't hold both seats.
+
+## Settings
+
+Each account keeps its settings in the `users.settings` column, so they follow it to any browser. The column holds only the settings the account changed; the rest take `defaultSettings` from `shared/src/settings.ts`, so a new setting needs no migration. They are changed on the account page or, for the duel ones, in the duel's Settings panel, through `PATCH /api/me/settings`. Guests have no settings and always get the defaults.
+
+- **Opponent's cards on the field:** face the opponent (turned 180 degrees, as across a real table; the default) or face you.
+
+Animation speed and reduce motion stay per browser, since they depend on the device.
 
 ## How it works
 

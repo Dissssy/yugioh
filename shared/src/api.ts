@@ -1,4 +1,5 @@
 import type { CardData, EffectSheet } from '@yugioh/engine';
+import type { UserSettings } from './settings.ts';
 
 // JSON shapes exchanged between the web client and the server.
 
@@ -17,11 +18,14 @@ export interface AdminUser extends User {
   email: string | null;
 }
 
-/** Who is making the request. A guest is someone without an account who accepted a challenge link. */
+/**
+ * Who is making the request. A guest is someone without an account who accepted a challenge link; only accounts
+ * have settings.
+ */
 export type Me =
   | { kind: 'anonymous' }
   | { kind: 'guest'; guest: { name: string } }
-  | { kind: 'user'; user: User };
+  | { kind: 'user'; user: User; settings: UserSettings };
 
 /** A decklist to pick from. */
 export interface DeckSummary {

@@ -5,8 +5,8 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
-import type { AdminDuels, Me, RulingCard } from '@yugioh/shared';
-import { findUserBySub, listUsers, setStatus, setUsername, syncUser, toUser, type LoginClaims } from './accounts.ts';
+import type { AdminDuels, Me, RulingCard, UserSettings } from '@yugioh/shared';
+import { findUserBySub, listUsers, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import { duelCosts } from './costs.ts';
 import type { Db } from './db/client.ts';
@@ -73,10 +73,11 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
 
     if (req.oidc.isAuthenticated()) {
       const claims = req.oidc.idTokenClaims as unknown as LoginClaims;
-      const user = toUser((await findUserBySub(db, claims.sub)) ?? (await syncUser(db, claims, config.ADMIN_EMAIL)));
+      const row = (await findUserBySub(db, claims.sub)) ?? (await syncUser(db, claims, config.ADMIN_EMAIL));
+      const user = toUser(row);
       // A guest who signs in to an approved account keeps playing their duels as that account.
       if (guest && user.status === 'approved' && (await adoptGuest(db, guest.id, userKey(user.id)))) guestCookie.clear(res);
-      return { kind: 'user', user };
+      return { kind: 'user', user, settings: settingsOf(row) };
     }
     if (guest) return { kind: 'guest', guest: { name: guest.name }, guestId: guest.id };
     return { kind: 'anonymous' };
@@ -106,6 +107,18 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     const user = await setUsername(db, v.user.id, body.data.username);
     if (!user) return void res.status(409).json({ error: 'username_taken' });
     res.json(user);
+  });
+
+  // Settings change one or more at a time; the response is all of them.
+  const settingsBody = z
+    .strictObject({ opponentCards: z.enum(['faceThem', 'faceYou']) } satisfies { [K in keyof UserSettings]: z.ZodType<UserSettings[K]> })
+    .partial();
+  app.patch('/api/me/settings', async (req, res) => {
+    const v = viewer(res);
+    if (v.kind !== 'user') return void res.status(401).json({ error: 'account_required' });
+    const body = settingsBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'invalid_settings' });
+    res.json(await updateSettings(db, v.user.id, body.data));
   });
 
   app.get('/api/admin/users', requireAdmin, async (_req, res) => {

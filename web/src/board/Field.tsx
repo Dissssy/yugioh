@@ -3,12 +3,15 @@ import { motion } from 'motion/react';
 import type { KeyboardEvent } from 'react';
 import { CardFace, dataOf, idOf } from './Card.tsx';
 import { useCardHover } from './CardTooltip.tsx';
+import { pileKey, useChoice, type PileKind } from './choice.tsx';
 import { useBoardLook, type CardMarks } from './look.ts';
 
 export interface FieldProps {
   seat: Seat;
   side: PlayerSideView;
   mine: boolean;
+  /** Whether this half's cards point away from the viewer, as the opponent's do across a real table. */
+  turned?: boolean;
   marks: CardMarks;
   /** Whether a zone can be picked now ('open'), and whether a dragged card or aimed arrow is over it ('over'). */
   zoneState: (row: Row, index: number) => 'open' | 'over' | null;
@@ -16,7 +19,8 @@ export interface FieldProps {
   onCard: (id: string, el: HTMLElement) => void;
   /** A press on one of your monsters, which may become an aimed attack. */
   onCardPress?: (id: string, e: React.PointerEvent<HTMLElement>) => void;
-  onPile: (title: string, cards: CardView[]) => void;
+  /** Opens a pile's viewer. */
+  onPile: (place: PileKind) => void;
 }
 
 export type Row = 'm' | 's';
@@ -30,7 +34,7 @@ export const dropKey = (seat: Seat, row: Row, index: number) => `${seat}:${row}:
  * each column faces the zone across from it.
  */
 export function Field(props: FieldProps) {
-  const { seat, side, mine, onPile } = props;
+  const { seat, side, mine, turned, onPile } = props;
   const order = (zones: (FieldCardView | null)[]) => {
     const indexed = zones.map((z, i) => [z, i] as const);
     return mine ? indexed : indexed.reverse();
@@ -39,35 +43,50 @@ export function Field(props: FieldProps) {
   const spellTraps = order(side.spellTraps).map(([z, i]) => <Zone key={`s${i}`} row="s" index={i} card={z} {...props} />);
 
   const fieldZone = <div className="zone field-zone"><span className="zone-label">Field</span></div>;
+  const choice = useChoice();
+  const options = (place: PileKind) => choice?.inPile(pileKey(seat, place)).length ?? 0;
   const gy = (
     <Pile
       label="GY"
       pile={`${seat}:gy`}
       top={side.graveyard.at(-1) ?? null}
       count={side.graveyard.length}
-      onOpen={() => onPile(`${side.name}'s Graveyard`, side.graveyard)}
+      options={options('graveyard')}
+      onOpen={() => onPile('graveyard')}
       extra={
         side.banished.length > 0 && (
-          <button className="banished-chip" onClick={() => onPile(`${side.name}'s banished cards`, side.banished)}>
+          <button className={`banished-chip${options('banished') > 0 ? ' pickable' : ''}`} onClick={() => onPile('banished')}>
             Banished {side.banished.length}
           </button>
         )
       }
     />
   );
-  const deck = <Pile label="Deck" pile={`${seat}:deck`} top={side.deckCount > 0 ? { hidden: true } : null} count={side.deckCount} />;
+  // Your Deck opens only to pick from it, and then shows just the cards you may pick.
+  const deckOptions = options('deck');
+  const deck = (
+    <Pile
+      label="Deck"
+      pile={`${seat}:deck`}
+      top={side.deckCount > 0 ? { hidden: true } : null}
+      count={side.deckCount}
+      options={deckOptions}
+      onOpen={deckOptions > 0 ? () => onPile('deck') : undefined}
+    />
+  );
   const extra = (
     <Pile
       label="Extra"
       pile={`${seat}:extra`}
       top={side.extra.length > 0 ? { hidden: true } : null}
       count={side.extra.length}
-      onOpen={mine ? () => onPile('Your Extra Deck', side.extra) : undefined}
+      options={options('extra')}
+      onOpen={mine ? () => onPile('extra') : undefined}
     />
   );
 
   return mine ? (
-    <div className="field">
+    <div className={`field${turned ? ' turned' : ''}`}>
       {fieldZone}
       {monsters}
       {gy}
@@ -76,7 +95,7 @@ export function Field(props: FieldProps) {
       {deck}
     </div>
   ) : (
-    <div className="field">
+    <div className={`field${turned ? ' turned' : ''}`}>
       {deck}
       {spellTraps}
       {extra}
@@ -149,12 +168,15 @@ function FieldCard({
   const data = dataOf(view.card);
   const hover = useCardHover();
   const { imageSize } = useBoardLook();
-  const act = onClick && id ? (el: HTMLElement) => onClick(id, el) : undefined;
+  // While the judge asks for cards, clicking one it offers picks it, even an opponent's.
+  const choice = useChoice();
+  const picking = choice?.state(id, slot) ?? null;
+  const act = picking ? () => choice!.toggle(id, slot) : onClick && id ? (el: HTMLElement) => onClick(id, el) : undefined;
   return (
     <motion.div
       layout
       layoutId={id ?? undefined}
-      className={`slot ${marks.classes(id)}`}
+      className={`slot ${marks.classes(id)} ${picking ?? ''}`}
       animate={{ rotate: view.position === 'defense' ? 90 : 0 }}
       {...hover(data)}
       onPointerDown={onPress && id ? (e) => onPress(id, e) : undefined}
@@ -163,6 +185,7 @@ function FieldCard({
       tabIndex={act ? 0 : undefined}
       role={act ? 'button' : undefined}
       aria-label={data ? `${data.name}, ${view.faceUp ? '' : 'Set, '}${view.position} position` : 'Face-down card'}
+      aria-pressed={picking ? picking === 'picked' : undefined}
     >
       <div className="fx" data-slot={slot} data-card-id={id ?? undefined}>
         <CardFace card={data} faceDown={!view.faceUp} size={imageSize} />
@@ -176,6 +199,7 @@ function Pile({
   pile,
   top,
   count,
+  options,
   onOpen,
   extra,
 }: {
@@ -183,6 +207,8 @@ function Pile({
   pile: string;
   top: CardView | null;
   count: number;
+  /** How many of the cards the judge offers are in this pile. */
+  options: number;
   onOpen?: () => void;
   extra?: React.ReactNode;
 }) {
@@ -198,9 +224,9 @@ function Pile({
     <div className="fx" data-pile={pile} />
   );
   return (
-    <div className="zone pile">
+    <div className={`zone pile${options > 0 ? ' pickable' : ''}`}>
       {onOpen ? (
-        <button className="plain pile-button" onClick={onOpen} aria-label={`${label}, ${count} cards`}>
+        <button className="plain pile-button" onClick={onOpen} aria-label={`${label}, ${count} cards${options > 0 ? `, ${options} to choose from` : ''}`}>
           {face}
         </button>
       ) : (
@@ -209,6 +235,7 @@ function Pile({
       <span className="pile-count">
         {label} {count}
       </span>
+      {options > 0 && <span className="pile-options">{options} to choose</span>}
       {extra}
     </div>
   );

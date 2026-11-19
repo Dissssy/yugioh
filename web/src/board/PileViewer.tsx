@@ -1,12 +1,17 @@
 import type { CardView } from '@yugioh/engine';
-import { useEffect, useState } from 'react';
-import { CardFace, dataOf } from './Card.tsx';
+import { useEffect, useState, type ReactNode } from 'react';
+import { CardFace, dataOf, idOf } from './Card.tsx';
 import { useCardHover } from './CardTooltip.tsx';
+import { useChoice } from './choice.tsx';
 
-/** A Graveyard, banished pile or Extra Deck opened over the board: large cards, searchable by name. */
-export function PileViewer({ title, cards, onClose }: { title: string; cards: CardView[]; onClose: () => void }) {
+/**
+ * A Graveyard, banished pile or Extra Deck opened over the board: large cards, searchable by name. While the judge
+ * asks for cards, the ones you may pick glow and are picked here, the rest dim, and `bar` (the question) sits on top.
+ */
+export function PileViewer({ title, cards, bar, onClose }: { title: string; cards: CardView[]; bar: ReactNode; onClose: () => void }) {
   const [search, setSearch] = useState('');
   const hover = useCardHover();
+  const choice = useChoice();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -16,23 +21,39 @@ export function PileViewer({ title, cards, onClose }: { title: string; cards: Ca
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div className={`sheet${choice ? ' choosing' : ''}`} role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="row">
           <h3>
             {title} ({cards.length})
           </h3>
           {cards.length > 8 && <input placeholder="Search by name" value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />}
-          <button onClick={onClose}>Close</button>
+          <span className="spacer" />
+          <button onClick={onClose}>{choice ? 'Back to the board' : 'Close'}</button>
         </div>
+        {bar && <div className="sheet-bar">{bar}</div>}
         {cards.length === 0 ? (
           <p className="muted">Empty.</p>
         ) : (
           <div className="sheet-grid">
-            {shown.map((c, i) => (
-              <div key={i} {...hover(dataOf(c))}>
-                <CardFace card={dataOf(c)} size="full" />
-              </div>
-            ))}
+            {shown.map((c, i) => {
+              const id = idOf(c);
+              const picking = choice?.state(id) ?? null;
+              return picking ? (
+                <button
+                  key={id ?? i}
+                  className={`plain sheet-card ${picking}`}
+                  aria-pressed={picking === 'picked'}
+                  onClick={() => choice!.toggle(id)}
+                  {...hover(dataOf(c))}
+                >
+                  <CardFace card={dataOf(c)} size="full" />
+                </button>
+              ) : (
+                <div key={id ?? i} className="sheet-card" {...hover(dataOf(c))}>
+                  <CardFace card={dataOf(c)} size="full" />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
