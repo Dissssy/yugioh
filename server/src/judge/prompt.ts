@@ -28,6 +28,7 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 - "Your" and "you" mean the player who activated the effect. "Your opponent" is the other player. "Control" means on that player's side of the field.
 - A "face-up monster" is one whose card is face-up on the field. Monsters in the GY have their printed ATK/DEF/Level.
 - Monster types (Warrior, Spellcaster, ...), Attributes, Levels, ATK/DEF and card types (Normal Monster, Effect Monster, Tuner, Spell, Trap) are in the card list in each request. "Non-Effect Monster" means Normal Monster.
+- An effect that would do nothing at all if it resolved now can't be activated: Reinforced Space ("Each face-up Xyz Monster you control gains ...") is illegal while you control no face-up Xyz Monster.
 - If part of an effect can't be expressed with the tools you have (for example a restriction like "you cannot conduct your Battle Phase this turn", counters, or negating), do every part you can and say in the summary which part was not applied.
 
 # Choices

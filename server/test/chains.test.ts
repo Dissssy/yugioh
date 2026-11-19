@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { evolve, replay, startDuel, statsOf, type DuelEvent, type DuelState, type DuelUpdate, type Intent, type PlayerView, type Seat } from '@yugioh/engine';
 import type { DeckSummary, DuelSummary } from '@yugioh/shared';
 import { loadCards, syncCards } from '../src/cards.ts';
-import { decks, matchEvents } from '../src/db/schema.ts';
+import { decks, effectSheets, matchEvents } from '../src/db/schema.ts';
 import { rule } from '../src/judge/script.ts';
-import { importSheetFiles, loadSheets } from '../src/sheets.ts';
+import { flagScripts, importSheetFiles, loadSheets, resetSheets } from '../src/sheets.ts';
 import { ADMIN_EMAIL, Browser, seeded, startHarness, Stream, type Harness } from './harness.ts';
 
 let h: Harness;
@@ -187,5 +187,30 @@ describe('scripted triggers', () => {
     s = evolve(s, { type: 'effectActivated', player: 0, card: ids.magnaDrago, effect: 0, zone: null, cause: null });
     s = await runLink(s);
     expect(statsOf(s, ids.magnaDrago).atk).toBe(1600);
+  });
+});
+
+describe('effect sheets stored in an older format', () => {
+  it('are never played, and the next import replaces them from the files', async () => {
+    // Mirror Force as stored before `when` existed: activatable at any time a Trap could be.
+    const current = (await h.db.query.effectSheets.findFirst({ where: eq(effectSheets.code, MIRROR_FORCE) }))!.sheet;
+    const old = { ...current, effects: current.effects.map(({ when: _, ...e }) => ({ ...e, respondsTo: 'attack' })) };
+    await h.db.update(effectSheets).set({ sheet: old as unknown as typeof current }).where(eq(effectSheets.code, MIRROR_FORCE));
+    const cards = await loadCards(h.db, [MIRROR_FORCE]);
+
+    expect(await loadSheets(h.db, cards)).toEqual({});
+    expect(await importSheetFiles(h.db)).toBe(1);
+    expect((await loadSheets(h.db, cards))[MIRROR_FORCE]?.effects[0]?.when?.event).toBe('attack_declared');
+  });
+});
+
+describe('RESET_SHEETS', () => {
+  it('throws away flagged sheets so the files load afresh', async () => {
+    await flagScripts(h.db, MIRROR_FORCE, 'test report');
+    await resetSheets(h.db);
+    expect(await h.db.select().from(effectSheets)).toEqual([]);
+    expect(await importSheetFiles(h.db)).toBeGreaterThan(0);
+    const cards = await loadCards(h.db, [MIRROR_FORCE]);
+    expect((await loadSheets(h.db, cards))[MIRROR_FORCE]?.effects[0]?.status).toBe('unverified');
   });
 });

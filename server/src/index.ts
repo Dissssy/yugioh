@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createApp } from './app.ts';
 import { scheduleCardSync } from './cards.ts';
+import { resetSheets } from './sheets.ts';
 import { loadConfig } from './config.ts';
 import { connect } from './db/client.ts';
 import { scheduleGuestCleanup } from './guests.ts';
@@ -9,6 +10,10 @@ import { runMigrations } from './db/migrate.ts';
 const config = loadConfig();
 const db = connect(config.DATABASE_URL);
 await runMigrations(db);
+if (config.RESET_SHEETS) {
+  await resetSheets(db);
+  console.log('RESET_SHEETS: deleted every stored effect sheet, revision and report; the card sync loads them from the files.');
+}
 scheduleCardSync(db, { imageDir: config.CARD_IMAGE_DIR, log: console.log });
 scheduleGuestCleanup(db);
 const client = config.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: config.ANTHROPIC_API_KEY }) : null;

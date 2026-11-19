@@ -23,6 +23,11 @@ const env = z.object({
    * activate, so the speed of a pass reveals nothing. A random extra of up to half as long is added.
    */
   RESPONSE_FLOOR_MS: z.coerce.number().int().nonnegative().default(1000),
+  /**
+   * Development only: at start, throw away every stored effect sheet, revision and report and load the sheets from
+   * server/effect-sheets/ again, so a deploy plays the repository's sheets and nothing players flagged.
+   */
+  RESET_SHEETS: z.stringbool().default(false),
 });
 
 export const cardImageDir = (source: NodeJS.ProcessEnv = process.env) => env.shape.CARD_IMAGE_DIR.parse(source.CARD_IMAGE_DIR);

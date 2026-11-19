@@ -73,7 +73,7 @@ Built with Motion alone. A hand card has one Motion drag for everything: while t
 | Drag | Onto | Does |
 | --- | --- | --- |
 | Monster in hand | An empty Main Monster Zone | A small two-button choice at the drop point: **Summon** or **Set** (always asked; see Decisions). Needs tributes: the tribute choice starts with the eligible monsters glowing. |
-| Spell/Trap in hand | An empty Spell/Trap Zone | Set (layer 1). From layer 2, the same small choice: **Activate** or **Set**. |
+| Spell/Trap in hand | An empty Spell/Trap Zone | Set (layer 1). From layer 2, the same small choice: **Activate** or **Set**. An activation is always asked, even when it is the only choice (while you hold priority after your own summon, a card can't be Set, and a drop meant as a Set must not activate it). |
 | Field Spell in hand | Field Zone | Activate or Set |
 | Monster on the field | An opponent's monster | Attack it. An arrow from the attacker follows the pointer during the drag. |
 | Monster on the field | The opponent's LP plate | Direct attack, when legal |

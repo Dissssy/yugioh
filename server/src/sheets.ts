@@ -21,7 +21,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { DESTINATIONS, UNTIL, type CardData, type CardFilter, type ModelUsage, type EffectSheet, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
-import { cards, decks, effectSheets, sheetRevisions } from './db/schema.ts';
+import { cards, decks, effectSheets, sheetReports, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
 import { strictSchema } from './judge/tools.ts';
 
@@ -150,7 +150,18 @@ export const sheetSchema = z.object({
 export async function loadSheets(db: Db, cardData: Record<number, CardData>): Promise<Record<number, EffectSheet>> {
   const codes = Object.keys(cardData).map(Number);
   const rows = codes.length ? await db.select().from(effectSheets).where(inArray(effectSheets.code, codes)) : [];
-  return current(cardData, rows.map((r) => r.sheet));
+  return current(cardData, rows.flatMap((r) => stored(r.sheet) ?? []));
+}
+
+/**
+ * A stored sheet as the current schema reads it, or null if it was written in an older shape (one from before a
+ * field like `when` existed). Such a sheet is never played: the next card sync replaces it from the files.
+ */
+function stored(sheet: unknown): EffectSheet | null {
+  const parsed = sheetSchema.safeParse(sheet);
+  if (parsed.success) return parsed.data;
+  console.warn(`Effect sheet ${(sheet as { code?: unknown }).code} is in an old format; the next card sync replaces it from server/effect-sheets/.`);
+  return null;
 }
 
 /** The sheets that match their card's text. */
@@ -182,7 +193,8 @@ export async function saveSheet(db: Db, sheet: EffectSheet, reason: string): Pro
 
 /** A card's sheet now, if it has one. */
 export async function sheetOf(db: Db, code: number): Promise<EffectSheet | null> {
-  return (await db.query.effectSheets.findFirst({ where: eq(effectSheets.code, code) }))?.sheet ?? null;
+  const row = await db.query.effectSheets.findFirst({ where: eq(effectSheets.code, code) });
+  return row ? stored(row.sheet) : null;
 }
 
 /** Sets aside every script on a card's sheet, so the judge rules on it from now on. Returns the new sheet, or null if it had no script to set aside. */
@@ -205,13 +217,16 @@ export async function readSheetFiles(cardData: Record<number, CardData>, dir = S
   return current(cardData, sheets);
 }
 
-/** Loads the sheet files into the database: those it lacks, or with `force` all of them. Returns how many. */
+/**
+ * Loads the sheet files into the database: those it lacks or holds only in an older format, or with `force` all of
+ * them. Returns how many.
+ */
 export async function importSheetFiles(db: Db, options: { dir?: string; force?: boolean } = {}): Promise<number> {
   const { dir = SHEET_DIR, force = false } = options;
   const codes = await listSheetCodes(dir);
   const rows = codes.length ? await db.select().from(cards).where(inArray(cards.id, codes)) : [];
   const files = await readSheetFiles(Object.fromEntries(rows.map((r) => [r.id, { code: r.id, name: r.name, text: r.text } as CardData])), dir);
-  const have = new Set((await db.select({ code: effectSheets.code }).from(effectSheets)).map((r) => r.code));
+  const have = new Set((await db.select().from(effectSheets)).filter((r) => sheetSchema.safeParse(r.sheet).success).map((r) => r.code));
   let n = 0;
   for (const sheet of Object.values(files)) {
     if (!force && have.has(sheet.code)) continue;
@@ -219,6 +234,18 @@ export async function importSheetFiles(db: Db, options: { dir?: string; force?: 
     n++;
   }
   return n;
+}
+
+/**
+ * Deletes every stored sheet, revision and report, so the next card sync loads the files afresh (`RESET_SHEETS`).
+ * Duels keep the sheets they started with in their logs.
+ */
+export async function resetSheets(db: Db): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.delete(sheetReports);
+    await tx.delete(sheetRevisions);
+    await tx.delete(effectSheets);
+  });
 }
 
 /** Writes every sheet in the database to `dir`, one file per card. */

@@ -365,6 +365,20 @@ export const CASES: EvalCase[] = [
     check: (b) => (b.monster('Sonic Chick')?.level === 4 ? null : `Level ${b.monster('Sonic Chick')?.level}`),
   },
   {
+    // Its text has no "different Level" requirement (Konami prints that limit on cards like Xyz Align, not here).
+    name: 'harmonic waves can target a monster that is already level 4',
+    board: [{ hand: ['Harmonic Waves'] }, { monsters: ['Gene-Warped Warwolf'] }],
+    activate: 'Harmonic Waves',
+    legal: true,
+    check: (b) => (b.monster('Gene-Warped Warwolf')?.level === 4 ? null : `Level ${b.monster('Gene-Warped Warwolf')?.level}`),
+  },
+  {
+    name: 'reinforced space needs a face-up xyz monster',
+    board: [{ set: ['Reinforced Space'], monsters: ['Axe Raider'] }, {}],
+    activate: 'Reinforced Space',
+    legal: false,
+  },
+  {
     name: 'harmonic waves needs a face-up monster',
     board: [{ hand: ['Harmonic Waves'], setMonsters: ['Junk Synchron'] }, {}],
     activate: 'Harmonic Waves',
