@@ -359,7 +359,7 @@ describe('activating effects', () => {
     expect(t.refuse(0, { type: 'activate', card: 'a0', effect: 0, zone: null })).toMatch(/Spell & Trap Zone/);
     t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 2 });
     expect(t.state.players[0].spellTraps[2]).toMatchObject({ id: 'a0', faceUp: true });
-    expect(t.state.chain).toEqual([{ player: 0, card: 'a0', effect: 0, targets: [] }]);
+    expect(t.state.chain).toEqual([{ player: 0, card: 'a0', effect: 0, targets: [], choice: null }]);
     expect(legalActions(t.state, 0)).toEqual([{ type: 'surrender' }]);
     expect(t.refuse(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 0 })).toMatch(/resolve/);
     resolve(t);
@@ -376,6 +376,15 @@ describe('activating effects', () => {
     expect(t.refuse(0, { type: 'activate', card: 'a1', effect: 0, zone: null })).toMatch(/can't be activated/);
     t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
     expect(legalActions(t.state, 0).filter((a) => a.type === 'activate').map((a) => a.card)).toEqual(['a1', 'a0']);
+  });
+
+  it('records the effect chosen on activation for the resolution', () => {
+    const t = new Table(stacked([9, 1, 1, 1, 1, ...filler(35)], filler(40, 2)));
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 2 });
+    expect(applyOp(t.state, { op: 'choose_effect', choice: 'Inflict 800 damage' }, ctx)).toMatchObject({ ok: false, error: expect.stringMatching(/activated/) });
+    ops(t, [{ op: 'choose_effect', choice: 'Inflict 800 damage' }], 'activation');
+    expect(t.state.chain[0]!.choice).toBe('Inflict 800 damage');
+    expect(applyOp(t.state, { op: 'choose_effect', choice: 'Gain 1200 LP' }, { ...ctx, stage: 'activation' })).toMatchObject({ ok: false, error: expect.stringMatching(/already/) });
   });
 
   it('checks ops against the board', () => {

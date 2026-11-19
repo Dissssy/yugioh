@@ -144,6 +144,12 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'targeted', cards: op.cards });
       return;
     }
+    case 'choose_effect':
+      check(ctx.stage === 'activation', 'The effect is chosen when the card is activated, not when it resolves.');
+      check(state.chain.at(-1)!.choice === null, 'An effect was already chosen for this activation.');
+      check(op.choice.trim() !== '', 'Say which effect was chosen.');
+      run.emit({ type: 'effectChosen', choice: op.choice });
+      return;
   }
 }
 

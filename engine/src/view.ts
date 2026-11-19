@@ -41,7 +41,7 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
         extra: p.extra.map((id) => (mine ? shown(id) : hidden)),
       };
     }) as PlayerView['players'],
-    chain: state.chain.map((link) => ({ player: link.player, card: shown(link.card), effect: link.effect, targets: link.targets })),
+    chain: state.chain.map((link) => ({ player: link.player, card: shown(link.card), effect: link.effect, targets: link.targets, choice: link.choice })),
     actions: legalActions(state, seat),
   };
 }
@@ -172,6 +172,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `${who(event.player)} activated ${name(event.card)}`;
     case 'targeted':
       return `Targeting ${names(event.cards)}`;
+    case 'effectChosen':
+      return `Chose: ${event.choice}`;
     case 'moved': {
       const to = { hand: 'to the hand', deck_top: 'on top of the Deck', deck_bottom: 'to the bottom of the Deck', deck_shuffled: 'into the Deck', graveyard: 'to the GY', banished: 'banished' }[event.to];
       const from = { deck: 'Deck', hand: 'hand', monsters: 'field', spellTraps: 'field', graveyard: 'GY', banished: 'banished cards', extra: 'Extra Deck' }[event.from];

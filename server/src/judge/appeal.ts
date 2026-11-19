@@ -42,7 +42,7 @@ export interface AppealInput {
 
 export async function appeal(input: AppealInput, model: ModelCall): Promise<AppealRecord> {
   const { before, record } = input;
-  const link = { player: record.player, card: record.card, effect: record.effect, targets: [] };
+  const link = { player: record.player, card: record.card, effect: record.effect, targets: [], choice: null };
   const request = [
     '# Board before the decision',
     describeState(before),

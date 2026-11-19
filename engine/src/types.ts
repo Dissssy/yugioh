@@ -81,6 +81,8 @@ export interface ChainLink {
   card: string;
   effect: number;
   targets: string[];
+  /** The effect chosen on activation when the text offers several ("Activate 1 of these effects"), as the judge worded it. */
+  choice: string | null;
 }
 
 /** A card on the field. */
@@ -173,7 +175,8 @@ export type Op =
   | { op: 'change_position'; card: string; position: Position }
   | { op: 'draw'; player: Seat; count: number }
   | { op: 'extra_normal_summon'; player: Seat }
-  | { op: 'declare_targets'; cards: string[] };
+  | { op: 'declare_targets'; cards: string[] }
+  | { op: 'choose_effect'; choice: string };
 
 /** One judge call, kept whole so it can be contested and replayed. Players see only `stage`, `legal` and `summary`. */
 export interface JudgeRecord {
@@ -240,6 +243,7 @@ export type DuelEvent =
   /** A Spell/Trap from the hand goes face-up to `zone`; a Set one flips face-up; a monster's effect leaves it where it is. */
   | { type: 'effectActivated'; player: Seat; card: string; effect: number; zone: number | null }
   | { type: 'targeted'; cards: string[] }
+  | { type: 'effectChosen'; choice: string }
   | { type: 'moved'; card: string; owner: Seat; from: Place; to: Destination }
   | { type: 'deckShuffled'; player: Seat; order: string[] }
   | { type: 'specialSummoned'; player: Seat; card: string; zone: number; position: Position }
@@ -270,7 +274,7 @@ export interface PlayerView {
   result: DuelResult | null;
   players: [PlayerSideView, PlayerSideView];
   /** Activated effects waiting to resolve, oldest first. */
-  chain: { player: Seat; card: CardView; effect: number; targets: string[] }[];
+  chain: { player: Seat; card: CardView; effect: number; targets: string[]; choice: string | null }[];
   actions: LegalAction[];
 }
 

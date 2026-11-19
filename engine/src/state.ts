@@ -131,12 +131,15 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
           const at = locate(s, event.card);
           if (at?.zone === 'spellTraps') onField(s, event.card).faceUp = true;
         }
-        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [] });
+        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null });
         s.usedThisTurn.push({ card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         return;
       }
       case 'targeted':
         s.chain.at(-1)!.targets = event.cards;
+        return;
+      case 'effectChosen':
+        s.chain.at(-1)!.choice = event.choice;
         return;
       case 'moved': {
         removeFromPlay(s, event.card);

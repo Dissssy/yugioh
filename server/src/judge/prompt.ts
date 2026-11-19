@@ -32,6 +32,7 @@ export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs e
 - Every choice the card gives a player is that player's: never choose for them. When exactly one card fits, you may still ask; when nothing fits, don't ask.
 - ask_player lists only real options: the card IDs that fit (in the place the text names), or short text choices. min and max are how many to pick ("up to 3" is min 1 max 3; "1" is min 1 max 1).
 - Ask for costs and targets one question at a time, cost first.
+- When the text offers several effects to pick from ("Activate 1 of these effects", "apply 1 of these effects"), the controller picks on activation: ask them with ask_player (one choice per effect, in the card's words) and record the pick with choose_effect. On resolution, apply only the chosen effect.
 - The answer comes back as the picked IDs or choices. Use exactly those.
 
 # Hidden information
@@ -100,5 +101,5 @@ export function activationRequest(state: DuelState, link: ChainLink): string {
 
 export function resolutionRequest(state: DuelState, link: ChainLink): string {
   const targets = link.targets.length ? link.targets.map((id) => `${id} ${cardOf(state, id).name}`).join('; ') : 'none';
-  return `${describeState(state)}\n\n# Request: resolve the effect\nThe activation was legal and its cost is paid. Targets declared on activation: ${targets}.\n${describeEffect(state, link)}`;
+  return `${describeState(state)}\n\n# Request: resolve the effect\nThe activation was legal and its cost is paid. Targets declared on activation: ${targets}.${link.choice ? ` Effect chosen on activation: ${link.choice}.` : ''}\n${describeEffect(state, link)}`;
 }
