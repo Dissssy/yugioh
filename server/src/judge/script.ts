@@ -210,6 +210,27 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         apply({ op: 'link', card: monster });
         return `${name} ${cardOf(state, self).race === 'Equip' ? 'was equipped to' : 'now applies to'} ${shown(monster, before)}.`;
       }
+      case 'negate_activation': {
+        const cause = link.cause?.event === 'activated' ? link.cause : null;
+        const answered = cause && state.chain[cause.link];
+        if (!answered || answered.card !== cause.card || answered.negated) return null;
+        apply({ op: 'negate_activation', card: cause.card });
+        const where = locate(state, cause.card)?.zone;
+        const destroyed = step.destroy && (where === 'monsters' || where === 'spellTraps');
+        if (destroyed) apply({ op: 'destroy', cards: [cause.card] });
+        return `The activation of ${shown(cause.card, before)} was negated${destroyed ? ', and it was destroyed' : ''}.`;
+      }
+      case 'negate_effects': {
+        const cards = (await select(step.cards, 'negate the effects of')).filter((id) => {
+          const at = locate(state, id);
+          return at?.zone === 'monsters' && state.players[at.seat].monsters[at.index]!.faceUp;
+        });
+        for (const id of cards) apply({ op: 'negate_effects', card: id });
+        return cards.length ? `${list(cards.map((id) => shown(id, before)))} ${cards.length === 1 ? 'has its' : 'have their'} effects negated.` : null;
+      }
+      case 'set_again':
+        apply({ op: 'set_again' });
+        return `${name} will be Set again.`;
       case 'forbid': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
         apply({ op: 'forbid', player, what: step.what });

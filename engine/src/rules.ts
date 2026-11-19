@@ -293,9 +293,9 @@ function extraSummon(run: Run, seat: Seat, intent: Extract<Intent, { type: 'extr
 // effect needs (`when`). A scripted effect's own conditions are checked here too (script.ts); for any other effect
 // they are the judge's call. Triggers go on the chain in their own step (chain.ts).
 
-/** Spell/Trap properties that can be activated. Field Spells and Counter Traps come later. */
+/** Spell/Trap properties that can be activated. Field Spells come later. */
 const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play', 'Continuous', 'Equip'];
-const ACTIVATABLE_TRAPS = ['Normal', 'Continuous'];
+const ACTIVATABLE_TRAPS = ['Normal', 'Continuous', 'Counter'];
 
 type Activate = Extract<LegalAction, { type: 'activate' }>;
 /** An activation the timing allows, with the event it answers, before its script is checked. */
@@ -327,10 +327,10 @@ function candidates(state: DuelState, seat: Seat, id: string): Candidate[] {
     if (effect.speed < minSpeed) return;
     if (!onceOk(state, id, card.code, index, effect.opt)) return;
     if (ruledIllegal(state, seat, id, index)) return;
-    // An effect that answers an event can only be activated in the window that event opened. Responding to an
-    // activation needs negation (a later layer).
-    const cause = effect.when ? (window?.cause ?? null) : null;
-    if (effect.when && (effect.when.event === 'activated' || !cause || !whenMatches(state, effect.when, cause, id, seat))) return;
+    // An effect that answers an event can only be activated in the window that event opened; one that answers an
+    // activation, in the window the last link on the chain opened.
+    const cause = effect.when?.event === 'activated' ? lastActivation(state) : effect.when ? (window?.cause ?? null) : null;
+    if (effect.when && (!cause || !whenMatches(state, effect.when, cause, id, seat))) return;
     const push = (zones: number[] | null) => result.push({ ...activateAction(state, id, index, zones), cause });
     if (card.kind === 'spell' && effect.kind === 'activation' && ACTIVATABLE_SPELLS.includes(card.race)) {
       const quick = card.race === 'Quick-Play';
@@ -344,13 +344,20 @@ function candidates(state: DuelState, seat: Seat, id: string): Candidate[] {
       if (fast && set && !set.faceUp && set.placedTurn !== state.turn) push(null);
     } else if (card.kind === 'monster' && (effect.kind === 'ignition' || effect.kind === 'quick')) {
       const m = at.zone === 'monsters' ? p.monsters[at.index]! : null;
-      if (!m?.faceUp) return;
+      if (!m?.faceUp || m.effectsNegated) return;
       // An ignition effect needs your open Main Phase, unless its script names other phases (Speed Warrior).
       const phased = scriptOf(state, id, index)?.conditions.some((c) => c.if === 'phase');
       if (effect.kind === 'ignition' ? !window && yourTurn && (main || phased) : fast) push(null);
     }
   });
   return result;
+}
+
+/** The activation a response window answers: the chain's last link, while players may respond to it. */
+function lastActivation(state: DuelState): Happening | null {
+  const last = state.chain.at(-1);
+  if (state.step.at !== 'respond' || !last) return null;
+  return { event: 'activated', card: last.card, player: last.player, link: state.chain.length - 1, group: state.resolvedLinks };
 }
 
 /** A chain link's Spell Speed, from its effect sheet. */

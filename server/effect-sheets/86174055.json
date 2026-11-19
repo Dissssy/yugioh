@@ -20,7 +20,54 @@
         "from": "graveyard",
         "canMiss": true
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "you",
+            "place": "graveyard",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": null,
+            "position": null,
+            "level": {
+              "min": 2,
+              "max": 2
+            },
+            "atk": null,
+            "def": null
+          },
+          "min": 2,
+          "max": 2,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "targets"
+                },
+                "position": "choice"
+              },
+              {
+                "do": "negate_effects",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

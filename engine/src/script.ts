@@ -23,7 +23,7 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   // An Xyz Material is not a card on the field, so no filter's place fits it.
   if (at.zone === 'materials') return false;
   const onField = at.zone === 'monsters' || at.zone === 'spellTraps';
-  if (filter.place === 'field' ? !onField : filter.place !== at.zone) return false;
+  if (filter.place !== 'any' && (filter.place === 'field' ? !onField : filter.place !== at.zone)) return false;
   const field = at.zone === 'monsters' || at.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
   if (filter.faceUp !== null && (!field || field.faceUp !== filter.faceUp)) return false;
   if (filter.position !== null && (at.zone !== 'monsters' || field!.position !== filter.position)) return false;
@@ -79,6 +79,7 @@ export function describeFilter(f: CardFilter): string {
     !r ? [] : r.min !== null && r.max !== null ? (r.min === r.max ? [`${name} ${r.min}`] : [`${name} ${r.min} to ${r.max}`]) : r.max !== null ? [`${name} ${r.max} or less`] : r.min !== null ? [`${name} ${r.min} or more`] : [];
   const stats = [...range('Level', f.level), ...range('ATK', f.atk), ...range('DEF', f.def)];
   if (stats.length) words.push(`with ${stats.join(' and ')}`);
+  if (f.place === 'any') return words.join(' ');
   const pile = { hand: 'hand', deck: 'Deck', graveyard: 'GY', banished: 'banished cards' }[f.place as 'hand'];
   const field = { field: 'on the field', monsters: 'in a Monster Zone', spellTraps: 'in a Spell & Trap Zone' }[f.place as 'field'];
   if (field) words.push(f.side === 'you' ? 'you control' : f.side === 'opponent' ? 'your opponent controls' : field);
@@ -91,6 +92,7 @@ const freeMonsterZones = (state: DuelState, seat: Seat) => monsterZonesFor(state
 /** Why a step couldn't do what it must on this board, or null. A `choose` with min 0 ("you can") and steps on targets need nothing here. */
 function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): string | null {
   if (step.do === 'negate_attack') return state.attack ? null : 'No attack is being made.';
+  if (step.do === 'negate_activation') return state.chain.length > 0 ? null : 'There is no activation to negate.';
   if (step.do === 'detach') return detachFrom(state, step, seat, card).length > 0 ? null : `No ${step.cards.from === 'self' ? 'this card has' : 'monster here has'} ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`;
   if (!('cards' in step)) return null;
   const sel = step.cards;

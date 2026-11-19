@@ -264,7 +264,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
           const at = locate(s, event.card);
           if (at?.zone === 'spellTraps') Object.assign(onField(s, event.card), { faceUp: true, activatedTurn: s.turn });
         }
-        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause });
+        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause, negated: false, setAgain: false });
         s.usedThisTurn.push({ card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         const step = s.step;
         // A trigger joins the chain with the others; any other activation hands the opponent priority.
@@ -331,6 +331,15 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'linked':
         onField(s, event.card).linked = event.to;
         return;
+      case 'activationNegated':
+        s.chain[event.link]!.negated = true;
+        return;
+      case 'effectsNegated':
+        onField(s, event.card).effectsNegated = true;
+        return;
+      case 'setAgain':
+        s.chain.at(-1)!.setAgain = true;
+        return;
       case 'normalSummonGranted':
         s.normalSummonLimit++;
         return;
@@ -346,7 +355,9 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const remains = effects.some((e) => e.continuous?.apply === 'self_destruct');
         const needsLink = card.race === 'Equip' || effects.some((e) => e.continuous?.apply === 'tie' || (e.continuous && 'to' in e.continuous && e.continuous.to === 'linked'));
         const unlinked = at?.zone === 'spellTraps' && needsLink && !s.players[at.seat].spellTraps[at.index]!.linked;
-        if (at?.zone === 'spellTraps' && ((leaves.includes(card.race) && !remains) || unlinked)) sendToGraveyard(s, link.card);
+        if (at?.zone === 'spellTraps' && link.setAgain && !link.negated) {
+          Object.assign(s.players[at.seat].spellTraps[at.index]!, { faceUp: false, placedTurn: s.turn, activatedTurn: null });
+        } else if (at?.zone === 'spellTraps' && (link.negated || (leaves.includes(card.race) && !remains) || unlinked)) sendToGraveyard(s, link.card);
         s.resolvedLinks++;
         // Once the whole chain has resolved, triggers from what happened during it go on a new one.
         if (s.chain.length === 0 && s.step.at === 'resolve') s.step = { at: 'triggers', cause: null, then: s.step.then, handled: [], passed: [] };
@@ -388,6 +399,7 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     materials: [],
     activatedTurn: null,
     linked: null,
+    effectsNegated: false,
   };
 }
 

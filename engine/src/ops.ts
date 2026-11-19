@@ -150,6 +150,29 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'linked', card: source, to: op.card });
       return;
     }
+    case 'negate_activation': {
+      // The link answered is below the one resolving (or, while activating, below the new one).
+      const below = state.chain.length - 1;
+      let index = -1;
+      for (let i = below - 1; i >= 0; i--) if (state.chain[i]!.card === op.card) { index = i; break; }
+      check(index >= 0, `${cardOf(state, op.card).name} has no activation on the chain below this effect to negate.`);
+      check(!state.chain[index]!.negated, 'That activation is already negated.');
+      run.emit({ type: 'activationNegated', link: index, card: op.card });
+      return;
+    }
+    case 'negate_effects': {
+      const target = onField(state, op.card);
+      check(target.at.zone === 'monsters' && target.card.faceUp, 'Only a face-up monster has its effects negated this way.');
+      run.emit({ type: 'effectsNegated', card: op.card });
+      return;
+    }
+    case 'set_again': {
+      check(ctx.stage === 'resolution', 'A card is Set again as it resolves.');
+      const source = state.chain.at(-1)?.card;
+      check(source && locate(state, source)?.zone === 'spellTraps', 'Only a Spell or Trap being resolved can be Set again.');
+      run.emit({ type: 'setAgain' });
+      return;
+    }
     case 'forbid':
       run.emit({ type: 'forbidden', player: op.player, what: op.what });
       return;

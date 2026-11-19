@@ -71,6 +71,7 @@ const cards: Record<number, CardData> = {
   24: spell(24, 'Swords of Revealing Light'),
   25: { ...spell(25, 'Synchro Boost'), race: 'Equip' },
   26: { ...spell(26, 'Limit Reverse'), type: 'Trap Card', kind: 'trap', race: 'Continuous' },
+  27: { ...spell(27, 'Seven Tools of the Bandit'), type: 'Trap Card', kind: 'trap', race: 'Counter' },
 };
 
 function spell(code: number, name: string): CardData {
@@ -121,6 +122,11 @@ const sheets: Record<number, EffectSheet> = {
     { ...effect('continuous'), continuous: { apply: 'tie', destroyLinked: true, defenseBreaks: true } },
     { ...effect('continuous'), continuous: restrict({ to: 'linked', cannot: ['attack'] }) },
   ),
+  27: sheet(27, {
+    ...effect('activation'),
+    speed: 3,
+    when: { event: 'activated', self: false, filter: filter({ place: 'any', kinds: ['trap'], faceUp: null }), how: [], from: 'field', canMiss: false },
+  }),
   21: { ...sheet(21, { ...effect('continuous'), continuous: aura({ to: filter({ side: 'you' }), atk: 200, def: 200, per: 'materials' }) }), materials: { summon: 'xyz', level: 2, count: 2 } },
   7: { ...sheet(7), materials: { summon: 'synchro', tuner: 'Junk Synchron', nonTuners: { min: 1, max: null } } },
   15: { ...sheet(15), materials: { summon: 'synchro', tuner: null, nonTuners: { min: 1, max: null } } },
@@ -645,6 +651,46 @@ describe('equipped and tied cards', () => {
   });
 });
 
+describe('negation', () => {
+  const op = (t: Table, o: Op, player: Seat = 0) => {
+    const r = applyOp(t.state, o, { player, stage: 'resolution', random: () => 0 });
+    if (!r.ok) throw new Error(r.error);
+    return t.push(...r.events);
+  };
+
+  it('a Counter Trap negates a Trap: the negated link resolves doing nothing and goes to the GY', () => {
+    const t = new Table(stacked([11, ...filler(39)], [27, ...filler(39, 2)]));
+    t.play(0, { type: 'setSpellTrap', card: 'a0', zone: 0 }).play(0, { type: 'endTurn', discard: [] });
+    t.play(1, { type: 'setSpellTrap', card: 'b0', zone: 0 }).play(1, { type: 'endTurn', discard: [] });
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: null });
+    expect(t.state.step).toMatchObject({ at: 'respond', priority: 1 });
+    expect(viewFor(t.state, 1).waiting?.cause).toBe('the activation of Reinforce Truth');
+    t.play(1, { type: 'activate', card: 'b0', effect: 0, zone: null });
+    expect(t.state.step.at).toBe('resolve');
+    op(t, { op: 'negate_activation', card: 'a0' }, 1).push({ type: 'linkResolved' });
+    expect(t.state.chain).toEqual([]);
+    expect(t.state.players[0].graveyard).toEqual(['a0']);
+    expect(t.state.players[1].graveyard).toEqual(['b0']);
+  });
+
+  it('a monster with its effects negated has no ignition effect to activate', () => {
+    const t = new Table(stacked([10, ...filler(39)], filler(40, 2)));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    expect(legalActions(t.state, 0).some((a) => a.type === 'activate' && a.card === 'a0')).toBe(true);
+    op(t, { op: 'negate_effects', card: 'a0' });
+    expect(legalActions(t.state, 0).some((a) => a.type === 'activate' && a.card === 'a0')).toBe(false);
+  });
+
+  it('a Trap Set again stays on the field face-down', () => {
+    const t = new Table(stacked([11, ...filler(39)], filler(40, 2)));
+    t.play(0, { type: 'setSpellTrap', card: 'a0', zone: 0 }).play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: null });
+    op(t, { op: 'set_again' }).push({ type: 'linkResolved' });
+    expect(t.state.players[0].spellTraps[0]).toMatchObject({ id: 'a0', faceUp: false, placedTurn: 3 });
+    expect(t.state.players[0].graveyard).toEqual([]);
+  });
+});
+
 describe('positions', () => {
   it("can't change position on the turn a monster arrives, then once per turn after", () => {
     const t = new Table(stacked(filler(40), filler(40, 2)));
@@ -797,7 +843,7 @@ describe('activating effects', () => {
     expect(t.refuse(0, { type: 'activate', card: 'a0', effect: 0, zone: null })).toMatch(/Spell & Trap Zone/);
     t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 2 });
     expect(t.state.players[0].spellTraps[2]).toMatchObject({ id: 'a0', faceUp: true });
-    expect(t.state.chain).toEqual([{ player: 0, card: 'a0', effect: 0, targets: [], choice: null, cause: null }]);
+    expect(t.state.chain).toEqual([{ player: 0, card: 'a0', effect: 0, targets: [], choice: null, cause: null, negated: false, setAgain: false }]);
     expect(legalActions(t.state, 0)).toEqual([{ type: 'surrender' }]);
     expect(t.refuse(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 0 })).toMatch(/resolve/);
     resolve(t);

@@ -18,11 +18,14 @@ import {
   cardOf,
   decide,
   evolve,
+  locate,
+  nextStep,
   replay,
   statsOf,
   type CardData,
   type DuelEvent,
   type DuelState,
+  type Intent,
   type JudgeRecord,
   type ModelUsage,
   type Seat,
@@ -55,14 +58,19 @@ interface Side {
 
 export interface EvalCase {
   name: string;
-  /** The activating player is on turn, in Main Phase 1 of turn 3. */
+  /** In Main Phase 1 of turn 3, on the activating player's turn, or player 0's when the case has `before`. */
   board: [Side, Side];
+  /**
+   * What happens first, each by the player named, given card IDs by name: an activation here is ruled on but doesn't
+   * resolve, and code then does what it does on its own (passes for a player with nothing to activate, battle steps).
+   */
+  before?: (id: (name: string) => string) => [Seat, Intent][];
   /** The player who activates (default 0). */
   seat?: Seat;
   activate: string;
   /** Which of the card's effects to activate, by its index in the sheet (default 0). */
   effect?: number;
-  /** Names or choices to pick, one list per question, in order. Unlisted questions get the first options. */
+  /** Names or choices to pick, one list per question, in order (`before` first). Unlisted questions get the first options. */
   picks?: string[][];
   legal: boolean;
   /** Checks the board after resolution; returns a problem, or null. */
@@ -542,6 +550,67 @@ export const CASES: EvalCase[] = [
     check: (b) => (b.monster('Dark Blade')?.atk === 800 && b.monster('Dark Blade')?.level === 3 ? null : `Dark Blade is ${JSON.stringify(b.monster('Dark Blade'))}`),
   },
   {
+    name: 'seven tools negates a trap for 1000 lp',
+    board: [{ set: ['Limit Reverse'], gy: ['Speed Warrior'] }, { set: ['Seven Tools of the Bandit'] }],
+    before: (id) => [[0, { type: 'activate', card: id('Limit Reverse'), effect: 0, zone: null }]],
+    seat: 1,
+    activate: 'Seven Tools of the Bandit',
+    legal: true,
+    check: (b) => all(b.lp(1) === 7000 ? null : `LP is ${b.lp(1)}`, b.state.chain[0]?.negated ? null : 'Limit Reverse was not negated'),
+  },
+  {
+    name: 'seven tools cannot answer a monster effect',
+    board: [{ monsters: ['Exiled Force'] }, { set: ['Seven Tools of the Bandit'], monsters: ['Axe Raider'] }],
+    before: (id) => [[0, { type: 'activate', card: id('Exiled Force'), effect: 0, zone: null }]],
+    seat: 1,
+    activate: 'Seven Tools of the Bandit',
+    legal: false,
+  },
+  {
+    name: 'divine wrath discards to negate a monster effect',
+    board: [{ monsters: ['Exiled Force'] }, { set: ['Divine Wrath'], hand: ['Sonic Chick'], monsters: ['Axe Raider'] }],
+    before: (id) => [[0, { type: 'activate', card: id('Exiled Force'), effect: 0, zone: null }]],
+    seat: 1,
+    activate: 'Divine Wrath',
+    picks: [['Axe Raider'], ['Sonic Chick']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Sonic Chick', '1:gy'), expectAt(b, 'Exiled Force', '0:gy'), expectAt(b, 'Axe Raider', '1:monsters'), b.state.chain[0]?.negated ? null : 'Exiled Force was not negated'),
+  },
+  {
+    name: 'scrap-iron scarecrow negates an attack and sets itself again',
+    board: [{ monsters: ['Axe Raider'] }, { set: ['Scrap-Iron Scarecrow'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Axe Raider'), target: 'direct' }],
+    ],
+    seat: 1,
+    activate: 'Scrap-Iron Scarecrow',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Scrap-Iron Scarecrow', '1:spellTraps'), b.state.players[1].spellTraps.some((s) => s && !s.faceUp) ? null : 'it is not Set again', b.state.attack ? 'the attack goes on' : null),
+  },
+  {
+    name: 'junk synchron revives a level 2 or lower with its effects negated',
+    board: [{ hand: ['Junk Synchron'], gy: ['Speed Warrior', 'Axe Raider'] }, {}],
+    before: (id) => [[0, { type: 'normalSummon', card: id('Junk Synchron'), tributes: [], zone: 0 }]],
+    activate: 'Junk Synchron',
+    picks: [['Speed Warrior']],
+    legal: true,
+    check: (b) =>
+      all(expectAt(b, 'Speed Warrior', '0:monsters'), b.monster('Speed Warrior')?.position === 'defense' ? null : 'not in Defense Position', b.monster('Speed Warrior')?.effectsNegated ? null : 'its effects are not negated'),
+  },
+  {
+    name: 'speed bird revives two level 2 monsters with their effects negated',
+    board: [{ monsters: ['Dark Blade'] }, { monsters: ['Speed Bird'], gy: ['Speed Warrior', 'Tenshin'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Dark Blade'), target: 0 }],
+    ],
+    seat: 1,
+    activate: 'Speed Bird',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Speed Warrior', '1:monsters'), expectAt(b, 'Tenshin', '1:monsters'), b.monster('Tenshin')?.effectsNegated ? null : 'Tenshin is not negated'),
+  },
+  {
     name: 'xyz effect needs an xyz summon',
     board: [{ set: ['Xyz Effect'] }, { monsters: ['Axe Raider'] }],
     activate: 'Xyz Effect',
@@ -647,7 +716,7 @@ export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: 
   for (const { id, seat, materials } of xyzs) {
     events.push({ type: 'extraSummoned', player: seat, card: id, how: 'xyz', materials, zone: zones[seat]![0]++, position: 'attack' });
   }
-  events.push({ type: 'turnStarted', player: c.seat ?? 0, turn: 3 }, { type: 'phaseChanged', phase: 'main1' });
+  events.push({ type: 'turnStarted', player: c.before ? 0 : (c.seat ?? 0), turn: 3 }, { type: 'phaseChanged', phase: 'main1' });
   return replay(events);
 }
 
@@ -663,20 +732,14 @@ export interface EvalResult {
  * Runs one case: the activation check, then (if legal) the resolution, answering questions from `picks`. A scripted
  * effect runs without the model, so `model` may be null for cases whose effects all have scripts.
  */
-export async function runCase(c: EvalCase, state: DuelState, model: ModelCall | null): Promise<EvalResult> {
+export async function runCase(c: EvalCase, board: DuelState, model: ModelCall | null): Promise<EvalResult> {
   const seat = c.seat ?? 0;
-  const p = state.players[seat];
-  const id = [...p.hand, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((m) => (m ? [m.id] : []))].find((x) => cardOf(state, x).name === c.activate)!;
-  const zone = p.hand.includes(id) ? p.spellTraps.indexOf(null) : null;
-  const intent = decide(state, seat, { type: 'activate', card: id, effect: c.effect ?? 0, zone });
-  // Code refuses an activation that the effect's script or `when` rules out, with no judge call.
-  if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   const picks = [...(c.picks ?? [])];
   const unmatched: string[] = [];
   // A pick names a card, or a phrase found in one of the judge's choices (its wording varies between runs).
   const ask = async (q: Question) => {
     const want = picks.shift() ?? [];
-    const named = q.cards.filter((o) => want.includes(cardOf(state, o.id).name)).map((o) => o.id);
+    const named = q.cards.filter((o) => want.includes(cardOf(board, o.id).name)).map((o) => o.id);
     const chosen = [...named, ...q.choices.filter((x) => want.some((w) => x.toLowerCase().includes(w.toLowerCase())))];
     if (chosen.length >= Math.max(q.min, 1)) return chosen.slice(0, q.max);
     if (c.picks && !want.length) unmatched.push(`the judge asked more questions than the case has picks: "${q.text}"`);
@@ -684,6 +747,15 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall | 
     return [...q.cards.map((o) => o.id), ...q.choices].slice(0, Math.max(q.min, 1));
   };
   const deps = { model, ask, random: Math.random };
+  const state = await playBefore(c, board, deps);
+  const p = state.players[seat];
+  const id = [...p.hand, ...p.graveyard, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((m) => (m ? [m.id] : []))].find(
+    (x) => cardOf(state, x).name === c.activate,
+  )!;
+  const zone = p.hand.includes(id) && cardOf(state, id).kind !== 'monster' ? p.spellTraps.indexOf(null) : null;
+  const intent = decide(state, seat, { type: 'activate', card: id, effect: c.effect ?? 0, zone });
+  // Code refuses an activation that the effect's script or `when` rules out, with no judge call.
+  if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   let scratch = intent.events.slice(1).reduce(evolve, state);
   const checked = await rule({ stage: 'activation', state: scratch, link: scratch.chain.at(-1)! }, deps);
   const records = [checked.record];
@@ -700,6 +772,29 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall | 
   if (picks.length) unmatched.push(`the judge never asked for ${JSON.stringify(picks[0])}`);
   const problem = unmatched[0] ?? c.check?.(new Board(after)) ?? null;
   return result(problem === null, problem ?? resolved.record.summary);
+}
+
+/** Plays the case's `before` intents, each followed by what code does on its own. */
+async function playBefore(c: EvalCase, board: DuelState, deps: Parameters<typeof rule>[1]): Promise<DuelState> {
+  const id = (name: string) => {
+    const found = Object.keys(board.instances).find((x) => cardOf(board, x).name === name && locate(board, x)?.zone !== 'deck');
+    if (!found) throw new Error(`${c.name}: no ${name} on the board`);
+    return found;
+  };
+  let state = board;
+  for (const [seat, intent] of c.before?.(id) ?? []) {
+    const d = decide(state, seat, intent);
+    if (!d.ok) throw new Error(`${c.name}: ${d.error}`);
+    state = d.events.reduce(evolve, state);
+    if (intent.type === 'activate') state = (await rule({ stage: 'activation', state, link: state.chain.at(-1)! }, deps)).events.reduce(evolve, state);
+    for (;;) {
+      const next = nextStep(state);
+      if (next?.kind === 'events') state = next.events.reduce(evolve, state);
+      else if (next?.kind === 'wait' && next.autoPass) state = evolve(state, { type: 'passed', player: next.player });
+      else break;
+    }
+  }
+  return state;
 }
 
 /** Runs the matching cases `repeat` times; each round runs its cases in parallel. Returns one list per round. */

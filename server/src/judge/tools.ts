@@ -62,6 +62,19 @@ export const opTools = {
       'Equip the card being resolved (an Equip Spell) to a face-up monster, or tie a Continuous Trap to the monster it works on ("that monster cannot attack", Birthright\'s Special Summoned monster). Code then applies its continuous effect to that monster and destroys the card when the monster leaves the field. Only while resolving.',
     input: z.object({ card }),
   },
+  negate_activation: {
+    description:
+      'Negate the activation of a card or effect below this one on the chain ("negate the activation"): it resolves doing nothing. Name the card whose activation it is. "And if you do, destroy it" is a separate destroy call.',
+    input: z.object({ card }),
+  },
+  negate_effects: {
+    description: 'A face-up monster has its effects negated while it stays face-up on the field ("but it has its effects negated"): its triggers, ignition and continuous effects stop.',
+    input: z.object({ card }),
+  },
+  set_again: {
+    description: 'Set the card being resolved face-down again instead of sending it to the GY ("Set this card face-down instead of sending it to the GY"). Only while resolving.',
+    input: z.object({}),
+  },
   forbid: {
     description:
       'For the rest of this turn, stop a player declaring attacks ("your opponent cannot declare an attack this turn") or conducting their Battle Phase ("you cannot conduct your Battle Phase this turn").',

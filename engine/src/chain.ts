@@ -48,7 +48,9 @@ export function pendingTriggers(state: DuelState): PendingTrigger[] {
       const when = effect.when;
       if (effect.kind !== 'trigger' || !when || when.event === 'activated') return;
       if (step.handled.includes(`${id}:${index}`) || (!effect.mandatory && step.passed.includes(at.seat))) return;
-      const place = at.zone === 'monsters' || at.zone === 'spellTraps' ? when.from === 'field' && state.players[at.seat][at.zone][at.index]!.faceUp : at.zone === when.from;
+      // A monster whose effects are negated triggers nothing.
+      const onField = at.zone === 'monsters' || at.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
+      const place = onField ? when.from === 'field' && onField.faceUp && !onField.effectsNegated : at.zone === when.from;
       if (!place || !onceOk(state, id, sheet.code, index, effect.opt) || ruledIllegal(state, at.seat, id, index)) return;
       const cause = state.happened.find((h) => (!when.canMiss || h.group >= last) && whenMatches(state, when, h, id, at.seat));
       if (!cause || scriptProblem(state, at.seat, id, index, cause)) return;
@@ -99,7 +101,8 @@ export function nextStep(state: DuelState): Next | null {
       return { kind: 'wait', player: step.priority, autoPass: !canAct, floor: step.priority !== step.actor };
     }
     case 'resolve':
-      return { kind: 'resolve' };
+      // A negated activation resolves doing nothing, so code finishes it.
+      return state.chain.at(-1)?.negated ? { kind: 'events', events: [{ type: 'linkResolved' }] } : { kind: 'resolve' };
     case 'continue':
       return { kind: 'events', events: continuation(state, step.then) };
   }
@@ -108,7 +111,11 @@ export function nextStep(state: DuelState): Next | null {
 /** Who the duel waits on in a triggers step or a response window, as a player's view shows it. */
 export function waitingFor(state: DuelState, seat: Seat): { player: Seat; for: 'respond' | 'triggers'; cause: string | null } | null {
   const step = state.step;
-  if (step.at === 'respond') return { player: step.priority, for: 'respond', cause: describeCause(state, step.cause) };
+  if (step.at === 'respond') {
+    // With a chain building, players respond to its last link.
+    const last = state.chain.at(-1);
+    return { player: step.priority, for: 'respond', cause: last ? `the activation of ${cardOf(state, last.card).name}` : describeCause(state, step.cause) };
+  }
   if (step.at !== 'triggers') return null;
   const first = pendingTriggers(state)[0];
   if (!first || first.mandatory) return null;
@@ -135,6 +142,8 @@ export function describeCause(state: DuelState, cause: Happening | null): string
       return `${name(cause.card)} destroying ${name(cause.target)} by battle`;
     case 'battle_damage':
       return `the battle damage ${name(cause.card)} inflicted`;
+    case 'activated':
+      return `the activation of ${name(cause.card)}`;
   }
 }
 

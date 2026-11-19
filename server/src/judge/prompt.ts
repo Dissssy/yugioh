@@ -142,6 +142,8 @@ function describeHappening(state: DuelState, h: Happening): string {
       return `player ${h.player}'s ${label(h.card)} destroyed ${label(h.target)} by battle`;
     case 'battle_damage':
       return `player ${h.player}'s ${label(h.card)} inflicted ${h.amount} battle damage to the opponent`;
+    case 'activated':
+      return `player ${h.player} activated ${label(h.card)} (chain link ${h.link + 1})`;
     case 'phase':
       return `the start of player ${h.player}'s ${h.phase === 'battle' ? 'Battle Phase' : 'End Phase'}`;
   }

@@ -34,7 +34,30 @@
         "from": "field",
         "canMiss": false
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "change_lp",
+            "player": "you",
+            "amount": 1000,
+            "kind": "cost"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "negate_activation",
+                "destroy": true
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

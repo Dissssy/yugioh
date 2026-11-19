@@ -303,6 +303,12 @@ function describe(state: DuelState, event: LogEvent): string | null {
     }
     case 'normalSummonGranted':
       return `${who(event.player)} may Normal Summon again this turn`;
+    case 'activationNegated':
+      return `${name(event.card)}'s activation was negated`;
+    case 'effectsNegated':
+      return `${name(event.card)} has its effects negated`;
+    case 'setAgain':
+      return null;
     case 'linked':
       return `${name(event.card)} ${state.cards[state.instances[event.card]!.code]!.race === 'Equip' ? 'equipped to' : 'tied to'} ${name(event.to)}`;
     case 'forbidden':

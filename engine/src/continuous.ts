@@ -22,7 +22,7 @@ export function continuousOnField(state: DuelState): InForce<Continuous>[] {
   for (const seat of [0, 1] as const) {
     for (const zone of ['monsters', 'spellTraps'] as const) {
       for (const c of state.players[seat][zone]) {
-        if (!c?.faceUp || (zone === 'spellTraps' && state.chain.some((l) => l.card === c.id))) continue;
+        if (!c?.faceUp || c.effectsNegated || (zone === 'spellTraps' && state.chain.some((l) => l.card === c.id))) continue;
         for (const e of state.sheets[state.instances[c.id]!.code]?.effects ?? []) {
           if (e.kind === 'continuous' && e.continuous && e.status !== 'flagged') found.push({ source: c.id, seat, effect: e.continuous });
         }

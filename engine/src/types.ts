@@ -154,6 +154,12 @@ export type Step =
    * Continuous Trap to its target. It is destroyed when that monster leaves the field.
    */
   | { do: 'link'; cards: Selection }
+  /** Negates the activation this effect answers ("negate the activation"); `destroy`: "and if you do, destroy it". */
+  | { do: 'negate_activation'; destroy: boolean }
+  /** The monsters the selection picks have their effects negated while they stay face-up on the field. */
+  | { do: 'negate_effects'; cards: Selection }
+  /** This card is Set face-down again instead of going to the GY when it resolves (Scrap-Iron Scarecrow). */
+  | { do: 'set_again' }
   /** For the rest of this turn, that player can't declare attacks, or can't conduct their Battle Phase. */
   | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden };
 
@@ -217,7 +223,8 @@ export type Selection =
 export interface CardFilter {
   /** Whose: the controller of a card on the field, or the player whose hand, Deck, GY or banished pile it is in. */
   side: 'you' | 'opponent' | 'either';
-  place: 'field' | 'monsters' | 'spellTraps' | 'hand' | 'deck' | 'graveyard' | 'banished';
+  /** `any`: wherever it is (a monster effect activated from the hand or GY still is one). */
+  place: 'field' | 'monsters' | 'spellTraps' | 'hand' | 'deck' | 'graveyard' | 'banished' | 'any';
   kinds: ('monster' | 'spell' | 'trap')[];
   /** Words that must all be in the card's type line, such as "Synchro", "Tuner", "Normal" ("non-Effect"), "Effect". */
   types: string[];
@@ -286,6 +293,10 @@ export interface ChainLink {
   choice: string | null;
   /** The event it was activated for: what set off a trigger, or what a response responds to; else null. */
   cause: Happening | null;
+  /** An effect negated its activation: it resolves doing nothing, and its card goes to the GY. */
+  negated: boolean;
+  /** Its card is Set again instead of going to the GY when it resolves (`set_again`). */
+  setAgain: boolean;
 }
 
 /**
@@ -299,6 +310,8 @@ export type Happening =
   | { event: 'destroyed_by_battle'; card: string; player: Seat; group: number }
   | { event: 'battle_destroying'; card: string; player: Seat; target: string; group: number }
   | { event: 'battle_damage'; card: string; player: Seat; amount: number; group: number }
+  /** A card or effect was activated: chain link `link` (from 0). Only responses watch for it, never triggers. */
+  | { event: 'activated'; card: string; player: Seat; link: number; group: number }
   | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number };
 
 /** What happens once a sequence of triggers, responses and chains is over. */
@@ -344,6 +357,8 @@ export interface FieldCard {
   activatedTurn: number | null;
   /** For a Spell/Trap, the monster it is equipped or tied to (see the `link` step); else null. */
   linked: string | null;
+  /** Its effects are negated while it stays face-up on the field ("but it has its effects negated"). */
+  effectsNegated: boolean;
 }
 
 export type Zones = (FieldCard | null)[];
@@ -460,6 +475,11 @@ export type Op =
   | { op: 'forbid'; player: Seat; what: Forbidden }
   /** Links the card being resolved to this face-up monster (see the `link` step). */
   | { op: 'link'; card: string }
+  /** Negates the activation of this card's link on the chain, below the one resolving. */
+  | { op: 'negate_activation'; card: string }
+  | { op: 'negate_effects'; card: string }
+  /** Sets the card being resolved face-down again instead of sending it to the GY. */
+  | { op: 'set_again' }
   | { op: 'declare_targets'; cards: string[] }
   | { op: 'choose_effect'; choice: string };
 
@@ -569,6 +589,9 @@ export type DuelEvent =
   | { type: 'statsModified'; modifier: Modifier }
   | { type: 'forbidden'; player: Seat; what: Forbidden }
   | { type: 'linked'; card: string; to: string }
+  | { type: 'activationNegated'; link: number; card: string }
+  | { type: 'effectsNegated'; card: string }
+  | { type: 'setAgain' }
   | { type: 'normalSummonGranted'; player: Seat }
   /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
   | { type: 'linkResolved' }
