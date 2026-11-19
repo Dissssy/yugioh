@@ -1,6 +1,6 @@
 import './board.css';
 import { useMutation } from '@tanstack/react-query';
-import type { CardView, Intent, LegalAction, PlayerView, Seat } from '@yugioh/engine';
+import type { Intent, LegalAction, PlayerView, Seat } from '@yugioh/engine';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -9,11 +9,11 @@ import { ActionMenu } from './ActionMenu.tsx';
 import { Arrows, cardCentre, dropAt, dropCentre, type Point } from './aim.tsx';
 import { dataOf, idOf, imageUrl, preloadImages } from './Card.tsx';
 import { CardTooltipProvider } from './CardTooltip.tsx';
+import { ChoiceBar, ChoiceProvider, pileKey, useBoardChoice, type PileKind } from './choice.tsx';
 import { cueMs, playCue } from './cues.ts';
 import { ChatInput, DuelLog, type Contest } from './DuelLog.tsx';
 import { dropKey, Field, type Row } from './Field.tsx';
 import { FoeHand, OwnHand, type HandDrag } from './Hand.tsx';
-import { JudgePrompt } from './JudgePrompt.tsx';
 import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
 import { LpPlate } from './LpPlate.tsx';
 import { PhaseStrip } from './PhaseStrip.tsx';
@@ -65,7 +65,10 @@ export function Board({ duelId }: { duelId: string }) {
   const pace = useCallback((event: Parameters<typeof cueMs>[0], waiting: number) => cueMs(event, waiting, settings, reduceMotion), [settings, reduceMotion]);
   const { shown, connected, judging } = useDuel(duelId, pace);
   const [mode, setMode] = useReducer((_: Mode, next: Mode) => next, idle);
-  const [pile, setPile] = useState<{ title: string; cards: CardView[] } | null>(null);
+  /** The open pile viewer, by `pileKey`. */
+  const [pile, setPile] = useState<string | null>(null);
+  /** The judge's question to this player (only the player asked gets it), answered on the board. */
+  const choice = useBoardChoice(judging?.prompt ?? null);
   const [highlight, setHighlight] = useState<string[]>([]);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [over, setOver] = useState<string | null>(null);
@@ -130,6 +133,15 @@ export function Board({ duelId }: { duelId: string }) {
   useEffect(() => {
     setMode(idle);
   }, [shown?.view.turn, shown?.view.phase]);
+
+  // A new question opens the pile its cards are in when they're all in one; an answered one closes the viewer.
+  const promptId = choice?.prompt.id;
+  useEffect(() => {
+    setPile(choice?.onlyPile ?? null);
+    answer.reset();
+    // Only a new question should change the viewer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptId]);
 
   if (!shown) return <div className="duel-loading">{connected ? 'Loading the duel…' : 'Connecting…'}</div>;
 
@@ -346,6 +358,33 @@ export function Board({ duelId }: { duelId: string }) {
     send: (seq, note) => contestRuling.mutate({ seq, note }),
   };
 
+  const choiceBar = choice && (
+    <ChoiceBar
+      choice={choice}
+      pending={answer.isPending}
+      error={answer.isError ? errorText(answer.error) : null}
+      onConfirm={() => answer.mutate({ prompt: choice.prompt.id, picks: choice.picks })}
+    />
+  );
+
+  /** A pile's viewer: its cards, or for your Deck only the ones you may pick. */
+  const pileView = (key: string) => {
+    const [seat, place] = key.split(':') as [string, PileKind];
+    const side = view.players[Number(seat) as Seat];
+    const whose = Number(seat) === me ? 'Your' : `${side.name}'s`;
+    switch (place) {
+      case 'graveyard':
+        return { title: `${whose} Graveyard`, cards: side.graveyard };
+      case 'banished':
+        return { title: `${whose} banished cards`, cards: side.banished };
+      case 'extra':
+        return { title: `${whose} Extra Deck`, cards: side.extra };
+      case 'deck':
+        return { title: `${whose} Deck: the cards you may choose`, cards: choice?.inPile(key).map((o) => o.card) ?? [] };
+    }
+  };
+  const openPile = pile && pileView(pile);
+
   /** What the judge is doing, in the phase strip. */
   const judgeNote = judging && (
     <span className="judging" role="status">
@@ -374,159 +413,151 @@ export function Board({ duelId }: { duelId: string }) {
   return (
     <MotionConfig reducedMotion={reduceMotion ? 'always' : 'never'}>
       <BoardLookProvider value={look}>
-        <CardTooltipProvider
-          suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}
-          pinnedFooter={(card) => <ReportRuling key={card.code} duelId={duelId} card={card} />}
-        >
-          <div className={`duel${choosing ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
-            <div className="table" ref={setTable}>
-              {!ready ? (
-                <div className="duel-loading">Loading cards…</div>
-              ) : (
-                <>
-                  <div className="hand-row foe-row">
-                    <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={view.turnPlayer === foe} target={lpTarget()} />
-                    <FoeHand seat={foe} count={view.players[foe].hand.length} />
-                  </div>
-                  <Field
-                    seat={foe}
-                    side={view.players[foe]}
-                    mine={false}
-                    marks={marks}
-                    zoneState={(row, zone) => zoneState(foe, row, zone)}
-                    onZone={(row, zone) => clickZone(foe, row, zone)}
-                    onCard={() => undefined}
-                    onPile={(title, cards) => setPile({ title, cards })}
-                  />
-                  <PhaseStrip
-                    turn={view.turn}
-                    turnLabel={yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`}
-                    yours={yourTurn}
-                    phase={view.phase}
-                    goTo={{
-                      ...(enterBattle && { battle: () => start(enterBattle) }),
-                      ...(enterMain2 && { main2: () => start(enterMain2) }),
-                      ...(endTurn && { end: () => start(endTurn) }),
-                    }}
-                    prompt={prompt || judgeNote || null}
-                    endTurn={endTurn && !choosing ? () => start(endTurn) : null}
-                  />
-                  <Field
-                    seat={me}
-                    side={view.players[me]}
-                    mine
-                    marks={marks}
-                    zoneState={(row, zone) => zoneState(me, row, zone)}
-                    onZone={(row, zone) => clickZone(me, row, zone)}
-                    onCard={clickOwn}
-                    onCardPress={pressOwn}
-                    onPile={(title, cards) => setPile({ title, cards })}
-                  />
-                  <div className="hand-row own-row">
-                    <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={view.turnPlayer === me} />
-                    <OwnHand duelId={duelId} seat={me} cards={view.players[me].hand} marks={marks} onCard={clickOwn} drag={handDrag} held={held} />
-                  </div>
-                </>
-              )}
+        <ChoiceProvider value={choice}>
+          <CardTooltipProvider
+            suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}
+            pinnedFooter={(card) => <ReportRuling key={card.code} duelId={duelId} card={card} />}
+          >
+            <div className={`duel${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
+              <div className="table" ref={setTable}>
+                {!ready ? (
+                  <div className="duel-loading">Loading cards…</div>
+                ) : (
+                  <>
+                    <div className="hand-row foe-row">
+                      <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={view.turnPlayer === foe} target={lpTarget()} />
+                      <FoeHand seat={foe} count={view.players[foe].hand.length} />
+                    </div>
+                    <Field
+                      seat={foe}
+                      side={view.players[foe]}
+                      mine={false}
+                      marks={marks}
+                      zoneState={(row, zone) => zoneState(foe, row, zone)}
+                      onZone={(row, zone) => clickZone(foe, row, zone)}
+                      onCard={() => undefined}
+                      onPile={(place) => setPile(pileKey(foe, place))}
+                    />
+                    <PhaseStrip
+                      turn={view.turn}
+                      turnLabel={yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`}
+                      yours={yourTurn}
+                      phase={view.phase}
+                      goTo={{
+                        ...(enterBattle && { battle: () => start(enterBattle) }),
+                        ...(enterMain2 && { main2: () => start(enterMain2) }),
+                        ...(endTurn && { end: () => start(endTurn) }),
+                      }}
+                      prompt={prompt || choiceBar || judgeNote || null}
+                      endTurn={endTurn && !choosing ? () => start(endTurn) : null}
+                    />
+                    <Field
+                      seat={me}
+                      side={view.players[me]}
+                      mine
+                      marks={marks}
+                      zoneState={(row, zone) => zoneState(me, row, zone)}
+                      onZone={(row, zone) => clickZone(me, row, zone)}
+                      onCard={clickOwn}
+                      onCardPress={pressOwn}
+                      onPile={(place) => setPile(pileKey(me, place))}
+                    />
+                    <div className="hand-row own-row">
+                      <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={view.turnPlayer === me} />
+                      <OwnHand duelId={duelId} seat={me} cards={view.players[me].hand} marks={marks} onCard={clickOwn} drag={handDrag} held={held} />
+                    </div>
+                  </>
+                )}
 
-              <AnimatePresence>
-                {cue?.event.type === 'turnStarted' && (
-                  <motion.div
-                    key={cue.seq}
-                    className={`turn-banner${cue.event.player === me ? ' yours' : ''}`}
-                    initial={{ opacity: 0, x: '-30%' }}
-                    animate={{ opacity: 1, x: '0%' }}
-                    exit={{ opacity: 0, x: '30%' }}
-                    transition={{ duration: 0.3, ease: 'easeOut' }}
-                  >
-                    {cue.event.player === me ? 'Your turn' : `${view.players[cue.event.player].name}'s turn`}
+                <AnimatePresence>
+                  {cue?.event.type === 'turnStarted' && (
+                    <motion.div
+                      key={cue.seq}
+                      className={`turn-banner${cue.event.player === me ? ' yours' : ''}`}
+                      initial={{ opacity: 0, x: '-30%' }}
+                      animate={{ opacity: 1, x: '0%' }}
+                      exit={{ opacity: 0, x: '30%' }}
+                      transition={{ duration: 0.3, ease: 'easeOut' }}
+                    >
+                      {cue.event.player === me ? 'Your turn' : `${view.players[cue.event.player].name}'s turn`}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {result && cue === null && (
+                  <motion.div className="result-overlay" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                    <strong>{result.winner === null ? 'Draw' : result.winner === me ? 'Victory' : 'Defeat'}</strong>
+                    {resultText && <span>{resultText}</span>}
+                    <Link className="button" to="/">
+                      Back to duels
+                    </Link>
                   </motion.div>
                 )}
-              </AnimatePresence>
-
-              {result && cue === null && (
-                <motion.div className="result-overlay" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-                  <strong>{result.winner === null ? 'Draw' : result.winner === me ? 'Victory' : 'Defeat'}</strong>
-                  {resultText && <span>{resultText}</span>}
-                  <Link className="button" to="/">
-                    Back to duels
-                  </Link>
-                </motion.div>
-              )}
-            </div>
-
-            <aside className="panel">
-              <div className="row panel-top">
-                <Link to="/">← Duels</Link>
-                <span className="spacer" />
-                <button className="quiet" onClick={() => setShowSettings((s) => !s)} aria-expanded={showSettings}>
-                  Settings
-                </button>
-                {canSurrender && !confirmSurrender && (
-                  <button className="quiet" onClick={() => setConfirmSurrender(true)}>
-                    Surrender
-                  </button>
-                )}
               </div>
-              {canSurrender && confirmSurrender && (
-                <p className="row">
-                  Surrender this duel?
-                  <button onClick={() => send.mutate({ type: 'surrender' })}>Yes, surrender</button>
-                  <button onClick={() => setConfirmSurrender(false)}>No</button>
-                </p>
-              )}
-              {showSettings && (
-                <div className="settings">
-                  <label>
-                    Animation speed{' '}
-                    <select value={settings.speed} onChange={(e) => updateSettings({ speed: e.target.value as 'normal' | 'fast' })}>
-                      <option value="normal">Normal</option>
-                      <option value="fast">Fast</option>
-                    </select>
-                  </label>
-                  <label>
-                    <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
-                  </label>
-                  <p className="muted small">Right-click a card or hold Shift to pin its details. Drag cards in your hand to reorder them.</p>
-                </div>
-              )}
-              {!connected && <p className="error">Reconnecting…</p>}
-              {send.isError && <p className="error">{errorText(send.error)}</p>}
-              {contestRuling.isError && <p className="error">{errorText(contestRuling.error)}</p>}
-              {chat.isError && <p className="error">{errorText(chat.error)}</p>}
-              <DuelLog log={log} onHighlight={setHighlight} contest={contest} />
-              <ChatInput send={chat.mutateAsync} sending={chat.isPending} />
-            </aside>
 
-            {mode.kind === 'menu' && (
-              <ActionMenu
-                anchor={mode.anchor}
-                items={actionsFor(mode.id).map((a) => ({ label: actionLabel(a, view), run: () => start(a) }))}
-                onClose={() => setMode(idle)}
-              />
-            )}
-            {mode.kind === 'place' && (
-              <ActionMenu
-                anchor={mode.anchor}
-                items={mode.options.map((a) => ({ label: actionLabel(a, view), run: () => place(a, mode.zone) }))}
-                onClose={() => setMode(idle)}
-              />
-            )}
-            {drag?.kind === 'aim' && <Arrows kind="aim" arrows={[drag]} />}
-            {targetArrows.length > 0 && <Arrows kind="target" arrows={targetArrows} />}
-            {judging?.prompt && judging.waitingOn === me && (
-              <JudgePrompt
-                key={judging.prompt.id}
-                prompt={judging.prompt}
-                you={me}
-                pending={answer.isPending}
-                error={answer.isError ? errorText(answer.error) : null}
-                onAnswer={(picks) => answer.mutate({ prompt: judging.prompt!.id, picks })}
-              />
-            )}
-            {pile && <PileViewer title={pile.title} cards={pile.cards} onClose={() => setPile(null)} />}
-          </div>
-        </CardTooltipProvider>
+              <aside className="panel">
+                <div className="row panel-top">
+                  <Link to="/">← Duels</Link>
+                  <span className="spacer" />
+                  <button className="quiet" onClick={() => setShowSettings((s) => !s)} aria-expanded={showSettings}>
+                    Settings
+                  </button>
+                  {canSurrender && !confirmSurrender && (
+                    <button className="quiet" onClick={() => setConfirmSurrender(true)}>
+                      Surrender
+                    </button>
+                  )}
+                </div>
+                {canSurrender && confirmSurrender && (
+                  <p className="row">
+                    Surrender this duel?
+                    <button onClick={() => send.mutate({ type: 'surrender' })}>Yes, surrender</button>
+                    <button onClick={() => setConfirmSurrender(false)}>No</button>
+                  </p>
+                )}
+                {showSettings && (
+                  <div className="settings">
+                    <label>
+                      Animation speed{' '}
+                      <select value={settings.speed} onChange={(e) => updateSettings({ speed: e.target.value as 'normal' | 'fast' })}>
+                        <option value="normal">Normal</option>
+                        <option value="fast">Fast</option>
+                      </select>
+                    </label>
+                    <label>
+                      <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
+                    </label>
+                    <p className="muted small">Right-click a card or hold Shift to pin its details. Drag cards in your hand to reorder them.</p>
+                  </div>
+                )}
+                {!connected && <p className="error">Reconnecting…</p>}
+                {send.isError && <p className="error">{errorText(send.error)}</p>}
+                {contestRuling.isError && <p className="error">{errorText(contestRuling.error)}</p>}
+                {chat.isError && <p className="error">{errorText(chat.error)}</p>}
+                <DuelLog log={log} onHighlight={setHighlight} contest={contest} />
+                <ChatInput send={chat.mutateAsync} sending={chat.isPending} />
+              </aside>
+
+              {mode.kind === 'menu' && (
+                <ActionMenu
+                  anchor={mode.anchor}
+                  items={actionsFor(mode.id).map((a) => ({ label: actionLabel(a, view), run: () => start(a) }))}
+                  onClose={() => setMode(idle)}
+                />
+              )}
+              {mode.kind === 'place' && (
+                <ActionMenu
+                  anchor={mode.anchor}
+                  items={mode.options.map((a) => ({ label: actionLabel(a, view), run: () => place(a, mode.zone) }))}
+                  onClose={() => setMode(idle)}
+                />
+              )}
+              {drag?.kind === 'aim' && <Arrows kind="aim" arrows={[drag]} />}
+              {targetArrows.length > 0 && <Arrows kind="target" arrows={targetArrows} />}
+              {openPile && <PileViewer title={openPile.title} cards={openPile.cards} bar={choiceBar} onClose={() => setPile(null)} />}
+            </div>
+          </CardTooltipProvider>
+        </ChoiceProvider>
       </BoardLookProvider>
     </MotionConfig>
   );
