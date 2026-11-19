@@ -1,5 +1,8 @@
 import type { LogEntry, LogEvent } from '@yugioh/engine';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+
+/** How close to its end the log counts as following along. */
+const END_SLOP_PX = 24;
 
 /** Card IDs an event names, for highlighting them on the board. */
 export function cardsOf(event: LogEvent): string[] {
@@ -29,13 +32,33 @@ export function DuelLog({ log, onHighlight, contest }: { log: LogEntry[]; onHigh
     turns.set(entry.turn, [...(turns.get(entry.turn) ?? []), entry]);
   }
   const current = log.at(-1)?.turn ?? 0;
-  const end = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    void end.current?.scrollIntoView({ block: 'end' });
+  // New entries keep the log at its end, unless the player scrolled up to read. Only the log scrolls, never the page.
+  const box = useRef<HTMLDivElement>(null);
+  const atEnd = useRef(true);
+  useLayoutEffect(() => {
+    if (box.current && atEnd.current) box.current.scrollTop = box.current.scrollHeight;
   }, [log.length]);
+  // So does the log changing size, as when the board makes way for the keyboard.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      if (atEnd.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className="duel-log" aria-label="Duel log">
+    <div
+      ref={box}
+      className="duel-log"
+      aria-label="Duel log"
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < END_SLOP_PX;
+      }}
+    >
       {[...turns].map(([turn, entries]) => (
         <details key={turn} open={turn >= current - 1 || undefined}>
           <summary>{turn === 0 ? 'Before the duel' : entries[0]?.event.type === 'turnStarted' ? entries[0].text : `Turn ${turn}`}</summary>
@@ -81,7 +104,6 @@ export function DuelLog({ log, onHighlight, contest }: { log: LogEntry[]; onHigh
           </ol>
         </details>
       ))}
-      <div ref={end} />
     </div>
   );
 }

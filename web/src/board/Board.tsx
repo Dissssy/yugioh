@@ -591,7 +591,7 @@ export function Board({ duelId }: { duelId: string }) {
             suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}
             pinnedFooter={(card) => <ReportRuling key={card.code} duelId={duelId} card={card} />}
           >
-            <div className={`duel${look.stacked ? ' stacked' : ''}${look.compact ? ' compact' : ''}${look.tight ? ' tight' : ''}${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
+            <div className={`duel${look.stacked ? ' stacked' : ''}${look.compact ? ' compact' : ''}${look.tight ? ' tight' : ''}${look.typing ? ' typing' : ''}${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
               <div className="table" ref={setTable}>
                 {!ready ? (
                   <div className="duel-loading">Loading cards…</div>

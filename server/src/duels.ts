@@ -38,7 +38,7 @@ import type { Db, Tx } from './db/client.ts';
 import { decks, matchEvents, matches, sheetReports, users } from './db/schema.ts';
 import { appeal } from './judge/appeal.ts';
 import type { ModelCall, Question } from './judge/judge.ts';
-import { rule, SCRIPT } from './judge/script.ts';
+import { calledModel, NO_JUDGE, rule, SCRIPT } from './judge/script.ts';
 import { flagScripts, loadSheets } from './sheets.ts';
 import { aiKey, isAiKey } from './viewer.ts';
 
@@ -570,7 +570,7 @@ function notRuled(state: DuelState, stage: 'activation' | 'resolution', player: 
     player,
     card,
     effect,
-    model: 'none',
+    model: NO_JUDGE,
     promptVersion: '',
     stateHash: '',
     transcript: [],
@@ -585,7 +585,7 @@ function notRuled(state: DuelState, stage: 'activation' | 'resolution', player: 
 /** Reports each player may make per duel. */
 const REPORTS_PER_SEAT = 5;
 
-const judgeCallsMade = (events: DuelEvent[]) => events.filter((e) => e.type === 'judged' && e.record.model !== SCRIPT).length;
+const judgeCallsMade = (events: DuelEvent[]) => events.filter((e) => e.type === 'judged' && calledModel(e.record.model)).length;
 
 /** The whole duel as one seat sees it now. */
 const syncFor = (duel: LiveDuel, seat: Seat): DuelUpdate => ({ type: 'sync', view: viewFor(duel.state, seat), log: logFor(duel.events, seat), judging: judgingFor(duel, seat) });

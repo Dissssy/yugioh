@@ -19,9 +19,11 @@ export interface BoardLook {
   compact: boolean;
   /** Zones so small that the Life Points plates shrink to a zone's width, beside the hands, and labels shrink with them. */
   tight: boolean;
+  /** Typing on a portrait screen with the on-screen keyboard up: the log and chat get the screen to themselves. */
+  typing: boolean;
 }
 
-const LookContext = createContext<BoardLook>({ zone: 100, imageSize: 'small', stacked: false, compact: false, tight: false });
+const LookContext = createContext<BoardLook>({ zone: 100, imageSize: 'small', stacked: false, compact: false, tight: false, typing: false });
 export const BoardLookProvider = LookContext.Provider;
 export const useBoardLook = () => useContext(LookContext);
 
@@ -40,6 +42,10 @@ const TIGHT_BELOW_ZONE = 80;
 const STACKED_BOARD_SHARE = 0.62;
 /** The table's vertical padding when stacked, as set in board.css. */
 const STACKED_PADDING = 8;
+/** The on-screen keyboard counts as up when typing leaves less than this share of the screen's full height. */
+const KEYBOARD_LEAVES = 0.8;
+
+const isTextField = (el: Element | null) => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
 
 /**
  * Sizes the board to fit without scrolling. Vertically the table stacks: the opponent's hand (half shown), four zone
@@ -65,19 +71,36 @@ export function useBoardSize(el: HTMLElement | null): BoardLook {
     observer.observe(el);
     return () => observer.disconnect();
   }, [el]);
-  const [screenHeight, setScreenHeight] = useState(window.innerHeight);
+  // The screen's full height, and how much of it shows now: an on-screen keyboard shrinks the visual viewport (and, on
+  // browsers that honour index.html's interactive-widget, the layout too) while a text field has focus.
+  const [screen, setScreen] = useState({ full: window.innerHeight, shown: window.innerHeight, typing: false });
   useEffect(() => {
-    const onResize = () => setScreenHeight(window.innerHeight);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    const viewport = window.visualViewport;
+    const update = () => {
+      const shown = viewport?.height ?? window.innerHeight;
+      const typing = isTextField(document.activeElement);
+      // Without a text field in focus there's no keyboard, so the screen shows in full; the full height stays from then.
+      setScreen((s) => ({ full: typing ? s.full : Math.max(shown, window.innerHeight), shown, typing }));
+    };
+    viewport?.addEventListener('resize', update);
+    window.addEventListener('resize', update);
+    document.addEventListener('focusin', update);
+    document.addEventListener('focusout', update);
+    return () => {
+      viewport?.removeEventListener('resize', update);
+      window.removeEventListener('resize', update);
+      document.removeEventListener('focusin', update);
+      document.removeEventListener('focusout', update);
+    };
   }, []);
+  const typing = stacked && screen.typing && screen.shown < screen.full * KEYBOARD_LEAVES;
 
   const GAP = 6;
-  const height = stacked ? screenHeight * STACKED_BOARD_SHARE - STACKED_PADDING : size.height;
+  const height = stacked ? screen.full * STACKED_BOARD_SHARE - STACKED_PADDING : size.height;
   const byHeight = (height - 6 * GAP) / (0.5 + 5 + 1.2);
   const byWidth = (size.width - 6 * GAP) / 7;
   const zone = Math.max(40, Math.floor(Math.min(byHeight, byWidth, MAX_ZONE)));
   const cardWidth = zone * CARD_HEIGHT_IN_ZONE * CARD_ASPECT;
   const imageSize: ImageSize = cardWidth * window.devicePixelRatio > SMALL_IMAGE_WIDTH ? 'full' : 'small';
-  return { zone, imageSize, stacked, compact: stacked || zone < COMPACT_BELOW_ZONE, tight: zone < TIGHT_BELOW_ZONE };
+  return { zone, imageSize, stacked, compact: stacked || zone < COMPACT_BELOW_ZONE, tight: zone < TIGHT_BELOW_ZONE, typing };
 }

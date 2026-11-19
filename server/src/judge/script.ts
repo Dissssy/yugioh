@@ -38,6 +38,10 @@ const counterName = (counter: 'spell', count: number) => `${count} ${counter ===
 
 /** The `model` of a ruling made by a script. */
 export const SCRIPT = 'script';
+/** The `model` of a ruling nobody made, because the card needs the judge and this server has none. */
+export const NO_JUDGE = 'none';
+/** Whether a ruling called a model, which is what counts as a judge call. */
+export const calledModel = (model: string | null) => model !== SCRIPT && model !== NO_JUDGE;
 
 const untilText = { end_of_turn: 'until the end of the turn', end_of_battle_phase: 'until the end of the Battle Phase', next_standby_phase: 'until the next Standby Phase', while_on_field: '' };
 
