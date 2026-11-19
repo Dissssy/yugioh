@@ -69,4 +69,4 @@ The board doesn't offer activations yet: duel UI step 3 adds the menu, targeting
 
 `npm run judge:eval` runs them against the real model (`-- <text>` runs only cases whose name contains it). It needs `ANTHROPIC_API_KEY` and a database with the cards imported. Run it after any change to the rules reference, the tools or the model settings, and add a case for every mistake worth fixing. It exits with an error if any case fails. The test suite builds every case's board offline, so a broken case fails CI without a model call.
 
-In GitHub Actions, `judge-eval.yml` runs the suite on pull requests that touch the judge, the effect sheets or the engine's ops and activation rules, and on demand from the Actions tab. It needs the `ANTHROPIC_API_KEY` repository secret. `ci.yml` runs the type checks and the offline tests on every pull request.
+The suite isn't run in GitHub Actions: run it by hand before deploying a change to the judge, the effect sheets or the engine's ops and activation rules (in production, `docker compose exec app node server/src/judge/evals.ts`; a full run costs about $0.03). `ci.yml` runs the type checks and the offline tests on every pull request.

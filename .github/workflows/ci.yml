@@ -1,4 +1,4 @@
-# Type checks and the offline test suites (engine, server, web). No model calls; see judge-eval.yml for those.
+# Type checks and the offline test suites (engine, server, web). No model calls: the judge evals are run by hand (docs/effects.md).
 name: CI
 
 on:
