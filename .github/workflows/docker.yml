@@ -7,6 +7,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A new push to a pull request cancels its build still going; every push to main gets its own build and push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   image:
     runs-on: ubuntu-latest

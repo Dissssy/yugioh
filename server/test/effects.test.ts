@@ -286,18 +286,25 @@ describe('a scripted card effect', () => {
   it('asks the player its choices and resolves without the judge', async () => {
     const mine = new Stream(await s.guest.fetch(`${h.baseUrl}/api/duels/${s.duel.id}/stream`));
     await mine.update();
+    const seen: DuelUpdate[] = [];
+    const next = <T>(pick: (u: DuelUpdate) => T | undefined) => until(mine, (u) => (seen.push(u), pick(u)));
     const sent = await s.guest.json(`${h.baseUrl}/api/duels/${s.duel.id}/intents`, {
       method: 'POST',
       body: JSON.stringify({ type: 'activate', card: s.poison, effect: 0, zone: 2 }),
     });
     expect(sent.status).toBe(204);
-    const prompt = await until(mine, (u) => (u.type === 'judging' ? (u.judging?.prompt ?? undefined) : undefined));
+    const prompt = await next( (u) => (u.type === 'judging' ? (u.judging?.prompt ?? undefined) : undefined));
     expect(prompt).toMatchObject({ min: 1, max: 1, cards: [] });
     const damage = prompt.choices.find((c) => c.includes('800'))!;
     await s.guest.json(`${h.baseUrl}/api/duels/${s.duel.id}/answer`, { method: 'POST', body: JSON.stringify({ prompt: prompt.id, picks: [damage] }) });
-    const resolved = await until(mine, (u) => (u.type === 'steps' && entries(u).some((e) => e.event.type === 'linkResolved') ? u : undefined));
+    const resolved = await next( (u) => (u.type === 'steps' && entries(u).some((e) => e.event.type === 'linkResolved') ? u : undefined));
     if (resolved.type !== 'steps') throw new Error('expected steps');
     expect(resolved.steps.at(-1)!.view.players[0].lp).toBe(7200);
+    // The judging banner comes down only once the ruling is on the board, so the board from before it never shows
+    // without the banner (offering moves it no longer has).
+    await next((u) => (u.type === 'judging' && !u.judging ? u : undefined));
+    const cleared = seen.flatMap((u, i) => (u.type === 'judging' && !u.judging ? [seen[i - 1]!] : []));
+    expect(cleared.map((u) => entries(u).filter((e) => e.event.type === 'judged').length)).toEqual([1, 1]);
     const log = await until(new Stream(await s.admin.fetch(`${h.baseUrl}/api/duels/${s.duel.id}/stream`)), (u) => (u.type === 'sync' ? u.log : undefined));
     expect(log.filter((e) => e.event.type === 'judged').map((e) => e.event)).toEqual([
       expect.objectContaining({ stage: 'activation', legal: true, failed: false, summary: `Poison of the Old Man is activated (${damage}).` }),
