@@ -141,6 +141,9 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(state.attack, 'No attack is being made.');
       run.emit({ type: 'attackEnded', replay: false });
       return;
+    case 'forbid':
+      run.emit({ type: 'forbidden', player: op.player, what: op.what });
+      return;
     case 'detach': {
       const at = known(state, op.card);
       check(at.zone === 'materials', `${cardOf(state, op.card).name} is not an Xyz Material.`);

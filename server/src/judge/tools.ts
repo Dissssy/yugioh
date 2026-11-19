@@ -3,7 +3,7 @@
 
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { DESTINATIONS, UNTIL, type Op } from '@yugioh/engine';
+import { DESTINATIONS, FORBIDDEN, UNTIL, type Op } from '@yugioh/engine';
 
 const card = z.string().describe('A card instance ID from the state, such as "k3f9a0b2".');
 const seat = z.union([z.literal(0), z.literal(1)]).describe('Player 0 or player 1.');
@@ -56,6 +56,11 @@ export const opTools = {
   negate_attack: {
     description: 'Negate the attack being made ("negate the attack"): it ends with no damage.',
     input: z.object({}),
+  },
+  forbid: {
+    description:
+      'For the rest of this turn, stop a player declaring attacks ("your opponent cannot declare an attack this turn") or conducting their Battle Phase ("you cannot conduct your Battle Phase this turn").',
+    input: z.object({ player: seat, what: z.enum(FORBIDDEN) }),
   },
   detach: {
     description: 'Detach an Xyz Material from the Xyz Monster it is attached to: it goes to its owner\'s GY. One call per material.',

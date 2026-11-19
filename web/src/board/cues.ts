@@ -39,6 +39,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   lpChanged: 650,
   statsModified: 400,
   normalSummonGranted: 300,
+  forbidden: 300,
   linkResolved: 200,
   chatted: 0,
 };

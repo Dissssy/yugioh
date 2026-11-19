@@ -290,7 +290,7 @@ export const CASES: EvalCase[] = [
     activate: 'Reinforce Truth',
     picks: [['Speed Warrior'], ['Defense']],
     legal: true,
-    check: (b) => all(expectAt(b, 'Speed Warrior', '0:monsters'), b.monster('Speed Warrior')?.position === 'defense' ? null : 'not in Defense Position', expectAt(b, 'Reinforce Truth', '0:gy')),
+    check: (b) => all(expectAt(b, 'Speed Warrior', '0:monsters'), b.monster('Speed Warrior')?.position === 'defense' ? null : 'not in Defense Position', expectAt(b, 'Reinforce Truth', '0:gy'), b.state.forbidden.some((f) => f.player === 0 && f.what === 'battle_phase') ? null : 'no Battle Phase ban'),
   },
   {
     name: 'backup soldier needs 5 monsters in the GY',
@@ -429,7 +429,7 @@ export const CASES: EvalCase[] = [
     board: [{ set: ['Threatening Roar'] }, { monsters: ['Speed Warrior'] }],
     activate: 'Threatening Roar',
     legal: true,
-    check: (b) => expectAt(b, 'Threatening Roar', '0:gy'),
+    check: (b) => all(expectAt(b, 'Threatening Roar', '0:gy'), b.state.forbidden.some((f) => f.player === 1 && f.what === 'declare_attack') ? null : 'no attack ban on player 1'),
   },
   {
     name: 'backup soldier returns up to 3 non-effect monsters',
@@ -483,6 +483,14 @@ export const CASES: EvalCase[] = [
     activate: 'Banner of Courage',
     legal: true,
     check: (b) => all(expectAt(b, 'Banner of Courage', '0:spellTraps'), b.monster('Axe Raider')?.atk === 1700 ? null : `Axe Raider has ATK ${b.monster('Axe Raider')?.atk} in Main Phase 1`),
+  },
+  {
+    name: 'swords of revealing light stays on the field and flips face-down monsters',
+    board: [{ hand: ['Swords of Revealing Light'] }, { setMonsters: ['Mystic Tomato'] }],
+    activate: 'Swords of Revealing Light',
+    effect: 1,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Swords of Revealing Light', '0:spellTraps'), b.state.players[1].monsters[0]?.faceUp ? null : 'Mystic Tomato is still face-down'),
   },
   {
     name: 'xyz effect needs an xyz summon',

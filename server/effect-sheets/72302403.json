@@ -14,7 +14,10 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "self_destruct",
+        "opponentTurns": 3
+      },
       "status": "unverified"
     },
     {
@@ -42,7 +45,28 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": {
+          "side": "opponent",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "others": false,
+        "cannot": [
+          "attack"
+        ],
+        "by": null,
+        "while": []
+      },
       "status": "unverified"
     }
   ],

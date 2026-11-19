@@ -148,7 +148,13 @@ export type Step =
   /** Negates the attack being made: it ends without damage. */
   | { do: 'negate_attack' }
   /** Detaches `count` Xyz Materials from an Xyz Monster the selection picks (only those with that many can be picked). */
-  | { do: 'detach'; cards: Selection; count: number };
+  | { do: 'detach'; cards: Selection; count: number }
+  /** For the rest of this turn, that player can't declare attacks, or can't conduct their Battle Phase. */
+  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden };
+
+export const FORBIDDEN = ['declare_attack', 'battle_phase'] as const;
+/** What a lingering restriction from a resolved effect stops a player doing this turn (Threatening Roar, Reinforce Truth). */
+export type Forbidden = (typeof FORBIDDEN)[number];
 
 /**
  * A continuous effect: it applies, with no activation, while its card is face-up on the field and every `while`
@@ -156,17 +162,19 @@ export type Step =
  * stored and nothing can go stale.
  * - `stats`: the cards in `to` gain `atk`/`def` (times the count of `per`: the cards that fit it, or this card's Xyz
  *   Materials), and their Level changes by `levelDelta` or becomes `levelSet`.
+ * - `restrict`: the cards in `to` (not this card itself when `others`) can't do these things. For
+ *   `be_destroyed_by_battle`, `by` is the monster they battle ("with a monster that has 1900 or more ATK"); null for any.
+ * - `self_destruct`: this card remains on the field after it resolves, and is destroyed in the End Phase of its
+ *   controller's opponent's `opponentTurns`th turn after its activation (Swords of Revealing Light).
  */
-export type Continuous = {
-  apply: 'stats';
-  to: Affected;
-  atk: number;
-  def: number;
-  per: CardFilter | 'materials' | null;
-  levelDelta: number;
-  levelSet: number | null;
-  while: Condition[];
-};
+export type Continuous =
+  | { apply: 'stats'; to: Affected; atk: number; def: number; per: CardFilter | 'materials' | null; levelDelta: number; levelSet: number | null; while: Condition[] }
+  | { apply: 'restrict'; to: Affected; others: boolean; cannot: Restriction[]; by: CardFilter | null; while: Condition[] }
+  | { apply: 'self_destruct'; opponentTurns: number };
+
+export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle'] as const;
+/** What a restricted monster can't do: declare an attack, change its battle position, be targeted for an attack, or be destroyed by battle. */
+export type Restriction = (typeof RESTRICTIONS)[number];
 
 /** The cards a continuous effect applies to: this card, or face-up monsters that fit a filter. */
 export type Affected = 'self' | CardFilter;
@@ -320,6 +328,8 @@ export interface FieldCard {
   summoned: { how: SummonKind; turn: number } | null;
   /** Xyz Materials attached to it, first attached first. They go to the GY when it leaves the field. */
   materials: string[];
+  /** For a Spell/Trap, the turn its card was activated; null while Set. */
+  activatedTurn: number | null;
 }
 
 export type Zones = (FieldCard | null)[];
@@ -351,6 +361,8 @@ export interface DuelState {
   /** Normal Summons/Sets allowed this turn: 1, or more after an effect like Double Summon. */
   normalSummonLimit: number;
   modifiers: Modifier[];
+  /** What resolved effects stopped each player doing this turn; they lapse when the turn ends. */
+  forbidden: { player: Seat; what: Forbidden; turn: number }[];
   chain: ChainLink[];
   step: DuelStep;
   /** Events since the last triggers were put on the chain, for triggers to watch. */
@@ -431,6 +443,7 @@ export type Op =
   | { op: 'negate_attack' }
   /** Detaches this Xyz Material: it goes to its owner's GY. */
   | { op: 'detach'; card: string }
+  | { op: 'forbid'; player: Seat; what: Forbidden }
   | { op: 'declare_targets'; cards: string[] }
   | { op: 'choose_effect'; choice: string };
 
@@ -538,6 +551,7 @@ export type DuelEvent =
   | { type: 'destroyed'; cards: string[] }
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
+  | { type: 'forbidden'; player: Seat; what: Forbidden }
   | { type: 'normalSummonGranted'; player: Seat }
   /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
   | { type: 'linkResolved' }

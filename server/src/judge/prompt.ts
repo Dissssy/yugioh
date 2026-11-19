@@ -88,6 +88,9 @@ export function describeState(state: DuelState, activating: string | null = null
     lines.push(`  Deck (${p.deck.length} cards, top first): ${pile(p.deck)}`);
     lines.push(`  Extra Deck: ${pile(p.extra)}`);
   }
+  for (const f of state.forbidden) {
+    lines.push('', `This turn, player ${f.player} can't ${f.what === 'battle_phase' ? 'conduct their Battle Phase' : 'declare an attack'}.`);
+  }
   if (state.modifiers.length) {
     lines.push('', 'Active stat changes:');
     for (const m of state.modifiers) {

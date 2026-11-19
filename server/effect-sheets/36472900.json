@@ -8,13 +8,37 @@
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "While this card is on the field, when it battles a monster that has 1900 or more ATK",
+      "window": "While this card is face-up on the field",
       "cost": "",
       "effect": "Cannot be destroyed by battle with a monster that has 1900 or more ATK.",
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": "self",
+        "others": false,
+        "cannot": [
+          "be_destroyed_by_battle"
+        ],
+        "by": {
+          "side": "either",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": {
+            "min": 1900,
+            "max": null
+          },
+          "def": null
+        },
+        "while": []
+      },
       "status": "unverified"
     }
   ],

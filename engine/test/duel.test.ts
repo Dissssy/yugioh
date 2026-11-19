@@ -66,6 +66,9 @@ const cards: Record<number, CardData> = {
   19: { ...monster(19, 'Tenshin', 2, 800, 100), type: 'Effect Monster' },
   20: { ...monster(20, 'Shine Knight', 3, 400, 1900), type: 'Effect Monster' },
   21: { ...monster(21, 'Gachi Gachi Gantetsu', 2, 500, 1800), type: 'XYZ Monster', extraDeck: true },
+  22: { ...monster(22, 'Sonic Chick', 1, 300, 300), type: 'Effect Monster', race: 'Winged Beast' },
+  23: { ...monster(23, 'Marauding Captain', 3, 1200, 400), type: 'Effect Monster' },
+  24: spell(24, 'Swords of Revealing Light'),
 };
 
 function spell(code: number, name: string): CardData {
@@ -88,7 +91,8 @@ const effect = (kind: SheetEffect['kind'], opt: SheetEffect['opt'] = 'none'): Sh
 });
 /** Face-up monsters on the field that fit, for continuous effects. */
 const filter = (f: Partial<CardFilter>): CardFilter => ({ side: 'either', place: 'monsters', kinds: [], types: [], races: [], attributes: [], faceUp: true, position: null, level: null, atk: null, def: null, ...f });
-const aura = (c: Partial<Continuous>): Continuous => ({ apply: 'stats', to: 'self', atk: 0, def: 0, per: null, levelDelta: 0, levelSet: null, while: [], ...c });
+const aura = (c: Partial<Extract<Continuous, { apply: 'stats' }>>): Continuous => ({ apply: 'stats', to: 'self', atk: 0, def: 0, per: null, levelDelta: 0, levelSet: null, while: [], ...c });
+const restrict = (c: Partial<Extract<Continuous, { apply: 'restrict' }>>): Continuous => ({ apply: 'restrict', to: 'self', others: false, cannot: [], by: null, while: [], ...c });
 const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null });
 const detachSelf = { do: 'detach', cards: { from: 'self' }, count: 1 } as const;
 const scripted = (script: Partial<Script>): Pick<SheetEffect, 'script'> => ({ script: { conditions: [], cost: [], targets: null, options: [], unapplied: null, ...script } });
@@ -100,6 +104,14 @@ const sheets: Record<number, EffectSheet> = {
   12: sheet(12, effect('activation'), { ...effect('continuous'), continuous: aura({ to: filter({ side: 'you' }), atk: 200, while: [{ if: 'turn', whose: 'you' }, { if: 'phase', phases: ['battle'] }] }) }),
   19: sheet(19, { ...effect('continuous'), continuous: aura({ to: 'self', atk: 400, per: filter({ side: 'you', level: { min: 2, max: 2 } }) }) }),
   20: sheet(20, { ...effect('continuous'), continuous: aura({ to: 'self', levelSet: 4, while: [{ if: 'position', position: 'defense' }] }) }),
+  22: sheet(22, { ...effect('continuous'), continuous: restrict({ cannot: ['be_destroyed_by_battle'], by: filter({ atk: { min: 1900, max: null } }) }) }),
+  23: sheet(23, { ...effect('continuous'), continuous: restrict({ to: filter({ side: 'you', races: ['Warrior'] }), others: true, cannot: ['be_attacked'] }) }),
+  24: sheet(
+    24,
+    { ...effect('continuous'), continuous: { apply: 'self_destruct', opponentTurns: 3 } },
+    { ...effect('activation'), ...scripted({ options: [{ label: '', steps: [] }] }) },
+    { ...effect('continuous'), continuous: restrict({ to: filter({ side: 'opponent', faceUp: null }), cannot: ['attack'] }) },
+  ),
   21: { ...sheet(21, { ...effect('continuous'), continuous: aura({ to: filter({ side: 'you' }), atk: 200, def: 200, per: 'materials' }) }), materials: { summon: 'xyz', level: 2, count: 2 } },
   7: { ...sheet(7), materials: { summon: 'synchro', tuner: 'Junk Synchron', nonTuners: { min: 1, max: null } } },
   15: { ...sheet(15), materials: { summon: 'synchro', tuner: null, nonTuners: { min: 1, max: null } } },
@@ -515,6 +527,63 @@ describe('continuous effects', () => {
     const d = applyOp(t.state, { op: 'destroy', cards: ['ax4'] }, { player: 0, stage: 'resolution', random: () => 0 });
     t.push(...(d.ok ? d.events : []));
     expect(statsOf(t.state, 'a2').atk).toBe(1700);
+  });
+});
+
+describe('restrictions', () => {
+  /** Monsters put on the field directly, Yusei's then Yuma's, on Yuma's turn 4 (so his can attack). */
+  function board(mine: number[], theirs: number[]) {
+    const t = new Table(stacked([...mine, ...filler(40 - mine.length)], [...theirs, ...filler(40 - theirs.length, 2)]));
+    mine.forEach((_, i) => t.push({ type: 'specialSummoned', player: 0, card: `a${i}`, zone: i, position: 'attack' }));
+    theirs.forEach((_, i) => t.push({ type: 'specialSummoned', player: 1, card: `b${i}`, zone: i, position: 'attack' }));
+    t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] }).play(0, { type: 'endTurn', discard: [] });
+    return t.play(1, { type: 'enterBattle' });
+  }
+  const attacks = (t: Table, seat: Seat = 1) => legalActions(t.state, seat).filter((a) => a.type === 'attack');
+  /** Ends the turn, discarding down to the hand limit. */
+  const end = (t: Table, seat: Seat) => t.play(seat, { type: 'endTurn', discard: t.state.players[seat].hand.slice(6) });
+
+  it('keep a monster from being destroyed by battle with a strong enough attacker, while damage is still dealt', () => {
+    const t = board([22, 22], [3, 2]);
+    t.play(1, { type: 'attack', attacker: 'b0', target: 0 });
+    expect(t.state.players[0].monsters[0]).toMatchObject({ id: 'a0' });
+    expect(t.state.players[0].lp).toBe(8000 - 2100);
+    t.play(1, { type: 'attack', attacker: 'b1', target: 1 });
+    expect(t.state.players[0].graveyard).toEqual(['a1']);
+  });
+
+  it('keep other Warriors from being attacked, but not the card itself', () => {
+    const t = board([23, 1, 22], [3]);
+    expect(attacks(t)).toEqual([{ type: 'attack', attacker: 'b0', targets: [0, 2], direct: false }]);
+    expect(t.refuse(1, { type: 'attack', attacker: 'b0', target: 1 })).toMatch(/can't be targeted/);
+  });
+
+  it('remain on the field and stop attacks until the End Phase of the opponent\'s third turn', () => {
+    const t = new Table(stacked([24, ...filler(39)], [3, ...filler(39, 2)]));
+    t.push({ type: 'specialSummoned', player: 1, card: 'b0', zone: 0, position: 'attack' });
+    t.play(0, { type: 'activate', card: 'a0', effect: 1, zone: 0 }).push({ type: 'linkResolved' });
+    expect(t.state.players[0].spellTraps[0]).toMatchObject({ id: 'a0', faceUp: true, activatedTurn: 1 });
+    for (const turn of [2, 4, 6]) {
+      end(t, 0);
+      expect(t.state.turn).toBe(turn);
+      t.play(1, { type: 'enterBattle' });
+      expect(attacks(t)).toEqual([]);
+      end(t, 1);
+    }
+    expect(t.state.players[0].graveyard).toEqual(['a0']);
+  });
+
+  it('stop a player declaring attacks or entering the Battle Phase for the rest of the turn only', () => {
+    const t = board([], [3]);
+    const r = applyOp(t.state, { op: 'forbid', player: 1, what: 'declare_attack' }, { player: 0, stage: 'resolution', random: () => 0 });
+    t.push(...(r.ok ? r.events : []));
+    expect(attacks(t)).toEqual([]);
+    end(t, 1);
+    const b = applyOp(t.state, { op: 'forbid', player: 0, what: 'battle_phase' }, { player: 0, stage: 'resolution', random: () => 0 });
+    t.push(...(b.ok ? b.events : []));
+    expect(t.refuse(0, { type: 'enterBattle' })).toMatch(/can't conduct/);
+    end(t, 0).play(1, { type: 'enterBattle' });
+    expect(attacks(t)).toHaveLength(1);
   });
 });
 

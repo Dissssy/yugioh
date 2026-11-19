@@ -201,6 +201,11 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         for (const id of picked) apply({ op: 'detach', card: id });
         return cost ? null : `${list(picked.map((id) => shown(id, before)))} ${picked.length === 1 ? 'was' : 'were'} detached from ${shown(xyz!, before)}.`;
       }
+      case 'forbid': {
+        const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
+        apply({ op: 'forbid', player, what: step.what });
+        return `${state.players[player].name} can't ${step.what === 'battle_phase' ? 'conduct their Battle Phase' : 'declare an attack'} this turn.`;
+      }
       case 'extra_normal_summon':
         apply({ op: 'extra_normal_summon', player: seat });
         return `${state.players[seat].name} may conduct one more Normal Summon or Set this turn.`;

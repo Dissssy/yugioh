@@ -70,6 +70,7 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     normalSummons: 0,
     normalSummonLimit: 1,
     modifiers: [],
+    forbidden: [],
     chain: [],
     step: { at: 'rps', picks: [null, null], last: null },
     happened: [],
@@ -163,6 +164,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.normalSummonLimit = 1;
         s.usedThisTurn = [];
         s.modifiers = s.modifiers.filter((m) => m.until !== 'end_of_turn');
+        s.forbidden = [];
         return;
       case 'phaseChanged':
         s.phase = event.phase;
@@ -252,10 +254,10 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const p = s.players[event.player];
         if (event.zone !== null) {
           take(p.hand, event.card);
-          p.spellTraps[event.zone] = { ...fieldCard(event.card, s.turn, true), position: 'attack' };
+          p.spellTraps[event.zone] = { ...fieldCard(event.card, s.turn, true), position: 'attack', activatedTurn: s.turn };
         } else {
           const at = locate(s, event.card);
-          if (at?.zone === 'spellTraps') onField(s, event.card).faceUp = true;
+          if (at?.zone === 'spellTraps') Object.assign(onField(s, event.card), { faceUp: true, activatedTurn: s.turn });
         }
         s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause });
         s.usedThisTurn.push({ card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
@@ -318,6 +320,9 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'statsModified':
         s.modifiers.push(event.modifier);
         return;
+      case 'forbidden':
+        s.forbidden.push({ player: event.player, what: event.what, turn: s.turn });
+        return;
       case 'normalSummonGranted':
         s.normalSummonLimit++;
         return;
@@ -327,7 +332,9 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const at = locate(s, link.card);
         const card = s.cards[s.instances[link.card]!.code]!;
         const leaves = card.kind === 'spell' ? ['Normal', 'Quick-Play', 'Ritual'] : card.kind === 'trap' ? ['Normal', 'Counter'] : [];
-        if (at?.zone === 'spellTraps' && leaves.includes(card.race)) sendToGraveyard(s, link.card);
+        // A Normal Spell/Trap that says it remains on the field (Swords of Revealing Light) stays.
+        const remains = s.sheets[card.code]?.effects.some((e) => e.continuous?.apply === 'self_destruct');
+        if (at?.zone === 'spellTraps' && leaves.includes(card.race) && !remains) sendToGraveyard(s, link.card);
         s.resolvedLinks++;
         // Once the whole chain has resolved, triggers from what happened during it go on a new one.
         if (s.chain.length === 0 && s.step.at === 'resolve') s.step = { at: 'triggers', cause: null, then: s.step.then, handled: [], passed: [] };
@@ -367,6 +374,7 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     attackedTurn: null,
     summoned: null,
     materials: [],
+    activatedTurn: null,
   };
 }
 

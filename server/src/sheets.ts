@@ -19,7 +19,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { DESTINATIONS, UNTIL, type CardData, type CardFilter, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
+import { DESTINATIONS, FORBIDDEN, RESTRICTIONS, UNTIL, type CardData, type CardFilter, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
 import { cards, decks, effectSheets, sheetReports, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
@@ -82,6 +82,7 @@ const step = z.union([
   z.object({ do: z.literal('extra_normal_summon') }),
   z.object({ do: z.literal('negate_attack') }),
   z.object({ do: z.literal('detach'), cards: selection, count: z.number().int() }),
+  z.object({ do: z.literal('forbid'), player, what: z.enum(FORBIDDEN) }),
 ]) satisfies z.ZodType<Step>;
 
 const condition = z.union([
@@ -102,16 +103,21 @@ const script = z.object({
   unapplied: z.string().nullable(),
 }) satisfies z.ZodType<Script>;
 
-const continuous = z.object({
-  apply: z.literal('stats'),
-  to: z.union([z.literal('self'), cardFilter]),
-  atk: z.number().int(),
-  def: z.number().int(),
-  per: z.union([cardFilter, z.literal('materials')]).nullable(),
-  levelDelta: z.number().int(),
-  levelSet: z.number().int().nullable(),
-  while: z.array(condition),
-}) satisfies z.ZodType<Continuous>;
+const affected = z.union([z.literal('self'), cardFilter]);
+const continuous = z.union([
+  z.object({
+    apply: z.literal('stats'),
+    to: affected,
+    atk: z.number().int(),
+    def: z.number().int(),
+    per: z.union([cardFilter, z.literal('materials')]).nullable(),
+    levelDelta: z.number().int(),
+    levelSet: z.number().int().nullable(),
+    while: z.array(condition),
+  }),
+  z.object({ apply: z.literal('restrict'), to: affected, others: z.boolean(), cannot: z.array(z.enum(RESTRICTIONS)), by: cardFilter.nullable(), while: z.array(condition) }),
+  z.object({ apply: z.literal('self_destruct'), opponentTurns: z.number().int().min(1) }),
+]) satisfies z.ZodType<Continuous>;
 
 const when = z.object({
   event: z.enum(['summoned', 'attack_declared', 'attacked', 'destroyed_by_battle', 'battle_destroying', 'battle_damage', 'activated']),
@@ -305,6 +311,10 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 
 {"apply": "stats", "to", "atk", "def", "per", "levelDelta", "levelSet", "while"}: while this card is face-up on the field and every "while" condition holds (the conditions above, with "you" as this card's controller), the monsters in "to" gain atk and def (negative for a loss) and their Level changes by levelDelta, or becomes levelSet (else null). "to" is "self" or a filter of the face-up monsters it applies to. "per" multiplies atk and def: null for a flat amount, a filter to count cards ("for each face-up Level 2 monster you control", counting this card too if it fits), or "materials" for "for each Xyz Material attached to this card". Examples: "All monsters you control gain 200 ATK during your Battle Phase only": to {"side": "you", "place": "monsters", "faceUp": true, ...}, atk 200, while [{"if": "turn", "whose": "you"}, {"if": "phase", "phases": ["battle"]}]. "This card is Level 4 while in face-up Defense Position": to "self", levelSet 4, while [{"if": "position", "position": "defense"}].
 
+{"apply": "restrict", "to", "others", "cannot", "by", "while"}: the monsters in "to" can't do what "cannot" lists: "attack" (declare an attack), "change_position", "be_attacked" (be targeted for an attack), "be_destroyed_by_battle". others true leaves this card itself out ("except this one"). by: for be_destroyed_by_battle, a filter the monster it battles must fit ("with a monster that has 1900 or more ATK": atk {"min": 1900, "max": null}), else null. "Your opponent's monsters cannot declare an attack": to {"side": "opponent", "place": "monsters", ...}, cannot ["attack"]. "Your opponent cannot target Warrior monsters for attacks, except this one": to {"side": "you", "place": "monsters", "faceUp": true, "races": ["Warrior"], ...}, others true, cannot ["be_attacked"].
+
+{"apply": "self_destruct", "opponentTurns": n}: "this card remains on the field, but destroy it during the End Phase of your opponent's nth turn" (a Normal Spell/Trap with this stays on the field after it resolves).
+
 Steps (each "cards" is a selection):
 - {"do": "destroy", "cards"}: destroy cards on the field.
 - {"do": "move", "cards", "to"}: to "hand", "graveyard", "banished", "deck_top", "deck_bottom" or "deck_shuffled". Add to hand, send, discard, banish, return to the Deck.
@@ -315,6 +325,7 @@ Steps (each "cards" is a selection):
 - {"do": "draw", "player", "count"}.
 - {"do": "extra_normal_summon"}: you may conduct one more Normal Summon/Set this turn.
 - {"do": "negate_attack"}: "negate the attack"; the attack ends with no damage.
+- {"do": "forbid", "player", "what"}: for the rest of this turn that player can't "declare_attack" ("your opponent cannot declare an attack this turn") or can't conduct their "battle_phase" ("you cannot conduct your Battle Phase the turn you activate this card"; pair it with the before_battle_phase condition). Such a restriction is a step, not unapplied.
 - {"do": "detach", "cards", "count"}: detach count Xyz Materials from an Xyz Monster the selection picks. "Detach 1 Xyz Material from this card" (usually a cost): cards {"from": "self"}, count 1. "Detach 1 Xyz Material from a monster you control": a choose selection of face-up Xyz monsters you control.
 
 Selections:

@@ -14,7 +14,30 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [
+            "Warrior"
+          ],
+          "attributes": [],
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "others": true,
+        "cannot": [
+          "be_attacked"
+        ],
+        "by": null,
+        "while": []
+      },
       "status": "unverified"
     },
     {

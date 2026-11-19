@@ -303,6 +303,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
     }
     case 'normalSummonGranted':
       return `${who(event.player)} may Normal Summon again this turn`;
+    case 'forbidden':
+      return event.what === 'battle_phase' ? `${who(event.player)} can't conduct their Battle Phase this turn` : `${who(event.player)} can't declare an attack this turn`;
     case 'chatted':
       return `${who(event.player)}: ${event.text}`;
     case 'flippedByAttack':
