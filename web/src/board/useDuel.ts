@@ -1,4 +1,4 @@
-import type { DuelUpdate, LogEntry, LogEvent, PlayerView } from '@yugioh/engine';
+import type { DuelUpdate, JudgingView, LogEntry, LogEvent, PlayerView } from '@yugioh/engine';
 import { useEffect, useRef, useState } from 'react';
 
 /** What the board shows right now: the view after the current step, the one before it, and the step being played. */
@@ -16,11 +16,13 @@ type Step = Extract<DuelUpdate, { type: 'steps' }>['steps'][number];
 /**
  * The seat's live duel, pushed by the server. Each change arrives as steps (one per event); they are shown one
  * at a time, each held for `pace(event, stepsStillWaiting)` milliseconds. A sync (on connect and after the
- * browser reconnects by itself) replaces everything and drops any steps not yet shown.
+ * browser reconnects by itself) replaces everything and drops any steps not yet shown. `judging` is the judge's
+ * work on an effect, shown as soon as it arrives.
  */
 export function useDuel(duelId: string, pace: (event: LogEvent, waiting: number) => number) {
   const [shown, setShown] = useState<Shown | null>(null);
   const [connected, setConnected] = useState(true);
+  const [judging, setJudging] = useState<JudgingView | null>(null);
   const paceRef = useRef(pace);
   paceRef.current = pace;
 
@@ -49,10 +51,10 @@ export function useDuel(duelId: string, pace: (event: LogEvent, waiting: number)
         clearTimeout(timer);
         playing = false;
         setShown({ view: update.view, prev: null, log: update.log, cue: null });
+        setJudging(update.judging);
         return;
       }
-      // The judge's progress and questions aren't shown yet (duel UI step 3).
-      if (update.type === 'judging') return;
+      if (update.type === 'judging') return setJudging(update.judging);
       queue.push(...update.steps);
       if (!playing) {
         playing = true;
@@ -66,5 +68,5 @@ export function useDuel(duelId: string, pace: (event: LogEvent, waiting: number)
     };
   }, [duelId]);
 
-  return { shown, connected };
+  return { shown, connected, judging };
 }

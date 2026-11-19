@@ -61,7 +61,7 @@ Everything a player sees comes over the duel's event stream as before; the shape
 - Contest a ruling with `POST /api/duels/:id/contest` `{ seq, note }`, where `seq` is the `judged` entry's `seq`. It answers 202; the verdict arrives as an `appealed` entry. Each player may contest each ruling once.
 - `PlayerView.chain` lists effects waiting to resolve, and face-up monsters' `FieldCardView.stats` carries current ATK, DEF and Level.
 
-The board doesn't offer activations yet: duel UI step 3 adds the menu, targeting and the prompt picker.
+The board's side of this is duel UI step 3 (see [duel-ui.md](duel-ui.md)).
 
 ## The eval suite
 
