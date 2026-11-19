@@ -5,6 +5,7 @@
 // must run as a single server process.
 
 import { randomBytes, randomInt } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { and, desc, eq, or } from 'drizzle-orm';
 import {
   cardOf,
@@ -204,7 +205,8 @@ export class Duels {
           const now = await loadSheets(this.db, live.state.cards);
           const changed = Object.keys(live.state.cards)
             .map(Number)
-            .filter((code) => JSON.stringify(now[code] ?? null) !== JSON.stringify(live.state.sheets[code] ?? null));
+            // Compared as values: Postgres stores JSON with its keys in its own order, so the text of an unchanged sheet differs.
+            .filter((code) => !isDeepStrictEqual(now[code] ?? null, live.state.sheets[code] ?? null));
           if (changed.length) await this.write(live, changed.map((code) => ({ type: 'sheetUpdated', code, sheet: now[code] ?? null })));
         }
         // Whatever the duel was doing when the server stopped (resolving a chain, waiting out a window) carries on.
