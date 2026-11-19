@@ -8,6 +8,9 @@ import type { DuelSettings } from './settings.ts';
 import { idOf } from './Card.tsx';
 
 const baseMs: Record<LogEvent['type'], number> = {
+  // Long enough to see both picks before the next round or the winner's choice.
+  rpsShown: 1200,
+  orderChosen: 600,
   turnStarted: 1000,
   phaseChanged: 250,
   drew: 450,

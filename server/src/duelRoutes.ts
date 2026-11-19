@@ -4,7 +4,7 @@
 import { Router, type Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Intent } from '@yugioh/engine';
+import { HANDS, type Intent } from '@yugioh/engine';
 import type { DeckDetail, DeckSummary } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db } from './db/client.ts';
@@ -26,6 +26,8 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('endTurn'), discard: z.array(id).max(60) }),
   z.object({ type: z.literal('activate'), card: id, effect: z.number().int().min(0).max(9), zone: z.number().int().min(0).max(4).nullable() }),
   z.object({ type: z.literal('pass') }),
+  z.object({ type: z.literal('rps'), hand: z.enum(HANDS) }),
+  z.object({ type: z.literal('chooseOrder'), goFirst: z.boolean() }),
   z.object({ type: z.literal('surrender') }),
 ]);
 

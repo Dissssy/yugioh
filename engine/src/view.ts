@@ -3,7 +3,7 @@
 import { waitingFor } from './chain.ts';
 import { legalActions, normalSummonUsed } from './rules.ts';
 import { evolve, locate, replay, statsOf } from './state.ts';
-import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, LogEntry, LogEvent, Phase, Place, PlayerView, Seat } from './types.ts';
+import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, LogEntry, LogEvent, Phase, Place, PlayerView, Seat, StartView } from './types.ts';
 
 export function viewFor(state: DuelState, seat: Seat): PlayerView {
   const shown = (id: string): CardView => ({ id, card: state.cards[state.instances[id]!.code]! });
@@ -44,8 +44,17 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
     }) as PlayerView['players'],
     chain: state.chain.map((link) => ({ player: link.player, card: shown(link.card), effect: link.effect, targets: link.targets, choice: link.choice })),
     waiting: waitingFor(state, seat),
+    start: startFor(state, seat),
     actions: legalActions(state, seat),
   };
+}
+
+/** Rock-paper-scissors as `seat` sees it: never the opponent's pick before both are shown. */
+function startFor(state: DuelState, seat: Seat): StartView | null {
+  const step = state.step;
+  if (step.at === 'rps') return { at: 'rps', yours: step.picks[seat], theirsIn: step.picks[seat === 0 ? 1 : 0] !== null, last: step.last };
+  if (step.at === 'order') return { at: 'order', chooser: step.chooser, hands: step.hands };
+  return null;
 }
 
 /** The whole duel log as one player sees it. */
@@ -86,7 +95,9 @@ function reviewText(state: DuelState, event: DuelEvent): string {
   const labelled = (value: unknown) => JSON.stringify(value, (_key, v: unknown) => (typeof v === 'string' && state.instances[v] ? label(v) : v));
   switch (event.type) {
     case 'duelStarted':
-      return `Duel started: ${event.players[0].name} (seat 0) vs ${event.players[1].name} (seat 1); ${event.players[event.first].name} goes first`;
+      return `Duel started: ${event.players[0].name} (seat 0) vs ${event.players[1].name} (seat 1)`;
+    case 'rpsPicked':
+      return `${who(event.player)} picked ${event.hand}`;
     case 'intent':
       return `${who(event.player)} asked for ${labelled(event.intent)}`;
     case 'deckShuffled':
@@ -151,6 +162,7 @@ function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat): LogEvent 
   switch (event.type) {
     case 'duelStarted':
     case 'intent':
+    case 'rpsPicked':
     case 'deckShuffled':
     case 'sheetUpdated':
     case 'checkpoint':
@@ -207,7 +219,15 @@ function describe(state: DuelState, event: LogEvent): string | null {
   const who = (seat: Seat) => state.players[seat].name;
   const name = (id: string) => state.cards[state.instances[id]!.code]!.name;
   const names = (ids: string[]) => ids.map(name).join(', ');
+  const hand = (h: Hand) => h[0]!.toUpperCase() + h.slice(1);
   switch (event.type) {
+    case 'rpsShown': {
+      const [a, b] = event.hands;
+      const picks = `${who(0)} threw ${hand(a)}, ${who(1)} threw ${hand(b)}`;
+      return event.winner === null ? `Rock-paper-scissors: ${picks}. A tie, so they pick again.` : `Rock-paper-scissors: ${picks}. ${who(event.winner)} wins.`;
+    }
+    case 'orderChosen':
+      return `${who(event.player)} chose to go ${event.first === event.player ? 'first' : 'second'}`;
     case 'turnStarted':
       return `Turn ${event.turn}: ${who(event.player)}`;
     case 'phaseChanged':

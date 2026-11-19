@@ -21,6 +21,7 @@ import { LpPlate } from './LpPlate.tsx';
 import { PhaseStrip } from './PhaseStrip.tsx';
 import { PileViewer } from './PileViewer.tsx';
 import { ReportRuling } from './ReportRuling.tsx';
+import { StartPanel } from './StartPanel.tsx';
 import { systemReducesMotion, useDuelSettings } from './settings.ts';
 import { useDuel } from './useDuel.ts';
 
@@ -448,7 +449,7 @@ export function Board({ duelId }: { duelId: string }) {
     return attack?.direct ? (over === `lp:${foe}` ? 'over' : 'open') : null;
   };
 
-  const yourTurn = view.turnPlayer === me && !view.result;
+  const yourTurn = view.turnPlayer === me && !view.result && !view.start;
   const enterBattle = has('enterBattle');
   const enterMain2 = has('enterMain2');
   const endTurn = has('endTurn');
@@ -471,7 +472,7 @@ export function Board({ duelId }: { duelId: string }) {
                 ) : (
                   <>
                     <div className="hand-row foe-row">
-                      <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={view.turnPlayer === foe} target={lpTarget()} />
+                      <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={!view.start && view.turnPlayer === foe} target={lpTarget()} />
                       <FoeHand seat={foe} count={view.players[foe].hand.length} />
                     </div>
                     <Field
@@ -487,7 +488,7 @@ export function Board({ duelId }: { duelId: string }) {
                     />
                     <PhaseStrip
                       turn={view.turn}
-                      turnLabel={yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`}
+                      turnLabel={view.start ? 'Deciding who goes first' : yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`}
                       yours={yourTurn}
                       phase={view.phase}
                       goTo={{
@@ -517,7 +518,7 @@ export function Board({ duelId }: { duelId: string }) {
                       onPile={(place) => setPile(pileKey(me, place))}
                     />
                     <div className="hand-row own-row">
-                      <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={view.turnPlayer === me} />
+                      <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={!view.start && view.turnPlayer === me} />
                       <OwnHand duelId={duelId} seat={me} cards={view.players[me].hand} marks={marks} onCard={clickOwn} drag={handDrag} held={held} />
                     </div>
                   </>
@@ -537,6 +538,10 @@ export function Board({ duelId }: { duelId: string }) {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {ready && view.start && !result && (
+                  <StartPanel start={view.start} view={view} can={has(view.start.at === 'rps' ? 'rps' : 'chooseOrder') !== undefined} send={(intent) => send.mutate(intent)} />
+                )}
 
                 {result && cue === null && (
                   <motion.div className="result-overlay" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>

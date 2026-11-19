@@ -95,7 +95,6 @@ function stacked(deck0: number[], deck1: number[]): DuelEvent[] {
         { name: 'Yusei', deck: ids('a', 0, deck0), extra: ids('ax', 0, [7]) },
         { name: 'Yuma', deck: ids('b', 1, deck1), extra: [] },
       ],
-      first: 0,
     },
     { type: 'drew', player: 0, count: 5 },
     { type: 'drew', player: 1, count: 5 },
@@ -141,22 +140,58 @@ class Table {
 const filler = (n: number, code = 1) => Array<number>(n).fill(code);
 
 describe('starting a duel', () => {
-  it('shuffles, deals five each and lets the first player start in Main Phase 1 without drawing', () => {
+  const dealt = () => {
     let seed = 1;
     const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-    const events = startDuel(
+    return startDuel(
       { players: [{ name: 'A', main: filler(40), extra: [7] }, { name: 'B', main: filler(40, 2), extra: [] }], cards, sheets },
       random,
     );
-    const state = replay(events);
-    const first = state.turnPlayer;
-    expect(state.turn).toBe(1);
-    expect(state.phase).toBe('main1');
-    expect(state.players[first].hand).toHaveLength(5);
-    expect(state.players[first === 0 ? 1 : 0].hand).toHaveLength(5);
-    expect(state.players[0].deck).toHaveLength(35);
-    expect(state.players[0].extra).toHaveLength(1);
-    expect(new Set(Object.keys(state.instances)).size).toBe(81);
+  };
+
+  it('shuffles and deals nothing until rock-paper-scissors decides who goes first', () => {
+    const t = new Table(dealt());
+    expect(t.state.turn).toBe(0);
+    expect(t.state.players[0].deck).toHaveLength(40);
+    expect(t.state.players[0].extra).toHaveLength(1);
+    expect(new Set(Object.keys(t.state.instances)).size).toBe(81);
+    expect(legalActions(t.state, 0).map((a) => a.type)).toEqual(['rps', 'surrender']);
+    expect(t.refuse(0, { type: 'endTurn', discard: [] })).toMatch(/rock-paper-scissors/);
+  });
+
+  it('hides a pick from the opponent until both are in', () => {
+    const t = new Table(dealt());
+    t.play(1, { type: 'rps', hand: 'rock' });
+    expect(viewFor(t.state, 0).start).toEqual({ at: 'rps', yours: null, theirsIn: true, last: null });
+    expect(viewFor(t.state, 1).start).toEqual({ at: 'rps', yours: 'rock', theirsIn: false, last: null });
+    expect(JSON.stringify(logFor(t.events, 0))).not.toMatch(/rock/);
+    expect(t.refuse(1, { type: 'rps', hand: 'paper' })).toMatch(/already/);
+  });
+
+  it('replays a tie, and the winner chooses to go second', () => {
+    const t = new Table(dealt());
+    t.play(0, { type: 'rps', hand: 'paper' });
+    t.play(1, { type: 'rps', hand: 'paper' });
+    expect(viewFor(t.state, 1).start).toEqual({ at: 'rps', yours: null, theirsIn: false, last: ['paper', 'paper'] });
+    t.play(0, { type: 'rps', hand: 'scissors' });
+    t.play(1, { type: 'rps', hand: 'rock' });
+    expect(viewFor(t.state, 0).start).toEqual({ at: 'order', chooser: 1, hands: ['scissors', 'rock'] });
+    expect(t.refuse(0, { type: 'chooseOrder', goFirst: true })).toMatch(/winner/);
+    t.play(1, { type: 'chooseOrder', goFirst: false });
+    expect(t.state.turn).toBe(1);
+    expect(t.state.turnPlayer).toBe(0);
+    expect(t.state.phase).toBe('main1');
+    expect(t.state.players[0].hand).toHaveLength(5);
+    expect(t.state.players[1].hand).toHaveLength(5);
+    expect(viewFor(t.state, 0).start).toBeNull();
+    expect(logFor(t.events, 0).flatMap((e) => (e.text ? [e.text] : []))).toEqual([
+      'Rock-paper-scissors: A threw Paper, B threw Paper. A tie, so they pick again.',
+      'Rock-paper-scissors: A threw Scissors, B threw Rock. B wins.',
+      'B chose to go second',
+      'A drew 5 cards',
+      'B drew 5 cards',
+      'Turn 1: A',
+    ]);
   });
 });
 

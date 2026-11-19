@@ -79,7 +79,7 @@ export interface Ai {
   appeals: number;
 }
 
-/** A random float in [0, 1) from the system's secure generator, for shuffles and the coin toss. */
+/** A random float in [0, 1) from the system's secure generator, for shuffles and response timing. */
 const secureRandom = () => randomInt(2 ** 47) / 2 ** 47;
 
 export class Duels {
@@ -89,7 +89,7 @@ export class Duels {
   private random: () => number;
   private responseFloorMs: number;
   /**
-   * `random` deals, shuffles and tosses the coin; tests pass a seeded one so every run deals the same hands.
+   * `random` shuffles and times auto-passes; tests pass a seeded one so every run deals the same hands.
    * `responseFloorMs` is the least time a response window stays open (see Config).
    */
   constructor(db: Db, ai: Ai, random: () => number = secureRandom, responseFloorMs = 1000) {
@@ -140,7 +140,7 @@ export class Duels {
   }
 
   /**
-   * Takes the empty seat and deals the opening hands. Returns false, having changed nothing, if the
+   * Takes the empty seat and shuffles the Decks; rock-paper-scissors then decides who goes first. Returns false, having changed nothing, if the
    * seat was already taken or the claimant is the challenger.
    */
   async join(id: string, deckId: number, challengerName: string, claim: SeatClaim): Promise<boolean> {

@@ -185,6 +185,10 @@ export interface EffectSheet {
   materials: string | null;
 }
 
+export const HANDS = ['rock', 'paper', 'scissors'] as const;
+/** A rock-paper-scissors pick. */
+export type Hand = (typeof HANDS)[number];
+
 export type Phase = 'draw' | 'standby' | 'main1' | 'battle' | 'main2' | 'end';
 export type Position = 'attack' | 'defense';
 
@@ -237,7 +241,10 @@ export type Happening =
 export type Then = { do: 'open' } | { do: 'damage' } | { do: 'endTurn'; discard: string[] };
 
 /**
- * Where the duel is in the timing of effects (docs/chains.md).
+ * Where the duel is: deciding who goes first, or in the timing of effects (docs/chains.md).
+ * - `rps`: before the first turn, both players pick rock, paper or scissors. `picks` stay hidden from the opponent;
+ *   `last` is the tied round before, if any.
+ * - `order`: `chooser` won rock-paper-scissors and picks whether to go first or second.
  * - `open`: the turn player acts.
  * - `triggers`: triggers from what just happened go on the chain, turn player's first (mandatory before optional).
  *   `handled` holds `card:effect` keys already activated or set aside, `passed` the players who declined the rest.
@@ -247,6 +254,8 @@ export type Then = { do: 'open' } | { do: 'damage' } | { do: 'endTurn'; discard:
  * - `continue`: the sequence is over; `then` happens next (the attack's damage, or the end of the turn).
  */
 export type DuelStep =
+  | { at: 'rps'; picks: [Hand | null, Hand | null]; last: [Hand, Hand] | null }
+  | { at: 'order'; chooser: Seat; hands: [Hand, Hand] }
   | { at: 'open' }
   | { at: 'triggers'; cause: Happening | null; then: Then; handled: string[]; passed: Seat[] }
   | { at: 'respond'; cause: Happening | null; then: Then; priority: Seat; actor: Seat; passed: boolean }
@@ -342,6 +351,9 @@ export type Intent =
   | { type: 'activate'; card: string; effect: number; zone: number | null }
   /** Declines to respond, or to activate optional triggers. */
   | { type: 'pass' }
+  | { type: 'rps'; hand: Hand }
+  /** The rock-paper-scissors winner goes first, or lets the opponent go first. */
+  | { type: 'chooseOrder'; goFirst: boolean }
   | { type: 'surrender' };
 
 /** Where an op sends a card. Deck places shuffle the Deck, except the top and bottom. */
@@ -425,8 +437,13 @@ export type DuelEvent =
       instances: Record<string, { code: number; owner: Seat }>;
       /** Decks already shuffled, top first. */
       players: [StartingPlayer, StartingPlayer];
-      first: Seat;
     }
+  /** A player's rock-paper-scissors pick. Only that player sees it until both have picked. */
+  | { type: 'rpsPicked'; player: Seat; hand: Hand }
+  /** Both picks, shown together. `winner` chooses who goes first; on a tie (null) both pick again. */
+  | { type: 'rpsShown'; hands: [Hand, Hand]; winner: Seat | null }
+  /** The winner of rock-paper-scissors chose who goes first. */
+  | { type: 'orderChosen'; player: Seat; first: Seat }
   | { type: 'intent'; player: Seat; intent: Intent }
   | { type: 'turnStarted'; player: Seat; turn: number }
   | { type: 'phaseChanged'; phase: Phase }
@@ -496,12 +513,22 @@ export interface PlayerView {
    * window answers ("Axe Raider's attack"). The other player sees the same, whether or not the player can respond.
    */
   waiting: { player: Seat; for: 'respond' | 'triggers'; cause: string | null } | null;
+  /** Deciding who goes first, before turn 1; null once the duel is under way. */
+  start: StartView | null;
   actions: LegalAction[];
 }
 
 /**
+ * Rock-paper-scissors as one player sees it: their own pick, whether the opponent has picked (never what), and the
+ * tied round before. Then the winner's choice of who goes first. Hands are indexed by seat.
+ */
+export type StartView =
+  | { at: 'rps'; yours: Hand | null; theirsIn: boolean; last: [Hand, Hand] | null }
+  | { at: 'order'; chooser: Seat; hands: [Hand, Hand] };
+
+/**
  * An event as one player may see it: a card Set by the opponent has no ID, nor does a card moving between places
- * the player can't see. Intents, the duel's start and Deck orders are never shown, and a judge decision shows only its outcome.
+ * the player can't see. Intents, the duel's start, Deck orders and rock-paper-scissors picks (until both are shown) are never shown, and a judge decision shows only its outcome.
  */
 export type LogEvent =
   | Exclude<
@@ -510,6 +537,7 @@ export type LogEvent =
         type:
           | 'duelStarted'
           | 'intent'
+          | 'rpsPicked'
           | 'monsterSet'
           | 'spellTrapSet'
           | 'attackDeclared'
@@ -624,4 +652,6 @@ export type LegalAction =
   | { type: 'activate'; card: string; effect: number; zones: number[] | null; text: string }
   /** Pass in a response window, or decline your optional triggers. */
   | { type: 'pass' }
+  | { type: 'rps' }
+  | { type: 'chooseOrder' }
   | { type: 'surrender' };

@@ -38,7 +38,7 @@ export function DuelLog({ log, onHighlight, contest }: { log: LogEntry[]; onHigh
     <div className="duel-log" aria-label="Duel log">
       {[...turns].map(([turn, entries]) => (
         <details key={turn} open={turn >= current - 1 || undefined}>
-          <summary>{turn === 0 ? 'Opening hands' : entries[0]?.event.type === 'turnStarted' ? entries[0].text : `Turn ${turn}`}</summary>
+          <summary>{turn === 0 ? 'Before the duel' : entries[0]?.event.type === 'turnStarted' ? entries[0].text : `Turn ${turn}`}</summary>
           <ol>
             {entries
               .filter((e) => e.event.type !== 'turnStarted')

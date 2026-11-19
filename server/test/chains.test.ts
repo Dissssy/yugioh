@@ -7,7 +7,7 @@ import { loadCards, syncCards } from '../src/cards.ts';
 import { decks, matchEvents } from '../src/db/schema.ts';
 import { rule } from '../src/judge/script.ts';
 import { importSheetFiles, loadSheets } from '../src/sheets.ts';
-import { ADMIN_EMAIL, Browser, startHarness, Stream, type Harness } from './harness.ts';
+import { ADMIN_EMAIL, Browser, seeded, startHarness, Stream, type Harness } from './harness.ts';
 
 let h: Harness;
 beforeAll(async () => {
@@ -50,9 +50,9 @@ async function setUp() {
   const sheets = await loadSheets(h.db, cards);
   const [dealt] = startDuel(
     { players: [{ name: 'Ethan', main: d0!.main, extra: d0!.extra }, { name: 'Kaiba (guest)', main: d1!.main, extra: d1!.extra }], cards, sheets },
-    Math.random,
+    seeded(1),
   );
-  const start = { ...(dealt as Extract<DuelEvent, { type: 'duelStarted' }>), first: 0 as const };
+  const start = dealt as Extract<DuelEvent, { type: 'duelStarted' }>;
   const find = (seat: Seat, code: number) => start.players[seat].deck.find((id) => start.instances[id]!.code === code)!;
   const ids = {
     speedWarrior: find(0, SPEED_WARRIOR),

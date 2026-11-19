@@ -105,29 +105,51 @@ describe('a challenge link played by a guest', () => {
   it('streams each player their own view and applies intents', async () => {
     const mine = new Stream(await admin.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
     const theirs = new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
+    const send = (who: Browser, intent: Intent) =>
+      who.json<{ error?: string }>(`${h.baseUrl}/api/duels/${duel.id}/intents`, { method: 'POST', body: JSON.stringify(intent) });
     const sync = await mine.update();
     expect(sync.type).toBe('sync');
     let a = (sync as Extract<DuelUpdate, { type: 'sync' }>).view;
-    const b = await theirs.next();
+    let b = await theirs.next();
     expect(a.you).toBe(0);
     expect(b.you).toBe(1);
     expect(a.players[0].name).toBe('Ethan');
     expect(a.players[1].name).toBe('Kaiba (guest)');
+
+    // Rock-paper-scissors first: a pick reaches the opponent only as "they've picked".
+    expect(a.start).toEqual({ at: 'rps', yours: null, theirsIn: false, last: null });
+    expect((await send(guest, { type: 'endTurn', discard: [] })).status).toBe(422);
+    expect((await send(guest, { type: 'rps', hand: 'lizard' } as unknown as Intent)).status).toBe(400);
+    expect((await send(admin, { type: 'rps', hand: 'rock' })).status).toBe(204);
+    const picked = await theirs.update();
+    expect(picked.type === 'steps' && picked.steps.at(-1)!.view.start).toEqual({ at: 'rps', yours: null, theirsIn: true, last: null });
+    expect(JSON.stringify(picked)).not.toContain('rock');
+    await mine.next();
+    expect((await send(guest, { type: 'rps', hand: 'paper' })).status).toBe(204);
+    b = await theirs.next();
+    expect(b.start).toEqual({ at: 'order', chooser: 1, hands: ['rock', 'paper'] });
+    await mine.next();
+    expect((await send(admin, { type: 'chooseOrder', goFirst: true })).status).toBe(422);
+    expect((await send(guest, { type: 'chooseOrder', goFirst: true })).status).toBe(204);
+    do a = await mine.next();
+    while (a.turn < 1);
+    b = await theirs.next();
+    expect(a.start).toBeNull();
+    expect(a.turnPlayer).toBe(1);
+
     expect(a.players[1].hand.every((c) => 'hidden' in c)).toBe(true);
     expect(b.players[1].hand.every((c) => 'id' in c)).toBe(true);
     expect(a.players[0].extra).toHaveLength(3);
     expect(b.players[0].extra.every((c) => 'hidden' in c)).toBe(true);
 
-    const [first, second, firstStream, secondStream] = a.turnPlayer === 0 ? [admin, guest, mine, theirs] : [guest, admin, theirs, mine];
-    const send = (who: Browser, intent: Intent) =>
-      who.json<{ error?: string }>(`${h.baseUrl}/api/duels/${duel.id}/intents`, { method: 'POST', body: JSON.stringify(intent) });
+    const [first, second, firstStream, secondStream] = [guest, admin, theirs, mine];
 
     // The player who isn't on turn is refused.
     const early = await send(second, { type: 'enterBattle' });
     expect(early).toEqual({ status: 422, body: { error: "It's not your turn." } });
     expect((await send(first, { type: 'attack', attacker: 'x', target: 9 } as Intent)).status).toBe(400);
 
-    let view = a.turnPlayer === 0 ? a : b;
+    let view = b;
     const set = view.actions.find((x) => x.type === 'setMonster' && x.tributes === 0);
     expect(set).toBeDefined();
     expect((await send(first, { type: 'setMonster', card: (set as { card: string }).card, tributes: [], zone: 0 })).status).toBe(204);

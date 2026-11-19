@@ -37,7 +37,7 @@ export function PhaseStrip({
   return (
     <div className={`phase-strip${yours ? ' yours' : ''}`}>
       <span className="turn-label">
-        Turn {turn} · <strong>{turnLabel}</strong>
+        {turn > 0 && `Turn ${turn} · `}<strong>{turnLabel}</strong>
       </span>
       {prompt ?? (
         <ol className="phases" aria-label="Phases">

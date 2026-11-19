@@ -42,13 +42,14 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     sheets: start.sheets,
     players: [player(start.players[0]), player(start.players[1])],
     turn: 0,
-    turnPlayer: start.first,
+    // Set by the first turnStarted, once rock-paper-scissors has decided.
+    turnPlayer: 0,
     phase: 'draw',
     normalSummons: 0,
     normalSummonLimit: 1,
     modifiers: [],
     chain: [],
-    step: { at: 'open' },
+    step: { at: 'rps', picks: [null, null], last: null },
     happened: [],
     resolvedLinks: 0,
     attack: null,
@@ -65,6 +66,17 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         throw new Error('duelStarted can only be the first event');
       case 'intent':
       case 'chatted':
+        return;
+      case 'orderChosen':
+        // The opening hands are dealt next, then turn 1 starts.
+        s.turnPlayer = event.first;
+        s.step = { at: 'open' };
+        return;
+      case 'rpsPicked':
+        if (s.step.at === 'rps') s.step.picks[event.player] = event.hand;
+        return;
+      case 'rpsShown':
+        s.step = event.winner === null ? { at: 'rps', picks: [null, null], last: event.hands } : { at: 'order', chooser: event.winner, hands: event.hands };
         return;
       case 'passed': {
         // Declining changes nothing on the board, so standing rulings stay.

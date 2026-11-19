@@ -178,7 +178,7 @@ export class Stream {
 }
 
 /** A small seeded generator (mulberry32), so the duels in a test run are dealt the same way every time. */
-function seeded(seed: number) {
+export function seeded(seed: number) {
   return () => {
     seed = (seed + 0x6d2b79f5) | 0;
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
