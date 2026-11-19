@@ -93,7 +93,7 @@ main:has(.duel) { max-width: none; padding: 0; }
 .hand-row { position: relative; display: flex; justify-content: center; min-width: 0; }
 .foe-row { overflow: clip; align-items: flex-end; }
 .own-row { align-items: flex-start; }
-.hand { display: flex; align-items: flex-start; }
+.hand { position: relative; display: flex; align-items: flex-start; }
 .hand.foe { margin-top: calc(var(--card-h) * -0.5); }
 .hand-card { flex: none; perspective: 800px; touch-action: none; }
 .hand.own .hand-card { cursor: grab; }
