@@ -12,6 +12,12 @@ As of 2026-11-18. This is the website shell that sits outside the duel engine: l
 | Approved account | Everything, including creating challenges. |
 | Admin | Approves or rejects accounts. The account whose **verified** email equals `ADMIN_EMAIL` is the admin and is always approved. |
 
+## Names
+
+Other people only ever see an account's **username**, never its email. A new account gets a random one built from Yu-Gi-Oh words, like `Mystic_Kuriboh_4821`, and can change it from the home page as often as it likes. Usernames are 3 to 32 letters, digits, `_` or `-`, and unique regardless of case. Only the admin sees emails, on the accounts page, so they can tell who is asking to join.
+
+Guests pick any name, so wherever other players see it, it reads `<name> (guest)`, which keeps a guest from passing as an account. A duel keeps the names the players had when it started.
+
 A challenge link is the invite. Opening one signed out offers two ways in: log in (which comes back to the same link), or give a name and play as a guest. The guest is created in the same transaction that takes the seat, so a visitor who finds the seat already taken leaves nothing behind; they are told the duel already has two players.
 
 A guest lasts while any of their duels is waiting or in progress, and for a day after their last duel finishes, so they can still see the final board. An hourly cleanup then deletes them. A guest stuck in an abandoned duel lasts as long as that duel does.
@@ -21,7 +27,7 @@ If a guest logs in on the same browser to an approved account, their seats move 
 ## How it works
 
 - **Login:** [express-openid-connect](https://github.com/auth0/express-openid-connect), Auth0's library for server-rendered apps. The session is an encrypted cookie on the site's own domain, so the API and the duel event streams authenticate with the same cookie and the browser never handles tokens.
-- **Accounts:** on each login the server creates or refreshes the `users` row keyed by Auth0's `sub`. New rows start `pending`.
+- **Accounts:** on each login the server creates or refreshes the `users` row keyed by Auth0's `sub`. New rows start `pending` with a random username. Only `sub` and the email are read from the login; the email is used for the admin check and shown only to the admin.
 - **Guests:** a `guests` row (random token and name) and a signed `guest` cookie holding the token. The row is checked on every request, so deleting it ends the guest's access at once. Duel seats are `user:<id>` or `guest:<id>`.
 - **Layout:** npm workspaces. `server/` (Express 5, Drizzle ORM, Postgres), `web/` (React, Vite, React Router, TanStack Query), `shared/` (types used by both). The server runs TypeScript directly with Node's built-in type stripping, so it has no build step. In production it also serves the built web app from `web/dist`.
 

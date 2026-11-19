@@ -6,11 +6,15 @@ export type AccountStatus = 'pending' | 'approved' | 'rejected';
 
 export interface User {
   id: number;
-  email: string | null;
-  name: string | null;
+  username: string;
   status: AccountStatus;
   isAdmin: boolean;
   createdAt: string;
+}
+
+/** What the admin sees of an account: also its email, so they know who is asking to join. */
+export interface AdminUser extends User {
+  email: string | null;
 }
 
 /** Who is making the request. A guest is someone without an account who accepted a challenge link. */

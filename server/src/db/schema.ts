@@ -1,16 +1,23 @@
-import { boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
 
-export const users = pgTable('users', {
-  id: serial('id').primaryKey(),
-  auth0Sub: text('auth0_sub').notNull().unique(),
-  email: text('email'),
-  name: text('name'),
-  status: accountStatus('status').notNull().default('pending'),
-  isAdmin: boolean('is_admin').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+/** An account. Only the admin ever sees the email; everyone else sees the username. */
+export const users = pgTable(
+  'users',
+  {
+    id: serial('id').primaryKey(),
+    auth0Sub: text('auth0_sub').notNull().unique(),
+    email: text('email'),
+    username: text('username').notNull(),
+    status: accountStatus('status').notNull().default('pending'),
+    isAdmin: boolean('is_admin').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  // Usernames are unique regardless of case, so `Yugi` and `yugi` can't both exist.
+  (t) => [uniqueIndex('users_username_lower_unique').on(sql`lower(${t.username})`)],
+);
 
 /**
  * Someone without an account who accepted a challenge link. The signed `guest` cookie holds the token.

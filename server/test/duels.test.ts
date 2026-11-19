@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DuelUpdate, Intent, PlayerView } from '@yugioh/engine';
-import type { DeckDetail, DeckSummary, DuelSummary, Me, User } from '@yugioh/shared';
+import type { DeckDetail, DeckSummary, DuelSummary, AdminUser, Me } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { guests } from '../src/db/schema.ts';
 import { deleteIdleGuests, GUEST_GRACE_MS } from '../src/guests.ts';
@@ -58,7 +58,7 @@ class Stream {
 describe('card data', () => {
   it('imports cards, builds both starter decks from their sets and downloads their images', async () => {
     await syncCards(h.db, { imageDir: h.imageDir, api: h.ygoprodeck, imageGapMs: 0 });
-    const admin = await login({ sub: 'admin', email: ADMIN_EMAIL, email_verified: true, name: 'Ethan' });
+    const admin = await login({ sub: 'admin', email: ADMIN_EMAIL, email_verified: true });
     const { body: decks } = await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`);
     expect(decks.map((d) => [d.name, d.mainCount, d.extraCount])).toEqual([
       ["Yu-Gi-Oh! 5D's Starter Deck (2008)", 40, 3],
@@ -88,7 +88,8 @@ describe('a challenge link played by a guest', () => {
     (await by.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: decks[0]!.id }) })).body;
 
   it('lets a signed-out visitor accept a challenge link as a guest', async () => {
-    admin = await login({ sub: 'admin', email: ADMIN_EMAIL, email_verified: true, name: 'Ethan' });
+    admin = await login({ sub: 'admin', email: ADMIN_EMAIL, email_verified: true });
+    await admin.json(`${h.baseUrl}/api/me/username`, { method: 'POST', body: JSON.stringify({ username: 'Ethan' }) });
     decks = (await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`)).body;
     const created = await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, {
       method: 'POST',
@@ -143,7 +144,7 @@ describe('a challenge link played by a guest', () => {
     expect(a.you).toBe(0);
     expect(b.you).toBe(1);
     expect(a.players[0].name).toBe('Ethan');
-    expect(a.players[1].name).toBe('Kaiba');
+    expect(a.players[1].name).toBe('Kaiba (guest)');
     expect(a.players[1].hand.every((c) => 'hidden' in c)).toBe(true);
     expect(b.players[1].hand.every((c) => 'id' in c)).toBe(true);
     expect(a.players[0].extra).toHaveLength(3);
@@ -223,12 +224,12 @@ describe('a challenge link played by a guest', () => {
     expect(await deleteIdleGuests(h.db, new Date(Date.now() + 10 * GUEST_GRACE_MS))).toBe(0);
 
     // A pending account doesn't take the guest's seats.
-    await login({ sub: 'mai', email: 'mai@example.com', email_verified: true, name: 'Mai' }, visitor);
+    await login({ sub: 'mai', email: 'mai@example.com', email_verified: true }, visitor);
     expect(await me(visitor)).toMatchObject({ kind: 'user', user: { status: 'pending' } });
     expect(await guestCount()).toBe(1);
 
-    const { body: users } = await admin.json<User[]>(`${h.baseUrl}/api/admin/users`);
-    const mai = users.find((u) => u.name === 'Mai')!;
+    const { body: users } = await admin.json<AdminUser[]>(`${h.baseUrl}/api/admin/users`);
+    const mai = users.find((u) => u.email === 'mai@example.com')!;
     await admin.json(`${h.baseUrl}/api/admin/users/${mai.id}/status`, { method: 'POST', body: JSON.stringify({ status: 'approved' }) });
     expect((await visitor.json<DuelSummary[]>(`${h.baseUrl}/api/duels`)).body).toEqual([expect.objectContaining({ id: third.id, yourSeat: 1 })]);
     expect(await guestCount()).toBe(0);
@@ -242,7 +243,7 @@ describe('a challenge link played by a guest', () => {
       method: 'POST',
       body: JSON.stringify({ deckId: decks[1]!.id, guestName: 'Also Ethan' }),
     });
-    await login({ sub: 'admin', email: ADMIN_EMAIL, email_verified: true, name: 'Ethan' }, self);
+    await login({ sub: 'admin', email: ADMIN_EMAIL, email_verified: true }, self);
     expect(await me(self)).toMatchObject({ kind: 'user' });
     expect((await self.json<DuelSummary>(`${h.baseUrl}/api/duels/${own.id}`)).body).toMatchObject({ yourSeat: 0 });
     expect(await guestCount()).toBe(1);

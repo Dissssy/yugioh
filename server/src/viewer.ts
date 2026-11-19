@@ -16,7 +16,10 @@ export function playerKey(viewer: Viewer): string | null {
   return null;
 }
 
+/** Guests pick any name, so it is always marked to keep it apart from the accounts' usernames. */
+export const guestName = (name: string) => `${name} (guest)`;
+
 export function displayName(viewer: Viewer): string {
-  if (viewer.kind === 'user') return viewer.user.name ?? viewer.user.email ?? 'Player';
-  return viewer.kind === 'guest' ? viewer.guest.name : 'Visitor';
+  if (viewer.kind === 'user') return viewer.user.username;
+  return viewer.kind === 'guest' ? guestName(viewer.guest.name) : 'Visitor';
 }
