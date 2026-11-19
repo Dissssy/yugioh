@@ -116,7 +116,7 @@ The 200 calls are a guess for a full duel. Code makes the trivial decisions, and
 
 - If the model believes a move should be possible but it isn't in the list (for example "Trap Hole should be able to answer that Summon"), it fills in `missing`. The opponent posts that in the duel chat as an ordinary message, starting with "I expected to be able to: ", and the game goes on with the move it chose.
 - Code drops a complaint it already made this turn, and allows at most 10 per duel, so the chat doesn't fill up.
-- By default this is chat only, and it does **not** file a ruling report. A report flags a card's scripts in every duel at once, and the AI will sometimes be wrong about the rules (see Open questions).
+- This is chat only, and it does **not** file a ruling report (Ethan, 2026-11-19). A report flags a card's scripts in every duel at once, and the AI will sometimes be wrong about the rules.
 - Because chat is in the duel log, every complaint shows up in the admin Full log with the board around it.
 
 ## As a playtester
@@ -137,7 +137,3 @@ Each step works end to end on its own.
 1. **Play against Claude.** The admin entry point, the AI seat, the watch loop, move expansion, judge questions, code-made decisions, the model call and its answer, `aiDecided` records and cost, limits, errors, and the response-window timing. One generic plan for every deck. Offline tests use a fake model that picks at random and play whole duels through, which also tests the engine.
 2. **Contests and missing moves.** The `contest` and `missing` fields, their limits and the chat messages.
 3. **Deck plans and tuning.** A plan file per premade deck, and a small eval set of positions with a clear best move (lethal on board, don't attack into a face-up Mirror Force, use Trap Hole on the big Summon), run by hand like the judge evals.
-
-## Open questions
-
-- Should a missing-move complaint also file a ruling report, which flags the card's scripts at once in every duel?
