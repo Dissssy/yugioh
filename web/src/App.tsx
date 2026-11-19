@@ -1,4 +1,5 @@
 import { Link, NavLink, Route, Routes, useLocation } from 'react-router';
+import { isAdmin } from '@yugioh/shared';
 import { AccountMenu, Avatar } from './AccountMenu.tsx';
 import { loginHref, useMe } from './api.ts';
 import { Account } from './pages/Account.tsx';
@@ -22,7 +23,7 @@ export function App() {
           Yu-Gi-Oh Duels
         </Link>
         <nav>
-          {user?.isAdmin && <NavLink to="/admin" className="nav-link">Admin</NavLink>}
+          {user && isAdmin(user.role) && <NavLink to="/admin" className="nav-link">Admin</NavLink>}
           {guest && (
             <span className="who">
               <Avatar name={guest.name} />
@@ -46,7 +47,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<Home me={me.data} />} />
             <Route path="/account" element={<Account me={me.data} />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<Admin me={me.data} />} />
             <Route path="/duel/:id" element={<DuelPage me={me.data} />} />
             <Route path="/decks/:id" element={<DeckPage />} />
             <Route

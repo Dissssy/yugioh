@@ -2,7 +2,7 @@
 
 Status, 2026-11-19: steps 1 and 2 of the build order (play against Claude; contests and missing-move complaints) are built; deck plans and tuning (step 3) are not yet. Notes marked **Built** say where the code differs from the plan.
 
-The admin can start a duel against Claude. Claude sits in a seat like any other player: it sees what that seat sees, picks one move at a time from the moves code already offers, answers the judge's questions, can contest a ruling, and says in the duel chat when it thinks a move should be possible but isn't offered. It is for the admin only, both to play against and as a playtester that finds rules bugs.
+The super admin (see docs/accounts.md) can start a duel against Claude. Claude sits in a seat like any other player: it sees what that seat sees, picks one move at a time from the moves code already offers, answers the judge's questions, can contest a ruling, and says in the duel chat when it thinks a move should be possible but isn't offered. It is for the super admin only, both to play against and as a playtester that finds rules bugs.
 
 ## Principles
 
@@ -13,7 +13,7 @@ The admin can start a duel against Claude. Claude sits in a seat like any other 
 
 ## Starting a duel
 
-- The admin's home page gets a **Play against Claude** box, shown only to the admin (without an API key, starting a duel answers 503 with a message). The admin picks their own deck and the AI's deck (any premade deck).
+- The admin's home page gets a **Play against Claude** box, shown only to the super admin (without an API key, starting a duel answers 503 with a message). The admin picks their own deck and the AI's deck (any premade deck).
 - `POST /api/admin/duels/ai { deckId, aiDeckId }` (behind `requireAdmin`) creates the match and joins it at once through the existing `create` and `join` (`Duels.createAgainstAi`), with a `SeatClaim` that returns the key `ai:claude` and the name **Claude**. A seat key starting with `ai:` is how the server knows a seat is played by the AI (`isAiKey` in `viewer.ts`); the tests use `ai:a` and `ai:b` to have it play both seats.
 - The duel then runs exactly like any other: same link, same stream, same log, same admin Full log.
 - When a duel loads (`Duels.load`) and a seat's key starts with `ai:`, `Duels.onAiSeat` has `Opponents` (`server/src/opponent/opponent.ts`) attach an opponent to that seat. So after a restart, the AI picks up where it was, as soon as the duel is loaded again.

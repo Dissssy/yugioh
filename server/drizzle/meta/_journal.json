@@ -43,6 +43,13 @@
       "when": 1795061140003,
       "tag": "0005_user_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795101491622,
+      "tag": "0006_roles",
+      "breakpoints": true
     }
   ]
 }
