@@ -16,11 +16,72 @@ export interface CardData {
   atk: number | null;
   def: number | null;
   attribute: string | null;
+  /** Monster type ("Warrior"), or for Spells and Traps their property ("Normal", "Quick-Play", "Continuous", "Equip", "Field", "Counter"). */
   race: string;
+}
+
+/** How one effect of a card works, read once from its text by a strong model (see docs/effects.md). */
+export interface SheetEffect {
+  /**
+   * `activation`: activating the Spell/Trap card itself. `ignition`, `trigger`, `quick`, `flip`: monster effects.
+   * `continuous`: always on, never activated. `condition`: a summoning condition or procedure.
+   */
+  kind: 'activation' | 'ignition' | 'trigger' | 'quick' | 'continuous' | 'flip' | 'condition';
+  speed: 1 | 2 | 3;
+  /** For triggers: whether the controller must activate it. */
+  mandatory: boolean;
+  /** `soft`: once per turn for each copy. `hard`: once per turn for all copies by card name. */
+  opt: 'none' | 'soft' | 'hard';
+  /** When it can be used, in plain words. */
+  window: string;
+  /** The cost, as worded on the card, or empty. */
+  cost: string;
+  /** What it does, as worded on the card. */
+  effect: string;
+  /** What it targets, or null if it doesn't target. */
+  targets: string | null;
+}
+
+export interface EffectSheet {
+  code: number;
+  /** sha256 of the card text the sheet was made from; a sheet whose hash no longer matches is ignored. */
+  textHash: string;
+  /** Made by `model`; set to true by a person who checked it, after which the compiler never overwrites it. */
+  verified: boolean;
+  model: string;
+  effects: SheetEffect[];
+  /** Extra Deck materials as worded on the card, or null. */
+  materials: string | null;
 }
 
 export type Phase = 'draw' | 'standby' | 'main1' | 'battle' | 'main2' | 'end';
 export type Position = 'attack' | 'defense';
+
+/** A change to a face-up monster's stats. Every modifier ends when the card leaves the field. */
+export interface Modifier {
+  card: string;
+  /** Who applied it, for "your next Standby Phase". */
+  player: Seat;
+  atk: number;
+  def: number;
+  /** Added to the Level. */
+  levelDelta: number;
+  /** The Level becomes this, before levelDelta of later modifiers. */
+  levelSet: number | null;
+  until: Until;
+  turn: number;
+}
+
+export const UNTIL = ['end_of_turn', 'end_of_battle_phase', 'next_standby_phase', 'while_on_field'] as const;
+export type Until = (typeof UNTIL)[number];
+
+/** An activated effect waiting to resolve. Layer 2 has no responses, so the chain never holds more than one link. */
+export interface ChainLink {
+  player: Seat;
+  card: string;
+  effect: number;
+  targets: string[];
+}
 
 /** A card on the field. */
 export interface FieldCard {
@@ -53,11 +114,19 @@ export interface DuelState {
   /** Card instances by ID. Instance IDs are random so an ID never reveals which card it is. */
   instances: Record<string, { code: number; owner: Seat }>;
   cards: Record<number, CardData>;
+  /** Effect sheets of the cards in the duel that have effects. */
+  sheets: Record<number, EffectSheet>;
   players: [PlayerState, PlayerState];
   turn: number;
   turnPlayer: Seat;
   phase: Phase;
-  normalSummonUsed: boolean;
+  normalSummons: number;
+  /** Normal Summons/Sets allowed this turn: 1, or more after an effect like Double Summon. */
+  normalSummonLimit: number;
+  modifiers: Modifier[];
+  chain: ChainLink[];
+  /** Effects used this turn, for once-per-turn clauses. */
+  usedThisTurn: { card: string; code: number; effect: number }[];
   result: DuelResult | null;
 }
 
@@ -83,13 +152,70 @@ export type Intent =
   | { type: 'attack'; attacker: string; target: number | 'direct' }
   | { type: 'enterMain2' }
   | { type: 'endTurn'; discard: string[] }
+  /** Activates effect `effect` (an index into the card's effect sheet). `zone` is where a Spell/Trap from the hand goes. */
+  | { type: 'activate'; card: string; effect: number; zone: number | null }
   | { type: 'surrender' };
+
+/** Where an op sends a card. Deck places shuffle the Deck, except the top and bottom. */
+export const DESTINATIONS = ['hand', 'deck_top', 'deck_bottom', 'deck_shuffled', 'graveyard', 'banished'] as const;
+export type Destination = (typeof DESTINATIONS)[number];
+
+/**
+ * The closed set of changes the judge can make. Code checks each one against the board before it applies.
+ * Card references are instance IDs, so the model can't invent a card.
+ */
+export type Op =
+  | { op: 'move'; card: string; to: Destination }
+  | { op: 'special_summon'; card: string; controller: Seat; position: Position }
+  | { op: 'destroy'; cards: string[] }
+  | { op: 'change_lp'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
+  | { op: 'modify_stats'; card: string; atk: number; def: number; level_delta: number; level_set: number | null; until: Until }
+  | { op: 'change_position'; card: string; position: Position }
+  | { op: 'draw'; player: Seat; count: number }
+  | { op: 'extra_normal_summon'; player: Seat }
+  | { op: 'declare_targets'; cards: string[] };
+
+/** One judge call, kept whole so it can be contested and replayed. Players see only `stage`, `legal` and `summary`. */
+export interface JudgeRecord {
+  stage: 'activation' | 'resolution';
+  player: Seat;
+  card: string;
+  effect: number;
+  model: string;
+  promptVersion: string;
+  /** sha256 of the state the judge saw. */
+  stateHash: string;
+  /** The conversation after the system prompt, exactly as sent and received. */
+  transcript: unknown[];
+  /** For `activation`, whether the activation was allowed. Always true for `resolution`. */
+  legal: boolean;
+  /** One line for both players' logs. */
+  summary: string;
+  ops: Op[];
+  /** Set when the judge failed (an API error, or no answer within the turn limit); the activation is refused or the effect does nothing. */
+  error: string | null;
+}
+
+/** A stronger model's second look at a judge decision. */
+export interface AppealRecord {
+  /** Event index of the contested `judged` event. */
+  judged: number;
+  by: Seat;
+  note: string;
+  model: string;
+  verdict: 'upheld' | 'overturned';
+  /** One or two sentences for both players; checked to name no card hidden from either. */
+  explanation: string;
+  /** The correct ruling, kept for review as a candidate ruling. Never shown, since it may mention hidden cards. */
+  ruling: string;
+}
 
 /** Everything that happens is one of these. The duel's state is the fold of its events. */
 export type DuelEvent =
   | {
       type: 'duelStarted';
       cards: Record<number, CardData>;
+      sheets: Record<number, EffectSheet>;
       instances: Record<string, { code: number; owner: Seat }>;
       /** Decks already shuffled, top first. */
       players: [StartingPlayer, StartingPlayer];
@@ -110,6 +236,20 @@ export type DuelEvent =
   | { type: 'battleDamage'; player: Seat; amount: number }
   | { type: 'destroyedByBattle'; cards: string[] }
   | { type: 'discarded'; player: Seat; cards: string[] }
+  | { type: 'judged'; record: JudgeRecord }
+  /** A Spell/Trap from the hand goes face-up to `zone`; a Set one flips face-up; a monster's effect leaves it where it is. */
+  | { type: 'effectActivated'; player: Seat; card: string; effect: number; zone: number | null }
+  | { type: 'targeted'; cards: string[] }
+  | { type: 'moved'; card: string; owner: Seat; from: Place; to: Destination }
+  | { type: 'deckShuffled'; player: Seat; order: string[] }
+  | { type: 'specialSummoned'; player: Seat; card: string; zone: number; position: Position }
+  | { type: 'destroyed'; cards: string[] }
+  | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
+  | { type: 'statsModified'; modifier: Modifier }
+  | { type: 'normalSummonGranted'; player: Seat }
+  /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
+  | { type: 'linkResolved' }
+  | { type: 'appealed'; appeal: AppealRecord }
   | { type: 'duelEnded'; result: DuelResult };
 
 export interface StartingPlayer {
@@ -129,13 +269,25 @@ export interface PlayerView {
   normalSummonUsed: boolean;
   result: DuelResult | null;
   players: [PlayerSideView, PlayerSideView];
+  /** Activated effects waiting to resolve, oldest first. */
+  chain: { player: Seat; card: CardView; effect: number; targets: string[] }[];
   actions: LegalAction[];
 }
 
-/** An event as one player may see it: a card Set by the opponent has no ID. Intents and the duel's start are never shown. */
+/**
+ * An event as one player may see it: a card Set by the opponent has no ID, nor does a card moving between places
+ * the player can't see. Intents, the duel's start and Deck orders are never shown, and a judge decision shows only its outcome.
+ */
 export type LogEvent =
-  | Exclude<DuelEvent, { type: 'duelStarted' | 'intent' | 'monsterSet' | 'spellTrapSet' | 'attackDeclared' }>
+  | Exclude<
+      DuelEvent,
+      { type: 'duelStarted' | 'intent' | 'monsterSet' | 'spellTrapSet' | 'attackDeclared' | 'judged' | 'moved' | 'deckShuffled' | 'appealed' }
+    >
   | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number }
+  | (Omit<Extract<DuelEvent, { type: 'moved' }>, 'card'> & { card: string | null })
+  /** A judge decision. `card` is null when the player can't see it. Contest it by its log entry's `seq`. */
+  | { type: 'judged'; stage: 'activation' | 'resolution'; player: Seat; card: string | null; legal: boolean; summary: string; failed: boolean }
+  | { type: 'appealed'; judged: number; by: Seat; verdict: 'upheld' | 'overturned'; explanation: string }
   /** `targetZone` locates a face-down target, which the attacker's view shows without an ID until it flips. */
   | (Extract<DuelEvent, { type: 'attackDeclared' }> & { targetZone: number | null });
 
@@ -153,8 +305,37 @@ export interface LogEntry {
  * with the board after every event so the client can animate them one by one.
  */
 export type DuelUpdate =
-  | { type: 'sync'; view: PlayerView; log: LogEntry[] }
-  | { type: 'steps'; steps: { entry: LogEntry; view: PlayerView }[] };
+  | { type: 'sync'; view: PlayerView; log: LogEntry[]; judging: JudgingView | null }
+  | { type: 'steps'; steps: { entry: LogEntry; view: PlayerView }[] }
+  /** The judge started, asked a player something, got an answer, or finished (null). */
+  | { type: 'judging'; judging: JudgingView | null };
+
+/** The judge at work on an effect. Nothing it does reaches the board until it finishes. */
+export interface JudgingView {
+  stage: 'activation' | 'resolution';
+  player: Seat;
+  /** Hidden while the opponent is still checking whether a card from their hand can be activated. */
+  card: CardView;
+  /** Who the judge is waiting on, or null while the model works. */
+  waitingOn: Seat | null;
+  /** The question, for the player it is put to; null for the other player. */
+  prompt: PromptView | null;
+}
+
+/** An `ask_player` question. Answer with POST /api/duels/:id/answer `{ prompt, picks }`, picking card IDs or choices. */
+export interface PromptView {
+  id: string;
+  text: string;
+  /** Cards to pick from; the asked player may see all of them, even ones from their Deck. */
+  cards: { id: string; card: CardData; place: Place }[];
+  /** Picks that aren't cards, such as "Gain 1200 LP". */
+  choices: string[];
+  min: number;
+  max: number;
+}
+
+/** Where a card is, without the slot. */
+export type Place = 'deck' | 'hand' | 'monsters' | 'spellTraps' | 'graveyard' | 'banished' | 'extra';
 
 export type CardView = { id: string; card: CardData } | { hidden: true };
 
@@ -162,6 +343,8 @@ export interface FieldCardView {
   card: CardView;
   position: Position;
   faceUp: boolean;
+  /** A face-up monster's current ATK, DEF and Level, after modifiers. */
+  stats: { atk: number; def: number; level: number | null } | null;
 }
 
 export interface PlayerSideView {
@@ -188,4 +371,10 @@ export type LegalAction =
   | { type: 'attack'; attacker: string; targets: number[]; direct: boolean }
   | { type: 'enterMain2' }
   | { type: 'endTurn'; discard: number }
+  /**
+   * Activating effect `effect` of the card (an index into its sheet). Only the generic rules are checked here; the judge
+   * decides the rest when the player tries. `zones` are the Spell & Trap Zones a card from the hand may go to (null if
+   * it isn't in the hand). `text` is the effect's wording, for the menu.
+   */
+  | { type: 'activate'; card: string; effect: number; zones: number[] | null; text: string }
   | { type: 'surrender' };
