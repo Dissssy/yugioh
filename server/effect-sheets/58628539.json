@@ -1,8 +1,7 @@
 {
   "code": 58628539,
   "textHash": "f2ed2cd53a350f3c58b004b4cefc5f7953d47e7a12d12d5d684b2b8607c43f5f",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
@@ -11,8 +10,11 @@
       "opt": "none",
       "window": "When you Xyz Summon a monster",
       "cost": "",
-      "effect": "Destroy it.",
-      "targets": "1 card on the field"
+      "effect": "Target 1 card on the field; destroy it.",
+      "targets": "1 card on the field",
+      "respondsTo": "summon",
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

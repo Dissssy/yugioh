@@ -1,5 +1,6 @@
 // The game rules as code: what a player may do now, and the events an intent produces.
 
+import { scriptProblem } from './script.ts';
 import { evolve, locate, other, replay, statsOf } from './state.ts';
 import {
   HAND_LIMIT,
@@ -164,8 +165,9 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
 }
 
 // ---------------------------------------------------------------------------
-// Activating effects. Code checks only what is the same for every card: whose turn, which phase, where the card
-// is, a free zone, once-per-turn use. Whether the card's own conditions hold is the judge's call.
+// Activating effects. Code checks what is the same for every card: whose turn, which phase, where the card is, a free
+// zone, once-per-turn use, and that nothing needs responding to. A scripted effect's own conditions are checked here too
+// (script.ts); for any other effect they are the judge's call.
 
 /** Spell/Trap properties that work in layer 2. Continuous, Equip and Field cards need lingering effects (layer 5). */
 const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play'];
@@ -188,6 +190,8 @@ function activatableEffects(state: DuelState, seat: Seat, id: string): Extract<L
   sheet.effects.forEach((effect, index) => {
     if (!onceOk(state, id, card.code, index, effect.opt)) return;
     if (ruledIllegal(state, seat, id, index)) return;
+    // Responses need chains (layer 4).
+    if (effect.respondsTo) return;
     const text = effect.effect;
     if (lingers) return;
     if (card.kind === 'spell' && effect.kind === 'activation' && ACTIVATABLE_SPELLS.includes(card.race)) {
@@ -228,7 +232,7 @@ function onceOk(state: DuelState, id: string, code: number, effect: number, opt:
 function activations(state: DuelState, seat: Seat): LegalAction[] {
   const p = state.players[seat];
   const ids = [...p.hand, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((c) => (c ? [c.id] : []))];
-  return ids.flatMap((id) => activatableEffects(state, seat, id));
+  return ids.flatMap((id) => activatableEffects(state, seat, id)).filter((a) => !scriptProblem(state, seat, a.card, a.effect));
 }
 
 const notJustPlaced = (state: DuelState, m: FieldCard) => m.placedTurn !== state.turn;
@@ -321,6 +325,8 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
       check(!ruling, `The judge already ruled this activation illegal, and nothing has changed since: ${ruling?.summary}`);
       const options = activatableEffects(state, seat, intent.card).filter((a) => a.effect === intent.effect);
       check(options.length > 0, "That effect can't be activated now.");
+      const problem = scriptProblem(state, seat, intent.card, intent.effect);
+      check(!problem, problem!);
       const fromHand = options.find((a) => a.zones !== null);
       if (fromHand) {
         check(intent.zone !== null && fromHand.zones!.includes(intent.zone), 'Choose an empty Spell & Trap Zone.');

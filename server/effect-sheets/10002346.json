@@ -1,28 +1,33 @@
 {
   "code": 10002346,
   "textHash": "8005caffa714663ee35a9bcce7e315319129f6c78d37407c5106730d796c4d40",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "",
+      "window": "If this face-up card would be destroyed",
       "cost": "",
-      "effect": "If this face-up card would be destroyed, you can detach 1 Xyz Material from this card instead.",
-      "targets": null
+      "effect": "You can detach 1 Xyz Material from this card instead.",
+      "targets": null,
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "",
+      "window": "While this card is face-up on the field",
       "cost": "",
       "effect": "Face-up monsters you control gain 200 ATK and DEF for each Xyz Material attached to this card.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": "2 Level 2 monsters"

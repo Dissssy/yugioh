@@ -18,6 +18,7 @@ import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
 import { LpPlate } from './LpPlate.tsx';
 import { PhaseStrip } from './PhaseStrip.tsx';
 import { PileViewer } from './PileViewer.tsx';
+import { ReportRuling } from './ReportRuling.tsx';
 import { systemReducesMotion, useDuelSettings } from './settings.ts';
 import { useDuel } from './useDuel.ts';
 
@@ -373,7 +374,10 @@ export function Board({ duelId }: { duelId: string }) {
   return (
     <MotionConfig reducedMotion={reduceMotion ? 'always' : 'never'}>
       <BoardLookProvider value={look}>
-        <CardTooltipProvider suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}>
+        <CardTooltipProvider
+          suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}
+          pinnedFooter={(card) => <ReportRuling key={card.code} duelId={duelId} card={card} />}
+        >
           <div className={`duel${choosing ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
             <div className="table" ref={setTable}>
               {!ready ? (

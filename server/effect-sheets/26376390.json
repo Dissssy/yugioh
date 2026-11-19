@@ -1,18 +1,20 @@
 {
   "code": 26376390,
   "textHash": "132802c527494f606e116ccb57577ddaf471794ece38bc60fec0a2469cda0078",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
       "opt": "none",
-      "window": "If this card is Summoned",
+      "window": "When this card is Summoned",
       "cost": "",
       "effect": "This card's ATK/DEF become equal to that monster's original ATK/DEF.",
-      "targets": "1 face-up monster your opponent controls"
+      "targets": "1 face-up monster your opponent controls",
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

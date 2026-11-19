@@ -5,7 +5,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
-import type { AdminDuels, Me } from '@yugioh/shared';
+import type { AdminDuels, Me, RulingCard } from '@yugioh/shared';
 import { findUserBySub, listUsers, setStatus, setUsername, syncUser, toUser, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import { duelCosts } from './costs.ts';
@@ -14,6 +14,7 @@ import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
 import { matchReport, reportText } from './matchReport.ts';
+import { editSheet, resolveReport, rulingCards } from './rulings.ts';
 import { username } from './usernames.ts';
 import { userKey, viewerOf, type Viewer } from './viewer.ts';
 
@@ -136,6 +137,29 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     if (!report) return void res.status(404).json({ error: 'not_found' });
     if (req.query.format === 'json') return void res.json(report);
     res.type('text/plain').send(reportText(report));
+  });
+
+  // Rulings: reported cards and set-aside scripts, the admin's sheet edits, and closing reports.
+  app.get('/api/admin/rulings', requireAdmin, async (_req, res) => {
+    res.json((await rulingCards(db)) satisfies RulingCard[]);
+  });
+
+  const sheetBody = z.object({ sheet: z.unknown(), note: z.string().trim().min(1).max(1000) });
+  app.post('/api/admin/sheets/:code', requireAdmin, async (req, res) => {
+    const code = z.coerce.number().int().safeParse(req.params.code);
+    const body = sheetBody.safeParse(req.body);
+    if (!code.success || !body.success) return void res.status(400).json({ error: 'Give the sheet and a note on what changed.' });
+    const saved = await editSheet(db, code.data, body.data.sheet, body.data.note);
+    if ('error' in saved) return void res.status(400).json(saved);
+    await duels.sheetChanged(code.data, saved.sheet);
+    res.json(saved.sheet);
+  });
+
+  app.post('/api/admin/reports/:id/resolve', requireAdmin, async (req, res) => {
+    const id = z.coerce.number().int().safeParse(req.params.id);
+    if (!id.success) return void res.status(400).json({ error: 'bad_request' });
+    if (!(await resolveReport(db, id.data))) return void res.status(404).json({ error: 'not_found' });
+    res.status(204).end();
   });
 
   app.use('/api', duelRoutes(db, duels, guestCookie));

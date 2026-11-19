@@ -1,9 +1,21 @@
 {
   "code": 72302403,
   "textHash": "21fa0db1c2623e482f72ec7a35cf1a1a11519aed7f3e69ab048f4195ac93cad2",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "After this card's activation",
+      "cost": "",
+      "effect": "This card remains on the field, but you must destroy it during the End Phase of your opponent's 3rd turn.",
+      "targets": null,
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
+    },
     {
       "kind": "activation",
       "speed": 1,
@@ -11,18 +23,24 @@
       "opt": "none",
       "window": "Your Main Phase",
       "cost": "",
-      "effect": "If your opponent controls a face-down monster, flip all monsters they control face-up. This card remains on the field.",
-      "targets": null
+      "effect": "When this card is activated: If your opponent controls a face-down monster, flip all monsters they control face-up.",
+      "targets": null,
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
     },
     {
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "",
+      "window": "While this card is face-up on the field",
       "cost": "",
-      "effect": "While this card is face-up on the field, your opponent's monsters cannot declare an attack. Destroy it during the End Phase of your opponent's 3rd turn after its activation.",
-      "targets": null
+      "effect": "Your opponent's monsters cannot declare an attack.",
+      "targets": null,
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

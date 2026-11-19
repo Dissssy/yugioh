@@ -1,8 +1,7 @@
 {
   "code": 22346472,
   "textHash": "6061caef5e4b612b37cd45467d6fad23966d44cc23a328714259d7c2e8a32dfc",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
@@ -12,7 +11,51 @@
       "window": "Your Main Phase",
       "cost": "",
       "effect": "It gains 1000 ATK and DEF until your next Standby Phase.",
-      "targets": "1 face-up monster you control"
+      "targets": "1 face-up monster you control",
+      "respondsTo": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "you",
+            "place": "monsters",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1
+        },
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "modify_stats",
+                "cards": {
+                  "from": "targets"
+                },
+                "atk": 1000,
+                "def": 1000,
+                "levelDelta": 0,
+                "levelSet": null,
+                "until": "next_standby_phase"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "status": "unverified"
     }
   ],
   "materials": null

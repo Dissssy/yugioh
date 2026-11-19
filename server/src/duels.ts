@@ -9,6 +9,7 @@ import { and, desc, eq, or } from 'drizzle-orm';
 import {
   cardOf,
   decide,
+  scriptOf,
   entryFor,
   evolve,
   logFor,
@@ -20,6 +21,7 @@ import {
   type DuelEvent,
   type DuelState,
   type DuelUpdate,
+  type EffectSheet,
   type Intent,
   type JudgingView,
   type Seat,
@@ -27,10 +29,11 @@ import {
 import type { DuelSummary } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
-import { decks, matchEvents, matches, users } from './db/schema.ts';
+import { decks, matchEvents, matches, sheetReports, users } from './db/schema.ts';
 import { appeal } from './judge/appeal.ts';
-import { judge, type ModelCall, type Question } from './judge/judge.ts';
-import { loadSheets } from './sheets.ts';
+import type { ModelCall, Question } from './judge/judge.ts';
+import { rule, SCRIPT } from './judge/script.ts';
+import { flagScripts, loadSheets } from './sheets.ts';
 
 type MatchRow = typeof matches.$inferSelect;
 
@@ -158,7 +161,7 @@ export class Duels {
             { name: player.name, main: deck1.main, extra: deck1.extra },
           ],
           cards,
-          sheets: await loadSheets(cards),
+          sheets: await loadSheets(this.db, cards),
         },
         this.random,
       );
@@ -176,6 +179,14 @@ export class Duels {
         const rows = await this.db.select().from(matchEvents).where(eq(matchEvents.matchId, id)).orderBy(matchEvents.seq);
         const events = rows.map((r) => r.event as DuelEvent);
         const live: LiveDuel = { id, events, state: replay(events), listeners: new Set(), queue: Promise.resolve(), writes: Promise.resolve(), judging: null, appealing: new Set() };
+        // Sheets that changed while the duel wasn't loaded (a report, a fix) apply from here on.
+        if (!live.state.result) {
+          const now = await loadSheets(this.db, live.state.cards);
+          const changed = Object.keys(live.state.cards)
+            .map(Number)
+            .filter((code) => JSON.stringify(now[code] ?? null) !== JSON.stringify(live.state.sheets[code] ?? null));
+          if (changed.length) await this.write(live, changed.map((code) => ({ type: 'sheetUpdated', code, sheet: now[code] ?? null })));
+        }
         // An effect that was activated but not resolved when the server stopped resolves now.
         if (live.state.chain.length > 0) void this.enqueue(live, () => this.resolveChain(live));
         return live;
@@ -215,9 +226,12 @@ export class Duels {
           await this.commit(duel, decision.events);
           return answer({ ok: true });
         }
-        if (!this.ai.judge) return answer({ ok: false, status: 503, error: "Card effects need the judge, and it isn't set up on this server." });
-        if (judgeCallsMade(duel.events) + 2 > this.ai.judgeCalls) {
-          return answer({ ok: false, status: 429, error: 'This duel has used all its judge calls.' });
+        // A scripted effect needs no model, so neither the API key nor the duel's judge calls.
+        if (!scriptOf(duel.state, intent.card, intent.effect)) {
+          if (!this.ai.judge) return answer({ ok: false, status: 503, error: "This card's effect needs the judge, and it isn't set up on this server." });
+          if (judgeCallsMade(duel.events) + 2 > this.ai.judgeCalls) {
+            return answer({ ok: false, status: 429, error: 'This duel has used all its judge calls.' });
+          }
         }
         answer({ ok: true });
         await this.activate(duel, decision.events);
@@ -250,10 +264,10 @@ export class Duels {
     duel.judging = { stage, link, question: null };
     this.broadcastJudging(duel);
     try {
-      return await judge(
+      return await rule(
         { stage, state, link, appealRuling },
         {
-          model: this.ai.judge!,
+          model: this.ai.judge,
           random: this.random,
           ask: (question) =>
             new Promise<string[]>((answer) => {
@@ -309,10 +323,50 @@ export class Duels {
     duel.appealing.add(key);
     const input = { before: replay(duel.events.slice(0, seq)), now: duel.state, record: event.record, judged: seq, by: seat, note };
     void appeal(input, this.ai.appeal)
-      .then((record) => this.enqueue(duel, () => this.commit(duel, [{ type: 'appealed', appeal: record }])))
+      .then(async (record) => {
+        await this.enqueue(duel, () => this.commit(duel, [{ type: 'appealed', appeal: record }]));
+        // An overturned scripted ruling means the script is wrong: the judge takes the card over until it is fixed.
+        if (record.verdict === 'overturned' && event.record.model === SCRIPT) {
+          const code = cardOf(duel.state, event.record.card).code;
+          await this.db.insert(sheetReports).values({ code, matchId: id, seq, reporter: 'appeal', note: record.ruling });
+          await this.sheetChanged(code, await flagScripts(this.db, code, `appeal overturned a scripted ruling: ${record.ruling}`));
+        }
+      })
       .catch((error: unknown) => console.error(`Appeal in duel ${duel.id} failed:`, error))
       .finally(() => duel.appealing.delete(key));
     return { ok: true };
+  }
+
+  /**
+   * A player's report that a card is ruled wrongly. It is kept for the admin with the board it was made on, and any
+   * script on the card is set aside at once, here and in every other duel, so the judge rules on the card instead.
+   */
+  async report(id: string, seatKey: string, code: number, note: string): Promise<ActResult> {
+    const duel = await this.load(id);
+    const seat = await this.seatOf(id, seatKey);
+    if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
+    const state = duel.state;
+    const known = Object.entries(state.instances).some(([card, i]) => i.code === code && (i.owner === seat || visibleTo(state, card, seat)));
+    if (!known) return { ok: false, status: 404, error: "There's no such card in this duel." };
+    const mine = await this.db.$count(sheetReports, and(eq(sheetReports.matchId, id), eq(sheetReports.reporter, seatKey)));
+    if (mine >= REPORTS_PER_SEAT) return { ok: false, status: 429, error: `You can report up to ${REPORTS_PER_SEAT} cards per duel.` };
+    await this.db.insert(sheetReports).values({ code, matchId: id, seq: duel.events.length, reporter: seatKey, note });
+    await this.sheetChanged(code, await flagScripts(this.db, code, `reported by a player: ${note}`));
+    return { ok: true };
+  }
+
+  /** Applies a card's new sheet to every loaded duel that has the card and is still going. */
+  async sheetChanged(code: number, sheet: EffectSheet | null) {
+    if (!sheet) return;
+    for (const loading of this.live.values()) {
+      const duel = await loading.catch(() => null);
+      if (!duel || duel.state.result || !duel.state.cards[code]) continue;
+      void this.enqueue(duel, async () => {
+        await this.commit(duel, [{ type: 'sheetUpdated', code, sheet }]);
+        // Nobody sees the change in the log, but it can change what each player may do.
+        for (const l of duel.listeners) l.send(syncFor(duel, l.seat));
+      });
+    }
   }
 
   /** A player's chat message. It joins the log in order with everything else, even while the judge is working. */
@@ -350,7 +404,7 @@ export class Duels {
     const duel = await this.load(id);
     const listener = { seat, send };
     duel.listeners.add(listener);
-    send({ type: 'sync', view: viewFor(duel.state, seat), log: logFor(duel.events, seat), judging: judgingFor(duel, seat) });
+    send(syncFor(duel, seat));
     return () => duel.listeners.delete(listener);
   }
 
@@ -378,7 +432,13 @@ export class Duels {
   }
 }
 
-const judgeCallsMade = (events: DuelEvent[]) => events.filter((e) => e.type === 'judged').length;
+/** Reports each player may make per duel. */
+const REPORTS_PER_SEAT = 5;
+
+const judgeCallsMade = (events: DuelEvent[]) => events.filter((e) => e.type === 'judged' && e.record.model !== SCRIPT).length;
+
+/** The whole duel as one seat sees it now. */
+const syncFor = (duel: LiveDuel, seat: Seat): DuelUpdate => ({ type: 'sync', view: viewFor(duel.state, seat), log: logFor(duel.events, seat), judging: judgingFor(duel, seat) });
 
 /** The judge's progress as one seat may see it. */
 function judgingFor(duel: LiveDuel, seat: Seat): JudgingView | null {

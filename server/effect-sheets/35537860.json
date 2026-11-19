@@ -1,8 +1,7 @@
 {
   "code": 35537860,
   "textHash": "685c1296abbeea473ba076510e377e3f71aba197c6e77b5237aca51bdd7b45bd",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
@@ -12,7 +11,68 @@
       "window": "Your Main Phase, if you control a Synchro Monster",
       "cost": "",
       "effect": "Destroy that target.",
-      "targets": "1 monster your opponent controls"
+      "targets": "1 monster your opponent controls",
+      "respondsTo": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "monsters",
+              "kinds": [
+                "monster"
+              ],
+              "types": [
+                "Synchro"
+              ],
+              "races": [],
+              "attributes": [],
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 1
+          }
+        ],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "monsters",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1
+        },
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "status": "unverified"
     }
   ],
   "materials": null

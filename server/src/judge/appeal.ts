@@ -8,6 +8,7 @@ import type { AppealRecord, DuelState, JudgeRecord, ModelUsage, Seat } from '@yu
 import { hiddenNameIn } from './hidden.ts';
 import type { ModelCall } from './judge.ts';
 import { usageOf } from './pricing.ts';
+import { SCRIPT } from './script.ts';
 import { describeEffect, describeState, RULES } from './prompt.ts';
 
 export const APPEAL_MODEL = 'claude-opus-5-5';
@@ -54,6 +55,9 @@ export async function appeal(input: AppealInput, model: ModelCall): Promise<Appe
     `# The decision (${record.stage === 'activation' ? 'checking the activation' : 'resolving the effect'})`,
     `Outcome: ${record.stage === 'activation' ? (record.legal ? 'activation allowed' : 'activation refused') : 'resolved'}. Summary shown to players: ${record.summary}`,
     record.error ? `The judge failed: ${record.error}` : '',
+    record.model === SCRIPT
+      ? "This decision was made without the judge, by code running the effect's script (the first transcript entry) exactly. If it was wrong, the script is wrong: say how in the ruling."
+      : '',
     'Transcript:',
     JSON.stringify(record.transcript),
     '',

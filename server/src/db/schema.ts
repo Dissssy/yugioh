@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { EffectSheet } from '@yugioh/engine';
 import { boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
@@ -99,3 +100,47 @@ export const matchEvents = pgTable(
   },
   (t) => [primaryKey({ columns: [t.matchId, t.seq] })],
 );
+
+/**
+ * Each card's effect sheet as it is now (see docs/effects.md). The database is where sheets live and change: the
+ * compiler, players' reports and the admin all write here. `npm run sheets:export` copies them to files for diffing.
+ */
+export const effectSheets = pgTable('effect_sheets', {
+  code: integer('code')
+    .primaryKey()
+    .references(() => cards.id, { onDelete: 'cascade' }),
+  sheet: jsonb('sheet').$type<EffectSheet>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Every version a sheet has had, newest last, with why it changed. */
+export const sheetRevisions = pgTable('sheet_revisions', {
+  id: serial('id').primaryKey(),
+  code: integer('code')
+    .notNull()
+    .references(() => cards.id, { onDelete: 'cascade' }),
+  sheet: jsonb('sheet').$type<EffectSheet>().notNull(),
+  /** "compiled", "imported", "reported", "appeal overturned a scripted ruling", or the admin's note. */
+  reason: text('reason').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * A player's report that a card is ruled wrongly, or an appeal that overturned a scripted ruling. `seq` is how many
+ * events the duel had, so the board it was made on can be replayed. Open until the admin resolves it.
+ */
+export const sheetReports = pgTable('sheet_reports', {
+  id: serial('id').primaryKey(),
+  code: integer('code')
+    .notNull()
+    .references(() => cards.id, { onDelete: 'cascade' }),
+  matchId: text('match_id')
+    .notNull()
+    .references(() => matches.id, { onDelete: 'cascade' }),
+  seq: integer('seq').notNull(),
+  /** The reporting seat key, or "appeal". */
+  reporter: text('reporter').notNull(),
+  note: text('note').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});

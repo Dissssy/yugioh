@@ -3,11 +3,11 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startDuel, type DuelEvent, type DuelUpdate, type LogEntry } from '@yugioh/engine';
-import type { AdminDuels, DeckSummary, DuelSummary } from '@yugioh/shared';
+import type { AdminDuels, DeckSummary, DuelSummary, RulingCard } from '@yugioh/shared';
 import { loadCards, syncCards } from '../src/cards.ts';
 import { decks, matchEvents } from '../src/db/schema.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
-import { loadSheets } from '../src/sheets.ts';
+import { flagScripts, importSheetFiles, loadSheets, sheetOf } from '../src/sheets.ts';
 import { ADMIN_EMAIL, Browser, startHarness, Stream, type Harness } from './harness.ts';
 
 let h: Harness;
@@ -39,7 +39,55 @@ async function until<T>(stream: Stream, pick: (u: DuelUpdate) => T | undefined):
 }
 const entries = (u: DuelUpdate): LogEntry[] => (u.type === 'steps' ? u.steps.map((s) => s.entry) : []);
 
-describe('a card effect', () => {
+/** Who plays a duel set up by `setUp`, and the guest's two cards. */
+interface Setup {
+  admin: Browser;
+  guest: Browser;
+  duel: DuelSummary;
+  poison: string;
+  returning: string;
+}
+
+/**
+ * A duel where the guest goes first holding Poison of the Old Man and The Warrior Returning Alive, with an empty GY.
+ * Without `scripts`, every script is set aside, so the judge rules on every effect; with it, the sheet files are restored.
+ */
+async function setUp(scripts: boolean): Promise<Setup> {
+  const admin = await login();
+  const deckList = (await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`)).body;
+  const duel = (await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: deckList[0]!.id }) })).body;
+  const guest = new Browser();
+  await guest.json(`${h.baseUrl}/api/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify({ deckId: deckList[1]!.id, guestName: 'Kaiba' }) });
+
+  // Replace the dealt duel with one where the guest goes first with both cards in their hand.
+  const [d0, d1] = await Promise.all(deckList.map((d) => h.db.query.decks.findFirst({ where: eq(decks.id, d.id) })));
+  const cards = await loadCards(h.db, [...d0!.main, ...d0!.extra, ...d1!.main, ...d1!.extra]);
+  if (scripts) await importSheetFiles(h.db, { force: true });
+  else for (const code of Object.keys(cards)) await flagScripts(h.db, Number(code), 'judge tests');
+  const sheets = await loadSheets(h.db, cards);
+  const [dealt] = startDuel(
+    { players: [{ name: 'Ethan', main: d0!.main, extra: d0!.extra }, { name: 'Kaiba (guest)', main: d1!.main, extra: d1!.extra }], cards, sheets },
+    Math.random,
+  );
+  const start = { ...(dealt as Extract<DuelEvent, { type: 'duelStarted' }>), first: 1 as const };
+  const poison = start.players[1].deck.find((id) => start.instances[id]!.code === POISON)!;
+  const returning = start.players[1].deck.find((id) => start.instances[id]!.code === RETURNING)!;
+  const events: DuelEvent[] = [
+    start,
+    { type: 'drew', player: 1, count: 5 },
+    { type: 'drew', player: 0, count: 5 },
+    { type: 'turnStarted', player: 1, turn: 1 },
+    { type: 'phaseChanged', phase: 'main1' },
+  ];
+  for (const card of [poison, returning]) {
+    if (!start.players[1].deck.slice(0, 5).includes(card)) events.push({ type: 'moved', card, owner: 1, from: 'deck', to: 'hand' });
+  }
+  await h.db.delete(matchEvents).where(eq(matchEvents.matchId, duel.id));
+  await h.db.insert(matchEvents).values(events.map((event, seq) => ({ matchId: duel.id, seq, event })));
+  return { admin, guest, duel, poison, returning };
+}
+
+describe('a card effect the judge rules on', () => {
   let admin: Browser;
   let guest: Browser;
   let duel: DuelSummary;
@@ -47,37 +95,7 @@ describe('a card effect', () => {
   let returning: string;
 
   it('sets up a duel where the guest goes first holding Poison of the Old Man', async () => {
-    admin = await login();
-    const deckList = (await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`)).body;
-    duel = (await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: deckList[0]!.id }) })).body;
-    guest = new Browser();
-    await guest.json(`${h.baseUrl}/api/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify({ deckId: deckList[1]!.id, guestName: 'Kaiba' }) });
-
-    // Replace the dealt duel with one where the guest goes first with Poison in their hand.
-    const [d0, d1] = await Promise.all(deckList.map((d) => h.db.query.decks.findFirst({ where: eq(decks.id, d.id) })));
-    const cards = await loadCards(h.db, [...d0!.main, ...d0!.extra, ...d1!.main, ...d1!.extra]);
-    const [dealt] = startDuel(
-      { players: [{ name: 'Ethan', main: d0!.main, extra: d0!.extra }, { name: 'Kaiba (guest)', main: d1!.main, extra: d1!.extra }], cards, sheets: await loadSheets(cards) },
-      Math.random,
-    );
-    const start = { ...(dealt as Extract<DuelEvent, { type: 'duelStarted' }>), first: 1 as const };
-    poison = start.players[1].deck.find((id) => start.instances[id]!.code === POISON)!;
-    returning = start.players[1].deck.find((id) => start.instances[id]!.code === RETURNING)!;
-    const events: DuelEvent[] = [
-      start,
-      { type: 'drew', player: 1, count: 5 },
-      { type: 'drew', player: 0, count: 5 },
-      { type: 'turnStarted', player: 1, turn: 1 },
-      { type: 'phaseChanged', phase: 'main1' },
-    ];
-    if (!start.players[1].deck.slice(0, 5).includes(poison)) {
-      events.push({ type: 'moved', card: poison, owner: 1, from: 'deck', to: 'hand' });
-    }
-    if (!start.players[1].deck.slice(0, 5).includes(returning)) {
-      events.push({ type: 'moved', card: returning, owner: 1, from: 'deck', to: 'hand' });
-    }
-    await h.db.delete(matchEvents).where(eq(matchEvents.matchId, duel.id));
-    await h.db.insert(matchEvents).values(events.map((event, seq) => ({ matchId: duel.id, seq, event })));
+    ({ admin, guest, duel, poison, returning } = await setUp(false));
   });
 
   it('activates, asks the player to choose, resolves, and logs the ruling', async () => {
@@ -243,6 +261,105 @@ describe('a card effect', () => {
     expect(list.totalCost).toBeCloseTo(expected, 10);
     const report = await admin.fetch(`${h.baseUrl}/api/admin/duels/${duel.id}/report`);
     expect(await report.text()).toContain(`Estimated API cost: $${expected.toFixed(4)}`);
+  });
+});
+
+describe('a scripted card effect', () => {
+  let s: Setup;
+  it('is offered only when its script allows it, and refused with the reason otherwise', async () => {
+    s = await setUp(true);
+    h.setModel(async () => {
+      throw new Error('A scripted effect must not call the model.');
+    });
+    const view = await until(new Stream(await s.guest.fetch(`${h.baseUrl}/api/duels/${s.duel.id}/stream`)), (u) => (u.type === 'sync' ? u.view : undefined));
+    expect(view.actions.some((a) => a.type === 'activate' && a.card === s.poison)).toBe(true);
+    // No Warrior in the GY, so The Warrior Returning Alive can't be activated, and isn't offered.
+    expect(view.actions.some((a) => a.type === 'activate' && a.card === s.returning)).toBe(false);
+    const tried = await s.guest.json<{ error: string }>(`${h.baseUrl}/api/duels/${s.duel.id}/intents`, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'activate', card: s.returning, effect: 0, zone: 0 }),
+    });
+    expect(tried.status).toBe(422);
+    expect(tried.body.error).toMatch(/Warrior monster in your GY to target/);
+  });
+
+  it('asks the player its choices and resolves without the judge', async () => {
+    const mine = new Stream(await s.guest.fetch(`${h.baseUrl}/api/duels/${s.duel.id}/stream`));
+    await mine.update();
+    const sent = await s.guest.json(`${h.baseUrl}/api/duels/${s.duel.id}/intents`, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'activate', card: s.poison, effect: 0, zone: 2 }),
+    });
+    expect(sent.status).toBe(204);
+    const prompt = await until(mine, (u) => (u.type === 'judging' ? (u.judging?.prompt ?? undefined) : undefined));
+    expect(prompt).toMatchObject({ min: 1, max: 1, cards: [] });
+    const damage = prompt.choices.find((c) => c.includes('800'))!;
+    await s.guest.json(`${h.baseUrl}/api/duels/${s.duel.id}/answer`, { method: 'POST', body: JSON.stringify({ prompt: prompt.id, picks: [damage] }) });
+    const resolved = await until(mine, (u) => (u.type === 'steps' && entries(u).some((e) => e.event.type === 'linkResolved') ? u : undefined));
+    if (resolved.type !== 'steps') throw new Error('expected steps');
+    expect(resolved.steps.at(-1)!.view.players[0].lp).toBe(7200);
+    const log = await until(new Stream(await s.admin.fetch(`${h.baseUrl}/api/duels/${s.duel.id}/stream`)), (u) => (u.type === 'sync' ? u.log : undefined));
+    expect(log.filter((e) => e.event.type === 'judged').map((e) => e.event)).toEqual([
+      expect.objectContaining({ stage: 'activation', legal: true, failed: false, summary: `Poison of the Old Man is activated (${damage}).` }),
+      expect.objectContaining({ stage: 'resolution', legal: true, failed: false, summary: 'Ethan took 800 damage.' }),
+    ]);
+    // It called no model, so the admin sees no cost for this duel.
+    const { body: list } = await s.admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`);
+    expect(list.duels.find((d) => d.id === s.duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, cost: 0 });
+    mine.close();
+  });
+
+  it("sets a reported card's scripts aside at once, so the judge rules on it, until the admin restores them", async () => {
+    const mine = new Stream(await s.guest.fetch(`${h.baseUrl}/api/duels/${s.duel.id}/stream`));
+    await mine.update();
+    const report = (code: number, note: string) =>
+      s.guest.json(`${h.baseUrl}/api/duels/${s.duel.id}/report`, { method: 'POST', body: JSON.stringify({ code, note }) });
+    expect((await report(12345, 'Not in this duel.')).status).toBe(404);
+    expect((await report(RETURNING, 'It should see the Warrior I discarded.')).status).toBe(204);
+
+    // The running duel takes the flagged sheet, and the player may now try the activation, which the judge rules on.
+    const view = await until(mine, (u) => (u.type === 'sync' ? u.view : undefined));
+    expect(view.actions.some((a) => a.type === 'activate' && a.card === s.returning)).toBe(true);
+    expect((await sheetOf(h.db, RETURNING))!.effects[0]!.status).toBe('flagged');
+    const log = await until(new Stream(await s.admin.fetch(`${h.baseUrl}/api/duels/${s.duel.id}/stream`)), (u) => (u.type === 'sync' ? u.log : undefined));
+    expect(JSON.stringify(log)).not.toContain('sheetUpdated');
+
+    // The admin sees the report, restores the script, and closes the report.
+    expect((await s.guest.json(`${h.baseUrl}/api/admin/rulings`)).status).toBe(403);
+    const { body: cards } = await s.admin.json<RulingCard[]>(`${h.baseUrl}/api/admin/rulings`);
+    expect(cards).toHaveLength(1);
+    const card = cards[0]!;
+    expect(card).toMatchObject({ code: RETURNING, name: 'The Warrior Returning Alive', reports: [{ from: 'player', note: 'It should see the Warrior I discarded.' }] });
+    const restored = { ...card.sheet!, effects: card.sheet!.effects.map((e) => ({ ...e, status: 'unverified' })) };
+    const save = (sheet: unknown, note: string) =>
+      s.admin.json(`${h.baseUrl}/api/admin/sheets/${RETURNING}`, { method: 'POST', body: JSON.stringify({ sheet, note }) });
+    expect((await save({ ...restored, textHash: 'stale' }, 'Restore.')).status).toBe(400);
+    expect((await save(restored, 'The script is right: the GY was empty.')).status).toBe(200);
+    const again = await until(mine, (u) => (u.type === 'sync' ? u.view : undefined));
+    expect(again.actions.some((a) => a.type === 'activate' && a.card === s.returning)).toBe(false);
+    expect((await sheetOf(h.db, RETURNING))!.model).toBe('admin');
+
+    expect((await s.admin.json(`${h.baseUrl}/api/admin/reports/${card.reports[0]!.id}/resolve`, { method: 'POST' })).status).toBe(204);
+    expect((await s.admin.json<RulingCard[]>(`${h.baseUrl}/api/admin/rulings`)).body).toEqual([]);
+    mine.close();
+  });
+
+  it("sets a card's scripts aside when an appeal overturns one of its fixed rulings", async () => {
+    const log = await until(new Stream(await s.guest.fetch(`${h.baseUrl}/api/duels/${s.duel.id}/stream`)), (u) => (u.type === 'sync' ? u.log : undefined));
+    const ruling = log.find((e) => e.event.type === 'judged' && e.event.stage === 'resolution')!;
+    const mine = new Stream(await s.admin.fetch(`${h.baseUrl}/api/duels/${s.duel.id}/stream`));
+    await mine.update();
+    h.setModel(async (params) =>
+      message(params.model, [{ type: 'text', text: JSON.stringify({ verdict: 'overturned', explanation: 'Wrong player.', ruling: 'The damage goes to the opponent.' }) }], 'end_turn'),
+    );
+    const contest = await s.admin.json(`${h.baseUrl}/api/duels/${s.duel.id}/contest`, { method: 'POST', body: JSON.stringify({ seq: ruling.seq, note: 'Wrong.' }) });
+    expect(contest.status).toBe(202);
+    await until(mine, (u) => entries(u).find((e) => e.event.type === 'appealed'));
+    await until(mine, (u) => (u.type === 'sync' ? u : undefined));
+    expect((await sheetOf(h.db, POISON))!.effects.every((e) => !e.script || e.status === 'flagged')).toBe(true);
+    const { body: cards } = await s.admin.json<RulingCard[]>(`${h.baseUrl}/api/admin/rulings`);
+    expect(cards).toMatchObject([{ code: POISON, reports: [{ from: 'appeal', note: 'The damage goes to the opponent.' }] }]);
+    mine.close();
   });
 });
 

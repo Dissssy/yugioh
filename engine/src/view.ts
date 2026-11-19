@@ -113,6 +113,8 @@ function reviewText(state: DuelState, event: DuelEvent): string {
         .filter(Boolean)
         .join(' | ');
     }
+    case 'sheetUpdated':
+      return `The effect sheet of ${state.cards[event.code]?.name ?? event.code} changed: ${labelled(event.sheet)}`;
     case 'appealed': {
       const a = event.appeal;
       const note = a.note ? ` with the note "${a.note}"` : '';
@@ -140,6 +142,7 @@ function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat): LogEvent 
     case 'duelStarted':
     case 'intent':
     case 'deckShuffled':
+    case 'sheetUpdated':
       return null;
     case 'moved': {
       // A card moving between places this player can't see (Deck to hand, say) stays anonymous.

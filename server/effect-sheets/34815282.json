@@ -1,28 +1,33 @@
 {
   "code": 34815282,
   "textHash": "c6d5351de695102c05b4b63db3fb284e2608d1936f82f77eeb7c40787e87340c",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
       "opt": "none",
-      "window": "Either player's turn",
+      "window": "Any time a Continuous Trap can be activated, targeting 1 face-up monster on the field with more than 1000 original ATK that has a Level",
       "cost": "",
-      "effect": "Its Level is reduced by 1, also it loses 1000 ATK.",
-      "targets": "1 face-up monster on the field with more than 1000 original ATK that has a Level"
+      "effect": "Its Level is reduced by 1, also it loses 1000 ATK (while this card remains face-up on the field).",
+      "targets": "1 face-up monster on the field with more than 1000 original ATK that has a Level",
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
     },
     {
-      "kind": "trigger",
+      "kind": "continuous",
       "speed": 1,
-      "mandatory": true,
+      "mandatory": false,
       "opt": "none",
-      "window": "When that monster leaves the field",
+      "window": "When the targeted monster leaves the field",
       "cost": "",
-      "effect": "Destroy this card.",
-      "targets": null
+      "effect": "When that monster leaves the field, destroy this card.",
+      "targets": null,
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

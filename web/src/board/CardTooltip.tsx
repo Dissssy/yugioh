@@ -26,8 +26,17 @@ export const useCardHover = () => useContext(TooltipContext);
 /**
  * Card details in a tooltip beside the hovered card. Right-click or Shift pins it open so long text can be
  * scrolled; Esc or a click elsewhere closes it. `suppressed` hides it while the player is choosing or dragging.
+ * `pinnedFooter` adds controls under a pinned card's details.
  */
-export function CardTooltipProvider({ suppressed, children }: { suppressed: boolean; children: ReactNode }) {
+export function CardTooltipProvider({
+  suppressed,
+  pinnedFooter,
+  children,
+}: {
+  suppressed: boolean;
+  pinnedFooter?: (card: CardData) => ReactNode;
+  children: ReactNode;
+}) {
   const [hover, setHover] = useState<Hover | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pending = useRef<{ card: CardData; el: HTMLElement } | null>(null);
@@ -99,6 +108,7 @@ export function CardTooltipProvider({ suppressed, children }: { suppressed: bool
             role="tooltip"
           >
             <CardDetail card={hover.card} />
+            {hover.pinned && pinnedFooter?.(hover.card)}
           </div>
         </FloatingPortal>
       )}

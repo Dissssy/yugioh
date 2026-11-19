@@ -1,18 +1,20 @@
 {
   "code": 85839825,
   "textHash": "a2bbc657e46a34946e53dade5599e1c5442700d9bb5636f4301dccc093a36011",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "Your Main Phase",
+      "window": "Your Main Phase, while you control an Xyz Monster with Xyz Material",
       "cost": "Detach 1 Xyz Material you control",
       "effect": "Destroy that target.",
-      "targets": "1 face-up monster your opponent controls"
+      "targets": "1 face-up monster your opponent controls",
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

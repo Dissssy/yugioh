@@ -1,18 +1,20 @@
 {
   "code": 9365703,
   "textHash": "e1599bf5eb8f73ec949868cc5d5ed61bb0832741075b013377640aa42e577631",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
-      "kind": "quick",
-      "speed": 2,
+      "kind": "ignition",
+      "speed": 1,
       "mandatory": false,
       "opt": "soft",
-      "window": "Once per Battle Phase, if this card was Normal Summoned this turn, except during the Damage Step",
+      "window": "During the Battle Phase of the turn this card was Normal Summoned (except during the Damage Step); once per Battle Phase",
       "cost": "",
       "effect": "Make its ATK become double its original ATK, until the end of the Battle Phase.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": null,
+      "status": "unverified"
     }
   ],
   "materials": null

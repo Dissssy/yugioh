@@ -268,7 +268,7 @@ function activationPickProblem(
 }
 
 /** Checks an ask_player call: real options, sensible counts, and a prompt that names nothing the player can't see. */
-function checkQuestion(state: DuelState, q: AskPlayer): Question | { error: string } {
+export function checkQuestion(state: DuelState, q: AskPlayer): Question | { error: string } {
   const p = q.player;
   if (q.cards.length === 0 && q.choices.length === 0) return { error: 'Give at least one card or choice.' };
   if (q.cards.length > 0 && q.choices.length > 0) return { error: 'Ask for cards or for choices, not both in one question.' };

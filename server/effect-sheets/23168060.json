@@ -1,18 +1,43 @@
 {
   "code": 23168060,
   "textHash": "a29dc11f10dc160482891327eeb13628aea7af6440c865504979b1510013b130",
-  "verified": false,
-  "model": "hand-written in a Claude Code session",
+  "model": "claude-opus-5-5",
   "effects": [
     {
       "kind": "ignition",
       "speed": 1,
       "mandatory": false,
       "opt": "soft",
-      "window": "Once per turn, during your Main Phase",
+      "window": "During your Main Phase",
       "cost": "",
       "effect": "Make this card Level 3 until the End Phase.",
-      "targets": null
+      "targets": null,
+      "respondsTo": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "modify_stats",
+                "cards": {
+                  "from": "self"
+                },
+                "atk": 0,
+                "def": 0,
+                "levelDelta": 0,
+                "levelSet": 3,
+                "until": "end_of_turn"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "status": "unverified"
     }
   ],
   "materials": null

@@ -6,6 +6,7 @@ import type { DuelCost } from '@yugioh/shared';
 import type { Db } from './db/client.ts';
 import { matchEvents } from './db/schema.ts';
 import { costOf } from './judge/pricing.ts';
+import { SCRIPT } from './judge/script.ts';
 
 /** Every duel's judge calls, appeals and cost (duels that never used the judge are absent), and the total of all. */
 export async function duelCosts(db: Db): Promise<{ total: number; byDuel: Map<string, DuelCost> }> {
@@ -15,6 +16,7 @@ export async function duelCosts(db: Db): Promise<{ total: number; byDuel: Map<st
       id: matchEvents.matchId,
       type,
       // Only the token counts, not the transcripts around them.
+      model: sql<string | null>`${matchEvents.event}->'record'->>'model'`,
       usage: sql<ModelUsage[]>`coalesce(${matchEvents.event}->'record'->'usage', ${matchEvents.event}->'appeal'->'usage')`,
     })
     .from(matchEvents)
@@ -23,6 +25,8 @@ export async function duelCosts(db: Db): Promise<{ total: number; byDuel: Map<st
   const byDuel = new Map<string, DuelCost>();
   let total = 0;
   for (const r of rows) {
+    // A ruling a script made called no model.
+    if (r.type === 'judged' && r.model === SCRIPT) continue;
     const duel = byDuel.get(r.id) ?? { judgeCalls: 0, appeals: 0, cost: 0 };
     byDuel.set(r.id, duel);
     if (r.type === 'judged') duel.judgeCalls++;
