@@ -22,13 +22,22 @@
       "speed": 1,
       "mandatory": false,
       "opt": "none",
-      "window": "When the targeted monster leaves the field",
+      "window": "While this card is face-up on the field and linked to the targeted monster",
       "cost": "",
-      "effect": "When that monster leaves the field, destroy this card.",
+      "effect": "The targeted monster's Level is reduced by 1 and it loses 1000 ATK. When that monster leaves the field, destroy this card.",
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "linked",
+        "atk": -1000,
+        "def": 0,
+        "per": null,
+        "levelDelta": -1,
+        "levelSet": null,
+        "while": []
+      },
       "status": "unverified"
     }
   ],

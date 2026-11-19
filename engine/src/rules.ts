@@ -293,9 +293,9 @@ function extraSummon(run: Run, seat: Seat, intent: Extract<Intent, { type: 'extr
 // effect needs (`when`). A scripted effect's own conditions are checked here too (script.ts); for any other effect
 // they are the judge's call. Triggers go on the chain in their own step (chain.ts).
 
-/** Spell/Trap properties that can be activated. Equip cards and Continuous Traps, which tie themselves to a monster, come later. */
-const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play', 'Continuous'];
-const ACTIVATABLE_TRAPS = ['Normal'];
+/** Spell/Trap properties that can be activated. Field Spells and Counter Traps come later. */
+const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play', 'Continuous', 'Equip'];
+const ACTIVATABLE_TRAPS = ['Normal', 'Continuous'];
 
 type Activate = Extract<LegalAction, { type: 'activate' }>;
 /** An activation the timing allows, with the event it answers, before its script is checked. */

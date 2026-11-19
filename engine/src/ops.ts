@@ -141,6 +141,15 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(state.attack, 'No attack is being made.');
       run.emit({ type: 'attackEnded', replay: false });
       return;
+    case 'link': {
+      check(ctx.stage === 'resolution', 'A card is equipped or tied to its monster as it resolves.');
+      const source = state.chain.at(-1)?.card;
+      const at = source ? locate(state, source) : null;
+      check(source && at?.zone === 'spellTraps' && state.players[at.seat].spellTraps[at.index]!.faceUp, 'Only a face-up Spell or Trap being resolved can be linked to a monster.');
+      check(onField(state, op.card).at.zone === 'monsters', 'A card can only be linked to a monster.');
+      run.emit({ type: 'linked', card: source, to: op.card });
+      return;
+    }
     case 'forbid':
       run.emit({ type: 'forbidden', player: op.player, what: op.what });
       return;

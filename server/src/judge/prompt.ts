@@ -69,7 +69,7 @@ export function describeState(state: DuelState, activating: string | null = null
   const fieldCard = (zone: 'monsters' | 'spellTraps', index: number, c: FieldCard) => {
     const activated = c.placedTurn < state.turn ? `Set on turn ${c.placedTurn}, flipped face-up because it is being activated now` : 'placed from the hand, face-up because it is being activated now';
     const face = c.id === activating && zone === 'spellTraps' ? activated : c.faceUp ? 'face-up' : 'face-down';
-    if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face})`;
+    if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face}${c.linked ? `, linked to ${label(c.linked)}` : ''})`;
     const s = statsOf(state, c.id);
     return `[${index}${index >= MONSTER_ZONES ? ', Extra Monster Zone' : ''}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''}${c.materials.length ? `, Xyz Materials attached: ${c.materials.map(label).join('; ')}` : ''})`;
   };

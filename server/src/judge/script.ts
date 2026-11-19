@@ -90,10 +90,12 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     ([0, 1] as const).every((p) => visibleTo(before, id, p)) || ([0, 1] as const).every((p) => visibleTo(state, id, p)) ? cardOf(state, id).name : 'a card';
   const list = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 
+  /** Targets an earlier step of this effect Special Summoned: still its targets ("Special Summon it, and if you do, equip this card to it"). */
+  const summonedHere = new Set<string>();
   /** The cards a selection picks, asking the player when it is theirs to choose. */
   const select = async (sel: Selection, verb: string, limit = Infinity): Promise<string[]> => {
     if (sel.from === 'self') return locate(state, self) ? [self] : [];
-    if (sel.from === 'targets') return link.targets.filter((id) => script.targets && fits(state, id, script.targets.filter, seat));
+    if (sel.from === 'targets') return link.targets.filter((id) => summonedHere.has(id) || (script.targets && fits(state, id, script.targets.filter, seat)));
     if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, self);
     const options = chooseFrom(state, sel, seat, self);
     const max = Math.min(sel.max, options.length, limit);
@@ -144,6 +146,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
                 ? 'defense'
                 : 'attack';
           apply({ op: 'special_summon', card: id, controller: seat, position });
+          summonedHere.add(id);
         }
         return cards.length ? `${list(cards.slice(0, free).map((id) => shown(id, before)))} ${cards.length === 1 ? 'was' : 'were'} Special Summoned.` : null;
       }
@@ -200,6 +203,12 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
             : await ask({ prompt: `${name}: choose ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`, cards: attached, choices: [], min: step.count, max: step.count });
         for (const id of picked) apply({ op: 'detach', card: id });
         return cost ? null : `${list(picked.map((id) => shown(id, before)))} ${picked.length === 1 ? 'was' : 'were'} detached from ${shown(xyz!, before)}.`;
+      }
+      case 'link': {
+        const [monster] = (await select(step.cards, 'equip it to')).filter((id) => locate(state, id)?.zone === 'monsters');
+        if (!monster) return null;
+        apply({ op: 'link', card: monster });
+        return `${name} ${cardOf(state, self).race === 'Equip' ? 'was equipped to' : 'now applies to'} ${shown(monster, before)}.`;
       }
       case 'forbid': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;

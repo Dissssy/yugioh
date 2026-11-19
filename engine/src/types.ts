@@ -149,6 +149,11 @@ export type Step =
   | { do: 'negate_attack' }
   /** Detaches `count` Xyz Materials from an Xyz Monster the selection picks (only those with that many can be picked). */
   | { do: 'detach'; cards: Selection; count: number }
+  /**
+   * Links the card being resolved to the monster on the field the selection picks: equips an Equip Spell, or ties a
+   * Continuous Trap to its target. It is destroyed when that monster leaves the field.
+   */
+  | { do: 'link'; cards: Selection }
   /** For the rest of this turn, that player can't declare attacks, or can't conduct their Battle Phase. */
   | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden };
 
@@ -166,18 +171,25 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  *   `be_destroyed_by_battle`, `by` is the monster they battle ("with a monster that has 1900 or more ATK"); null for any.
  * - `self_destruct`: this card remains on the field after it resolves, and is destroyed in the End Phase of its
  *   controller's opponent's `opponentTurns`th turn after its activation (Swords of Revealing Light).
+ * - `tie`: more about this card's tie to its linked monster (every linked card is destroyed when its monster leaves the
+ *   field). `destroyLinked`: when this card leaves the field, the monster is destroyed (Birthright). `defenseBreaks`: if
+ *   the monster is changed to Defense Position, both are destroyed (Limit Reverse).
  */
 export type Continuous =
   | { apply: 'stats'; to: Affected; atk: number; def: number; per: CardFilter | 'materials' | null; levelDelta: number; levelSet: number | null; while: Condition[] }
   | { apply: 'restrict'; to: Affected; others: boolean; cannot: Restriction[]; by: CardFilter | null; while: Condition[] }
-  | { apply: 'self_destruct'; opponentTurns: number };
+  | { apply: 'self_destruct'; opponentTurns: number }
+  | { apply: 'tie'; destroyLinked: boolean; defenseBreaks: boolean };
 
 export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle'] as const;
 /** What a restricted monster can't do: declare an attack, change its battle position, be targeted for an attack, or be destroyed by battle. */
 export type Restriction = (typeof RESTRICTIONS)[number];
 
-/** The cards a continuous effect applies to: this card, or face-up monsters that fit a filter. */
-export type Affected = 'self' | CardFilter;
+/**
+ * The cards a continuous effect applies to: this card, the monster it is linked to (the equipped monster, or the one
+ * a Continuous Trap targeted), or face-up monsters that fit a filter.
+ */
+export type Affected = 'self' | 'linked' | CardFilter;
 
 /**
  * A stat read from a card when the step resolves: `self` or the first target still there. `original` is the printed
@@ -330,6 +342,8 @@ export interface FieldCard {
   materials: string[];
   /** For a Spell/Trap, the turn its card was activated; null while Set. */
   activatedTurn: number | null;
+  /** For a Spell/Trap, the monster it is equipped or tied to (see the `link` step); else null. */
+  linked: string | null;
 }
 
 export type Zones = (FieldCard | null)[];
@@ -444,6 +458,8 @@ export type Op =
   /** Detaches this Xyz Material: it goes to its owner's GY. */
   | { op: 'detach'; card: string }
   | { op: 'forbid'; player: Seat; what: Forbidden }
+  /** Links the card being resolved to this face-up monster (see the `link` step). */
+  | { op: 'link'; card: string }
   | { op: 'declare_targets'; cards: string[] }
   | { op: 'choose_effect'; choice: string };
 
@@ -552,6 +568,7 @@ export type DuelEvent =
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
   | { type: 'forbidden'; player: Seat; what: Forbidden }
+  | { type: 'linked'; card: string; to: string }
   | { type: 'normalSummonGranted'; player: Seat }
   /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
   | { type: 'linkResolved' }

@@ -226,6 +226,11 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const card = onField(s, event.card);
         card.position = event.position;
         card.positionChangedTurn = s.turn;
+        // Limit Reverse: its monster changed to Defense Position takes both cards with it.
+        if (event.position === 'defense') {
+          const breaking = tiedTo(s, event.card).filter((c) => tie(s, c.id)?.defenseBreaks);
+          if (breaking.length > 0) for (const id of [event.card, ...breaking.map((c) => c.id)]) if (locate(s, id)) sendToGraveyard(s, id);
+        }
         return;
       }
       case 'attackDeclared':
@@ -323,6 +328,9 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'forbidden':
         s.forbidden.push({ player: event.player, what: event.what, turn: s.turn });
         return;
+      case 'linked':
+        onField(s, event.card).linked = event.to;
+        return;
       case 'normalSummonGranted':
         s.normalSummonLimit++;
         return;
@@ -332,9 +340,13 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const at = locate(s, link.card);
         const card = s.cards[s.instances[link.card]!.code]!;
         const leaves = card.kind === 'spell' ? ['Normal', 'Quick-Play', 'Ritual'] : card.kind === 'trap' ? ['Normal', 'Counter'] : [];
-        // A Normal Spell/Trap that says it remains on the field (Swords of Revealing Light) stays.
-        const remains = s.sheets[card.code]?.effects.some((e) => e.continuous?.apply === 'self_destruct');
-        if (at?.zone === 'spellTraps' && leaves.includes(card.race) && !remains) sendToGraveyard(s, link.card);
+        // A Normal Spell/Trap that says it remains on the field (Swords of Revealing Light) stays. An Equip Spell, or a
+        // Continuous Trap that works through its monster, that didn't get one has nothing to do there.
+        const effects = s.sheets[card.code]?.effects ?? [];
+        const remains = effects.some((e) => e.continuous?.apply === 'self_destruct');
+        const needsLink = card.race === 'Equip' || effects.some((e) => e.continuous?.apply === 'tie' || (e.continuous && 'to' in e.continuous && e.continuous.to === 'linked'));
+        const unlinked = at?.zone === 'spellTraps' && needsLink && !s.players[at.seat].spellTraps[at.index]!.linked;
+        if (at?.zone === 'spellTraps' && ((leaves.includes(card.race) && !remains) || unlinked)) sendToGraveyard(s, link.card);
         s.resolvedLinks++;
         // Once the whole chain has resolved, triggers from what happened during it go on a new one.
         if (s.chain.length === 0 && s.step.at === 'resolve') s.step = { at: 'triggers', cause: null, then: s.step.then, handled: [], passed: [] };
@@ -375,6 +387,7 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     summoned: null,
     materials: [],
     activatedTurn: null,
+    linked: null,
   };
 }
 
@@ -424,8 +437,23 @@ function removeFromPlay(state: DuelState, id: string) {
     p[at.zone][at.index] = null;
     state.modifiers = state.modifiers.filter((m) => m.card !== id);
     for (const m of card.materials) state.players[state.instances[m]!.owner].graveyard.push(m);
+    // Cards linked to a monster go when it goes; a card that takes its monster with it (Birthright) does so.
+    for (const c of tiedTo(state, id)) sendToGraveyard(state, c.id);
+    if (card.linked && tie(state, id)?.destroyLinked && locate(state, card.linked)?.zone === 'monsters') sendToGraveyard(state, card.linked);
   } else if (at.zone === 'materials') take(p.monsters[at.index]!.materials, id);
   else take(p[at.zone], id);
+}
+
+/** The Spells and Traps on the field linked to this monster. */
+function tiedTo(state: DuelState, id: string): FieldCard[] {
+  return state.players.flatMap((p) => p.spellTraps.filter((c): c is FieldCard => c?.linked === id));
+}
+
+/** A card's `tie` continuous effect, if it has one. */
+function tie(state: DuelState, id: string) {
+  const effects = state.sheets[state.instances[id]!.code]?.effects ?? [];
+  for (const e of effects) if (e.continuous?.apply === 'tie' && e.status !== 'flagged') return e.continuous;
+  return null;
 }
 
 /** Cards always go to their owner's Graveyard. */

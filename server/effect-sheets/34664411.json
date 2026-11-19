@@ -13,7 +13,42 @@
       "effect": "Equip this card to 1 face-up monster on the field.",
       "targets": "1 face-up monster on the field",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "place": "monsters",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     },
@@ -28,7 +63,16 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "linked",
+        "atk": 500,
+        "def": 0,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
       "status": "unverified"
     },
     {

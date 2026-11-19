@@ -6,7 +6,7 @@ import { cardsFitting, conditionProblem, fits, materialsOf } from './script.ts';
 import { levelOf, locate } from './state.ts';
 import type { Continuous, DuelState, Restriction, Seat } from './types.ts';
 
-type Applied = Exclude<Continuous, { apply: 'self_destruct' }>;
+type Applied = Extract<Continuous, { apply: 'stats' | 'restrict' }>;
 type Stats = Extract<Continuous, { apply: 'stats' }>;
 
 /** A continuous effect in force: the card it comes from, that card's controller, and what it does. */
@@ -35,7 +35,7 @@ export function continuousOnField(state: DuelState): InForce<Continuous>[] {
 /** The continuous effects that apply to cards now: those whose `while` conditions hold. */
 export function inForce(state: DuelState): InForce[] {
   return continuousOnField(state).filter(
-    (f): f is InForce => f.effect.apply !== 'self_destruct' && f.effect.while.every((w) => !conditionProblem(state, w, f.seat, f.source)),
+    (f): f is InForce => (f.effect.apply === 'stats' || f.effect.apply === 'restrict') && f.effect.while.every((w) => !conditionProblem(state, w, f.seat, f.source)),
   );
 }
 
@@ -43,6 +43,10 @@ export function inForce(state: DuelState): InForce[] {
 function affects(state: DuelState, f: InForce, id: string): boolean {
   const to = f.effect.to;
   if (to === 'self') return id === f.source;
+  if (to === 'linked') {
+    const at = locate(state, f.source);
+    return at?.zone === 'spellTraps' && state.players[at.seat].spellTraps[at.index]!.linked === id;
+  }
   if (f.effect.apply === 'restrict' && f.effect.others && id === f.source) return false;
   return fits(state, id, to, f.seat);
 }

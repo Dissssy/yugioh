@@ -57,6 +57,11 @@ export const opTools = {
     description: 'Negate the attack being made ("negate the attack"): it ends with no damage.',
     input: z.object({}),
   },
+  link: {
+    description:
+      'Equip the card being resolved (an Equip Spell) to a face-up monster, or tie a Continuous Trap to the monster it works on ("that monster cannot attack", Birthright\'s Special Summoned monster). Code then applies its continuous effect to that monster and destroys the card when the monster leaves the field. Only while resolving.',
+    input: z.object({ card }),
+  },
   forbid: {
     description:
       'For the rest of this turn, stop a player declaring attacks ("your opponent cannot declare an attack this turn") or conducting their Battle Phase ("you cannot conduct your Battle Phase this turn").',

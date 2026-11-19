@@ -83,6 +83,7 @@ const step = z.union([
   z.object({ do: z.literal('negate_attack') }),
   z.object({ do: z.literal('detach'), cards: selection, count: z.number().int() }),
   z.object({ do: z.literal('forbid'), player, what: z.enum(FORBIDDEN) }),
+  z.object({ do: z.literal('link'), cards: selection }),
 ]) satisfies z.ZodType<Step>;
 
 const condition = z.union([
@@ -103,7 +104,7 @@ const script = z.object({
   unapplied: z.string().nullable(),
 }) satisfies z.ZodType<Script>;
 
-const affected = z.union([z.literal('self'), cardFilter]);
+const affected = z.union([z.literal('self'), z.literal('linked'), cardFilter]);
 const continuous = z.union([
   z.object({
     apply: z.literal('stats'),
@@ -117,6 +118,7 @@ const continuous = z.union([
   }),
   z.object({ apply: z.literal('restrict'), to: affected, others: z.boolean(), cannot: z.array(z.enum(RESTRICTIONS)), by: cardFilter.nullable(), while: z.array(condition) }),
   z.object({ apply: z.literal('self_destruct'), opponentTurns: z.number().int().min(1) }),
+  z.object({ apply: z.literal('tie'), destroyLinked: z.boolean(), defenseBreaks: z.boolean() }),
 ]) satisfies z.ZodType<Continuous>;
 
 const when = z.object({
@@ -309,9 +311,11 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 
 # Continuous effects
 
-{"apply": "stats", "to", "atk", "def", "per", "levelDelta", "levelSet", "while"}: while this card is face-up on the field and every "while" condition holds (the conditions above, with "you" as this card's controller), the monsters in "to" gain atk and def (negative for a loss) and their Level changes by levelDelta, or becomes levelSet (else null). "to" is "self" or a filter of the face-up monsters it applies to. "per" multiplies atk and def: null for a flat amount, a filter to count cards ("for each face-up Level 2 monster you control", counting this card too if it fits), or "materials" for "for each Xyz Material attached to this card". Examples: "All monsters you control gain 200 ATK during your Battle Phase only": to {"side": "you", "place": "monsters", "faceUp": true, ...}, atk 200, while [{"if": "turn", "whose": "you"}, {"if": "phase", "phases": ["battle"]}]. "This card is Level 4 while in face-up Defense Position": to "self", levelSet 4, while [{"if": "position", "position": "defense"}].
+{"apply": "stats", "to", "atk", "def", "per", "levelDelta", "levelSet", "while"}: while this card is face-up on the field and every "while" condition holds (the conditions above, with "you" as this card's controller), the monsters in "to" gain atk and def (negative for a loss) and their Level changes by levelDelta, or becomes levelSet (else null). "to" is "self", "linked" (the monster this card is equipped or tied to: "the equipped monster", a Continuous Trap's "that monster"), or a filter of the face-up monsters it applies to. "per" multiplies atk and def: null for a flat amount, a filter to count cards ("for each face-up Level 2 monster you control", counting this card too if it fits), or "materials" for "for each Xyz Material attached to this card". Examples: "All monsters you control gain 200 ATK during your Battle Phase only": to {"side": "you", "place": "monsters", "faceUp": true, ...}, atk 200, while [{"if": "turn", "whose": "you"}, {"if": "phase", "phases": ["battle"]}]. "This card is Level 4 while in face-up Defense Position": to "self", levelSet 4, while [{"if": "position", "position": "defense"}].
 
 {"apply": "restrict", "to", "others", "cannot", "by", "while"}: the monsters in "to" can't do what "cannot" lists: "attack" (declare an attack), "change_position", "be_attacked" (be targeted for an attack), "be_destroyed_by_battle". others true leaves this card itself out ("except this one"). by: for be_destroyed_by_battle, a filter the monster it battles must fit ("with a monster that has 1900 or more ATK": atk {"min": 1900, "max": null}), else null. "Your opponent's monsters cannot declare an attack": to {"side": "opponent", "place": "monsters", ...}, cannot ["attack"]. "Your opponent cannot target Warrior monsters for attacks, except this one": to {"side": "you", "place": "monsters", "faceUp": true, "races": ["Warrior"], ...}, others true, cannot ["be_attacked"].
+
+{"apply": "tie", "destroyLinked", "defenseBreaks"}: for an Equip Spell or Continuous Trap linked to a monster (see the link step). Code always destroys a linked card when its monster leaves the field, so "When that monster is destroyed, destroy this card" needs only this entry with both false. destroyLinked true for "When this card leaves the field, destroy that monster"; defenseBreaks true for "If the target is changed to Defense Position, destroy it and this card". Write these as kind "continuous" even when worded "When ...".
 
 {"apply": "self_destruct", "opponentTurns": n}: "this card remains on the field, but destroy it during the End Phase of your opponent's nth turn" (a Normal Spell/Trap with this stays on the field after it resolves).
 
@@ -325,6 +329,7 @@ Steps (each "cards" is a selection):
 - {"do": "draw", "player", "count"}.
 - {"do": "extra_normal_summon"}: you may conduct one more Normal Summon/Set this turn.
 - {"do": "negate_attack"}: "negate the attack"; the attack ends with no damage.
+- {"do": "link", "cards"}: equip this card to the monster the selection picks ("Equip this card to 1 face-up monster": targets that monster, then link {"from": "targets"}), or tie a Continuous Trap to its target or to the monster it Special Summoned (special_summon {"from": "targets"}, then link {"from": "targets"}). An Equip Spell or a Continuous Trap that works through its monster goes to the GY if it resolves without being linked.
 - {"do": "forbid", "player", "what"}: for the rest of this turn that player can't "declare_attack" ("your opponent cannot declare an attack this turn") or can't conduct their "battle_phase" ("you cannot conduct your Battle Phase the turn you activate this card"; pair it with the before_battle_phase condition). Such a restriction is a step, not unapplied.
 - {"do": "detach", "cards", "count"}: detach count Xyz Materials from an Xyz Monster the selection picks. "Detach 1 Xyz Material from this card" (usually a cost): cards {"from": "self"}, count 1. "Detach 1 Xyz Material from a monster you control": a choose selection of face-up Xyz monsters you control.
 
