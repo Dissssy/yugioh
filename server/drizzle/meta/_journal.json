@@ -22,6 +22,13 @@
       "when": 1795044239687,
       "tag": "0002_guests",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795047533954,
+      "tag": "0003_usernames",
+      "breakpoints": true
     }
   ]
 }

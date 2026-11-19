@@ -6,12 +6,13 @@ import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
 import type { Me } from '@yugioh/shared';
-import { findUserBySub, listUsers, setStatus, syncUser, toUser, type LoginClaims } from './accounts.ts';
+import { findUserBySub, listUsers, setStatus, setUsername, syncUser, toUser, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db/client.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
+import { username } from './usernames.ts';
 import { userKey, viewerOf, type Viewer } from './viewer.ts';
 
 const GUEST_COOKIE = 'guest';
@@ -33,7 +34,7 @@ export function createApp(config: Config, db: Db) {
       clientID: config.AUTH0_CLIENT_ID,
       clientSecret: config.AUTH0_CLIENT_SECRET,
       secret: config.SESSION_SECRET,
-      authorizationParams: { response_type: 'code', scope: 'openid profile email' },
+      authorizationParams: { response_type: 'code', scope: 'openid email' },
       routes: { login: false, logout: '/auth/logout', callback: '/auth/callback', postLogoutRedirect: '/' },
       afterCallback: async (_req, _res, session) => {
         await syncUser(db, decodeJwt(session.id_token) as unknown as LoginClaims, config.ADMIN_EMAIL);
@@ -90,6 +91,18 @@ export function createApp(config: Config, db: Db) {
     const v = viewer(res);
     const me: Me = v.kind === 'guest' ? { kind: 'guest', guest: v.guest } : v;
     res.json(me);
+  });
+
+  // Any account may rename itself, as often as it likes, to a name no other account has.
+  const usernameBody = z.object({ username });
+  app.post('/api/me/username', async (req, res) => {
+    const v = viewer(res);
+    if (v.kind !== 'user') return void res.status(401).json({ error: 'account_required' });
+    const body = usernameBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'invalid_username' });
+    const user = await setUsername(db, v.user.id, body.data.username);
+    if (!user) return void res.status(409).json({ error: 'username_taken' });
+    res.json(user);
   });
 
   app.get('/api/admin/users', requireAdmin, async (_req, res) => {

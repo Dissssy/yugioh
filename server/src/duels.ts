@@ -72,14 +72,14 @@ export class Duels {
   }
 
   async summarize(row: MatchRow, seatKey: string | null, canJoin: boolean): Promise<DuelSummary> {
-    const [creator] = await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, row.createdBy));
+    const [creator] = await this.db.select({ username: users.username }).from(users).where(eq(users.id, row.createdBy));
     const deckName = async (id: number | null) =>
       id === null ? null : ((await this.db.query.decks.findFirst({ where: eq(decks.id, id) }))?.name ?? null);
     return {
       id: row.id,
       status: row.status,
       createdAt: row.createdAt.toISOString(),
-      createdBy: creator?.name ?? creator?.email ?? 'a player',
+      createdBy: creator?.username ?? 'a player',
       decks: [(await deckName(row.deck0)) ?? '', await deckName(row.deck1)],
       yourSeat: seatKey === null ? null : seatKey === row.seat0 ? 0 : seatKey === row.seat1 ? 1 : null,
       canJoin: canJoin && row.status === 'waiting' && seatKey !== row.seat0,

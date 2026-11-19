@@ -11,7 +11,7 @@ import type { Db } from './db/client.ts';
 import { decks } from './db/schema.ts';
 import type { Duels, SeatClaim } from './duels.ts';
 import { createGuest } from './guests.ts';
-import { displayName, guestKey, playerKey, viewerOf, type Viewer } from './viewer.ts';
+import { displayName, guestKey, guestName, playerKey, viewerOf, type Viewer } from './viewer.ts';
 
 const id = z.string();
 const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
@@ -114,7 +114,7 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
       claim = async (tx) => {
         const guest = await createGuest(tx, name);
         created.guestToken = guest.token;
-        return { key: guestKey(guest.id), name: guest.name };
+        return { key: guestKey(guest.id), name: guestName(guest.name) };
       };
     } else {
       const p = player(res);

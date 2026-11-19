@@ -1,5 +1,6 @@
 import type { Me } from '@yugioh/shared';
 import { Duels } from './Duels.tsx';
+import { Username } from './Username.tsx';
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -22,7 +23,8 @@ export function Home({ me }: { me: Me }) {
         return (
           <section>
             <h1>Waiting for approval</h1>
-            <p>Your account ({user.email ?? user.name}) has been created and is waiting for the admin to approve it. Check back later.</p>
+            <p>Your account has been created and is waiting for the admin to approve it. Check back later.</p>
+            <Username user={user} />
           </section>
         );
       if (user.status === 'rejected')
@@ -34,7 +36,8 @@ export function Home({ me }: { me: Me }) {
         );
       return (
         <section>
-          <h1>Hi {user.name ?? user.email}</h1>
+          <h1>Hi {user.username}</h1>
+          <Username user={user} />
           <Duels canChallenge />
         </section>
       );
