@@ -1,6 +1,6 @@
 // How long each event is shown, and the animations that aren't simply a card moving between zones.
 // Cards that keep their ID glide between zones by themselves (Motion layoutId); everything here is extra:
-// cards arriving from somewhere hidden, summon impacts, attacks, flips and hits.
+// cards arriving from somewhere hidden, summon impacts, Sets turning over, attacks, flips and hits.
 
 import type { LogEntry, LogEvent, PlayerView, Seat } from '@yugioh/engine';
 import { animate } from 'motion';
@@ -94,6 +94,10 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
       const el = slot(e.player, e.type === 'spellTrapSet' ? 's' : 'm', e.zone);
       // Your own cards glide from your hand by themselves; the opponent's come from a hidden hand card.
       if (e.player !== view.you) flyFrom(el, hand(e.player));
+      // A Set card turns face-down as it lands, and a Set monster turns sideways into Defense Position.
+      if (e.type !== 'normalSummoned' && el) {
+        void animate(el, { rotateY: [90, 0], ...(e.type === 'monsterSet' ? { rotate: [-90, 0] } : {}) }, { duration: s * 0.7, ease: 'easeOut' });
+      }
       if (e.type === 'normalSummoned' && el) {
         void animate(el, { scale: [1.35, 1] }, { duration: s * 0.6, ease: 'easeIn', delay: e.player === view.you ? s * 0.3 : s * 0.5 });
         const zone = el.closest<HTMLElement>('.zone');

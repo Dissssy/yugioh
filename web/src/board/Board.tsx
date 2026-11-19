@@ -24,6 +24,7 @@ type Summon = Extract<LegalAction, { type: 'normalSummon' | 'setMonster' }>;
 /** An action that puts a card from the hand into a zone the player picks. */
 type Placeable = Summon | Extract<LegalAction, { type: 'setSpellTrap' }>;
 type Attack = Extract<LegalAction, { type: 'attack' }>;
+type PlaceIntent = Extract<Intent, { type: Placeable['type'] }>;
 
 const isPlaceable = (a: LegalAction): a is Placeable => a.type === 'normalSummon' || a.type === 'setMonster' || a.type === 'setSpellTrap';
 const rowOf = (a: Placeable): Row => (a.type === 'setSpellTrap' ? 's' : 'm');
@@ -64,6 +65,8 @@ export function Board({ duelId }: { duelId: string }) {
   const [over, setOver] = useState<string | null>(null);
   /** Set when an aimed attack ends on the attacker, so the click that follows doesn't open its menu. */
   const swallowClick = useRef(false);
+  /** A card sent to a zone, kept over it until the step that moves it arrives. */
+  const [sent, setSent] = useState<{ id: string; key: string } | null>(null);
   const [confirmSurrender, setConfirmSurrender] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [table, setTable] = useState<HTMLDivElement | null>(null);
@@ -83,6 +86,11 @@ export function Board({ duelId }: { duelId: string }) {
     // Only a new step should play anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.seq]);
+
+  // Once the sent card has left the hand there is nothing left to hold.
+  useEffect(() => {
+    if (sent && shown && !shown.view.players[shown.view.you].hand.some((c) => idOf(c) === sent.id)) setSent(null);
+  }, [shown, sent]);
 
   // A choice in progress makes no sense on a board that changed under it.
   useEffect(() => {
@@ -133,21 +141,28 @@ export function Board({ duelId }: { duelId: string }) {
     }
   }
 
+  /** Sends a card to its zone, holding it over the zone until the step that moves it arrives. */
+  function play(intent: PlaceIntent) {
+    setSent({ id: intent.card, key: dropKey(me, intent.type === 'setSpellTrap' ? 's' : 'm', intent.zone) });
+    send.mutate(intent, { onError: () => setSent(null) });
+  }
+
   /** Puts a card in the chosen zone, first asking for tributes if it needs them. */
   function place(action: Placeable, zone: number) {
-    if (action.type === 'setSpellTrap') return send.mutate({ type: 'setSpellTrap', card: action.card, zone });
-    if (action.tributes === 0) return send.mutate({ type: action.type, card: action.card, tributes: [], zone });
+    if (action.type === 'setSpellTrap') return play({ type: 'setSpellTrap', card: action.card, zone });
+    if (action.tributes === 0) return play({ type: action.type, card: action.card, tributes: [], zone });
     // Dropping onto one of your monsters tributes it, so its zone is free for the new one.
     const occupant = myMonsters[zone] ? idOf(myMonsters[zone].card) : null;
     const chosen = occupant ? [occupant] : [];
-    if (chosen.length === action.tributes) return send.mutate({ type: action.type, card: action.card, tributes: chosen, zone });
+    if (chosen.length === action.tributes) return play({ type: action.type, card: action.card, tributes: chosen, zone });
     setMode({ kind: 'tributes', action, zone, chosen, keep: occupant });
   }
 
   /** Placing with several possible actions (Summon or Set) asks which, right where the card was dropped. */
-  function placeAt(options: Placeable[], zone: number, anchor: HTMLElement) {
-    if (options.length === 1) return place(options[0]!, zone);
+  function placeAt(options: Placeable[], zone: number, anchor: HTMLElement): boolean {
+    if (options.length === 1) place(options[0]!, zone);
     if (options.length > 1) setMode({ kind: 'place', options, zone, anchor });
+    return options.length > 0;
   }
 
   /** Clicking one of your own cards: pick it for the current choice, or open its action menu. */
@@ -160,7 +175,7 @@ export function Board({ duelId }: { duelId: string }) {
     if (mode.kind === 'tributes' && mode.action.tributeFrom.includes(id) && id !== mode.keep) {
       const chosen = toggle(mode.chosen, id);
       if (chosen.length === mode.action.tributes) {
-        return send.mutate({ type: mode.action.type, card: mode.action.card, tributes: chosen, zone: mode.zone });
+        return play({ type: mode.action.type, card: mode.action.card, tributes: chosen, zone: mode.zone });
       }
       return setMode({ ...mode, chosen });
     }
@@ -206,9 +221,9 @@ export function Board({ duelId }: { duelId: string }) {
       setDrag(null);
       setOver(null);
       const [seat, row, zone] = key?.split(':') ?? [];
-      if (busy || Number(seat) !== me || (row !== 'm' && row !== 's')) return;
+      if (busy || Number(seat) !== me || (row !== 'm' && row !== 's')) return false;
       const anchor = document.querySelector<HTMLElement>(`[data-drop="${key}"]`);
-      if (anchor) placeAt(fitsZone(placeables(id), row, Number(zone)), Number(zone), anchor);
+      return anchor !== null && placeAt(fitsZone(placeables(id), row, Number(zone)), Number(zone), anchor);
     },
   };
 
@@ -279,6 +294,14 @@ export function Board({ duelId }: { duelId: string }) {
     </span>
   );
 
+  /** The card waiting over its zone: while you pick Summon or Set or its tributes, and until it moves there. */
+  const held =
+    mode.kind === 'place'
+      ? { id: mode.options[0]!.card, key: dropKey(me, rowOf(mode.options[0]!), mode.zone) }
+      : mode.kind === 'tributes'
+        ? { id: mode.action.card, key: dropKey(me, 'm', mode.zone) }
+        : sent && myHand.includes(sent.id) ? sent : null;
+
   const lpTarget = (): 'open' | 'over' | null => {
     const attack = drag?.kind === 'aim' ? drag.action : null;
     return attack?.direct ? (over === `lp:${foe}` ? 'over' : 'open') : null;
@@ -342,7 +365,7 @@ export function Board({ duelId }: { duelId: string }) {
                   />
                   <div className="hand-row own-row">
                     <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={view.turnPlayer === me} />
-                    <OwnHand duelId={duelId} seat={me} cards={view.players[me].hand} marks={marks} onCard={clickOwn} drag={handDrag} />
+                    <OwnHand duelId={duelId} seat={me} cards={view.players[me].hand} marks={marks} onCard={clickOwn} drag={handDrag} held={held} />
                   </div>
                 </>
               )}
