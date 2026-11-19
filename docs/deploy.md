@@ -23,6 +23,7 @@ The shared Postgres runs as compose project `/git/postgres` (service `db`, Docke
    AUTH0_CLIENT_ID=
    AUTH0_CLIENT_SECRET=
    ADMIN_EMAIL=
+   ANTHROPIC_API_KEY=     # card effects and appeals; see effects.md
    ```
 
    compose.yaml sets `PORT` and `CARD_IMAGE_DIR` itself. Auth0 setup is in [accounts.md](accounts.md).
