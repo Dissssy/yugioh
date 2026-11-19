@@ -192,6 +192,33 @@ export const CASES: EvalCase[] = [
     check: (b) => all(expectAt(b, 'Exiled Force', '1:hand'), expectAt(b, 'Speed Warrior', '0:gy')),
   },
   {
+    // A live duel's board (turn 8), where the judge ruled illegal while its own summary said Exiled Force is a target.
+    name: 'the warrior returning alive on a full board',
+    board: [
+      {
+        hand: ['Twister'],
+        set: ['Miniaturize', 'Backup Soldier', 'Divine Wrath'],
+        gy: ['Double Summon', 'Copycat', 'Charcoal Inpachi', 'Water Spirit'],
+        deck: ['Sonic Chick', 'Birthright', 'Tune Warrior', 'Scrap-Iron Scarecrow', 'The Warrior Returning Alive', 'Sakuretsu Armor', 'Renge, Gatekeeper of Dark World', 'Marauding Captain', 'Symbols of Duty', 'Woodborg Inpachi', 'Synchro Boost', 'Rush Recklessly', 'Junk Synchron', 'Frequency Magician', 'Seven Tools of the Bandit', 'Magna Drago', 'Mystic Tomato', 'Trap Hole', 'UFO Turtle', 'Axe Raider', 'Speed Warrior', 'Atlantean Pikeman', 'Threatening Roar', 'Dark Blade', 'Spiral Serpent', 'Synchro Blast Wave', 'Exiled Force', 'Lightning Vortex', 'Synchronized Realm', 'Smashing Ground', 'Spellbinding Circle', 'Monster Reincarnation'],
+        extra: ['Junk Warrior', 'Gaia Knight, the Force of Earth', 'Colossal Fighter'],
+      },
+      {
+        hand: ['The Warrior Returning Alive', 'Copycat', 'Speed Warrior'],
+        monsters: ['Magna Drago'],
+        setMonsters: ['Water Spirit'],
+        set: ['Sakuretsu Armor', 'Backup Soldier', 'Birthright'],
+        gy: ['Exiled Force'],
+        deck: ['Symbols of Duty', 'Mystic Tomato', 'Marauding Captain', 'UFO Turtle', 'Woodborg Inpachi', 'Trap Hole', 'Divine Wrath', 'Axe Raider', 'Dark Blade', 'Miniaturize', 'Seven Tools of the Bandit', 'Rush Recklessly', 'Atlantean Pikeman', 'Charcoal Inpachi', 'Sonic Chick', 'Spiral Serpent', 'Synchronized Realm', 'Lightning Vortex', 'Twister', 'Monster Reincarnation', 'Tune Warrior', 'Scrap-Iron Scarecrow', 'Double Summon', 'Synchro Blast Wave', 'Frequency Magician', 'Junk Synchron', 'Spellbinding Circle', 'Renge, Gatekeeper of Dark World', 'Threatening Roar', 'Synchro Boost', 'Smashing Ground'],
+        extra: ['Junk Warrior', 'Gaia Knight, the Force of Earth', 'Colossal Fighter'],
+      },
+    ],
+    seat: 1,
+    activate: 'The Warrior Returning Alive',
+    legal: true,
+    picks: [['Exiled Force']],
+    check: (b) => expectAt(b, 'Exiled Force', '1:hand'),
+  },
+  {
     name: 'synchro blast wave needs a synchro monster',
     board: [{ hand: ['Synchro Blast Wave'], monsters: ['Speed Warrior'] }, { monsters: ['Sonic Chick'] }],
     activate: 'Synchro Blast Wave',

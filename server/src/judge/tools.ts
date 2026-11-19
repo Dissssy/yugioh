@@ -70,11 +70,12 @@ export const askPlayer = z.object({
   max: z.number().int(),
 });
 
+// The summary comes first, so the model has written its reasoning before it commits to the verdict.
 export const finish = z.object({
-  legal: z.boolean().describe('Checking an activation: whether it is legal. Resolving: always true.'),
   summary: z
     .string()
     .describe('One short sentence for both players\' logs: why an activation is illegal, or what the effect did. Never name a card a player can\'t see.'),
+  legal: z.boolean().describe('Checking an activation: whether it is legal, as the summary concludes. Resolving: always true.'),
 });
 
 export type AskPlayer = z.infer<typeof askPlayer>;
