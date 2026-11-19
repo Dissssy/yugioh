@@ -37,7 +37,7 @@ import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
 import { decks, matchEvents, matches, sheetReports, users } from './db/schema.ts';
 import { appeal } from './judge/appeal.ts';
-import type { ModelCall, Question } from './judge/judge.ts';
+import type { JudgeOutcome, ModelCall, Question } from './judge/judge.ts';
 import { calledModel, NO_JUDGE, rule, SCRIPT } from './judge/script.ts';
 import { flagScripts, loadSheets } from './sheets.ts';
 import { aiKey, isAiKey } from './viewer.ts';
@@ -309,9 +309,10 @@ export class Duels {
     const scratch = activation.reduce(evolve, duel.state);
     const link = scratch.chain.at(-1)!;
     const overturned = duel.state.rulings.find((r) => r.legal && r.player === link.player && r.card === link.card && r.effect === link.effect);
-    const { record, events: costs } = await this.runJudge(duel, 'activation', scratch, link, overturned?.summary ?? null);
-    const judged: DuelEvent = { type: 'judged', record };
-    await this.commit(duel, record.legal ? [...before, judged, ...activation, ...costs] : [...before, judged]);
+    await this.runJudge(duel, 'activation', scratch, link, overturned?.summary ?? null, ({ record, events: costs }) => {
+      const judged: DuelEvent = { type: 'judged', record };
+      return record.legal ? [...before, judged, ...activation, ...costs] : [...before, judged];
+    });
   }
 
   /**
@@ -336,11 +337,12 @@ export class Duels {
         const bound = duel.state.binding;
         const ruling = bound && bound.card === link.card && bound.effect === link.effect ? bound.ruling : null;
         // An activation reserved its resolution's judge call; only a missing API key (after a restart) stops it.
-        const { record, events } =
-          !scriptOf(duel.state, link.card, link.effect) && !this.ai.judge
-            ? { record: notRuled(duel.state, 'resolution', link.player, link.card, link.effect, "The judge isn't set up on this server."), events: [] }
-            : await this.runJudge(duel, 'resolution', duel.state, link, ruling);
-        await this.commit(duel, [{ type: 'judged', record }, ...events, { type: 'linkResolved' }]);
+        const resolved = ({ record, events }: JudgeOutcome): DuelEvent[] => [{ type: 'judged', record }, ...events, { type: 'linkResolved' }];
+        if (!scriptOf(duel.state, link.card, link.effect) && !this.ai.judge) {
+          await this.commit(duel, resolved({ record: notRuled(duel.state, 'resolution', link.player, link.card, link.effect, "The judge isn't set up on this server."), events: [] }));
+        } else {
+          await this.runJudge(duel, 'resolution', duel.state, link, ruling, resolved);
+        }
       } else {
         if (next.autoPass) this.passLater(duel, next.player, next.floor);
         return;
@@ -364,11 +366,15 @@ export class Duels {
     }, delay);
   }
 
-  private async runJudge(duel: LiveDuel, stage: 'activation' | 'resolution', state: DuelState, link: ChainLink, appealRuling: string | null = null) {
+  /**
+   * Rules on a link and commits `toEvents` of the ruling. The judging banner stays up until the commit, so no seat is
+   * shown the board from before the ruling without it, and offered moves on that stale board.
+   */
+  private async runJudge(duel: LiveDuel, stage: 'activation' | 'resolution', state: DuelState, link: ChainLink, appealRuling: string | null, toEvents: (ruled: JudgeOutcome) => DuelEvent[]) {
     duel.judging = { stage, link, question: null };
     this.broadcastJudging(duel);
     try {
-      return await rule(
+      const ruled = await rule(
         { stage, state, link, appealRuling },
         {
           model: this.ai.judge,
@@ -384,6 +390,7 @@ export class Duels {
             }),
         },
       );
+      await this.commit(duel, toEvents(ruled));
     } finally {
       duel.judging = null;
       this.broadcastJudging(duel);
