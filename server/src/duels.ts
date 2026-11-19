@@ -75,9 +75,12 @@ export class Duels {
   private live = new Map<string, Promise<LiveDuel>>();
   private db: Db;
   private ai: Ai;
-  constructor(db: Db, ai: Ai) {
+  private random: () => number;
+  /** `random` deals, shuffles and tosses the coin; tests pass a seeded one so every run deals the same hands. */
+  constructor(db: Db, ai: Ai, random: () => number = secureRandom) {
     this.db = db;
     this.ai = ai;
+    this.random = random;
   }
 
   async create(userId: number, seatKey: string, deckId: number): Promise<string | null> {
@@ -149,7 +152,7 @@ export class Duels {
           cards,
           sheets: await loadSheets(cards),
         },
-        secureRandom,
+        this.random,
       );
       await tx.insert(matchEvents).values(events.map((event, seq) => ({ matchId: id, seq, event })));
       return true;
@@ -241,7 +244,7 @@ export class Duels {
         { stage, state, link },
         {
           model: this.ai.judge!,
-          random: secureRandom,
+          random: this.random,
           ask: (question) =>
             new Promise<string[]>((answer) => {
               duel.judging!.question = { ...question, id: randomBytes(6).toString('base64url'), answer };

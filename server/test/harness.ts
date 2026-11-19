@@ -52,7 +52,7 @@ export async function startHarness(): Promise<Harness> {
   let model: ModelCall = () => Promise.reject(new Error('No model set for this test'));
   const call = (params: Anthropic.MessageCreateParamsNonStreaming) => model(params);
   const ai = { judge: call, appeal: call, judgeCalls: 300, appeals: 10 };
-  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10 }, db, ai));
+  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10 }, db, ai, seeded(1)));
 
   return {
     db,
@@ -175,4 +175,14 @@ export class Stream {
   close() {
     void this.reader.cancel();
   }
+}
+
+/** A small seeded generator (mulberry32), so the duels in a test run are dealt the same way every time. */
+function seeded(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }

@@ -20,7 +20,7 @@ const GUEST_COOKIE = 'guest';
 const GUEST_COOKIE_MS = 365 * 24 * 60 * 60 * 1000;
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
-export function createApp(config: Config, db: Db, ai: Ai) {
+export function createApp(config: Config, db: Db, ai: Ai, random?: () => number) {
   const app = express();
   app.set('trust proxy', 'loopback, linklocal, uniquelocal');
   const secure = config.BASE_URL.startsWith('https:');
@@ -119,7 +119,7 @@ export function createApp(config: Config, db: Db, ai: Ai) {
     res.json(user);
   });
 
-  app.use('/api', duelRoutes(db, new Duels(db, ai), guestCookie));
+  app.use('/api', duelRoutes(db, new Duels(db, ai, random), guestCookie));
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'not_found' }));
 
   // Card images, downloaded by the card sync. They never change, so browsers may cache them for long.
