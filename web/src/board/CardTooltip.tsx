@@ -26,12 +26,12 @@ const TooltipContext = createContext<Bind>(() => ({}));
 export const useCardHover = () => useContext(TooltipContext);
 
 /**
- * Card details in a tooltip beside the hovered card. Right-click or Shift pins it open so long text can be
+ * Card details in a tooltip beside the hovered card. Right-click pins it open so long text can be
  * scrolled; Esc or a click elsewhere closes it. `suppressed` hides it while the player is choosing or dragging.
  * `pinnedFooter` adds controls under a pinned card's details.
  *
- * Holding Alt zooms instead: the card under the pointer is shown as large as fits beside it, with its text,
- * until Alt is released. Zoom is asked for on purpose, so it works while suppressed too.
+ * Holding Shift zooms instead: the card under the pointer is shown as large as fits beside it, with its text,
+ * until Shift is released. Zoom is asked for on purpose, so it works while suppressed too.
  */
 export function CardTooltipProvider({
   suppressed,
@@ -45,7 +45,7 @@ export function CardTooltipProvider({
   const [hover, setHover] = useState<Hover | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pending = useRef<{ card: CardData; el: HTMLElement } | null>(null);
-  const altHeld = useRef(false);
+  const zoomHeld = useRef(false);
   const [zoom, setZoom] = useState<{ card: CardData; el: HTMLElement } | null>(null);
   const { refs, floatingStyles } = useFloating({
     elements: { reference: hover?.el ?? null },
@@ -60,7 +60,7 @@ export function CardTooltipProvider({
       const track = {
         onPointerEnter: (e: PointerEvent<HTMLElement>) => {
           pending.current = { card, el: e.currentTarget };
-          if (altHeld.current) setZoom(pending.current);
+          if (zoomHeld.current) setZoom(pending.current);
         },
         onPointerLeave: () => {
           pending.current = null;
@@ -100,23 +100,20 @@ export function CardTooltipProvider({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setHover(null);
-      if (e.key === 'Shift' && pending.current) setHover({ ...pending.current, pinned: true });
-      if (e.key === 'Alt') {
-        // Alone, Alt would focus the browser's menu bar on Windows and Linux.
-        e.preventDefault();
-        altHeld.current = true;
+      // Shift while typing (capitals in the chat or a search box) is not a request to zoom.
+      if (e.key === 'Shift' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        zoomHeld.current = true;
         setZoom(pending.current);
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key !== 'Alt') return;
-      e.preventDefault();
-      altHeld.current = false;
+      if (e.key !== 'Shift') return;
+      zoomHeld.current = false;
       setZoom(null);
     };
-    // Alt-Tab leaves the page without a keyup.
+    // Leaving the window while holding Shift gives no keyup.
     const onBlur = () => {
-      altHeld.current = false;
+      zoomHeld.current = false;
       setZoom(null);
     };
     const onDown = (e: globalThis.PointerEvent) => {
