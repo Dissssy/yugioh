@@ -210,6 +210,34 @@ button.phase.go { border: 1px solid var(--accent); color: var(--accent); backgro
 .card-tooltip .card-meta h3 { margin: 0 0 4px; font-size: 1em; }
 .card-tooltip .card-meta p { margin: 0 0 4px; font-size: 0.85em; }
 .card-tooltip .card-text, .card-tooltip .card-detail > .muted { grid-column: 1 / -1; margin: 4px 0 0; }
+/* Hold Alt: the card as large as fits beside the hovered one (--room wide), with its text. Never takes the pointer. */
+.card-zoom {
+  --text-w: 320px;
+  --img-h: min(calc(100vh - 56px), calc((var(--room) - var(--text-w) - 40px) * 86 / 59));
+  position: fixed;
+  top: 50%;
+  z-index: 60;
+  transform: translateY(-50%);
+  pointer-events: none;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 12px 48px rgb(0 0 0 / 0.45);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+.card-zoom .card-detail {
+  display: grid;
+  grid-template-columns: auto var(--text-w);
+  grid-template-rows: auto 1fr;
+  gap: 8px 16px;
+}
+.card-zoom .card-detail img { grid-row: 1 / -1; height: var(--img-h); width: auto; max-width: none; border-radius: 12px; }
+.card-zoom .card-meta h3 { margin: 0 0 6px; font-size: 1.3em; }
+.card-zoom .card-meta p { margin: 0 0 6px; }
+.card-zoom .card-text { margin: 0; font-size: 1.05em; line-height: 1.45; }
 .action-menu {
   z-index: 40;
   display: flex;

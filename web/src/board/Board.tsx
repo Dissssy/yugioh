@@ -487,7 +487,7 @@ export function Board({ duelId }: { duelId: string }) {
                   <label>
                     <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
                   </label>
-                  <p className="muted small">Right-click a card or hold Shift to pin its details. Drag cards in your hand to reorder them.</p>
+                  <p className="muted small">Hold Alt over a card to zoom in. Right-click a card or hold Shift to pin its details. Drag cards in your hand to reorder them.</p>
                 </div>
               )}
               {!connected && <p className="error">Reconnecting…</p>}

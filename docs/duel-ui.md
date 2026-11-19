@@ -130,6 +130,7 @@ Card details move out of the sidebar into a **tooltip next to the card** (reques
 - **Hidden while dragging or choosing targets**, so it never covers what you're aiming at. It comes back once the choice is done.
 - **Pin it** with right-click or Shift to keep it open and move the mouse into it (for scrolling long text). Esc or clicking elsewhere closes it.
 - No tooltip for cards you can't see (face-down opponent cards, the opponent's hand).
+- **Zoom with Alt** (like Tabletop Simulator's, requested by Ethan, 2026-11-19): while Alt is held, the card under the pointer is shown as tall as the screen with its text beside it. It sits beside the card on the side with more room and shrinks to fit there, so it never covers the card you point at, and it follows the pointer from card to card. Releasing Alt (or leaving the window) closes it. It replaces the tooltip while shown, and works while dragging or choosing, since you asked for it.
 - **Touch:** long-press opens the same content as a sheet from the bottom of the screen; tap outside to close.
 
 **Pile viewer:** clicking a GY, Banished or Extra Deck opens a sheet over the board with a grid of large cards, searchable by name. Hovering one shows the same tooltip.
