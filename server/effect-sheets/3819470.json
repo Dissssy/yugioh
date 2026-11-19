@@ -12,7 +12,28 @@
       "cost": "Pay 1000 LP",
       "effect": "Negate the activation, and if you do, destroy it.",
       "targets": null,
-      "respondsTo": "activation",
+      "when": {
+        "event": "activated",
+        "self": false,
+        "filter": {
+          "side": "either",
+          "place": "spellTraps",
+          "kinds": [
+            "trap"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     }

@@ -12,7 +12,16 @@
       "cost": "",
       "effect": "Special Summon that target in Defense Position, but it has its effects negated.",
       "targets": "1 Level 2 or lower monster in your Graveyard",
-      "respondsTo": null,
+      "when": {
+        "event": "summoned",
+        "self": true,
+        "filter": null,
+        "how": [
+          "normal"
+        ],
+        "from": "field",
+        "canMiss": true
+      },
       "script": null,
       "status": "unverified"
     }

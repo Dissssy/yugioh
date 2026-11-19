@@ -31,7 +31,7 @@ const sheets: Record<number, EffectSheet> = {
     textHash: '',
     model: 'test',
     materials: null,
-    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', respondsTo: null, script: null, status: 'unverified' }],
+    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, status: 'unverified' }],
   },
 };
 
@@ -276,7 +276,7 @@ const anyCard = (side: CardFilter['side'], place: CardFilter['place'], kinds: Ca
 const reincarnation: Script = {
   conditions: [],
   cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 1, rank: null }, to: 'graveyard' }],
-  targets: { filter: anyCard('you', 'graveyard', ['monster']), min: 1, max: 1 },
+  targets: { filter: anyCard('you', 'graveyard', ['monster']), min: 1, max: 1, event: false },
   options: [{ label: '', steps: [{ do: 'move', cards: { from: 'targets' }, to: 'hand' }] }],
   unapplied: null,
 };
@@ -288,7 +288,7 @@ const withScript = (state: DuelState): DuelState => ({
 describe('a scripted effect', () => {
   it('pays the cost, has the player pick targets that fit before it, and resolves, with no model', async () => {
     const state = withScript(board());
-    expect(scriptProblem(state, 0, 'a0', 0)).toBeNull();
+    expect(scriptProblem(state, 0, 'a0', 0, null)).toBeNull();
     const d = decide(state, 0, { type: 'activate', card: 'a0', effect: 0, zone: 0 });
     if (!d.ok) throw new Error(d.error);
     const scratch = d.events.slice(1).reduce(evolve, state);
@@ -335,7 +335,7 @@ describe('the eval suite', () => {
       const state = buildBoard(c, data, sheets);
       const code = Object.values(data).find((d) => d.name === c.activate)!.code;
       const effect = sheets[code]!.effects[c.effect ?? 0]!;
-      if (effect.script || effect.respondsTo) {
+      if (effect.script || effect.when) {
         // Code rules on these exactly, without a model.
         const result = await runCase(c, state, null);
         expect(result.passed, `${c.name}: ${result.detail}`).toBe(true);
@@ -361,7 +361,7 @@ describe('the eval suite', () => {
     const { model } = scripted([
       [{ name: 'ask_player', input: { player: 0, prompt: 'Choose a target.', cards: [monster], choices: [], min: 1, max: 1 } }],
       [{ name: 'declare_targets', input: { cards: [monster] } }, { name: 'finish', input: { legal: true, summary: 'Targeting it.' } }],
-      [{ name: 'modify_stats', input: { card: monster, atk: 700, def: 0, level_delta: 0, level_set: null, until: 'end_of_turn' } }, { name: 'finish', input: { legal: true, summary: '+700.' } }],
+      [{ name: 'modify_stats', input: { card: monster, atk: 700, def: 0, atk_set: null, def_set: null, level_delta: 0, level_set: null, until: 'end_of_turn' } }, { name: 'finish', input: { legal: true, summary: '+700.' } }],
     ]);
     expect(await runCase(rush, state, model)).toMatchObject({ name: rush.name, passed: true, detail: '+700.' });
     const lazy = scripted([

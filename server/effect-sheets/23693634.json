@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "This card gains 100 ATK for every Warrior-Type monster in any Graveyard.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +25,14 @@
       "cost": "",
       "effect": "Special Summon that target.",
       "targets": "1 Warrior-Type monster in either Graveyard",
-      "respondsTo": null,
+      "when": {
+        "event": "destroyed_by_battle",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "from": "graveyard",
+        "canMiss": true
+      },
       "script": null,
       "status": "unverified"
     }

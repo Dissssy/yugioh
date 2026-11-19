@@ -12,8 +12,47 @@
       "cost": "",
       "effect": "Make its ATK become double its original ATK, until the end of the Battle Phase.",
       "targets": null,
-      "respondsTo": null,
-      "script": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "phase",
+            "phases": [
+              "battle"
+            ]
+          },
+          {
+            "if": "summoned_this_turn",
+            "how": [
+              "normal"
+            ]
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "set_stats",
+                "cards": {
+                  "from": "self"
+                },
+                "atk": {
+                  "of": "self",
+                  "stat": "atk",
+                  "original": true,
+                  "times": 2
+                },
+                "def": null,
+                "until": "end_of_battle_phase"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "status": "unverified"
     }
   ],

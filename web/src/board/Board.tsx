@@ -190,6 +190,7 @@ export function Board({ duelId }: { duelId: string }) {
         return send.mutate({ type: action.type, card: action.card });
       case 'enterBattle':
       case 'enterMain2':
+      case 'pass':
       case 'surrender':
         return send.mutate({ type: action.type });
     }
@@ -401,6 +402,47 @@ export function Board({ duelId }: { duelId: string }) {
     </span>
   );
 
+  /**
+   * A response window or optional triggers: the player whose turn it is to answer gets the question and a Pass
+   * button (the cards they can activate glow); the other player sees whom the duel waits on.
+   */
+  const waiting = view.waiting;
+  const pass = has('pass');
+  const topLink = view.chain.at(-1);
+  const respondNote =
+    waiting &&
+    (waiting.player === me && pass ? (
+      <span className="choice-prompt" role="group">
+        <span className="choice-text">
+          {waiting.for === 'triggers'
+            ? 'Activate a trigger effect?'
+            : topLink
+              ? `Respond to ${dataOf(topLink.card)?.name ?? 'the chain'}?`
+              : `Respond to ${waiting.cause ?? 'this'}?`}
+        </span>
+        <button className="primary" onClick={() => start(pass)}>
+          {waiting.for === 'triggers' ? "Don't activate" : 'Pass'}
+        </button>
+      </span>
+    ) : (
+      waiting.player !== me && (
+        <span className="judging" role="status">
+          <span className="dot" />
+          Waiting for {view.players[waiting.player].name}…
+        </span>
+      )
+    ));
+  /** The chain waiting to resolve, link 1 first. */
+  const chainNote = view.chain.length > 0 && (
+    <span className="chain-list" aria-label="Chain">
+      {view.chain.map((l, i) => (
+        <span key={i} className={l.player === me ? 'mine' : 'theirs'}>
+          {i + 1}. {dataOf(l.card)?.name ?? 'a card'}
+        </span>
+      ))}
+    </span>
+  );
+
   const lpTarget = (): 'open' | 'over' | null => {
     const attack = drag?.kind === 'aim' ? drag.action : null;
     return attack?.direct ? (over === `lp:${foe}` ? 'over' : 'open') : null;
@@ -453,7 +495,14 @@ export function Board({ duelId }: { duelId: string }) {
                         ...(enterMain2 && { main2: () => start(enterMain2) }),
                         ...(endTurn && { end: () => start(endTurn) }),
                       }}
-                      prompt={prompt || choiceBar || judgeNote || null}
+                      prompt={
+                        prompt || choiceBar || judgeNote || respondNote || chainNote ? (
+                          <>
+                            {chainNote}
+                            {prompt || choiceBar || judgeNote || respondNote}
+                          </>
+                        ) : null
+                      }
                       endTurn={endTurn && !choosing ? () => start(endTurn) : null}
                     />
                     <Field

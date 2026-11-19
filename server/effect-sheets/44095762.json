@@ -12,7 +12,26 @@
       "cost": "",
       "effect": "Destroy all your opponent's Attack Position monsters.",
       "targets": null,
-      "respondsTo": "attack",
+      "when": {
+        "event": "attack_declared",
+        "self": false,
+        "filter": {
+          "side": "opponent",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
       "script": {
         "conditions": [],
         "cost": [],

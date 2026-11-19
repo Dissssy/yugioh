@@ -13,8 +13,10 @@ import {
   entryFor,
   evolve,
   logFor,
+  nextStep,
   replay,
   startDuel,
+  triggerEvent,
   viewFor,
   visibleTo,
   type ChainLink,
@@ -23,6 +25,7 @@ import {
   type DuelUpdate,
   type EffectSheet,
   type Intent,
+  type JudgeRecord,
   type JudgingView,
   type Seat,
 } from '@yugioh/engine';
@@ -53,6 +56,8 @@ interface LiveDuel {
   judging: Judging | null;
   /** Contests being reviewed, as `seq:seat`, so the same one isn't sent twice. */
   appealing: Set<string>;
+  /** A pass the server will make for a player with nothing to activate, once the response floor has passed. */
+  autoPass: ReturnType<typeof setTimeout> | null;
 }
 
 interface Judging {
@@ -82,11 +87,16 @@ export class Duels {
   private db: Db;
   private ai: Ai;
   private random: () => number;
-  /** `random` deals, shuffles and tosses the coin; tests pass a seeded one so every run deals the same hands. */
-  constructor(db: Db, ai: Ai, random: () => number = secureRandom) {
+  private responseFloorMs: number;
+  /**
+   * `random` deals, shuffles and tosses the coin; tests pass a seeded one so every run deals the same hands.
+   * `responseFloorMs` is the least time a response window stays open (see Config).
+   */
+  constructor(db: Db, ai: Ai, random: () => number = secureRandom, responseFloorMs = 1000) {
     this.db = db;
     this.ai = ai;
     this.random = random;
+    this.responseFloorMs = responseFloorMs;
   }
 
   async create(userId: number, seatKey: string, deckId: number): Promise<string | null> {
@@ -178,7 +188,17 @@ export class Duels {
         if (!row || row.status === 'waiting') throw new Error(`Duel ${id} has not started`);
         const rows = await this.db.select().from(matchEvents).where(eq(matchEvents.matchId, id)).orderBy(matchEvents.seq);
         const events = rows.map((r) => r.event as DuelEvent);
-        const live: LiveDuel = { id, events, state: replay(events), listeners: new Set(), queue: Promise.resolve(), writes: Promise.resolve(), judging: null, appealing: new Set() };
+        const live: LiveDuel = {
+          id,
+          events,
+          state: replay(events),
+          listeners: new Set(),
+          queue: Promise.resolve(),
+          writes: Promise.resolve(),
+          judging: null,
+          appealing: new Set(),
+          autoPass: null,
+        };
         // Sheets that changed while the duel wasn't loaded (a report, a fix) apply from here on.
         if (!live.state.result) {
           const now = await loadSheets(this.db, live.state.cards);
@@ -187,8 +207,8 @@ export class Duels {
             .filter((code) => JSON.stringify(now[code] ?? null) !== JSON.stringify(live.state.sheets[code] ?? null));
           if (changed.length) await this.write(live, changed.map((code) => ({ type: 'sheetUpdated', code, sheet: now[code] ?? null })));
         }
-        // An effect that was activated but not resolved when the server stopped resolves now.
-        if (live.state.chain.length > 0) void this.enqueue(live, () => this.resolveChain(live));
+        // Whatever the duel was doing when the server stopped (resolving a chain, waiting out a window) carries on.
+        void this.enqueue(live, () => this.advance(live));
         return live;
       })();
       duel.catch(() => this.live.delete(id));
@@ -211,8 +231,8 @@ export class Duels {
   }
 
   /**
-   * Handles a player's intent. An activation answers as soon as code accepts it; the judge then checks and resolves
-   * it in the duel's queue, and players follow along through their streams.
+   * Handles a player's intent. An activation answers as soon as code accepts it; the judge (or the effect's script)
+   * then checks and resolves it in the duel's queue, and players follow along through their streams.
    */
   async act(id: string, seatKey: string, intent: Intent): Promise<ActResult> {
     const duel = await this.load(id);
@@ -224,40 +244,85 @@ export class Duels {
         if (!decision.ok) return answer({ ok: false, status: 422, error: decision.error });
         if (intent.type !== 'activate') {
           await this.commit(duel, decision.events);
-          return answer({ ok: true });
+          answer({ ok: true });
+          return this.advance(duel);
         }
-        // A scripted effect needs no model, so neither the API key nor the duel's judge calls.
-        if (!scriptOf(duel.state, intent.card, intent.effect)) {
-          if (!this.ai.judge) return answer({ ok: false, status: 503, error: "This card's effect needs the judge, and it isn't set up on this server." });
-          if (judgeCallsMade(duel.events) + 2 > this.ai.judgeCalls) {
-            return answer({ ok: false, status: 429, error: 'This duel has used all its judge calls.' });
-          }
-        }
+        const blocked = this.judgeBlocked(duel, intent.card, intent.effect);
+        if (blocked) return answer(blocked);
         answer({ ok: true });
-        await this.activate(duel, decision.events);
+        const [intentEvent, ...activation] = decision.events;
+        await this.activate(duel, [intentEvent!], activation);
+        await this.advance(duel);
       }).catch(() => answer({ ok: false, status: 500, error: 'Something went wrong.' }));
     });
   }
 
-  /** Checks an activation with the judge, then resolves it. `events` are the intent and the activation, not yet committed. */
-  private async activate(duel: LiveDuel, events: DuelEvent[]) {
-    const [intent, ...activation] = events;
+  /** Why an effect can't go to the judge now (no API key, or the duel's judge calls are used up), or null. A scripted effect needs neither. */
+  private judgeBlocked(duel: LiveDuel, card: string, effect: number): Extract<ActResult, { ok: false }> | null {
+    if (scriptOf(duel.state, card, effect)) return null;
+    if (!this.ai.judge) return { ok: false, status: 503, error: "This card's effect needs the judge, and it isn't set up on this server." };
+    if (judgeCallsMade(duel.events) + 2 > this.ai.judgeCalls) return { ok: false, status: 429, error: 'This duel has used all its judge calls.' };
+    return null;
+  }
+
+  /**
+   * Checks an activation with the judge or the effect's script, and commits it if legal. `before` (the intent, if a
+   * player asked) is committed either way; `activation` (the card's activation) only if it is legal.
+   */
+  private async activate(duel: LiveDuel, before: DuelEvent[], activation: DuelEvent[]) {
     const scratch = activation.reduce(evolve, duel.state);
     const link = scratch.chain.at(-1)!;
     const overturned = duel.state.rulings.find((r) => r.legal && r.player === link.player && r.card === link.card && r.effect === link.effect);
     const { record, events: costs } = await this.runJudge(duel, 'activation', scratch, link, overturned?.summary ?? null);
     const judged: DuelEvent = { type: 'judged', record };
-    await this.commit(duel, record.legal ? [intent!, judged, ...activation, ...costs] : [intent!, judged]);
-    if (record.legal) await this.resolveChain(duel);
+    await this.commit(duel, record.legal ? [...before, judged, ...activation, ...costs] : [...before, judged]);
   }
 
-  /** Resolves the chain's links, last first. */
-  private async resolveChain(duel: LiveDuel) {
-    while (duel.state.chain.length > 0 && !duel.state.result) {
-      const link = duel.state.chain.at(-1)!;
-      const { record, events } = await this.runJudge(duel, 'resolution', duel.state, link);
-      await this.commit(duel, [{ type: 'judged', record }, ...events, { type: 'linkResolved' }]);
+  /**
+   * Moves the duel on until it waits for a player: commits the steps code takes by itself, puts mandatory triggers on
+   * the chain, resolves chains, and passes for a player who has nothing to activate (after the response floor, so
+   * the speed of a pass reveals nothing).
+   */
+  private async advance(duel: LiveDuel) {
+    for (;;) {
+      const next = nextStep(duel.state);
+      if (!next) return;
+      if (next.kind === 'events') {
+        await this.commit(duel, next.events);
+      } else if (next.kind === 'trigger') {
+        const { card, effect } = next.trigger;
+        const blocked = this.judgeBlocked(duel, card, effect);
+        if (blocked) await this.commit(duel, [{ type: 'judged', record: notRuled(duel.state, 'activation', next.trigger.player, card, effect, blocked.error) }]);
+        else await this.activate(duel, [], triggerEvent(next.trigger));
+      } else if (next.kind === 'resolve') {
+        const link = duel.state.chain.at(-1)!;
+        // An activation reserved its resolution's judge call; only a missing API key (after a restart) stops it.
+        const { record, events } =
+          !scriptOf(duel.state, link.card, link.effect) && !this.ai.judge
+            ? { record: notRuled(duel.state, 'resolution', link.player, link.card, link.effect, "The judge isn't set up on this server."), events: [] }
+            : await this.runJudge(duel, 'resolution', duel.state, link);
+        await this.commit(duel, [{ type: 'judged', record }, ...events, { type: 'linkResolved' }]);
+      } else {
+        if (next.autoPass) this.passLater(duel, next.player, next.floor);
+        return;
+      }
     }
+  }
+
+  /** Passes for a player with nothing to activate, after the response floor unless `floor` is false. */
+  private passLater(duel: LiveDuel, player: Seat, floor: boolean) {
+    if (duel.autoPass) clearTimeout(duel.autoPass);
+    const step = duel.state.step;
+    const delay = floor ? this.responseFloorMs * (1 + this.random() / 2) : 0;
+    duel.autoPass = setTimeout(() => {
+      duel.autoPass = null;
+      void this.enqueue(duel, async () => {
+        // Anything that moved the duel on since (an activation) makes this pass stale.
+        if (duel.state.step !== step) return;
+        await this.commit(duel, [{ type: 'passed', player }]);
+        await this.advance(duel);
+      });
+    }, delay);
   }
 
   private async runJudge(duel: LiveDuel, stage: 'activation' | 'resolution', state: DuelState, link: ChainLink, appealRuling: string | null = null) {
@@ -415,11 +480,13 @@ export class Duels {
   private broadcast(before: DuelState, events: DuelEvent[], first: number, duel: LiveDuel) {
     const updateFor = (seat: Seat): Extract<DuelUpdate, { type: 'steps' }> => {
       let state = before;
-      const steps = events.flatMap((event, i) => {
+      const steps: Extract<DuelUpdate, { type: 'steps' }>['steps'] = events.flatMap((event, i) => {
         state = evolve(state, event);
         const entry = entryFor(state, event, first + i, state.turn, seat);
         return entry ? [{ entry, view: viewFor(state, seat) }] : [];
       });
+      // A change nobody sees in the log (a pass) still changes what each player may do.
+      if (!entryFor(state, events.at(-1)!, first + events.length - 1, state.turn, seat)) steps.push({ entry: null, view: viewFor(state, seat) });
       for (const step of steps.slice(0, -1)) step.view.actions = [];
       return { type: 'steps', steps };
     };
@@ -430,6 +497,26 @@ export class Duels {
   private broadcastJudging(duel: LiveDuel) {
     for (const l of duel.listeners) l.send({ type: 'judging', judging: judgingFor(duel, l.seat) });
   }
+}
+
+/** A record for an effect nobody could rule on: an activation is refused, an effect does nothing. */
+function notRuled(state: DuelState, stage: 'activation' | 'resolution', player: Seat, card: string, effect: number, error: string): JudgeRecord {
+  const name = cardOf(state, card).name;
+  return {
+    stage,
+    player,
+    card,
+    effect,
+    model: 'none',
+    promptVersion: '',
+    stateHash: '',
+    transcript: [],
+    legal: stage === 'resolution',
+    summary: stage === 'activation' ? `${name}'s effect needs the judge, which isn't available, so it wasn't activated.` : `The judge isn't available, so ${name}'s effect did nothing.`,
+    ops: [],
+    error,
+    usage: [],
+  };
 }
 
 /** Reports each player may make per duel. */

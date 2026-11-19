@@ -12,8 +12,44 @@
       "cost": "",
       "effect": "Draw 1 card.",
       "targets": null,
-      "respondsTo": "attack",
-      "script": null,
+      "when": {
+        "event": "attacked",
+        "self": true,
+        "filter": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "faceUp": true,
+          "position": "attack",
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "draw",
+                "player": "you",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "status": "unverified"
     }
   ],

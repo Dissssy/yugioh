@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Add up to 3 targeted non-Effect Monsters with 1500 or less ATK from your Graveyard to your hand.",
       "targets": "up to 3 non-Effect Monsters with 1500 or less ATK in your Graveyard",
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [
           {
@@ -58,7 +58,8 @@
             "def": null
           },
           "min": 1,
-          "max": 3
+          "max": 3,
+          "event": false
         },
         "options": [
           {

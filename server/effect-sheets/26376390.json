@@ -12,8 +12,63 @@
       "cost": "",
       "effect": "This card's ATK/DEF become equal to that monster's original ATK/DEF.",
       "targets": "1 face-up monster your opponent controls",
-      "respondsTo": null,
-      "script": null,
+      "when": {
+        "event": "summoned",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "monsters",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "set_stats",
+                "cards": {
+                  "from": "self"
+                },
+                "atk": {
+                  "of": "targets",
+                  "stat": "atk",
+                  "original": true,
+                  "times": 1
+                },
+                "def": {
+                  "of": "targets",
+                  "stat": "def",
+                  "original": true,
+                  "times": 1
+                },
+                "until": "while_on_field"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "status": "unverified"
     }
   ],

@@ -12,7 +12,7 @@
       "cost": "detach 1 Xyz Material from this card",
       "effect": "Inflict 1000 damage to your opponent.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

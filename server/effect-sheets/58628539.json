@@ -12,7 +12,30 @@
       "cost": "",
       "effect": "Target 1 card on the field; destroy it.",
       "targets": "1 card on the field",
-      "respondsTo": "summon",
+      "when": {
+        "event": "summoned",
+        "self": false,
+        "filter": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [],
+          "types": [
+            "Xyz"
+          ],
+          "races": [],
+          "attributes": [],
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [
+          "special"
+        ],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     }

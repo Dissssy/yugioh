@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Equip this card to 1 face-up monster on the field.",
       "targets": "1 face-up monster on the field",
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +25,7 @@
       "cost": "",
       "effect": "The equipped monster gains 500 ATK.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -38,7 +38,7 @@
       "cost": "",
       "effect": "Draw 1 card.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

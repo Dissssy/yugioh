@@ -3,7 +3,7 @@
 
 import { cardOf } from './rules.ts';
 import { levelOf, locate, statsOf } from './state.ts';
-import type { CardFilter, DuelState, Range, Script, Seat, Selection, Step } from './types.ts';
+import type { CardFilter, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
 export function scriptOf(state: DuelState, card: string, effect: number): Script | null {
@@ -82,6 +82,7 @@ const freeMonsterZones = (state: DuelState, seat: Seat) => state.players[seat].m
 
 /** Why a step couldn't do what it must on this board, or null. A `choose` with min 0 ("you can") and steps on targets need nothing here. */
 function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): string | null {
+  if (step.do === 'negate_attack') return state.attack ? null : 'No attack is being made.';
   if (!('cards' in step)) return null;
   const sel = step.cards;
   if (step.do === 'special_summon' && freeMonsterZones(state, seat) === 0) return 'You have no free Monster Zone to Special Summon into.';
@@ -97,11 +98,21 @@ export function feasibleOptions(state: DuelState, script: Script, seat: Seat, ca
   return script.options.flatMap((o, i) => (o.steps.every((s) => !stepProblem(state, s, seat, card)) ? [i] : []));
 }
 
+/** The cards a script may target: those that fit, and for "target that monster" only the card its event happened to. */
+export function targetable(state: DuelState, script: Script, seat: Seat, card: string, cause: Happening | null): string[] {
+  if (!script.targets) return [];
+  const fitting = cardsFitting(state, script.targets.filter, seat, card);
+  return script.targets.event ? fitting.filter((id) => cause && cause.event !== 'phase' && id === cause.card) : fitting;
+}
+
+const phaseNames = { draw: 'Draw Phase', standby: 'Standby Phase', main1: 'Main Phase 1', battle: 'Battle Phase', main2: 'Main Phase 2', end: 'End Phase' };
+
 /**
  * Why a scripted activation is illegal on this board, or null if it is legal (or the effect has no script). Judged
- * before the cost is paid: a card the cost will use can't also be one of its targets.
+ * before the cost is paid: a card the cost will use can't also be one of its targets. `cause` is the event it is
+ * activated for, if any.
  */
-export function scriptProblem(state: DuelState, seat: Seat, card: string, effect: number): string | null {
+export function scriptProblem(state: DuelState, seat: Seat, card: string, effect: number, cause: Happening | null): string | null {
   const script = scriptOf(state, card, effect);
   if (!script) return null;
   for (const c of script.conditions) {
@@ -110,6 +121,14 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
     }
     if (c.if === 'count' && cardsFitting(state, c.filter, seat, card).length < c.min) {
       return `It needs ${c.min === 1 ? 'a' : `at least ${c.min} of:`} ${describeFilter(c.filter)}.`;
+    }
+    if (c.if === 'phase' && !c.phases.includes(state.phase)) return `It can only be activated during the ${c.phases.map((p) => phaseNames[p]).join(' or ')}.`;
+    if (c.if === 'summoned_this_turn') {
+      const at = locate(state, card);
+      const summoned = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.summoned : null;
+      if (!summoned || summoned.turn !== state.turn || (c.how.length > 0 && !c.how.includes(summoned.how))) {
+        return `It needs this card to have been ${c.how.length ? `${c.how.map((h) => (h === 'normal' ? 'Normal' : h === 'flip' ? 'Flip' : 'Special')).join(' or ')} ` : ''}Summoned this turn.`;
+      }
     }
   }
   const costCards = new Set<string>();
@@ -124,7 +143,7 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
     }
   }
   if (script.targets) {
-    const targets = cardsFitting(state, script.targets.filter, seat, card);
+    const targets = targetable(state, script, seat, card, cause);
     const both = new Set([...targets, ...costCards]).size;
     if (targets.length < script.targets.min || both < script.targets.min + costCount) {
       return `There is no ${describeFilter(script.targets.filter)} to target${costCount ? ' besides the cards paid as its cost' : ''}.`;

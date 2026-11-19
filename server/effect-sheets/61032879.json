@@ -12,7 +12,7 @@
       "cost": "",
       "effect": "Activate this Continuous Spell Card; the activation itself does nothing. The card remains on the field.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [],
         "cost": [],
@@ -36,7 +36,30 @@
       "cost": "",
       "effect": "Inflict 500 damage to your opponent.",
       "targets": null,
-      "respondsTo": "summon",
+      "when": {
+        "event": "summoned",
+        "self": false,
+        "filter": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [],
+          "types": [
+            "Synchro"
+          ],
+          "races": [],
+          "attributes": [],
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [
+          "special"
+        ],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     }

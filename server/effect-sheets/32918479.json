@@ -12,7 +12,14 @@
       "cost": "",
       "effect": "Draw 1 card.",
       "targets": null,
-      "respondsTo": null,
+      "when": {
+        "event": "battle_damage",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +32,7 @@
       "cost": "",
       "effect": "Send it to the Graveyard.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

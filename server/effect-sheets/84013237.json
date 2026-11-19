@@ -12,7 +12,14 @@
       "cost": "detach 1 material from this card",
       "effect": "negate the attack",
       "targets": null,
-      "respondsTo": "attack",
+      "when": {
+        "event": "attack_declared",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +32,14 @@
       "cost": "",
       "effect": "Destroy this card.",
       "targets": null,
-      "respondsTo": "attack",
+      "when": {
+        "event": "attacked",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "from": "field",
+        "canMiss": false
+      },
       "script": null,
       "status": "unverified"
     }

@@ -527,7 +527,7 @@ export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: 
     } else if (how === 'set') {
       events.push({ type: 'spellTrapSet', player: seat, card: id, zone: zones[seat]![1]++ });
     } else if (how === 'faceUp') {
-      events.push({ type: 'effectActivated', player: seat, card: id, effect: 0, zone: zones[seat]![1]++ }, { type: 'linkResolved' });
+      events.push({ type: 'effectActivated', player: seat, card: id, effect: 0, zone: zones[seat]![1]++, cause: null }, { type: 'linkResolved' });
     }
   }
   events.push({ type: 'turnStarted', player: c.seat ?? 0, turn: 3 }, { type: 'phaseChanged', phase: 'main1' });
@@ -552,7 +552,7 @@ export async function runCase(c: EvalCase, state: DuelState, model: ModelCall | 
   const id = [...p.hand, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((m) => (m ? [m.id] : []))].find((x) => cardOf(state, x).name === c.activate)!;
   const zone = p.hand.includes(id) ? p.spellTraps.indexOf(null) : null;
   const intent = decide(state, seat, { type: 'activate', card: id, effect: c.effect ?? 0, zone });
-  // Code refuses an activation that the effect's script or respondsTo rules out, with no judge call.
+  // Code refuses an activation that the effect's script or `when` rules out, with no judge call.
   if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   const picks = [...(c.picks ?? [])];
   const unmatched: string[] = [];

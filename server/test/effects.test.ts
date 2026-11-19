@@ -37,7 +37,7 @@ async function until<T>(stream: Stream, pick: (u: DuelUpdate) => T | undefined):
     if (found !== undefined) return found;
   }
 }
-const entries = (u: DuelUpdate): LogEntry[] => (u.type === 'steps' ? u.steps.map((s) => s.entry) : []);
+const entries = (u: DuelUpdate): LogEntry[] => (u.type === 'steps' ? u.steps.flatMap((s) => (s.entry ? [s.entry] : [])) : []);
 
 /** Who plays a duel set up by `setUp`, and the guest's two cards. */
 interface Setup {

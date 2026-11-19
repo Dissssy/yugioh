@@ -52,7 +52,7 @@ export async function startHarness(): Promise<Harness> {
   let model: ModelCall = () => Promise.reject(new Error('No model set for this test'));
   const call = (params: Anthropic.MessageCreateParamsNonStreaming) => model(params);
   const ai = { judge: call, appeal: call, judgeCalls: 300, appeals: 10 };
-  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10 }, db, ai, seeded(1)));
+  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10, RESPONSE_FLOOR_MS: 0 }, db, ai, seeded(1)));
 
   return {
     db,

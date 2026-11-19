@@ -12,7 +12,7 @@
       "cost": "Send 1 Normal Monster you control to the Graveyard",
       "effect": "Special Summon the targeted monster, and if you do, equip this card to it.",
       "targets": "1 monster in either player's Graveyard",
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     },
@@ -25,7 +25,7 @@
       "cost": "",
       "effect": "Destroy the equipped monster.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": null,
       "status": "unverified"
     }

@@ -10,9 +10,9 @@
       "opt": "none",
       "window": "Any time you could activate a Quick-Play Spell",
       "cost": "",
-      "effect": "Activate 1 of these effects; ● Gain 1200 LP. ● Inflict 800 damage to your opponent.",
+      "effect": "Activate 1 of these effects; \u25cf Gain 1200 LP. \u25cf Inflict 800 damage to your opponent.",
       "targets": null,
-      "respondsTo": null,
+      "when": null,
       "script": {
         "conditions": [],
         "cost": [],
