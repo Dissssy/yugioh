@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   decide,
+  legalActions,
   replay,
   startDuel,
   logFor,
@@ -114,34 +115,46 @@ describe('starting a duel', () => {
 describe('summoning', () => {
   it('allows one Normal Summon or Set per turn', () => {
     const t = new Table(stacked([1, 2, 5, 1, 1, ...filler(35)], filler(40, 2)));
-    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [] });
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
     expect(t.state.players[0].monsters[0]).toMatchObject({ id: 'a0', faceUp: true, position: 'attack' });
-    expect(t.refuse(0, { type: 'setMonster', card: 'a1', tributes: [] })).toMatch(/already/);
+    expect(t.refuse(0, { type: 'setMonster', card: 'a1', tributes: [], zone: 0 })).toMatch(/already/);
   });
 
   it('requires tributes for Level 5 and up, and sends them to the Graveyard', () => {
     const t = new Table(stacked([3, 4, 1, 1, 1, ...filler(35)], filler(40, 2)));
-    expect(t.refuse(0, { type: 'normalSummon', card: 'a0', tributes: [] })).toMatch(/needs 1 tribute/);
-    t.play(0, { type: 'normalSummon', card: 'a2', tributes: [] });
+    expect(t.refuse(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 })).toMatch(/needs 1 tribute/);
+    t.play(0, { type: 'normalSummon', card: 'a2', tributes: [], zone: 0 });
     t.play(0, { type: 'endTurn', discard: [] });
     t.play(1, { type: 'endTurn', discard: [] });
     // Turn 3: Yusei drew, tributes Axe Raider for Luster Dragon #2.
-    expect(t.refuse(0, { type: 'normalSummon', card: 'a1', tributes: ['a2'] })).toMatch(/needs 2 tributes/);
-    t.play(0, { type: 'normalSummon', card: 'a0', tributes: ['a2'] });
+    expect(t.refuse(0, { type: 'normalSummon', card: 'a1', tributes: ['a2'], zone: 0 })).toMatch(/needs 2 tributes/);
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: ['a2'], zone: 0 });
     expect(t.state.players[0].graveyard).toEqual(['a2']);
     expect(t.state.players[0].monsters[0]?.id).toBe('a0');
   });
 
   it("refuses Extra Deck monsters and the opponent's turn", () => {
     const t = new Table(stacked(filler(40), filler(40, 2)));
-    expect(t.refuse(0, { type: 'normalSummon', card: 'ax0', tributes: [] })).toMatch(/not in your hand/);
-    expect(t.refuse(1, { type: 'normalSummon', card: 'b0', tributes: [] })).toMatch(/not your turn/);
+    expect(t.refuse(0, { type: 'normalSummon', card: 'ax0', tributes: [], zone: 0 })).toMatch(/not in your hand/);
+    expect(t.refuse(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 })).toMatch(/not your turn/);
+  });
+
+  it('puts a card in the zone the player picks, and refuses a taken zone', () => {
+    const t = new Table(stacked([6, 1, 1, ...filler(37)], filler(40, 2)));
+    expect(legalActions(t.state, 0).find((a) => a.type === 'setSpellTrap')).toMatchObject({ zones: [0, 1, 2, 3, 4] });
+    t.play(0, { type: 'setSpellTrap', card: 'a0', zone: 3 });
+    expect(t.state.players[0].spellTraps[3]?.id).toBe('a0');
+    t.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 2 });
+    expect(t.state.players[0].monsters[2]?.id).toBe('a1');
+    t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
+    expect(t.refuse(0, { type: 'setMonster', card: 'a2', tributes: [], zone: 2 })).toMatch(/not empty/);
+    expect(t.refuse(0, { type: 'setMonster', card: 'a2', tributes: [], zone: 7 })).toMatch(/no Monster Zone/);
   });
 
   it('Sets Spells and Traps face-down and hides them from the opponent', () => {
     const t = new Table(stacked([6, 1, 1, 1, 1, ...filler(35)], filler(40, 2)));
-    t.play(0, { type: 'setSpellTrap', card: 'a0' });
-    t.play(0, { type: 'setMonster', card: 'a1', tributes: [] });
+    t.play(0, { type: 'setSpellTrap', card: 'a0', zone: 0 });
+    t.play(0, { type: 'setMonster', card: 'a1', tributes: [], zone: 0 });
     const theirs = viewFor(t.state, 1);
     const theirLog = logFor(t.events, 1);
     expect(theirs.players[0].spellTraps[0]).toEqual({ card: { hidden: true }, position: 'attack', faceUp: false });
@@ -161,7 +174,7 @@ describe('summoning', () => {
 describe('positions', () => {
   it("can't change position on the turn a monster arrives, then once per turn after", () => {
     const t = new Table(stacked(filler(40), filler(40, 2)));
-    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [] });
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
     expect(t.refuse(0, { type: 'changePosition', card: 'a0' })).toMatch(/can't be changed/);
     t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
     t.play(0, { type: 'changePosition', card: 'a0' });
@@ -171,7 +184,7 @@ describe('positions', () => {
 
   it('Flip Summons a Set monster on a later turn', () => {
     const t = new Table(stacked(filler(40), filler(40, 2)));
-    t.play(0, { type: 'setMonster', card: 'a0', tributes: [] });
+    t.play(0, { type: 'setMonster', card: 'a0', tributes: [], zone: 0 });
     expect(t.refuse(0, { type: 'flipSummon', card: 'a0' })).toMatch(/can't be Flip Summoned/);
     t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
     t.play(0, { type: 'flipSummon', card: 'a0' });
@@ -183,8 +196,8 @@ describe('battle', () => {
   /** Yusei summons `mine` on turn 1; Yuma summons or sets `theirs` on turn 2, then it is Yusei's battle on turn 3. */
   function battle(mine: number, theirs: number, set = false) {
     const t = new Table(stacked([mine, ...filler(39)], [theirs, ...filler(39, 2)]));
-    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [] }).play(0, { type: 'endTurn', discard: [] });
-    t.play(1, { type: set ? 'setMonster' : 'normalSummon', card: 'b0', tributes: [] }).play(1, { type: 'endTurn', discard: [] });
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).play(0, { type: 'endTurn', discard: [] });
+    t.play(1, { type: set ? 'setMonster' : 'normalSummon', card: 'b0', tributes: [], zone: 0 }).play(1, { type: 'endTurn', discard: [] });
     t.play(0, { type: 'enterBattle' });
     return t;
   }
@@ -240,9 +253,9 @@ describe('winning', () => {
     // Yuma's deck is all Traps; Setting one each turn keeps their hand at six.
     const t = new Table(stacked(filler(40), filler(40, 6)));
     const yumaTurn = () => {
-      t.play(1, { type: 'setSpellTrap', card: t.state.players[1].hand[0]! }).play(1, { type: 'endTurn', discard: [] });
+      t.play(1, { type: 'setSpellTrap', card: t.state.players[1].hand[0]!, zone: t.state.players[1].spellTraps.indexOf(null) }).play(1, { type: 'endTurn', discard: [] });
     };
-    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [] }).play(0, { type: 'endTurn', discard: [] });
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).play(0, { type: 'endTurn', discard: [] });
     yumaTurn();
     // Axe Raider attacks directly for 1700 a turn: the 5th attack takes 8000 LP to 0.
     for (let i = 0; i < 5; i++) {
