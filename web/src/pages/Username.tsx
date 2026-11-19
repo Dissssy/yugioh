@@ -15,8 +15,7 @@ export function Username({ user }: { user: User }) {
   const save = useMutation({
     mutationFn: (username: string) => api<User>('/me/username', { method: 'POST', body: JSON.stringify({ username }) }),
     onSuccess: (updated) => {
-      const me: Me = { kind: 'user', user: updated };
-      queryClient.setQueryData(['me'], me);
+      queryClient.setQueryData<Me>(['me'], (me) => me?.kind === 'user' ? { ...me, user: updated } : me);
       setDraft(null);
     },
   });

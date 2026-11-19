@@ -1,5 +1,7 @@
 import { Link, NavLink, Route, Routes, useLocation } from 'react-router';
+import { AccountMenu, Avatar } from './AccountMenu.tsx';
 import { loginHref, useMe } from './api.ts';
+import { Account } from './pages/Account.tsx';
 import { Admin } from './pages/Admin.tsx';
 import { DeckPage } from './pages/DeckPage.tsx';
 import { DuelPage } from './pages/DuelPage.tsx';
@@ -9,7 +11,7 @@ import { Loading, Notice } from './pages/Notice.tsx';
 export function App() {
   const me = useMe();
   const user = me.data?.kind === 'user' ? me.data.user : null;
-  const name = user?.username ?? (me.data?.kind === 'guest' ? me.data.guest.name : null);
+  const guest = me.data?.kind === 'guest' ? me.data.guest : null;
   const location = useLocation();
 
   return (
@@ -21,17 +23,17 @@ export function App() {
         </Link>
         <nav>
           {user?.isAdmin && <NavLink to="/admin" className="nav-link">Admin</NavLink>}
-          {name && (
+          {guest && (
             <span className="who">
-              <span className="avatar" aria-hidden>{name[0]!.toUpperCase()}</span>
-              {name}
-              {me.data?.kind === 'guest' && <span className="tag">guest</span>}
+              <Avatar name={guest.name} />
+              {guest.name}
+              <span className="tag">guest</span>
             </span>
           )}
           {user ? (
-            <a className="nav-link" href="/auth/logout">Log out</a>
+            <AccountMenu user={user} />
           ) : (
-            <a className="nav-link" href={loginHref(location.pathname)}>Log in</a>
+            me.data && <a className="nav-link" href={loginHref(location.pathname)}>Log in</a>
           )}
         </nav>
       </header>
@@ -43,6 +45,7 @@ export function App() {
         ) : (
           <Routes>
             <Route path="/" element={<Home me={me.data} />} />
+            <Route path="/account" element={<Account me={me.data} />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/duel/:id" element={<DuelPage me={me.data} />} />
             <Route path="/decks/:id" element={<DeckPage />} />

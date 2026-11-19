@@ -36,6 +36,13 @@
       "when": 1795059326254,
       "tag": "0004_effect_sheets",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795061140003,
+      "tag": "0005_user_settings",
+      "breakpoints": true
     }
   ]
 }

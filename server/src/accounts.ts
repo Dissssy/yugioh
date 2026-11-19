@@ -1,5 +1,5 @@
 import { asc, eq, sql } from 'drizzle-orm';
-import type { AccountStatus, AdminUser, User } from '@yugioh/shared';
+import { defaultSettings, type AccountStatus, type AdminUser, type User, type UserSettings } from '@yugioh/shared';
 import type { Db } from './db/client.ts';
 import { users } from './db/schema.ts';
 import { randomUsername } from './usernames.ts';
@@ -22,6 +22,8 @@ export function toUser(row: UserRow): User {
     createdAt: row.createdAt.toISOString(),
   };
 }
+
+export const settingsOf = (row: UserRow): UserSettings => ({ ...defaultSettings, ...row.settings });
 
 const toAdminUser = (row: UserRow): AdminUser => ({ ...toUser(row), email: row.email });
 
@@ -65,6 +67,16 @@ export async function setUsername(db: Db, id: number, username: string): Promise
     if (isUsernameTaken(error)) return null;
     throw error;
   }
+}
+
+/** Changes some of an account's settings and returns them all. */
+export async function updateSettings(db: Db, id: number, change: Partial<UserSettings>): Promise<UserSettings> {
+  const [row] = await db
+    .update(users)
+    .set({ settings: sql`${users.settings} || ${JSON.stringify(change)}::jsonb` })
+    .where(eq(users.id, id))
+    .returning();
+  return settingsOf(row!);
 }
 
 export async function findUserBySub(db: Db, sub: string): Promise<UserRow | undefined> {

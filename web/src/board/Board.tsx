@@ -4,7 +4,9 @@ import type { Intent, LegalAction, PlayerView, Seat } from '@yugioh/engine';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { api, errorText } from '../api.ts';
+import { api, errorText, useMe } from '../api.ts';
+import { OpponentCardsSetting } from '../pages/Account.tsx';
+import { useSettings } from '../settings.ts';
 import { ActionMenu } from './ActionMenu.tsx';
 import { Arrows, cardCentre, dropAt, dropCentre, type Point } from './aim.tsx';
 import { dataOf, idOf, imageUrl, preloadImages } from './Card.tsx';
@@ -61,6 +63,8 @@ const PRELOAD_TIMEOUT_MS = 4000;
 
 export function Board({ duelId }: { duelId: string }) {
   const [settings, updateSettings] = useDuelSettings();
+  const hasAccount = useMe().data?.kind === 'user';
+  const { opponentCards } = useSettings();
   const reduceMotion = settings.reduceMotion || systemReducesMotion();
   const pace = useCallback((event: Parameters<typeof cueMs>[0], waiting: number) => cueMs(event, waiting, settings, reduceMotion), [settings, reduceMotion]);
   const { shown, connected, judging } = useDuel(duelId, pace);
@@ -432,6 +436,7 @@ export function Board({ duelId }: { duelId: string }) {
                       seat={foe}
                       side={view.players[foe]}
                       mine={false}
+                      turned={opponentCards === 'faceThem'}
                       marks={marks}
                       zoneState={(row, zone) => zoneState(foe, row, zone)}
                       onZone={(row, zone) => clickZone(foe, row, zone)}
@@ -527,6 +532,7 @@ export function Board({ duelId }: { duelId: string }) {
                     <label>
                       <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
                     </label>
+                    {hasAccount && <OpponentCardsSetting />}
                     <p className="muted small">Right-click a card or hold Shift to pin its details. Drag cards in your hand to reorder them.</p>
                   </div>
                 )}

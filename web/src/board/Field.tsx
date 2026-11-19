@@ -10,6 +10,8 @@ export interface FieldProps {
   seat: Seat;
   side: PlayerSideView;
   mine: boolean;
+  /** Whether this half's cards point away from the viewer, as the opponent's do across a real table. */
+  turned?: boolean;
   marks: CardMarks;
   /** Whether a zone can be picked now ('open'), and whether a dragged card or aimed arrow is over it ('over'). */
   zoneState: (row: Row, index: number) => 'open' | 'over' | null;
@@ -32,7 +34,7 @@ export const dropKey = (seat: Seat, row: Row, index: number) => `${seat}:${row}:
  * each column faces the zone across from it.
  */
 export function Field(props: FieldProps) {
-  const { seat, side, mine, onPile } = props;
+  const { seat, side, mine, turned, onPile } = props;
   const order = (zones: (FieldCardView | null)[]) => {
     const indexed = zones.map((z, i) => [z, i] as const);
     return mine ? indexed : indexed.reverse();
@@ -84,7 +86,7 @@ export function Field(props: FieldProps) {
   );
 
   return mine ? (
-    <div className="field">
+    <div className={`field${turned ? ' turned' : ''}`}>
       {fieldZone}
       {monsters}
       {gy}
@@ -93,7 +95,7 @@ export function Field(props: FieldProps) {
       {deck}
     </div>
   ) : (
-    <div className="field">
+    <div className={`field${turned ? ' turned' : ''}`}>
       {deck}
       {spellTraps}
       {extra}
