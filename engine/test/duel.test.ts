@@ -383,7 +383,7 @@ describe('activating effects', () => {
     const t = new Table(stacked([9, 8, 1, 1, 1, ...filler(35)], filler(40, 2)));
     const record = (fields: Partial<JudgeRecord>): DuelEvent => ({
       type: 'judged',
-      record: { stage: 'activation', player: 0, card: 'a0', effect: 0, model: 'test', promptVersion: 'test', stateHash: '', transcript: [], legal: false, summary: 'There is no monster in your GY.', ops: [], error: null, ...fields },
+      record: { stage: 'activation', player: 0, card: 'a0', effect: 0, model: 'test', promptVersion: 'test', stateHash: '', transcript: [], legal: false, summary: 'There is no monster in your GY.', ops: [], error: null, usage: [], ...fields },
     });
     const offered = () => legalActions(t.state, 0).filter((a) => a.type === 'activate').map((a) => a.card);
     const push = (...events: DuelEvent[]) => {
@@ -401,7 +401,7 @@ describe('activating effects', () => {
     // Another refused activation and an upheld appeal leave the board as it was.
     const appealed = (card: string, verdict: 'upheld' | 'overturned'): DuelEvent => ({
       type: 'appealed',
-      appeal: { judged: 7, decision: { stage: 'activation', player: 0, card, effect: 0, legal: false }, by: 0, note: '', model: 'test', verdict, explanation: '', ruling: `${card} is legal.` },
+      appeal: { judged: 7, decision: { stage: 'activation', player: 0, card, effect: 0, legal: false }, by: 0, note: '', model: 'test', verdict, explanation: '', ruling: `${card} is legal.`, usage: [] },
     });
     push(record({ card: 'a1' }), appealed('a1', 'upheld'));
     expect(offered()).toEqual([]);

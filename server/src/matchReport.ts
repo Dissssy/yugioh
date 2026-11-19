@@ -4,6 +4,7 @@
 import { eq } from 'drizzle-orm';
 import { reviewLog, type DuelEvent } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
+import { costOf } from './judge/pricing.ts';
 import { decks, matchEvents, matches } from './db/schema.ts';
 
 export interface MatchReport {
@@ -46,6 +47,7 @@ export function reportText(report: MatchReport): string {
     `Seat 0: ${report.seats[0]} with ${report.decks[0] ?? '?'}`,
     `Seat 1: ${report.seats[1] ?? 'empty'} with ${report.decks[1] ?? '?'}`,
     `${events.length} events, ${judged} judge calls, ${appeals} appeals, ${chat} chat messages`,
+    `Estimated API cost: $${costOf(events.flatMap((e) => (e.type === 'judged' ? e.record.usage : e.type === 'appealed' ? e.appeal.usage : []))).toFixed(4)}`,
     '',
   ];
   if (events.length === 0) return header.join('\n');

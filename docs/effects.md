@@ -48,7 +48,9 @@ Model settings: `claude-haiku-5-5`, thinking disabled with effort `high` (the "r
 
 **An overturned refusal binds.** When an appeal overturns the judge's refusal of an activation, and nothing on the board has changed since, the next try of that activation gives the judge the appeal's ruling, and code refuses to let it rule the activation illegal again. Any change to the board ends this, as it ends a standing refusal.
 
-**Every decision is stored** as a `judged` event with the model, the prompt version (a hash of the rules reference and tools), a hash of the board it saw, the whole transcript, the ops, and the summary. Players see only the stage, outcome and summary.
+**Every decision is stored** as a `judged` event with the model, the prompt version (a hash of the rules reference and tools), a hash of the board it saw, the whole transcript, the ops, the summary, and the tokens each API call used. Players see only the stage, outcome and summary.
+
+**Cost.** Judge and appeal records keep each API call's token counts (input, cache writes, cache reads, output). `server/src/judge/pricing.ts` is the one place that holds Anthropic's prices and turns tokens into dollars, so updating a price there reprices past duels too; the eval runner uses it as well. The admin page's duel list shows each duel's judge calls, appeals and estimated cost, and the total spent across every duel; a duel's full log states its cost in the header. An appeal that fails (an API error, a refusal, an unreadable verdict) stores nothing, so its tokens aren't counted.
 
 **Limits.** Each duel may use 300 judge calls (an activation and its resolution are two) and 10 appeals; set `JUDGE_CALLS_PER_DUEL` and `APPEALS_PER_DUEL` to change them. Without `ANTHROPIC_API_KEY` the server runs, and activating an effect answers 503.
 

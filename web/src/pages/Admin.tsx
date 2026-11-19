@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AccountStatus, AdminUser, DuelSummary } from '@yugioh/shared';
+import type { AccountStatus, AdminDuels, AdminUser } from '@yugioh/shared';
 import { api, errorText } from '../api.ts';
 import { formatDate } from './Home.tsx';
 import { Loading, Notice } from './Notice.tsx';
@@ -15,27 +15,38 @@ export function Admin() {
   );
 }
 
-/** Everyone's latest duels, each with its full log for review: every card, intent, ruling, appeal and chat message. */
+/** Dollars, with more decimals for the small amounts one duel costs. */
+const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`;
+
+/**
+ * Everyone's latest duels, each with what its judge calls and appeals cost and its full log for review: every card,
+ * intent, ruling, appeal and chat message.
+ */
 function RecentDuels() {
-  const duels = useQuery({ queryKey: ['admin', 'duels'], queryFn: () => api<DuelSummary[]>('/admin/duels') });
+  const duels = useQuery({ queryKey: ['admin', 'duels'], queryFn: () => api<AdminDuels>('/admin/duels') });
   if (!duels.data) return null;
   return (
     <section className="box admin">
       <div className="page-head">
         <h1>Duels</h1>
+        <span className="pill">{usd(duels.data.totalCost)} spent on the judge so far</span>
       </div>
+      <p className="muted">Costs are estimated from the tokens each judge call and appeal used, at Anthropic's list prices.</p>
       <div className="table-scroll">
         <table>
           <thead>
-            <tr><th>Duel</th><th>Created</th><th>Status</th><th>Decks</th><th /></tr>
+            <tr><th>Duel</th><th>Created</th><th>Status</th><th>Decks</th><th>Judge calls</th><th>Appeals</th><th>Cost</th><th /></tr>
           </thead>
           <tbody>
-            {duels.data.map((duel) => (
+            {duels.data.duels.map((duel) => (
               <tr key={duel.id}>
                 <td><a href={`/duel/${duel.id}`}><code>{duel.id}</code></a></td>
                 <td className="muted">{formatDate(duel.createdAt)}</td>
                 <td><span className="pill">{duel.status}</span></td>
                 <td className="muted">{duel.createdBy}: {duel.decks[0]} vs {duel.decks[1] ?? '…'}</td>
+                <td>{duel.judgeCalls}</td>
+                <td>{duel.appeals}</td>
+                <td><strong>{usd(duel.cost)}</strong></td>
                 <td className="cell-actions">
                   <a href={`/api/admin/duels/${duel.id}/report`} target="_blank" rel="noreferrer">Full log</a>{' '}
                   <a href={`/api/admin/duels/${duel.id}/report?format=json`} target="_blank" rel="noreferrer">JSON</a>

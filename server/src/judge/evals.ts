@@ -24,6 +24,7 @@ import {
   type DuelEvent,
   type DuelState,
   type JudgeRecord,
+  type ModelUsage,
   type Seat,
 } from '@yugioh/engine';
 import { toCardData } from '../cards.ts';
@@ -31,6 +32,7 @@ import type { Db } from '../db/client.ts';
 import { cards } from '../db/schema.ts';
 import { loadSheets } from '../sheets.ts';
 import { judge, PROMPT_VERSION, type ModelCall, type Question } from './judge.ts';
+import { costOf, usageOf } from './pricing.ts';
 
 /** One side of a board, by card name. Field monsters are face-up in Attack Position unless listed under `setMonsters`. */
 interface Side {
@@ -589,13 +591,10 @@ if (import.meta.main) {
   const { connect } = await import('../db/client.ts');
   const db = connect(process.env.DATABASE_URL ?? '');
   const client = new Anthropic();
-  const usage = { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 };
+  const calls: ModelUsage[] = [];
   const model: ModelCall = async (p) => {
     const m = await client.messages.create(p);
-    usage.input += m.usage.input_tokens;
-    usage.cacheWrite += m.usage.cache_creation_input_tokens ?? 0;
-    usage.cacheRead += m.usage.cache_read_input_tokens ?? 0;
-    usage.output += m.usage.output_tokens;
+    calls.push(usageOf(p.model, m));
     return m;
   };
   const rounds = await runEvals(db, model, filter, repeat);
@@ -617,8 +616,9 @@ if (import.meta.main) {
   }
   const all = rounds.flat();
   const passed = all.filter((r) => r.passed).length;
-  // Haiku 5.5 per million tokens (2026-11): $0.10 input, $0.125 cache write, $0.01 cache read, $0.50 output.
-  const cost = (usage.input * 0.1 + usage.cacheWrite * 0.125 + usage.cacheRead * 0.01 + usage.output * 0.5) / 1e6;
+  const cost = costOf(calls);
+  const sum = (k: 'input' | 'cacheWrite' | 'cacheRead' | 'output') => calls.reduce((n, c) => n + c[k], 0);
+  const usage = { input: sum('input'), cacheWrite: sum('cacheWrite'), cacheRead: sum('cacheRead'), output: sum('output') };
   const rates = Object.fromEntries([...byCase].map(([name, runs]) => [name, runs.filter((r) => r.passed).length / runs.length]));
   const summary = { promptVersion: PROMPT_VERSION, filter, repeat, passed, total: all.length, usage, cost: Number(cost.toFixed(4)), cases: rates };
   await writeFile(join(dir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`);

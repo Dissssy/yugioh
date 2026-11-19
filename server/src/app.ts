@@ -5,9 +5,10 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
-import type { Me } from '@yugioh/shared';
+import type { AdminDuels, Me } from '@yugioh/shared';
 import { findUserBySub, listUsers, setStatus, setUsername, syncUser, toUser, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
+import { duelCosts } from './costs.ts';
 import type { Db } from './db/client.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
@@ -123,7 +124,10 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
   const duels = new Duels(db, ai, random);
 
   app.get('/api/admin/duels', requireAdmin, async (_req, res) => {
-    res.json(await Promise.all((await duels.recent()).map((row) => duels.summarize(row, null, false))));
+    const { total, byDuel } = await duelCosts(db);
+    const none = { judgeCalls: 0, appeals: 0, cost: 0 };
+    const list = await Promise.all((await duels.recent()).map(async (row) => ({ ...(await duels.summarize(row, null, false)), ...(byDuel.get(row.id) ?? none) })));
+    res.json({ totalCost: total, duels: list } satisfies AdminDuels);
   });
 
   // A whole duel with nothing hidden, for review: plain text, or JSON with every event (judge transcripts included).

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DuelUpdate, Intent } from '@yugioh/engine';
-import type { DeckDetail, DeckSummary, DuelSummary, AdminUser, Me } from '@yugioh/shared';
+import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelSummary, Me } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { guests } from '../src/db/schema.ts';
 import { deleteIdleGuests, GUEST_GRACE_MS } from '../src/guests.ts';
@@ -200,8 +200,8 @@ describe('a challenge link played by a guest', () => {
     const { body } = await admin.json<{ events: { seq: number; event: { type: string } }[] }>(`${report}?format=json`);
     expect(body.events[0]!.event.type).toBe('duelStarted');
     expect(body.events.at(-1)!.event.type).toBe('chatted');
-    const { body: list } = await admin.json<DuelSummary[]>(`${h.baseUrl}/api/admin/duels`);
-    expect(list.map((d) => d.id)).toContain(duel.id);
+    const { body: list } = await admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`);
+    expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, cost: 0 });
   });
 
   it('lets the guest take more challenges under the same identity', async () => {

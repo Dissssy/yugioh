@@ -185,6 +185,16 @@ export type Op =
   | { op: 'declare_targets'; cards: string[] }
   | { op: 'choose_effect'; choice: string };
 
+/** The tokens one Messages API call used, as the API reported them; the server prices them. */
+export interface ModelUsage {
+  model: string;
+  /** Uncached input tokens. */
+  input: number;
+  cacheWrite: number;
+  cacheRead: number;
+  output: number;
+}
+
 /** One judge call, kept whole so it can be contested and replayed. Players see only `stage`, `legal` and `summary`. */
 export interface JudgeRecord {
   stage: 'activation' | 'resolution';
@@ -204,6 +214,8 @@ export interface JudgeRecord {
   ops: Op[];
   /** Set when the judge failed (an API error, or no answer within the turn limit); the activation is refused or the effect does nothing. */
   error: string | null;
+  /** Every API call the judge made for this decision. */
+  usage: ModelUsage[];
 }
 
 /** A stronger model's second look at a judge decision. */
@@ -220,6 +232,8 @@ export interface AppealRecord {
   explanation: string;
   /** The correct ruling, kept for review as a candidate ruling. Never shown, since it may mention hidden cards. */
   ruling: string;
+  /** Every API call the appeal made. */
+  usage: ModelUsage[];
 }
 
 /** Everything that happens is one of these. The duel's state is the fold of its events. */

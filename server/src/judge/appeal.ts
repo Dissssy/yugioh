@@ -4,9 +4,10 @@
 
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import type { AppealRecord, DuelState, JudgeRecord, Seat } from '@yugioh/engine';
+import type { AppealRecord, DuelState, JudgeRecord, ModelUsage, Seat } from '@yugioh/engine';
 import { hiddenNameIn } from './hidden.ts';
 import type { ModelCall } from './judge.ts';
+import { usageOf } from './pricing.ts';
 import { describeEffect, describeState, RULES } from './prompt.ts';
 
 export const APPEAL_MODEL = 'claude-opus-5-5';
@@ -61,6 +62,7 @@ export async function appeal(input: AppealInput, model: ModelCall): Promise<Appe
   ].join('\n');
 
   const messages: Anthropic.MessageParam[] = [{ role: 'user', content: request }];
+  const usage: ModelUsage[] = [];
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await model({
       model: APPEAL_MODEL,
@@ -70,12 +72,13 @@ export async function appeal(input: AppealInput, model: ModelCall): Promise<Appe
       system: SYSTEM,
       messages,
     });
+    usage.push(usageOf(APPEAL_MODEL, response));
     if (response.stop_reason === 'refusal') throw new Error('The appeal model declined the request.');
     const text = response.content.find((b) => b.type === 'text');
     const parsed = verdict.parse(JSON.parse(text?.type === 'text' ? text.text : 'null'));
     const leak = hiddenNameIn(input.now, parsed.explanation, [0, 1]);
     const decision = { stage: record.stage, player: record.player, card: record.card, effect: record.effect, legal: record.legal };
-    const result = { judged: input.judged, decision, by: input.by, note: input.note, model: APPEAL_MODEL, ...parsed };
+    const result = { judged: input.judged, decision, by: input.by, note: input.note, model: APPEAL_MODEL, ...parsed, usage };
     if (!leak) return result;
     if (attempt === 1) return { ...result, explanation: `The appeal ${parsed.verdict === 'upheld' ? 'upheld' : 'overturned'} the ruling.` };
     messages.push(
