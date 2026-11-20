@@ -26,12 +26,20 @@ export interface CardData {
 export interface SheetEffect {
   /**
    * `activation`: activating the Spell/Trap card itself. `ignition`, `trigger`, `quick`, `flip`: monster effects.
-   * `continuous`: always on, never activated. `condition`: a summoning condition or procedure.
+   * `continuous`: always on, never activated. `condition`: a summoning condition or procedure; one whose `script` is
+   * set is a procedure from the hand ("You can Special Summon this card (from your hand) by ..."): used in its
+   * controller's open Main Phase like an ignition effect, but it doesn't start a chain, its cost is paid and its steps
+   * (the Special Summon of this card first) are done at once.
    */
   kind: 'activation' | 'ignition' | 'trigger' | 'quick' | 'continuous' | 'flip' | 'condition';
   speed: 1 | 2 | 3;
   /** For triggers: whether the controller must activate it. */
   mandatory: boolean;
+  /**
+   * For a monster effect, where the card is when it is used: a trigger fires, or an ignition or quick effect is
+   * activated ("You can banish this card from your GY; ..." is "graveyard"). "field" means face-up on the field.
+   */
+  from: 'field' | 'hand' | 'graveyard';
   /** `soft`: once per turn for each copy. `hard`: once per turn for all copies by card name. */
   opt: 'none' | 'soft' | 'hard';
   /** When it can be used, in plain words. */
@@ -83,7 +91,8 @@ export interface When {
    * damage to its controller's opponent. `battle_destroying`: a monster destroys another by battle (the event's card is the one that destroyed it: "When this card destroys a monster by battle"). `activated`: a card or effect is activated (Counter Traps).
    * `destroyed_by_effect`: a card on the field is destroyed by a card effect; the filter is checked against the card as
    * it was on the field, for its side and whether it was face-up. `damage_step_start`: the start of the Damage Step (the
-   * event's card is the attacker). `end_phase`: the End Phase starts.
+   * event's card is the attacker). `end_phase`: the End Phase starts. `sent_to_graveyard`: a card is sent from the field
+   * to the GY, by any means (destroyed, Tributed, used as Synchro Material, sent).
    */
   event:
     | 'summoned'
@@ -95,15 +104,14 @@ export interface When {
     | 'battle_damage'
     | 'activated'
     | 'damage_step_start'
-    | 'end_phase';
+    | 'end_phase'
+    | 'sent_to_graveyard';
   /** Only when it happens to this card itself ("When this card is Normal Summoned"). */
   self: boolean;
   /** The card it happens to must fit this as it is after the event ("this face-up Attack Position card"); null for any card. */
   filter: CardFilter | null;
   /** For `summoned`, which Summons count; empty for any. */
   how: SummonKind[];
-  /** For a trigger: where this card must be when the event happens (Ganbara Knight waits in the hand). */
-  from: 'field' | 'hand' | 'graveyard';
   /**
    * An optional "When ...: You can" trigger misses the timing unless its event was the last thing to happen (it
    * happened during the last chain link to resolve). "If ..." triggers and mandatory ones never miss.
@@ -127,8 +135,12 @@ export interface Script {
    * the card the effect's `when` event happened to may be targeted ("Target that monster").
    */
   targets: { filter: CardFilter; min: number; max: number; event: boolean } | null;
-  /** What the effect does. One option, or several when the text says "activate 1 of these effects" (picked on activation by `label`). */
-  options: { label: string; steps: Step[] }[];
+  /**
+   * What the effect does. One option, or several when the text says "activate 1 of these effects" (picked on
+   * activation by `label`). An option's own `cost` is paid after the script's, once it is picked ("Tribute 1 monster,
+   * then target ...").
+   */
+  options: { label: string; cost: Step[]; steps: Step[] }[];
   /** Any part of the text the steps can't express yet (a lingering restriction), said in the summary; else null. */
   unapplied: string | null;
 }
@@ -147,20 +159,43 @@ export type Condition =
   /** This card was Summoned this turn, in one of these ways (empty for any). */
   | { if: 'summoned_this_turn'; how: SummonKind[] }
   /** This card has between `min` and `max` Xyz Materials (null: no bound); "while it has no material" is max 0. */
-  | { if: 'materials'; min: number | null; max: number | null };
+  | { if: 'materials'; min: number | null; max: number | null }
+  /** The opponent controls at least `by` more cards than this player ("If your opponent controls 4 or more cards than you do"). */
+  | { if: 'outnumbered'; by: number }
+  /** This card is battling: attacking an opponent's monster, or the attack's target; during the Damage Step only if `damageStep`. */
+  | { if: 'battling'; as: 'attacker' | 'target'; damageStep: boolean }
+  /** This card attacked this turn, and its last attack was on a monster in this battle position (Twin-Sword Marauder). */
+  | { if: 'last_attack'; on: Position };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
+/** A Token's printed stats ("Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)). */
+export interface Token {
+  name: string;
+  attribute: string;
+  race: string;
+  level: number;
+  atk: number;
+  def: number;
+}
+
 /** Kinds of counters. The starter decks only use Spell Counters. */
 export type Counter = 'spell';
 
 export type Step =
   | { do: 'destroy'; cards: Selection }
   | { do: 'move'; cards: Selection; to: Destination }
-  /** `choice`: the activating player picks Attack or Defense Position. */
-  | { do: 'special_summon'; cards: Selection; position: Position | 'choice' }
+  /** `choice`: the activating player picks Attack or Defense Position. `banishWhenLeaves`: "but banish it when it leaves the field". */
+  | { do: 'special_summon'; cards: Selection; position: Position | 'choice'; banishWhenLeaves: boolean }
+  /**
+   * The activating player looks at the top `count` cards of their Deck and puts each back on the top (in the same
+   * order), or on the bottom if `bottom` allows (Dark Tinker).
+   */
+  | { do: 'arrange_top'; count: number; bottom: boolean }
   | { do: 'modify_stats'; cards: Selection; atk: number; def: number; levelDelta: number; levelSet: number | null; until: Until }
   /** ATK and/or DEF "become" a value (null leaves that stat alone). Gains and losses still apply on top. */
   | { do: 'set_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
+  /** ATK and/or DEF gain a value read when the step resolves ("it gains ATK equal to the Tributed monster's original ATK"). */
+  | { do: 'gain_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
   | { do: 'change_lp'; player: 'you' | 'opponent'; amount: number; kind: 'cost' | 'damage' | 'gain' }
   | { do: 'draw'; player: 'you' | 'opponent'; count: number }
   | { do: 'extra_normal_summon' }
@@ -183,11 +218,20 @@ export type Step =
   | { do: 'add_counters'; cards: Selection; counter: Counter; count: number; max: number | null }
   /** Removes counters from the card selected (a cost: "remove 1 Spell Counter from this card"). */
   | { do: 'remove_counters'; cards: Selection; counter: Counter; count: number }
-  /** For the rest of this turn, that player can't declare attacks, or can't conduct their Battle Phase. */
-  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden };
+  /** The selected monsters' control passes to the activating player, until the End Phase or (null) for good. */
+  | { do: 'take_control'; cards: Selection; until: 'end_phase' | null }
+  /** Changes the battle position of the monsters selected; `switch` turns Attack to Defense and Defense to Attack. A face-down monster turns face-up. */
+  | { do: 'change_position'; cards: Selection; position: Position | 'switch' }
+  /** Special Summons `count` Tokens to that player's field. */
+  | { do: 'summon_token'; player: 'you' | 'opponent'; token: Token; count: number; position: Position | 'choice' }
+  /**
+   * For the rest of this turn, that player can't declare attacks, can't conduct their Battle Phase, or can't Special
+   * Summon the monsters that fit `filter` (null for any monster). `filter` is null for the others.
+   */
+  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null };
 
-export const FORBIDDEN = ['declare_attack', 'battle_phase'] as const;
-/** What a lingering restriction from a resolved effect stops a player doing this turn (Threatening Roar, Reinforce Truth). */
+export const FORBIDDEN = ['declare_attack', 'battle_phase', 'special_summon'] as const;
+/** What a lingering restriction stops a player doing this turn (Threatening Roar, Reinforce Truth, Silent Angler). */
 export type Forbidden = (typeof FORBIDDEN)[number];
 
 /**
@@ -197,7 +241,17 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  * - `stats`: the cards in `to` gain `atk`/`def` (times the count of `per`: the cards that fit it, or this card's Xyz
  *   Materials), and their Level changes by `levelDelta` or becomes `levelSet`.
  * - `restrict`: the cards in `to` (not this card itself when `others`) can't do these things. For
- *   `be_destroyed_by_battle`, `by` is the monster they battle ("with a monster that has 1900 or more ATK"); null for any.
+ *   `be_destroyed_by_battle`, `by` is the monster they battle ("with a monster that has 1900 or more ATK"); for `be_destroyed_by_effect` and `be_affected` (by activated effects), the card whose effect
+ *   it is; null for any. `compare`: only cards whose `stat` is at least this card's `self` ("monsters your opponent
+ *   controls with ATK greater than or equal to this card's DEF"). `once`: once per turn, only the first time it would
+ *   apply (Fortress Warrior's "Once per turn, this card cannot be destroyed by battle").
+ * - `battle`: the cards in `to` can attack `attacks` times each Battle Phase, inflict piercing battle damage when they
+ *   attack a Defense Position monster (`piercing`), and their controller takes no battle damage from attacks involving
+ *   them (`noDamageToYou`).
+ * - `lock`: `player` can't activate cards that fit `filter` ("you" is this card's controller; null: any card), or can
+ *   activate no more than `perTurn` of them each turn, or can activate them only once they were Set on an earlier turn
+ *   (`setFirst`); or can't Tribute Summon (`tribute_summon`, `filter` null).
+ * - `negate_linked`: the linked monster's effects are negated (Fiendish Chain).
  * - `self_destruct`: this card remains on the field after it resolves, and is destroyed in the End Phase of its
  *   controller's opponent's `opponentTurns`th turn after its activation (Swords of Revealing Light).
  * - `tie`: more about this card's tie to its linked monster (every linked card is destroyed when its monster leaves the
@@ -206,7 +260,35 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  */
 export type Continuous =
   | { apply: 'stats'; to: Affected; atk: number; def: number; per: CardFilter | 'materials' | null; levelDelta: number; levelSet: number | null; while: Condition[] }
-  | { apply: 'restrict'; to: Affected; others: boolean; cannot: Restriction[]; by: CardFilter | null; while: Condition[] }
+  | {
+      apply: 'restrict';
+      to: Affected;
+      others: boolean;
+      cannot: Restriction[];
+      by: CardFilter | null;
+      compare: { stat: 'atk' | 'def'; self: 'atk' | 'def' } | null;
+      once: boolean;
+      while: Condition[];
+    }
+  | { apply: 'battle'; to: Affected; attacks: number; piercing: boolean; noDamageToYou: boolean; while: Condition[] }
+  | {
+      apply: 'lock';
+      player: 'you' | 'opponent' | 'both';
+      cannot: 'activate' | 'tribute_summon';
+      filter: CardFilter | null;
+      perTurn: number | null;
+      setFirst: boolean;
+      while: Condition[];
+    }
+  | { apply: 'negate_linked' }
+  /** "This card's name becomes `name` while it is on the field." */
+  | { apply: 'name'; name: string }
+  /**
+   * This card as Synchro Material: it can stand in for a Tuner whose required name contains `substitutes` ("you can
+   * substitute this card for any 1 "Synchron" Tuner"), and it can't be Synchro Material at all (`never`), or only for
+   * a Synchro Monster that fits `onlyFor` or whose required Tuner's name contains `onlyForTuner`.
+   */
+  | { apply: 'synchro_material'; substitutes: string | null; never: boolean; onlyFor: CardFilter | null; onlyForTuner: string | null }
   | { apply: 'self_destruct'; opponentTurns: number }
   | { apply: 'tie'; destroyLinked: boolean; defenseBreaks: boolean }
   /**
@@ -215,8 +297,11 @@ export type Continuous =
    */
   | { apply: 'replace_destruction'; detach: number };
 
-export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle'] as const;
-/** What a restricted monster can't do: declare an attack, change its battle position, be targeted for an attack, or be destroyed by battle. */
+export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle', 'be_destroyed_by_effect', 'be_affected'] as const;
+/**
+ * What a restricted card can't do: declare an attack, change its battle position, be targeted for an attack, be
+ * destroyed by battle or by an effect, or be affected by activated effects ("unaffected by").
+ */
 export type Restriction = (typeof RESTRICTIONS)[number];
 
 /**
@@ -226,11 +311,11 @@ export type Restriction = (typeof RESTRICTIONS)[number];
 export type Affected = 'self' | 'linked' | CardFilter;
 
 /**
- * A stat read from a card when the step resolves: `self` or the first target still there. `original` is the printed
- * value, else the current one. `times` multiplies it ("double its original ATK" is 2).
+ * A stat read from a card when the step resolves: `self`, the first target still there, or the first card paid as the
+ * cost. `original` is the printed value, else the current one. `times` multiplies it ("double its original ATK" is 2).
  */
 export interface StatValue {
-  of: 'self' | 'targets';
+  of: 'self' | 'targets' | 'cost';
   stat: 'atk' | 'def';
   original: boolean;
   times: number;
@@ -246,6 +331,8 @@ export type Selection =
   | { from: 'targets' }
   | { from: 'choose'; filter: CardFilter; min: number; max: number; rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null }
   | { from: 'all'; filter: CardFilter }
+  /** `count` cards that fit, picked at random by code ("discard 2 random cards from your opponent's hand"); fewer if fewer fit. */
+  | { from: 'random'; filter: CardFilter; count: number }
   /** The monster battling this card, if it fits ("At the start of the Damage Step, if this card attacks a face-up Defense Position monster: destroy that monster"). */
   | { from: 'battling'; filter: CardFilter };
 
@@ -260,7 +347,11 @@ export interface CardFilter {
   types: string[];
   /** Any of these monster types ("Warrior") or Spell/Trap properties ("Quick-Play"). */
   races: string[];
+  /** Text the card's name must contain: "Ice Barrier" for an "Ice Barrier" monster; null for any name. */
+  named: string | null;
   attributes: string[];
+  /** A monster that belongs in the Extra Deck (Fusion, Synchro, Xyz); null for either. */
+  extraDeck: boolean | null;
   faceUp: boolean | null;
   position: Position | null;
   /** Current values for a face-up monster, printed ones elsewhere. A card without the stat never fits a range on it. */
@@ -283,6 +374,8 @@ export interface EffectSheet {
   effects: SheetEffect[];
   /** How an Extra Deck monster is Summoned, or null for any other card. */
   materials: Materials | null;
+  /** False for "Cannot be Normal Summoned/Set". */
+  normalSummon: boolean;
 }
 
 export const HANDS = ['rock', 'paper', 'scissors'] as const;
@@ -346,7 +439,9 @@ export type Happening =
   | { event: 'destroyed_by_effect'; card: string; player: Seat; by: Seat; faceUp: boolean; group: number }
   /** The Damage Step of `card`'s attack starts; `target` is the monster it attacks, null for a direct attack. */
   | { event: 'damage_step_start'; card: string; player: Seat; target: string | null; group: number }
-  | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number };
+  | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number }
+  /** A card left the field for the GY, by any means; `player` controlled it. */
+  | { event: 'sent_to_graveyard'; card: string; player: Seat; group: number };
 
 /** What happens once a sequence of triggers, responses and chains is over. */
 /** `damage_step`: the attack's Damage Step starts; `damage`: its damage calculation. */
@@ -385,7 +480,8 @@ export interface FieldCard {
   placedTurn: number;
   /** Last turn its position changed, by a change of position or a Flip Summon. */
   positionChangedTurn: number | null;
-  attackedTurn: number | null;
+  /** The attacks it declared on the last turn it attacked, and the battle position of the last one's target (null: a direct attack). */
+  attacks: { turn: number; count: number; on: Position | null } | null;
   /** How and on which turn it was last Summoned; null if it was Set and not flipped since. */
   summoned: { how: SummonKind; turn: number } | null;
   /** Xyz Materials attached to it, first attached first. They go to the GY when it leaves the field. */
@@ -398,6 +494,10 @@ export interface FieldCard {
   effectsNegated: boolean;
   /** Counters on it, by kind. */
   counters: Partial<Record<Counter, number>>;
+  /** A monster whose control was taken "until the End Phase": it goes back to its owner when this turn's End Phase starts. */
+  returnsAtEndPhase: boolean;
+  /** Banished, not sent anywhere else, when it leaves the field ("but banish it when it leaves the field"). */
+  banishWhenLeaves: boolean;
 }
 
 export type Zones = (FieldCard | null)[];
@@ -430,7 +530,7 @@ export interface DuelState {
   normalSummonLimit: number;
   modifiers: Modifier[];
   /** What resolved effects stopped each player doing this turn; they lapse when the turn ends. */
-  forbidden: { player: Seat; what: Forbidden; turn: number }[];
+  forbidden: { player: Seat; what: Forbidden; filter: CardFilter | null; turn: number }[];
   chain: ChainLink[];
   step: DuelStep;
   /** Events since the last triggers were put on the chain, for triggers to watch. */
@@ -438,10 +538,13 @@ export interface DuelState {
   /** Chain links resolved so far in the duel, the `group` of new happenings. */
   resolvedLinks: number;
   /** The attack being made, from its declaration until damage is done. */
-  /** `replaced`: for each monster that would be destroyed in this battle, the materials detached instead (empty: none). */
-  attack: { attacker: string; target: string | null; replaced: Record<string, string[]> } | null;
-  /** Effects used this turn, for once-per-turn clauses. */
-  usedThisTurn: { card: string; code: number; effect: number }[];
+  /**
+   * `replaced`: for each monster that would be destroyed in this battle, the materials detached instead (empty: none).
+   * `damageStep`: the attack has entered the Damage Step.
+   */
+  attack: { attacker: string; target: string | null; replaced: Record<string, string[]>; damageStep: boolean } | null;
+  /** Effects used this turn by each player, for once-per-turn clauses and "only activate 1 ... each turn". */
+  usedThisTurn: { player: Seat; card: string; code: number; effect: number }[];
   /**
    * Rulings on activations that stand for the board as it is now, until any event changes it (another illegal ruling
    * or an appeal changes nothing). An activation the judge ruled illegal is refused without asking it again
@@ -525,7 +628,7 @@ export type Destination = (typeof DESTINATIONS)[number];
 export type Op =
   | { op: 'move'; card: string; to: Destination }
   /** `zone`: the empty Main Monster Zone the controller chose (see `askZone` on the server). */
-  | { op: 'special_summon'; card: string; controller: Seat; position: Position; zone: number }
+  | { op: 'special_summon'; card: string; controller: Seat; position: Position; zone: number; banish_when_leaves: boolean }
   | { op: 'destroy'; cards: string[] }
   | { op: 'change_lp'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { op: 'modify_stats'; card: string; atk: number; def: number; atk_set: number | null; def_set: number | null; level_delta: number; level_set: number | null; until: Until }
@@ -535,7 +638,10 @@ export type Op =
   | { op: 'negate_attack' }
   /** Detaches this Xyz Material: it goes to its owner's GY. */
   | { op: 'detach'; card: string }
-  | { op: 'forbid'; player: Seat; what: Forbidden }
+  | { op: 'forbid'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  /** `controller` takes control of this monster, into `zone` (an empty Main Monster Zone of theirs). */
+  | { op: 'take_control'; card: string; controller: Seat; zone: number; until: 'end_phase' | null }
+  | { op: 'summon_token'; controller: Seat; token: Token; position: Position; zone: number }
   /** Links the card being resolved to this face-up monster (see the `link` step). */
   | { op: 'link'; card: string }
   /** Negates the activation of this card's link on the chain, below the one resolving. */
@@ -713,18 +819,30 @@ export type DuelEvent =
   | { type: 'moved'; card: string; owner: Seat; from: Place; to: Destination }
   | { type: 'deckShuffled'; player: Seat; order: string[] }
   | { type: 'specialSummoned'; player: Seat; card: string; zone: number; position: Position }
+  /** The monster just Special Summoned is banished when it leaves the field. */
+  | { type: 'banishWhenLeaves'; card: string }
   /** A Synchro or Xyz Summon from the Extra Deck. Synchro materials go to the GY; Xyz materials are attached to it. */
   | { type: 'extraSummoned'; player: Seat; card: string; how: 'synchro' | 'xyz'; materials: string[]; zone: number; position: Position }
   /** `by`: the player whose card effect destroyed them. */
   | { type: 'destroyed'; cards: string[]; by: Seat }
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
-  | { type: 'forbidden'; player: Seat; what: Forbidden }
+  | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  /** `to` now controls the monster, in `zone`. A Token's card data comes with its event, since it isn't in any Deck. */
+  | { type: 'controlChanged'; card: string; to: Seat; zone: number; until: 'end_phase' | null }
+  | { type: 'tokenSummoned'; player: Seat; card: string; token: CardData; zone: number; position: Position }
   | { type: 'linked'; card: string; to: string }
   | { type: 'activationNegated'; link: number; card: string }
   | { type: 'effectsNegated'; card: string }
   | { type: 'setAgain' }
   | { type: 'countersChanged'; card: string; counter: Counter; delta: number }
+  /**
+   * A player uses a monster's Summoning procedure from the hand (a `condition` effect with a script). It doesn't start
+   * a chain: the cost and the Special Summon follow at once, then a checkpoint.
+   */
+  | { type: 'procedureUsed'; player: Seat; card: string; effect: number }
+  /** A once-per-turn protection of this card's effect kept a monster on the field (Fortress Warrior). */
+  | { type: 'protectionUsed'; player: Seat; card: string; effect: number }
   /** The attack moves into its Damage Step. */
   | { type: 'damageStepStarted' }
   | { type: 'replacementOffered'; card: string; player: Seat; then: Then }

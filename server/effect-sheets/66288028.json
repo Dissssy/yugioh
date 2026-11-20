@@ -1,0 +1,57 @@
+{
+  "code": 66288028,
+  "textHash": "9d564a78b1510b9377d3ae633371d3b003d9177071b346fb9e713535414eca68",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "You take no battle damage from attacks involving this card.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "battle",
+        "to": "self",
+        "attacks": 1,
+        "piercing": false,
+        "noDamageToYou": true,
+        "while": []
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "soft",
+      "window": "While this card is face-up on the field, the first time each turn it would be destroyed by battle",
+      "cost": "",
+      "effect": "Once per turn, this card cannot be destroyed by battle.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": "self",
+        "others": false,
+        "cannot": [
+          "be_destroyed_by_battle"
+        ],
+        "by": null,
+        "compare": null,
+        "once": true,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

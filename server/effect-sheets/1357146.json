@@ -1,0 +1,112 @@
+{
+  "code": 1357146,
+  "textHash": "77bb028919906dc8d3d8a925767dbf851c03467079a78695f8c705c257928cd6",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "always",
+      "cost": "",
+      "effect": "Cannot be used as a Synchro Material.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "synchro_material",
+        "substitutes": null,
+        "never": true,
+        "onlyFor": null,
+        "onlyForTuner": null
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "while this card is on the field",
+      "cost": "",
+      "effect": "This card's name becomes \"Des Frog\" while it is on the field.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "name",
+        "name": "Des Frog"
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "graveyard",
+      "opt": "none",
+      "window": "your Main Phase, if this card is in your Graveyard",
+      "cost": "banish 1 \"Frog\" monster from your Graveyard",
+      "effect": "Special Summon this card.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "place": "graveyard",
+                "kinds": [
+                  "monster"
+                ],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": "Frog",
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null
+            },
+            "to": "banished"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "self"
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

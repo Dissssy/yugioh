@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Any time you could activate a Quick-Play Spell",
       "cost": "Pay 500 LP",
@@ -34,6 +35,8 @@
             "types": [],
             "races": [],
             "attributes": [],
+            "named": null,
+            "extraDeck": null,
             "faceUp": true,
             "position": null,
             "level": null,
@@ -47,6 +50,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "destroy",
@@ -63,5 +67,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

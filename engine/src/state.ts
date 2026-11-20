@@ -260,16 +260,22 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         }
         return;
       }
-      case 'attackDeclared':
-        onField(s, event.attacker).attackedTurn = s.turn;
-        s.attack = { attacker: event.attacker, target: event.target, replaced: {} };
+      case 'attackDeclared': {
+        const attacker = onField(s, event.attacker);
+        const on = event.target ? onField(s, event.target).position : null;
+        attacker.attacks = { turn: s.turn, count: attacker.attacks?.turn === s.turn ? attacker.attacks.count + 1 : 1, on };
+        s.attack = { attacker: event.attacker, target: event.target, replaced: {}, damageStep: false };
         s.happened.push({ event: 'attack_declared', card: event.attacker, player: event.player, target: event.target, group });
         if (event.target) s.happened.push({ event: 'attacked', card: event.target, player: other(event.player), attacker: event.attacker, group });
         return;
+      }
       case 'attackEnded': {
         const attacker = s.attack && locate(s, s.attack.attacker);
         // A replay: the attack never happened, so the monster may attack again.
-        if (event.replay && attacker?.zone === 'monsters') onField(s, s.attack!.attacker).attackedTurn = null;
+        if (event.replay && attacker?.zone === 'monsters') {
+          const m = onField(s, s.attack!.attacker);
+          m.attacks = m.attacks!.count > 1 ? { ...m.attacks!, count: m.attacks!.count - 1 } : null;
+        }
         s.attack = null;
         return;
       }
@@ -292,7 +298,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
           if (at?.zone === 'spellTraps') Object.assign(onField(s, event.card), { faceUp: true, activatedTurn: s.turn });
         }
         s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause, negated: false, setAgain: false });
-        s.usedThisTurn.push({ card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
+        s.usedThisTurn.push({ player: event.player, card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         const step = s.step;
         // A trigger joins the chain with the others; any other activation hands the opponent priority.
         if (step.at === 'triggers') step.handled.push(`${event.card}:${event.effect}`);
@@ -307,14 +313,17 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.chain.at(-1)!.choice = event.choice;
         return;
       case 'moved': {
-        removeFromPlay(s, event.card);
+        if (event.to === 'graveyard') return sendToGraveyard(s, event.card);
+        const banish = removeFromPlay(s, event.card);
         const owner = s.players[event.owner];
         const card = s.cards[s.instances[event.card]!.code]!;
-        if (card.extraDeck && event.to !== 'graveyard' && event.to !== 'banished') owner.extra.push(event.card);
+        if (isToken(s, event.card)) return;
+        if (banish) owner.banished.push(event.card);
+        else if (card.extraDeck && event.to !== 'banished') owner.extra.push(event.card);
         else if (event.to === 'hand') owner.hand.push(event.card);
         else if (event.to === 'deck_top') owner.deck.unshift(event.card);
         else if (event.to === 'deck_bottom' || event.to === 'deck_shuffled') owner.deck.push(event.card);
-        else owner[event.to === 'graveyard' ? 'graveyard' : 'banished'].push(event.card);
+        else owner.banished.push(event.card);
         return;
       }
       case 'deckShuffled': {
@@ -325,6 +334,21 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         p.deck = [...event.order];
         return;
       }
+      case 'banishWhenLeaves':
+        onField(s, event.card).banishWhenLeaves = true;
+        return;
+      case 'controlChanged': {
+        const card = onField(s, event.card);
+        removeFromPlay(s, event.card, false);
+        s.players[event.to].monsters[event.zone] = { ...card, returnsAtEndPhase: event.until === 'end_phase' };
+        return;
+      }
+      case 'tokenSummoned':
+        s.instances[event.card] = { code: event.token.code, owner: event.player };
+        s.cards[event.token.code] = event.token;
+        s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position };
+        summoned(s, event.card, event.player, 'special', group);
+        return;
       case 'specialSummoned': {
         removeFromPlay(s, event.card);
         s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position };
@@ -366,6 +390,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         return;
       }
       case 'damageStepStarted':
+        s.attack!.damageStep = true;
         s.happened.push({ event: 'damage_step_start', card: s.attack!.attacker, player: s.turnPlayer, target: s.attack!.target, group });
         return;
       case 'lpChanged': {
@@ -377,7 +402,11 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.modifiers.push(event.modifier);
         return;
       case 'forbidden':
-        s.forbidden.push({ player: event.player, what: event.what, turn: s.turn });
+        s.forbidden.push({ player: event.player, what: event.what, filter: event.filter, turn: s.turn });
+        return;
+      case 'procedureUsed':
+      case 'protectionUsed':
+        s.usedThisTurn.push({ player: event.player, card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         return;
       case 'linked':
         onField(s, event.card).linked = event.to;
@@ -446,13 +475,15 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     faceUp,
     placedTurn: turn,
     positionChangedTurn: null,
-    attackedTurn: null,
+    attacks: null,
     summoned: null,
     materials: [],
     activatedTurn: null,
     linked: null,
     effectsNegated: false,
     counters: {},
+    returnsAtEndPhase: false,
+    banishWhenLeaves: false,
   };
 }
 
@@ -491,22 +522,28 @@ export function onField(state: DuelState, id: string): FieldCard {
 
 /**
  * Takes a card out of wherever it is. A card leaving the field loses its modifiers, and its Xyz Materials go to their
- * owners' GYs.
+ * owners' GYs; with `leaves` false (a change of control) it keeps everything.
  */
-function removeFromPlay(state: DuelState, id: string) {
+/** Takes a card out of where it is. Returns whether it must be banished instead, having left the field. */
+function removeFromPlay(state: DuelState, id: string, leaves = true): boolean {
   const at = locate(state, id);
   if (!at) throw new Error(`Unknown card ${id}`);
   const p = state.players[at.seat];
   if (at.zone === 'monsters' || at.zone === 'spellTraps') {
     const card = p[at.zone][at.index]!;
     p[at.zone][at.index] = null;
+    // A change of control moves the card without it leaving the field.
+    if (!leaves) return false;
     state.modifiers = state.modifiers.filter((m) => m.card !== id);
     for (const m of card.materials) state.players[state.instances[m]!.owner].graveyard.push(m);
     // Cards linked to a monster go when it goes; a card that takes its monster with it (Birthright) does so.
     for (const c of tiedTo(state, id)) sendToGraveyard(state, c.id);
     if (card.linked && tie(state, id)?.destroyLinked && locate(state, card.linked)?.zone === 'monsters') sendToGraveyard(state, card.linked);
-  } else if (at.zone === 'materials') take(p.monsters[at.index]!.materials, id);
+    return card.banishWhenLeaves;
+  }
+  if (at.zone === 'materials') take(p.monsters[at.index]!.materials, id);
   else take(p[at.zone], id);
+  return false;
 }
 
 /** The Spells and Traps on the field linked to this monster. */
@@ -521,8 +558,16 @@ function tie(state: DuelState, id: string) {
   return null;
 }
 
-/** Cards always go to their owner's Graveyard. */
+/** Cards always go to their owner's Graveyard. A Token that leaves the field is gone. */
 function sendToGraveyard(state: DuelState, id: string) {
-  removeFromPlay(state, id);
-  state.players[state.instances[id]!.owner].graveyard.push(id);
+  const at = locate(state, id)!;
+  const banish = removeFromPlay(state, id);
+  if (isToken(state, id)) return;
+  const owner = state.players[state.instances[id]!.owner];
+  if (banish) return void owner.banished.push(id);
+  owner.graveyard.push(id);
+  if (at.zone === 'monsters' || at.zone === 'spellTraps') state.happened.push({ event: 'sent_to_graveyard', card: id, player: at.seat, group: state.resolvedLinks });
 }
+
+/** Whether a card is a Token: made on the field by an effect, and gone once it leaves. */
+export const isToken = (state: DuelState, id: string) => state.cards[state.instances[id]!.code]!.type === 'Token';

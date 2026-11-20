@@ -7,6 +7,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When this face-up Attack Position card is targeted for an attack",
       "cost": "",
@@ -22,6 +23,8 @@
           "types": [],
           "races": [],
           "attributes": [],
+          "named": null,
+          "extraDeck": null,
           "faceUp": true,
           "position": "attack",
           "level": null,
@@ -29,7 +32,6 @@
           "def": null
         },
         "how": [],
-        "from": "field",
         "canMiss": true,
         "by": null
       },
@@ -38,5 +40,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

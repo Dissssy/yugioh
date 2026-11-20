@@ -66,6 +66,8 @@ const filter = (f: Partial<CardFilter>): CardFilter => ({
   types: [],
   races: [],
   attributes: [],
+  named: null,
+  extraDeck: null,
   faceUp: null,
   position: null,
   level: null,
@@ -73,11 +75,12 @@ const filter = (f: Partial<CardFilter>): CardFilter => ({
   def: null,
   ...f,
 });
-const when = (w: Partial<When> & Pick<When, 'event'>): When => ({ self: false, filter: null, how: [], from: 'field', canMiss: false, by: null, ...w });
-const script = (s: Partial<Script>): Script => ({ conditions: [], cost: [], targets: null, options: [{ label: '', steps: [] }], unapplied: null, ...s });
+const when = (w: Partial<When> & Pick<When, 'event'>): When => ({ self: false, filter: null, how: [], canMiss: false, by: null, ...w });
+const script = (s: Partial<Script>): Script => ({ conditions: [], cost: [], targets: null, options: [{ label: '', cost: [], steps: [] }], unapplied: null, ...s });
 const effect = (e: Partial<SheetEffect> & Pick<SheetEffect, 'kind'>): SheetEffect => ({
   speed: 1,
   mandatory: false,
+  from: 'field',
   opt: 'none',
   window: '',
   cost: '',
@@ -89,7 +92,7 @@ const effect = (e: Partial<SheetEffect> & Pick<SheetEffect, 'kind'>): SheetEffec
   status: 'unverified',
   ...e,
 });
-const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null });
+const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null, normalSummon: true });
 
 const sheets: Record<number, EffectSheet> = {
   3: sheet(
@@ -100,7 +103,7 @@ const sheets: Record<number, EffectSheet> = {
       when: when({ event: 'summoned', how: ['normal', 'flip'], filter: filter({ side: 'opponent', atk: { min: 1000, max: null } }) }),
       script: script({
         targets: { filter: filter({ side: 'opponent', atk: { min: 1000, max: null } }), min: 1, max: 1, event: true },
-        options: [{ label: '', steps: [{ do: 'destroy', cards: { from: 'targets' } }] }],
+        options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'targets' } }] }],
       }),
     }),
   ),
@@ -110,7 +113,7 @@ const sheets: Record<number, EffectSheet> = {
       kind: 'activation',
       speed: 2,
       when: when({ event: 'attack_declared', filter: filter({ side: 'opponent' }) }),
-      script: script({ options: [{ label: '', steps: [{ do: 'destroy', cards: { from: 'all', filter: filter({ side: 'opponent', position: 'attack' }) } }] }] }),
+      script: script({ options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'all', filter: filter({ side: 'opponent', position: 'attack' }) } }] }] }),
     }),
   ),
   5: sheet(
@@ -119,7 +122,7 @@ const sheets: Record<number, EffectSheet> = {
       kind: 'trigger',
       mandatory: true,
       when: when({ event: 'battle_damage', self: true }),
-      script: script({ options: [{ label: '', steps: [{ do: 'modify_stats', cards: { from: 'self' }, atk: 200, def: 0, levelDelta: 0, levelSet: null, until: 'while_on_field' }] }] }),
+      script: script({ options: [{ label: '', cost: [], steps: [{ do: 'modify_stats', cards: { from: 'self' }, atk: 200, def: 0, levelDelta: 0, levelSet: null, until: 'while_on_field' }] }] }),
     }),
   ),
   6: sheet(
@@ -133,6 +136,7 @@ const sheets: Record<number, EffectSheet> = {
         options: [
           {
             label: '',
+            cost: [],
             steps: [
               {
                 do: 'set_stats',
@@ -160,13 +164,14 @@ const sheets: Record<number, EffectSheet> = {
         options: [
           {
             label: '',
+            cost: [],
             steps: [{ do: 'set_stats', cards: { from: 'self' }, atk: { of: 'self', stat: 'atk', original: true, times: 2 }, def: null, until: 'end_of_battle_phase' }],
           },
         ],
       }),
     }),
   ),
-  8: sheet(8, effect({ kind: 'trigger', when: when({ event: 'destroyed_by_battle', self: true, from: 'graveyard', canMiss: true, by: null }) })),
+  8: sheet(8, effect({ kind: 'trigger', from: 'graveyard', when: when({ event: 'destroyed_by_battle', self: true, canMiss: true, by: null }) })),
   9: sheet(9, effect({ kind: 'activation', speed: 2 })),
   10: sheet(10, effect({ kind: 'activation', speed: 1 })),
   12: sheet(12, effect({ kind: 'trigger', when: when({ event: 'summoned', self: true, canMiss: true, by: null }) })),

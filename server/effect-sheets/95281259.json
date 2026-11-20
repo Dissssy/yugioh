@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Your Main Phase, when you can activate a Normal Spell",
       "cost": "",
@@ -28,6 +29,8 @@
               "Warrior"
             ],
             "attributes": [],
+            "named": null,
+            "extraDeck": null,
             "faceUp": null,
             "position": null,
             "level": null,
@@ -41,6 +44,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "move",
@@ -58,5 +62,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

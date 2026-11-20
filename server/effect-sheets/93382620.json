@@ -1,0 +1,123 @@
+{
+  "code": 93382620,
+  "textHash": "bf44d3b104a9d174e91ea15c74b50caa4718e4b22be1f22d8868f2baac2637a7",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "When a monster(s) is destroyed by battle and sent to your GY",
+      "cost": "Discard your entire hand (min.1)",
+      "effect": "Target 1 of those monsters; Special Summon it, and if you do, it gains 800 ATK.",
+      "targets": "1 of those monsters (destroyed by battle and sent to your GY)",
+      "when": {
+        "event": "destroyed_by_battle",
+        "self": false,
+        "filter": {
+          "side": "you",
+          "place": "graveyard",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "all",
+              "filter": {
+                "side": "you",
+                "place": "hand",
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              }
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": {
+          "filter": {
+            "side": "you",
+            "place": "graveyard",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": true
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "targets"
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              },
+              {
+                "do": "modify_stats",
+                "cards": {
+                  "from": "targets"
+                },
+                "atk": 800,
+                "def": 0,
+                "levelDelta": 0,
+                "levelSet": null,
+                "until": "while_on_field"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

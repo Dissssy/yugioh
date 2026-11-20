@@ -1,0 +1,98 @@
+{
+  "code": 47766694,
+  "textHash": "138fc9dc574b1bd1495f75cfddb4bc6d1a14496c46840d5ff2d2505a8471de73",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Activate this Set card on either player's turn, while there is a face-up card in a Spell & Trap Zone to target.",
+      "cost": "",
+      "effect": "Destroy that face-up card, then, its controller can Set 1 Spell/Trap from their hand.",
+      "targets": "1 face-up card in the Spell & Trap Zone",
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "graveyard",
+      "opt": "none",
+      "window": "If this Set card is destroyed and sent to the GY.",
+      "cost": "",
+      "effect": "Destroy that target.",
+      "targets": "1 face-up card on the field",
+      "when": {
+        "event": "destroyed_by_effect",
+        "self": true,
+        "filter": {
+          "side": "either",
+          "place": "field",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": false,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "place": "field",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -7,19 +7,19 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
+      "from": "field",
       "opt": "none",
       "window": "At the start of the Damage Step, if this card attacks a face-up Defense Position monster",
       "cost": "",
       "effect": "Destroy that monster.",
       "targets": null,
       "when": {
+        "event": "damage_step_start",
         "self": true,
         "filter": null,
         "how": [],
-        "from": "field",
         "canMiss": false,
-        "by": null,
-        "event": "damage_step_start"
+        "by": null
       },
       "script": {
         "conditions": [],
@@ -28,6 +28,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "destroy",
@@ -40,6 +41,8 @@
                     "types": [],
                     "races": [],
                     "attributes": [],
+                    "named": null,
+                    "extraDeck": null,
                     "faceUp": true,
                     "position": "defense",
                     "level": null,
@@ -57,5 +60,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

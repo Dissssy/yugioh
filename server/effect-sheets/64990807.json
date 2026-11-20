@@ -1,0 +1,24 @@
+{
+  "code": 64990807,
+  "textHash": "f6384cf1c94419cf5f9367af599ef4bf2c2cef21175e03a7491d879830c7cb95",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "During your Main Phase, while you have 3 \"Ice Barrier\" monsters with different names in your hand to reveal",
+      "cost": "Reveal 3 \"Ice Barrier\" monsters with different names in your hand",
+      "effect": "Destroy the opponent's card and Special Summon 1 \"Ice Barrier\" monster from your hand.",
+      "targets": "1 card your opponent controls",
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

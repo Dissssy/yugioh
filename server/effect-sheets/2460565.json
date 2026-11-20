@@ -7,6 +7,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field",
       "cost": "",
@@ -25,6 +26,8 @@
             "Warrior"
           ],
           "attributes": [],
+          "named": null,
+          "extraDeck": null,
           "faceUp": true,
           "position": null,
           "level": null,
@@ -36,6 +39,8 @@
           "be_attacked"
         ],
         "by": null,
+        "compare": null,
+        "once": false,
         "while": []
       },
       "status": "unverified"
@@ -44,6 +49,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When this card is Normal Summoned",
       "cost": "",
@@ -56,7 +62,6 @@
         "how": [
           "normal"
         ],
-        "from": "field",
         "canMiss": true,
         "by": null
       },
@@ -67,6 +72,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "special_summon",
@@ -81,6 +87,8 @@
                     "types": [],
                     "races": [],
                     "attributes": [],
+                    "named": null,
+                    "extraDeck": null,
                     "faceUp": null,
                     "position": null,
                     "level": {
@@ -94,7 +102,8 @@
                   "max": 1,
                   "rank": null
                 },
-                "position": "choice"
+                "position": "choice",
+                "banishWhenLeaves": false
               }
             ]
           }
@@ -105,5 +114,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

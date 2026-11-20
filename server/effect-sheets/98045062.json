@@ -1,0 +1,104 @@
+{
+  "code": 98045062,
+  "textHash": "4284e95b90a6d24240e2a9a718270c42cfec956a04d36a665d46b0c7e54e6e4e",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Whenever a Quick-Play Spell can be activated",
+      "cost": "",
+      "effect": "Activate 1 of these effects. ● Target 1 face-up monster your opponent controls; change that target's battle position. ● Tribute 1 monster, then target 1 face-up monster your opponent controls; take control of that target until the End Phase.",
+      "targets": "1 face-up monster your opponent controls",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "monsters",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "Target 1 face-up monster your opponent controls; change that target's battle position.",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_position",
+                "cards": {
+                  "from": "targets"
+                },
+                "position": "switch"
+              }
+            ]
+          },
+          {
+            "label": "Tribute 1 monster, then target 1 face-up monster your opponent controls; take control of that target until the End Phase.",
+            "cost": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "place": "monsters",
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null
+                },
+                "to": "graveyard"
+              }
+            ],
+            "steps": [
+              {
+                "do": "take_control",
+                "cards": {
+                  "from": "targets"
+                },
+                "until": "end_phase"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

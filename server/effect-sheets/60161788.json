@@ -1,0 +1,49 @@
+{
+  "code": 60161788,
+  "textHash": "0c189e3c91a8ac533aab0c4211dafb343e6dc2ccd25bbbe534121fbaabe650f9",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "graveyard",
+      "opt": "none",
+      "window": "When this card is destroyed by battle and sent to the Graveyard",
+      "cost": "",
+      "effect": "Draw 1 card.",
+      "targets": null,
+      "when": {
+        "event": "destroyed_by_battle",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "draw",
+                "player": "you",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

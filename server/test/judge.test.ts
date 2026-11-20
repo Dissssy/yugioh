@@ -1,3 +1,4 @@
+import { PREMADE_DECKS } from '../src/cards.ts';
 import { readFile } from 'node:fs/promises';
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
@@ -31,7 +32,8 @@ const sheets: Record<number, EffectSheet> = {
     textHash: '',
     model: 'test',
     materials: null,
-    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, continuous: null, status: 'unverified' }],
+    normalSummon: true,
+    effects: [{ kind: 'activation', speed: 1, mandatory: false, from: 'field', opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, continuous: null, status: 'unverified' }],
   },
 };
 
@@ -267,6 +269,8 @@ const anyCard = (side: CardFilter['side'], place: CardFilter['place'], kinds: Ca
   types: [],
   races: [],
   attributes: [],
+  named: null,
+  extraDeck: null,
   faceUp: null,
   position: null,
   level: null,
@@ -278,7 +282,7 @@ const reincarnation: Script = {
   conditions: [],
   cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 1, rank: null }, to: 'graveyard' }],
   targets: { filter: anyCard('you', 'graveyard', ['monster']), min: 1, max: 1, event: false },
-  options: [{ label: '', steps: [{ do: 'move', cards: { from: 'targets' }, to: 'hand' }] }],
+  options: [{ label: '', cost: [], steps: [{ do: 'move', cards: { from: 'targets' }, to: 'hand' }] }],
   unapplied: null,
 };
 const withScript = (state: DuelState): DuelState => ({
@@ -400,12 +404,12 @@ describe('the eval suite', () => {
 });
 
 describe('effect sheets', () => {
-  it('has a current sheet for every starter-deck card with an effect', async () => {
+  it('has a current sheet for every premade-deck card with an effect', async () => {
     const fixture = JSON.parse(await readFile(new URL('./fixtures/cardinfo.json', import.meta.url), 'utf8')) as {
       data: { id: number; name: string; desc: string; frameType: string; card_sets?: { set_name: string }[] }[];
     };
     const starter = fixture.data.filter(
-      (c) => c.frameType !== 'normal' && c.card_sets?.some((s) => /^Starter Deck: (Yu-Gi-Oh! 5D's|Dawn of the Xyz)$/.test(s.set_name)),
+      (c) => c.frameType !== 'normal' && c.card_sets?.some((s) => PREMADE_DECKS.some((d) => d.set === s.set_name)),
     );
     const data = Object.fromEntries(starter.map((c) => [c.id, { ...cards[1]!, code: c.id, name: c.name, text: c.desc }]));
     const loaded = await readSheetFiles(data);

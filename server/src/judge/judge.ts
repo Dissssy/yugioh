@@ -25,7 +25,7 @@ import {
 import { hiddenNameIn } from './hidden.ts';
 import { usageOf } from './pricing.ts';
 import { activationRequest, resolutionRequest, RULES } from './prompt.ts';
-import { askPlayer, finish, parseOp, TOOLS, type AskPlayer } from './tools.ts';
+import { askPlayer, finish, parseOp, randomCards, TOOLS, type AskPlayer } from './tools.ts';
 
 export const JUDGE_MODEL = 'claude-haiku-5-5';
 /** Model turns per judge call before it counts as failed. */
@@ -170,6 +170,18 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
           }
           continue;
         }
+        if (c.name === 'random_cards') {
+          const parsed = randomCards.safeParse(c.input);
+          if (!parsed.success) {
+            refused = reply(c.id, 'Invalid input.', true);
+            continue;
+          }
+          const hand = [...scratch.players[parsed.data.player].hand];
+          const picked: string[] = [];
+          while (hand.length > 0 && picked.length < parsed.data.count) picked.push(...hand.splice(Math.floor(deps.random() * hand.length), 1));
+          reply(c.id, JSON.stringify({ picked }));
+          continue;
+        }
         if (c.name === 'ask_player') {
           const parsed = askPlayer.safeParse(c.input);
           const question = !parsed.success
@@ -199,10 +211,11 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
           refused = reply(c.id, `The choice names ${named}, which a player can't see. Word it without naming hidden cards.`, true);
           continue;
         }
-        const opCtx = { player: link.player, stage, random: deps.random };
+        const opCtx = { player: link.player, source: link.card, stage, random: deps.random };
         let op = parsed.op;
-        if (op.op === 'special_summon') {
-          const placed = await summonInto(scratch, op, opCtx, deps.ask);
+        if (op.op === 'special_summon' || op.op === 'take_control' || op.op === 'summon_token') {
+          const { zone: _, ...unplaced } = op;
+          const placed = await placeInto(scratch, unplaced as Unplaced, opCtx, deps.ask);
           if (!placed.ok) {
             refused = reply(c.id, placed.error, true);
             continue;
@@ -306,24 +319,31 @@ export function checkQuestion(state: DuelState, q: AskPlayer): Question | { erro
   return { player: p, text: q.prompt, cards, choices: q.choices, zones: [], min: q.min, max: Math.min(q.max, count) };
 }
 
+/** An op that puts a monster in a Monster Zone of `controller`'s. */
+type ZoneOp = Extract<Op, { zone: number }>;
+type Unplaced = ZoneOp extends infer O ? (O extends ZoneOp ? Omit<O, 'zone'> : never) : never;
+
 /**
- * Special Summons as `op` (without a zone) says, into the Main Monster Zone its controller picks: they are asked when
- * more than one is empty, once code has checked the summon itself can happen. Returns the op with its zone, or why
- * it can't be applied.
+ * Applies `op` (without a zone: a Special Summon, a Token, or taking control) into the Main Monster Zone its
+ * controller picks: they are asked when more than one is empty, once code has checked the op itself can happen.
+ * Returns the op with its zone, or why it can't be applied.
  */
-export async function summonInto(
+export async function placeInto(
   state: DuelState,
-  op: Omit<Extract<Op, { op: 'special_summon' }>, 'zone'>,
+  op: Unplaced,
   ctx: Parameters<typeof applyOp>[2],
   ask: JudgeDeps['ask'],
 ): Promise<{ ok: true; op: Op; picks: string[] | null } | { ok: false; error: string }> {
   const free = monsterZonesFor(state, op.controller, false);
-  const check = applyOp(state, { ...op, zone: free[0] ?? 0 }, ctx);
+  const check = applyOp(state, { ...op, zone: free[0] ?? 0 } as ZoneOp, ctx);
   if (!check.ok) return check;
-  if (free.length === 1) return { ok: true, op: { ...op, zone: free[0]! }, picks: null };
-  const text = `Special Summon ${visibleTo(state, op.card, op.controller) ? cardOf(state, op.card).name : 'the monster'}: choose a Monster Zone for it.`;
-  const picks = await ask({ player: op.controller, text, cards: [], choices: [], zones: free, min: 1, max: 1 });
+  if (free.length === 1) return { ok: true, op: { ...op, zone: free[0]! } as ZoneOp, picks: null };
+  const what =
+    op.op === 'summon_token'
+      ? `Special Summon ${op.token.name}`
+      : `${op.op === 'take_control' ? 'Take control of' : 'Special Summon'} ${visibleTo(state, op.card, op.controller) ? cardOf(state, op.card).name : 'the monster'}`;
+  const picks = await ask({ player: op.controller, text: `${what}: choose a Monster Zone for it.`, cards: [], choices: [], zones: free, min: 1, max: 1 });
   const zone = free.find((z) => zonePick(z) === picks[0]);
   if (zone === undefined) return { ok: false, error: 'No Monster Zone was picked.' };
-  return { ok: true, op: { ...op, zone }, picks };
+  return { ok: true, op: { ...op, zone } as ZoneOp, picks };
 }

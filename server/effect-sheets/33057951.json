@@ -1,0 +1,73 @@
+{
+  "code": 33057951,
+  "textHash": "4714bf08a254f93510af91adfe218f14c22a9ae81cbd5af1c3b937f45a26ca47",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Special Summon the targeted monster in face-up Defense Position.",
+      "targets": "1 Level 3 or lower Fish, Sea Serpent, or Aqua monster in your GY",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "you",
+            "place": "graveyard",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [
+              "Fish",
+              "Sea Serpent",
+              "Aqua"
+            ],
+            "attributes": [],
+            "named": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": {
+              "min": null,
+              "max": 3
+            },
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "targets"
+                },
+                "position": "defense",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

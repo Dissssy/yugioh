@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While there are 5 or more monsters in your Graveyard",
       "cost": "",
@@ -26,6 +27,8 @@
               "types": [],
               "races": [],
               "attributes": [],
+              "named": null,
+              "extraDeck": null,
               "faceUp": null,
               "position": null,
               "level": null,
@@ -49,6 +52,8 @@
             ],
             "races": [],
             "attributes": [],
+            "named": null,
+            "extraDeck": null,
             "faceUp": null,
             "position": null,
             "level": null,
@@ -65,6 +70,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "move",
@@ -82,5 +88,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

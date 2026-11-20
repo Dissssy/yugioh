@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Your Main Phase, while you control a Normal Monster and there is a monster in either player's Graveyard",
       "cost": "Send 1 Normal Monster you control to the Graveyard",
@@ -29,6 +30,8 @@
                 ],
                 "races": [],
                 "attributes": [],
+                "named": null,
+                "extraDeck": null,
                 "faceUp": true,
                 "position": null,
                 "level": null,
@@ -52,6 +55,8 @@
             "types": [],
             "races": [],
             "attributes": [],
+            "named": null,
+            "extraDeck": null,
             "faceUp": null,
             "position": null,
             "level": null,
@@ -65,13 +70,15 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "special_summon",
                 "cards": {
                   "from": "targets"
                 },
-                "position": "choice"
+                "position": "choice",
+                "banishWhenLeaves": false
               },
               {
                 "do": "link",
@@ -91,6 +98,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When this card leaves the field",
       "cost": "",
@@ -106,5 +114,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

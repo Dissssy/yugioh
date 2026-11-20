@@ -1,0 +1,24 @@
+{
+  "code": 59546528,
+  "textHash": "764310c3e5dc469c04d398fd2980c70cb10f8da29bfd55c5e9f2d7a2a330ebdf",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "soft",
+      "window": "Your Main Phase, if you control another face-up \"Ice Barrier\" monster",
+      "cost": "reveal any number of \"Ice Barrier\" monsters in your hand",
+      "effect": "Return the selected Set Spell/Trap cards your opponent controls to the hand.",
+      "targets": "Set Spell/Trap cards your opponent controls, equal in number to the \"Ice Barrier\" monsters revealed",
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

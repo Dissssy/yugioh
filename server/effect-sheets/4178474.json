@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Any time you can activate a Normal Trap",
       "cost": "Discard 1 card",
@@ -27,6 +28,8 @@
                 "types": [],
                 "races": [],
                 "attributes": [],
+                "named": null,
+                "extraDeck": null,
                 "faceUp": null,
                 "position": null,
                 "level": null,
@@ -48,6 +51,8 @@
             "types": [],
             "races": [],
             "attributes": [],
+            "named": null,
+            "extraDeck": null,
             "faceUp": null,
             "position": null,
             "level": null,
@@ -61,6 +66,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "destroy",
@@ -77,5 +83,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

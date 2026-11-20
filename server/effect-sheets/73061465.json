@@ -1,0 +1,24 @@
+{
+  "code": 73061465,
+  "textHash": "d986fad87fae01d450a842b22ed54a861326ca312d0327b3839403ed33e516aa",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "soft",
+      "window": "Your Main Phase, once per turn, while this card is face-up on the field",
+      "cost": "send 1 \"Ice Barrier\" monster from your hand to the Graveyard",
+      "effect": "Spell Cards cannot be activated until the End Phase of your next turn, as long as this card remains face-up on the field.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

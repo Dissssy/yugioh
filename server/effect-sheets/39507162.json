@@ -7,6 +7,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While you have 1 or less cards in your hand",
       "cost": "",
@@ -32,6 +33,8 @@
               "types": [],
               "races": [],
               "attributes": [],
+              "named": null,
+              "extraDeck": null,
               "faceUp": null,
               "position": null,
               "level": null,
@@ -49,6 +52,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "If you control no other monsters",
       "cost": "",
@@ -60,5 +64,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

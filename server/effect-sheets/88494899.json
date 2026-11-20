@@ -1,0 +1,90 @@
+{
+  "code": 88494899,
+  "textHash": "a2a1e4b0144eee27388fb5e98d3675830350a85c2cff102792bb6ddd8f82a3a4",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "condition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "hand",
+      "opt": "none",
+      "window": "Your Main Phase, while this card is in your hand and your opponent controls 4 or more cards than you do",
+      "cost": "",
+      "effect": "Special Summon this card from your hand.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "outnumbered",
+            "by": 4
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "self"
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "Your opponent can only activate 1 Spell/Trap Card each turn.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "lock",
+        "player": "opponent",
+        "cannot": "activate",
+        "filter": {
+          "side": "either",
+          "place": "any",
+          "kinds": [
+            "spell",
+            "trap"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "perTurn": 1,
+        "setFirst": false,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

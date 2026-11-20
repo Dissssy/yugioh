@@ -18,8 +18,10 @@ import {
   cardOf,
   decide,
   evolve,
+  isProcedure,
   locate,
   nextStep,
+  procedureDone,
   triggerEvent,
   replay,
   statsOf,
@@ -715,6 +717,173 @@ export const CASES: EvalCase[] = [
     effect: 1,
     legal: false,
   },
+  // Summoning procedures from the hand: no chain, the cost and the Summon at once.
+  {
+    name: 'turret warrior tributes a warrior and gains its original ATK',
+    board: [{ hand: ['Turret Warrior'], monsters: ['Axe Raider', 'Sonic Chick'] }, {}],
+    activate: 'Turret Warrior',
+    picks: [['Axe Raider'], ['Attack']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Axe Raider', '0:gy'), expectAt(b, 'Sonic Chick', '0:monsters'), b.monster('Turret Warrior')?.atk === 1200 + 1700 ? null : `ATK ${b.monster('Turret Warrior')?.atk}`),
+  },
+  {
+    name: 'turret warrior needs a warrior to tribute',
+    board: [{ hand: ['Turret Warrior'], monsters: ['Sonic Chick'] }, {}],
+    activate: 'Turret Warrior',
+    legal: false,
+  },
+  {
+    name: 'quickdraw synchron sends a monster from the hand',
+    board: [{ hand: ['Quickdraw Synchron', 'Sonic Chick', 'Twister'] }, {}],
+    activate: 'Quickdraw Synchron',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Quickdraw Synchron', '0:monsters'), expectAt(b, 'Sonic Chick', '0:gy'), expectAt(b, 'Twister', '0:hand')),
+  },
+  {
+    name: 'aqua spirit banishes a water monster from the gy',
+    board: [{ hand: ['Aqua Spirit'], gy: ['Silent Angler', 'Axe Raider'] }, {}],
+    activate: 'Aqua Spirit',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Aqua Spirit', '0:monsters'), expectAt(b, 'Silent Angler', '0:banished'), expectAt(b, 'Axe Raider', '0:gy')),
+  },
+  {
+    name: 'silent angler needs a water monster and stops special summons from the hand',
+    board: [{ hand: ['Silent Angler', 'Quickdraw Synchron', 'Sonic Chick'], monsters: ['Medium of the Ice Barrier'] }, {}],
+    activate: 'Silent Angler',
+    legal: true,
+    check: (b) =>
+      all(
+        expectAt(b, 'Silent Angler', '0:monsters'),
+        b.state.forbidden.some((f) => f.player === 0 && f.what === 'special_summon' && f.filter?.place === 'hand') ? null : 'no ban on Special Summons from the hand',
+      ),
+  },
+  {
+    name: 'silent angler without a water monster',
+    board: [{ hand: ['Silent Angler'], monsters: ['Axe Raider'] }, {}],
+    activate: 'Silent Angler',
+    legal: false,
+  },
+  {
+    name: 'prior of the ice barrier needs an ice barrier monster and bans level 5 or higher',
+    board: [{ hand: ['Prior of the Ice Barrier'], monsters: ['Medium of the Ice Barrier'] }, {}],
+    activate: 'Prior of the Ice Barrier',
+    legal: true,
+    check: (b) =>
+      all(
+        expectAt(b, 'Prior of the Ice Barrier', '0:monsters'),
+        b.state.forbidden.some((f) => f.player === 0 && f.what === 'special_summon' && f.filter?.level?.min === 5) ? null : 'no ban on Level 5 or higher',
+      ),
+  },
+  {
+    name: 'medium of the ice barrier when the opponent controls 4 more cards',
+    board: [{ hand: ['Medium of the Ice Barrier'] }, { monsters: ['Axe Raider', 'Dark Blade'], set: ['Trap Hole', 'Twister'] }],
+    activate: 'Medium of the Ice Barrier',
+    legal: true,
+    check: (b) => expectAt(b, 'Medium of the Ice Barrier', '0:monsters'),
+  },
+  {
+    name: 'medium of the ice barrier when the opponent controls only 3 more cards',
+    board: [{ hand: ['Medium of the Ice Barrier'] }, { monsters: ['Axe Raider', 'Dark Blade'], set: ['Trap Hole'] }],
+    activate: 'Medium of the Ice Barrier',
+    legal: false,
+  },
+  {
+    name: 'moulinglacia needs exactly 5 water monsters in the gy',
+    board: [{ hand: ['Moulinglacia the Elemental Lord'], gy: ['Silent Angler', 'Aqua Spirit', 'Prior of the Ice Barrier', 'Medium of the Ice Barrier', 'Dupe Frog', 'Cryomancer of the Ice Barrier'] }, {}],
+    activate: 'Moulinglacia the Elemental Lord',
+    legal: false,
+  },
+  {
+    name: 'moulinglacia discards 2 random cards from the opponent\'s hand once Summoned',
+    board: [
+      { hand: ['Moulinglacia the Elemental Lord'], gy: ['Silent Angler', 'Aqua Spirit', 'Prior of the Ice Barrier', 'Medium of the Ice Barrier', 'Dupe Frog'] },
+      { hand: ['Axe Raider', 'Dark Blade', 'Twister'] },
+    ],
+    activate: 'Moulinglacia the Elemental Lord',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Moulinglacia the Elemental Lord', '0:monsters'), b.state.players[1].hand.length === 1 && b.state.players[1].graveyard.length === 2 ? null : 'not 2 cards discarded'),
+  },
+  // Control, Tokens, and effects used from the hand or GY.
+  {
+    name: 'crackdown takes control of a face-up monster for good',
+    board: [{ set: ['Crackdown'] }, { monsters: ['Axe Raider'] }],
+    activate: 'Crackdown',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Axe Raider', '0:monsters'), expectAt(b, 'Crackdown', '0:spellTraps'), b.monster('Axe Raider')?.returnsAtEndPhase === false ? null : 'it would go back'),
+  },
+  {
+    name: 'enemy controller tributes a monster to take control until the end phase',
+    board: [{ hand: ['Enemy Controller'], monsters: ['Sonic Chick'] }, { monsters: ['Dark Blade'] }],
+    activate: 'Enemy Controller',
+    picks: [['take control'], ['Sonic Chick'], ['Dark Blade']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dark Blade', '0:monsters'), expectAt(b, 'Sonic Chick', '0:gy'), b.monster('Dark Blade')?.returnsAtEndPhase ? null : 'it would not go back'),
+  },
+  {
+    name: 'enemy controller changes a battle position without a tribute',
+    board: [{ hand: ['Enemy Controller'] }, { monsters: ['Dark Blade'] }],
+    activate: 'Enemy Controller',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dark Blade', '1:monsters'), b.monster('Dark Blade')?.position === 'defense' ? null : 'still in Attack Position'),
+  },
+  {
+    name: 'speaker for the ice barriers makes an ice barrier token from the gy',
+    board: [{ gy: ['Speaker for the Ice Barriers'], monsters: ['Medium of the Ice Barrier'] }, {}],
+    activate: 'Speaker for the Ice Barriers',
+    effect: 2,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Ice Barrier Token', '0:monsters'), expectAt(b, 'Speaker for the Ice Barriers', '0:banished')),
+  },
+  {
+    name: 'speaker for the ice barriers special summons itself from the hand',
+    board: [{ hand: ['Speaker for the Ice Barriers'], monsters: ['Medium of the Ice Barrier'] }, {}],
+    activate: 'Speaker for the Ice Barriers',
+    effect: 1,
+    legal: true,
+    check: (b) => expectAt(b, 'Speaker for the Ice Barriers', '0:monsters'),
+  },
+  {
+    name: 'speaker for the ice barriers needs an ice barrier monster',
+    board: [{ hand: ['Speaker for the Ice Barriers'], monsters: ['Axe Raider'] }, {}],
+    activate: 'Speaker for the Ice Barriers',
+    effect: 1,
+    legal: false,
+  },
+  {
+    name: 'mind drain stops monster effects in the hand',
+    board: [{ hand: ['Speaker for the Ice Barriers'], monsters: ['Medium of the Ice Barrier'] }, { faceUp: ['Mind Drain'] }],
+    activate: 'Speaker for the Ice Barriers',
+    effect: 1,
+    legal: false,
+  },
+  {
+    name: 'warlock of the ice barrier makes spells be set first',
+    board: [{ hand: ['Monster Reincarnation', 'Twister'], gy: ['Sonic Chick'] }, { monsters: ['Warlock of the Ice Barrier', 'Medium of the Ice Barrier'] }],
+    activate: 'Monster Reincarnation',
+    legal: false,
+  },
+  {
+    name: 'dai-sojo keeps ice barrier monsters from spell destruction',
+    board: [{ hand: ['Fissure'] }, { monsters: ['Dai-sojo of the Ice Barrier'] }],
+    activate: 'Fissure',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dai-sojo of the Ice Barrier', '1:monsters'), expectAt(b, 'Fissure', '0:gy')),
+  },
+  {
+    name: 'fiendish chain ties itself to an effect monster',
+    board: [{ set: ['Fiendish Chain'] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Fiendish Chain',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Fiendish Chain', '0:spellTraps'), expectAt(b, 'Speed Warrior', '1:monsters')),
+  },
+  {
+    name: 'ronintoadin revives itself by banishing a frog',
+    board: [{ gy: ['Ronintoadin', 'Dupe Frog'] }, {}],
+    activate: 'Ronintoadin',
+    effect: 2,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Ronintoadin', '0:monsters'), expectAt(b, 'Dupe Frog', '0:banished')),
+  },
 ];
 
 /** Builds a case's board: every listed card is put in place from its owner's Deck. */
@@ -834,9 +1003,18 @@ export async function runCase(c: EvalCase, board: DuelState, model: ModelCall | 
   // Code refuses an activation that the effect's script or `when` rules out, with no judge call.
   if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   let scratch = intent.events.slice(1).reduce(evolve, state);
-  const checked = await rule({ stage: 'activation', state: scratch, link: scratch.chain.at(-1)! }, deps);
+  const procedure = isProcedure(state, id, c.effect ?? 0);
+  const link = procedure ? { player: seat, card: id, effect: c.effect ?? 0, targets: [], choice: null, cause: null, negated: false, setAgain: false } : scratch.chain.at(-1)!;
+  const checked = await rule({ stage: 'activation', state: scratch, link }, deps);
   const records = [checked.record];
   const result = (passed: boolean, detail: string): EvalResult => ({ name: c.name, passed, detail, records });
+  // A Summoning procedure is done in one go, with no chain; what its Summon sets off follows.
+  if (procedure && checked.record.legal && !checked.record.error && !unmatched.length) {
+    scratch = checked.events.reduce(evolve, scratch);
+    const after = await settle(evolve(scratch, procedureDone(scratch, id)), deps);
+    const problem = c.legal ? (c.check?.(new Board(after)) ?? null) : 'ruled legal';
+    return result(problem === null, problem ?? checked.record.summary);
+  }
   if (checked.record.error) return result(false, `judge failed: ${checked.record.error}`);
   if (unmatched.length) return result(false, unmatched[0]!);
   if (checked.record.legal !== c.legal) return result(false, `ruled ${checked.record.legal ? 'legal' : 'illegal'}: ${checked.record.summary}`);

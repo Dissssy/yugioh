@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Any time a Continuous Trap can be activated, targeting 1 face-up monster on the field with more than 1000 original ATK that has a Level",
       "cost": "",
@@ -21,6 +22,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field and linked to the targeted monster",
       "cost": "",
@@ -41,5 +43,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

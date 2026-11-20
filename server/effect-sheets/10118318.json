@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Any time you could activate a Normal Trap, provided you have not conducted your Battle Phase this turn",
       "cost": "",
@@ -24,6 +25,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "special_summon",
@@ -40,6 +42,8 @@
                       "Warrior"
                     ],
                     "attributes": [],
+                    "named": null,
+                    "extraDeck": null,
                     "faceUp": null,
                     "position": null,
                     "level": {
@@ -53,12 +57,14 @@
                   "max": 1,
                   "rank": null
                 },
-                "position": "choice"
+                "position": "choice",
+                "banishWhenLeaves": false
               },
               {
                 "do": "forbid",
                 "player": "you",
-                "what": "battle_phase"
+                "what": "battle_phase",
+                "filter": null
               }
             ]
           }
@@ -69,5 +75,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

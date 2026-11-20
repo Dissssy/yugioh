@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Activate this Continuous Spell during your Main Phase",
       "cost": "",
@@ -20,6 +21,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": []
           }
         ],
@@ -32,6 +34,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field, during your Battle Phase only",
       "cost": "",
@@ -48,6 +51,8 @@
           "types": [],
           "races": [],
           "attributes": [],
+          "named": null,
+          "extraDeck": null,
           "faceUp": true,
           "position": null,
           "level": null,
@@ -75,5 +80,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

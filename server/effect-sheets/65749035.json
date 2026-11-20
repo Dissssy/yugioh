@@ -1,0 +1,31 @@
+{
+  "code": 65749035,
+  "textHash": "921fae6cc54bafaa21322db965b56255f17ceccfc599ad041c071454f6a63e76",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "soft",
+      "window": "Your Main Phase, once per turn",
+      "cost": "discard up to 2 cards to the Graveyard",
+      "effect": "Target the same number of cards your opponent controls as cards discarded; destroy them.",
+      "targets": "the same number of cards your opponent controls (as cards discarded)",
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": {
+    "summon": "synchro",
+    "tuner": null,
+    "nonTuners": {
+      "min": 1,
+      "max": null
+    }
+  },
+  "normalSummon": true
+}

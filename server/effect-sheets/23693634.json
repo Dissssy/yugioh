@@ -7,6 +7,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field",
       "cost": "",
@@ -30,6 +31,8 @@
             "Warrior"
           ],
           "attributes": [],
+          "named": null,
+          "extraDeck": null,
           "faceUp": null,
           "position": null,
           "level": null,
@@ -46,6 +49,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
+      "from": "graveyard",
       "opt": "none",
       "window": "When this card is destroyed by battle and sent to the Graveyard",
       "cost": "",
@@ -56,7 +60,6 @@
         "self": true,
         "filter": null,
         "how": [],
-        "from": "graveyard",
         "canMiss": true,
         "by": null
       },
@@ -72,5 +75,6 @@
       "min": 1,
       "max": null
     }
-  }
+  },
+  "normalSummon": true
 }

@@ -7,6 +7,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "After this card's activation",
       "cost": "",
@@ -24,6 +25,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Your Main Phase",
       "cost": "",
@@ -38,6 +40,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field",
       "cost": "",
@@ -54,6 +57,8 @@
           "types": [],
           "races": [],
           "attributes": [],
+          "named": null,
+          "extraDeck": null,
           "faceUp": null,
           "position": null,
           "level": null,
@@ -65,10 +70,13 @@
           "attack"
         ],
         "by": null,
+        "compare": null,
+        "once": false,
         "while": []
       },
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

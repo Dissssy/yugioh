@@ -7,6 +7,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When this card is Normal or Special Summoned",
       "cost": "",
@@ -20,7 +21,6 @@
           "normal",
           "special"
         ],
-        "from": "field",
         "canMiss": true,
         "by": null
       },
@@ -29,5 +29,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

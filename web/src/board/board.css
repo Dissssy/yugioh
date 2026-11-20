@@ -93,6 +93,13 @@ main:has(.duel) { max-width: none; padding: 0; }
 
 /* Cards on the table */
 .duel .card { width: var(--card-w); height: var(--card-h); border-radius: 5px; box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); }
+/* A Token, drawn since it has no card image. */
+.token { box-sizing: border-box; display: grid; grid-template-rows: 1fr auto auto; place-items: center; gap: 2px; padding: 6% 4%; text-align: center; color: #1d2b3a; background: linear-gradient(160deg, #d9e6ef, #a9bfd0); border: 2px solid #6f8798; font-size: calc(var(--card-w, 84px) * 0.12); line-height: 1.1; overflow: hidden; }
+.token-name { font-weight: 600; align-self: center; }
+.token-level { color: #b8860b; letter-spacing: -1px; }
+.token-stats { font-variant-numeric: tabular-nums; }
+.token-detail { --card-w: 130px; width: 130px; aspect-ratio: 59 / 86; border-radius: 6px; }
+.card-zoom .token-detail { --card-w: calc(var(--img-h) * 59 / 86); width: auto; height: var(--img-h); grid-row: 1 / -1; border-radius: 12px; }
 /*
  * No transform-style: preserve-3d here. Flips get their depth from the zone's perspective, and a preserve-3d element
  * that also gets a filter (the brightness flashes) can leave a rotated card (the opponent's, turned to face them)

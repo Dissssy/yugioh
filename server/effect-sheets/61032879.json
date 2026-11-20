@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Any time you could activate a Spell Card (your Main Phase)",
       "cost": "",
@@ -20,6 +21,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": []
           }
         ],
@@ -32,6 +34,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
+      "from": "field",
       "opt": "none",
       "window": "Each time you Synchro Summon a Synchro Monster, while this card is face-up on the field",
       "cost": "",
@@ -49,6 +52,8 @@
           ],
           "races": [],
           "attributes": [],
+          "named": null,
+          "extraDeck": null,
           "faceUp": true,
           "position": null,
           "level": null,
@@ -58,7 +63,6 @@
         "how": [
           "synchro"
         ],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
@@ -69,6 +73,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "change_lp",
@@ -85,5 +90,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

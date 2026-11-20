@@ -2,9 +2,9 @@
 // Code decides these exactly, so an activation a script rules out is never offered.
 
 import { cardOf } from './rules.ts';
-import { levelNow, statsOf } from './continuous.ts';
-import { levelOf, locate, monsterZonesFor, summonMatches, summonName } from './state.ts';
-import type { CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
+import { levelNow, nameOf, statsOf } from './continuous.ts';
+import { levelOf, locate, monsterZonesFor, other, summonMatches, summonName } from './state.ts';
+import type { CardData, CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
 export function scriptOf(state: DuelState, card: string, effect: number): Script | null {
@@ -14,6 +14,20 @@ export function scriptOf(state: DuelState, card: string, effect: number): Script
 
 const inRange = (value: number | null, range: Range | null) =>
   range === null || (value !== null && (range.min === null || value >= range.min) && (range.max === null || value <= range.max));
+
+/**
+ * Whether a card's printed identity fits the filter: its kind, type line, monster type, name (`name` if an effect
+ * changed it), Attribute and Deck.
+ */
+export function identityFits(card: CardData, filter: CardFilter, name = card.name): boolean {
+  if (filter.kinds.length && !filter.kinds.includes(card.kind)) return false;
+  const words = card.type.toLowerCase().split(/\s+/);
+  if (!filter.types.every((t) => words.includes(t.toLowerCase()))) return false;
+  if (filter.races.length && !filter.races.some((r) => r.toLowerCase() === card.race.toLowerCase())) return false;
+  if (filter.named !== null && !name.toLowerCase().includes(filter.named.toLowerCase())) return false;
+  if (filter.attributes.length && !filter.attributes.some((a) => a.toUpperCase() === card.attribute)) return false;
+  return filter.extraDeck === null || card.extraDeck === filter.extraDeck;
+}
 
 /** Whether a card fits a filter, for the effect of player `seat`. A face-down card shows only whether it is a monster or a Spell/Trap. */
 export function fits(state: DuelState, id: string, filter: CardFilter, seat: Seat): boolean {
@@ -28,17 +42,13 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   if (filter.faceUp !== null && (!field || field.faceUp !== filter.faceUp)) return false;
   if (filter.position !== null && (at.zone !== 'monsters' || field!.position !== filter.position)) return false;
   if (field && !field.faceUp) {
-    const identity = filter.types.length + filter.races.length + filter.attributes.length > 0 || filter.level || filter.atk || filter.def;
+    const identity = filter.types.length + filter.races.length + filter.attributes.length > 0 || filter.named !== null || filter.extraDeck !== null || filter.level || filter.atk || filter.def;
     if (identity) return false;
     if (filter.kinds.length === 0) return true;
     return at.zone === 'monsters' ? filter.kinds.includes('monster') : filter.kinds.includes('spell') && filter.kinds.includes('trap');
   }
   const card = cardOf(state, id);
-  if (filter.kinds.length && !filter.kinds.includes(card.kind)) return false;
-  const words = card.type.toLowerCase().split(/\s+/);
-  if (!filter.types.every((t) => words.includes(t.toLowerCase()))) return false;
-  if (filter.races.length && !filter.races.some((r) => r.toLowerCase() === card.race.toLowerCase())) return false;
-  if (filter.attributes.length && !filter.attributes.some((a) => a.toUpperCase() === card.attribute)) return false;
+  if (!identityFits(card, filter, field ? nameOf(state, id) : card.name)) return false;
   // Current stats on the field, printed ones elsewhere. ATK and DEF are only worked out when the filter asks, since an
   // effect that counts monsters by Level (Tenshin) changes ATK itself.
   const monster = at.zone === 'monsters';
@@ -46,6 +56,16 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   if (!filter.atk && !filter.def) return true;
   const stats = monster ? statsOf(state, id) : { atk: card.atk, def: card.def };
   return inRange(stats.atk, filter.atk) && inRange(stats.def, filter.def);
+}
+
+/**
+ * Whether an effect stopped `seat` Special Summoning this card this turn (Silent Angler's "you cannot Special Summon
+ * monsters from your hand"). A Token (`id` null) is stopped only by a ban on every monster.
+ */
+export function specialSummonForbidden(state: DuelState, seat: Seat, id: string | null): boolean {
+  return state.forbidden.some(
+    (f) => f.player === seat && f.what === 'special_summon' && f.turn === state.turn && (f.filter === null || (id !== null && fits(state, id, f.filter, seat))),
+  );
 }
 
 /** Every card that fits, except `except` (the card being activated). */
@@ -63,14 +83,16 @@ export function chooseFrom(state: DuelState, selection: Extract<Selection, { fro
   return all.filter((id) => value(id) === best);
 }
 
-/** "face-up Warrior monster your opponent controls". */
-export function describeFilter(f: CardFilter): string {
+/** "face-up Warrior monster your opponent controls"; with `they`, as said of a player ("monster in their hand"). */
+export function describeFilter(f: CardFilter, they = false): string {
   const words: string[] = [];
   if (f.faceUp !== null) words.push(f.faceUp ? 'face-up' : 'face-down');
   if (f.position) words.push(`${f.position === 'attack' ? 'Attack' : 'Defense'} Position`);
   if (f.attributes.length) words.push(f.attributes.join(' or '));
+  if (f.named !== null) words.push(`"${f.named}"`);
   if (f.races.length) words.push(f.races.join(' or '));
   words.push(...f.types);
+  if (f.extraDeck !== null) words.push(f.extraDeck ? 'Extra Deck' : 'Main Deck');
   const kinds = [...f.kinds].sort();
   words.push(
     kinds.length === 0 ? 'card' : kinds.join() === 'spell,trap' ? 'Spell/Trap' : kinds.map((k) => (k === 'monster' ? 'monster' : k === 'spell' ? 'Spell' : 'Trap')).join(' or '),
@@ -82,26 +104,51 @@ export function describeFilter(f: CardFilter): string {
   if (f.place === 'any') return words.join(' ');
   const pile = { hand: 'hand', deck: 'Deck', graveyard: 'GY', banished: 'banished cards' }[f.place as 'hand'];
   const field = { field: 'on the field', monsters: 'in a Monster Zone', spellTraps: 'in a Spell & Trap Zone' }[f.place as 'field'];
-  if (field) words.push(f.side === 'you' ? 'you control' : f.side === 'opponent' ? 'your opponent controls' : field);
-  else words.push(f.side === 'you' ? `in your ${pile}` : f.side === 'opponent' ? `in your opponent's ${pile}` : `in either player's ${pile}`);
+  const [you, your] = they ? ['they control', 'their'] : ['you control', 'your'];
+  if (field) words.push(f.side === 'you' ? you : f.side === 'opponent' ? `${your} opponent controls` : field);
+  else words.push(f.side === 'you' ? `in ${your} ${pile}` : f.side === 'opponent' ? `in ${your} opponent's ${pile}` : `in either player's ${pile}`);
   return words.join(' ');
 }
 
 const freeMonsterZones = (state: DuelState, seat: Seat) => monsterZonesFor(state, seat, false).length;
 
-/** Why a step couldn't do what it must on this board, or null. A `choose` with min 0 ("you can") and steps on targets need nothing here. */
-function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): string | null {
+/**
+ * How many of the player's Monster Zones a cost frees: monsters it Tributes or sends from their field, so a Summon
+ * paid for that way still has a zone (Turret Warrior with five monsters out).
+ */
+function zonesFreedBy(state: DuelState, cost: Step[], card: string): number {
+  return cost.reduce((n, step) => {
+    if (step.do !== 'move') return n;
+    if (step.cards.from === 'self') return n + (locate(state, card)?.zone === 'monsters' ? 1 : 0);
+    const f = step.cards.from === 'choose' ? step.cards.filter : null;
+    return f && f.side === 'you' && (f.place === 'monsters' || (f.place === 'field' && f.kinds.join() === 'monster')) ? n + (step.cards as { min: number }).min : n;
+  }, 0);
+}
+
+/**
+ * Why a step couldn't do what it must on this board, or null. A `choose` with min 0 ("you can") and steps on targets
+ * need nothing here. `freed` is how many Monster Zones the cost frees first.
+ */
+function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, freed = 0): string | null {
+  if (step.do === 'change_lp' && step.kind === 'cost') return state.players[seat].lp < step.amount ? `You can't pay ${step.amount} LP.` : null;
+  if (step.do === 'summon_token') {
+    const player = step.player === 'you' ? seat : other(seat);
+    if (freeMonsterZones(state, player) + (player === seat ? freed : 0) < step.count) return `There ${step.count === 1 ? 'is no free Monster Zone' : `aren't ${step.count} free Monster Zones`} for the Token${step.count === 1 ? '' : 's'}.`;
+    return specialSummonForbidden(state, seat, null) ? "An effect stops you Special Summoning this turn." : null;
+  }
   if (step.do === 'negate_attack') return state.attack ? null : 'No attack is being made.';
   if (step.do === 'negate_activation') return state.chain.length > 0 ? null : 'There is no activation to negate.';
   if (step.do === 'detach') return detachFrom(state, step, seat, card).length > 0 ? null : `No ${step.cards.from === 'self' ? 'this card has' : 'monster here has'} ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`;
   if (!('cards' in step)) return null;
   const sel = step.cards;
-  if (step.do === 'special_summon' && freeMonsterZones(state, seat) === 0) return 'You have no free Monster Zone to Special Summon into.';
+  if (step.do === 'special_summon' && freeMonsterZones(state, seat) + freed === 0) return 'You have no free Monster Zone to Special Summon into.';
+  if (step.do === 'take_control' && freeMonsterZones(state, seat) + freed === 0) return 'You have no free Monster Zone to take control of a monster into.';
+  if (step.do === 'special_summon' && sel.from === 'self' && specialSummonForbidden(state, seat, card)) return "An effect stops you Special Summoning it this turn.";
   if (step.do === 'remove_counters' && selected(state, sel, seat, card).every((id) => (onFieldCard(state, id)?.counters[step.counter] ?? 0) < step.count)) {
     return `There aren't ${step.count} ${step.counter === 'spell' ? 'Spell Counter' : 'counter'}${step.count === 1 ? '' : 's'} to remove.`;
   }
   if (sel.from === 'battling' && battling(state, sel.filter, seat, card).length === 0) return `This card isn't battling a ${describeFilter(sel.filter)}.`;
-  if (sel.from === 'all' && cardsFitting(state, sel.filter, seat, card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
+  if ((sel.from === 'all' || sel.from === 'random') && cardsFitting(state, sel.filter, seat, card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
   if (sel.from === 'choose' && chooseFrom(state, sel, seat, card).length < sel.min) {
     return sel.min === 1 ? `There is no ${describeFilter(sel.filter)}.` : `There are fewer than ${sel.min} of: ${describeFilter(sel.filter)}.`;
   }
@@ -125,6 +172,7 @@ function selected(state: DuelState, sel: Selection, seat: Seat, card: string): s
     case 'choose':
       return chooseFrom(state, sel, seat, card);
     case 'all':
+    case 'random':
       return cardsFitting(state, sel.filter, seat, card);
     case 'battling':
       return battling(state, sel.filter, seat, card);
@@ -148,9 +196,19 @@ export function materialsOf(state: DuelState, id: string): string[] {
   return at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.materials : [];
 }
 
-/** The options of a script whose steps can all do what they must now, by index. */
+/** Why an option of a script can't be picked now (its own cost can't be paid, or a step couldn't do what it must), or null. */
+function optionProblem(state: DuelState, script: Script, option: Script['options'][number], seat: Seat, card: string): string | null {
+  for (const step of option.cost) {
+    const problem = stepProblem(state, step, seat, card);
+    if (problem) return `The cost can't be paid: ${problem}`;
+  }
+  const freed = zonesFreedBy(state, [...script.cost, ...option.cost], card);
+  return option.steps.map((s) => stepProblem(state, s, seat, card, freed)).find((p) => p) ?? null;
+}
+
+/** The options of a script that can be picked now, by index. */
 export function feasibleOptions(state: DuelState, script: Script, seat: Seat, card: string): number[] {
-  return script.options.flatMap((o, i) => (o.steps.every((s) => !stepProblem(state, s, seat, card)) ? [i] : []));
+  return script.options.flatMap((o, i) => (optionProblem(state, script, o, seat, card) ? [] : [i]));
 }
 
 /** The cards a script may target: those that fit, and for "target that monster" only the card its event happened to. */
@@ -186,11 +244,26 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
       if ((c.min === null || n >= c.min) && (c.max === null || n <= c.max)) return null;
       return c.max === 0 ? 'It needs this card to have no Xyz Material.' : `It needs this card to have ${c.min ?? 0}${c.max === null ? ' or more' : ` to ${c.max}`} Xyz Materials.`;
     }
+    case 'outnumbered': {
+      const count = (p: Seat) => [...state.players[p].monsters, ...state.players[p].spellTraps].filter((c) => c !== null).length;
+      return count(other(seat)) - count(seat) >= c.by ? null : `It needs your opponent to control at least ${c.by} more cards than you.`;
+    }
     case 'summoned_this_turn': {
       const at = locate(state, card);
       const summoned = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.summoned : null;
       if (summoned && summoned.turn === state.turn && summonMatches(summoned.how, c.how)) return null;
       return `It needs this card to have been ${c.how.length ? `${c.how.map((h) => summonName[h]).join(' or ')} ` : ''}Summoned this turn.`;
+    }
+    case 'battling': {
+      const a = state.attack;
+      const battling = c.as === 'attacker' ? a?.attacker === card && a.target !== null : a?.target === card;
+      if (battling && (!c.damageStep || a!.damageStep)) return null;
+      return `It needs this card to be ${c.as === 'attacker' ? "attacking an opponent's monster" : 'the attack target'}${c.damageStep ? ' in the Damage Step' : ''}.`;
+    }
+    case 'last_attack': {
+      const at = locate(state, card);
+      const attacks = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.attacks : null;
+      return attacks?.turn === state.turn && attacks.on === c.on ? null : `It needs this card's last attack this turn to have been on a ${c.on === 'attack' ? 'Attack' : 'Defense'} Position monster.`;
     }
   }
 }
@@ -210,7 +283,6 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
   const costCards = new Set<string>();
   let costCount = 0;
   for (const step of script.cost) {
-    if (step.do === 'change_lp' && step.kind === 'cost' && state.players[seat].lp < step.amount) return `You can't pay ${step.amount} LP.`;
     const problem = stepProblem(state, step, seat, card);
     if (problem) return `The cost can't be paid: ${problem}`;
     // A card the cost uses can't also be a target (an Xyz Monster that only loses a material still can).
@@ -227,8 +299,8 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
     }
   }
   if (feasibleOptions(state, script, seat, card).length === 0) {
-    const first = script.options[0]!.steps.map((s) => stepProblem(state, s, seat, card)).find((p) => p);
-    return `The effect couldn't do what it must: ${first ?? 'nothing applies.'}`;
+    const first = script.options[0] && optionProblem(state, script, script.options[0], seat, card);
+    return first?.startsWith('The cost') ? first : `The effect couldn't do what it must: ${first ?? 'nothing applies.'}`;
   }
   return null;
 }

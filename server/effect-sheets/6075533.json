@@ -1,0 +1,60 @@
+{
+  "code": 6075533,
+  "textHash": "4a265581587d8d3766a21549a4beb90f5a19bdfc922f0809155f19b0da32b521",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "hard",
+      "window": "Either player's turn, from a Set position; you must control at least 1 \"Ice Barrier\" Synchro Monster",
+      "cost": "",
+      "effect": "Apply these effects, in sequence, depending on the number of \"Ice Barrier\" Synchro Monsters you control with different names; ● 1+: Banish 1 card your opponent controls. ● 2+: Banish 1 card from your opponent's GY. ● 3+: Banish 1 random card from your opponent's hand.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "quick",
+      "speed": 2,
+      "mandatory": false,
+      "from": "graveyard",
+      "opt": "hard",
+      "window": "While this card is in your GY, when your opponent activates a card or effect that targets an \"Ice Barrier\" Synchro Monster(s) you control",
+      "cost": "You can banish this card from your GY",
+      "effect": "Negate that effect.",
+      "targets": null,
+      "when": {
+        "event": "activated",
+        "self": false,
+        "filter": {
+          "side": "opponent",
+          "place": "any",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null
+      },
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

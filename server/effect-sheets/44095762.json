@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When an opponent's monster declares an attack",
       "cost": "",
@@ -22,6 +23,8 @@
           "types": [],
           "races": [],
           "attributes": [],
+          "named": null,
+          "extraDeck": null,
           "faceUp": null,
           "position": null,
           "level": null,
@@ -29,7 +32,6 @@
           "def": null
         },
         "how": [],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
@@ -40,6 +42,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "destroy",
@@ -52,6 +55,8 @@
                     "types": [],
                     "races": [],
                     "attributes": [],
+                    "named": null,
+                    "extraDeck": null,
                     "faceUp": null,
                     "position": "attack",
                     "level": null,
@@ -69,5 +74,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

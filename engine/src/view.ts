@@ -3,6 +3,7 @@
 import { waitingFor } from './chain.ts';
 import { blockedAttacks, blockedEffects, legalActions, normalSummonUsed } from './rules.ts';
 import { statsOf } from './continuous.ts';
+import { describeFilter } from './script.ts';
 import { evolve, locate, replay } from './state.ts';
 import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, LogEntry, LogEvent, Phase, Place, PlayerView, Seat, SeatStep, Sight, StartView } from './types.ts';
 
@@ -404,7 +405,21 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'linked':
       return `${name(event.card)} ${state.cards[state.instances[event.card]!.code]!.race === 'Equip' ? 'equipped to' : 'tied to'} ${name(event.to)}`;
     case 'forbidden':
-      return event.what === 'battle_phase' ? `${who(event.player)} can't conduct their Battle Phase this turn` : `${who(event.player)} can't declare an attack this turn`;
+      return event.what === 'battle_phase'
+        ? `${who(event.player)} can't conduct their Battle Phase this turn`
+        : event.what === 'declare_attack'
+          ? `${who(event.player)} can't declare an attack this turn`
+          : `${who(event.player)} can't Special Summon ${event.filter ? `a ${describeFilter(event.filter, true)}` : 'monsters'} this turn`;
+    case 'procedureUsed':
+      return null;
+    case 'banishWhenLeaves':
+      return `${name(event.card)} will be banished when it leaves the field`;
+    case 'protectionUsed':
+      return `${name(event.card)} used its once-per-turn protection`;
+    case 'controlChanged':
+      return `${who(event.to)} took control of ${name(event.card)}${event.until === 'end_phase' ? ' until the End Phase' : ''}`;
+    case 'tokenSummoned':
+      return `${who(event.player)} Special Summoned ${event.token.name} in ${event.position} position`;
     case 'chatted':
       return `${who(event.player)}: ${event.text}`;
     case 'asked':

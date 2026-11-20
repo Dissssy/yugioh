@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Any time you can activate a Trap, while your opponent controls a monster",
       "cost": "",
@@ -24,6 +25,8 @@
             "types": [],
             "races": [],
             "attributes": [],
+            "named": null,
+            "extraDeck": null,
             "faceUp": null,
             "position": null,
             "level": null,
@@ -37,6 +40,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "link",
@@ -56,6 +60,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field and the targeted monster is on the field",
       "cost": "",
@@ -72,6 +77,8 @@
           "change_position"
         ],
         "by": null,
+        "compare": null,
+        "once": false,
         "while": []
       },
       "status": "unverified"
@@ -80,6 +87,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When the targeted monster is destroyed",
       "cost": "",
@@ -95,5 +103,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

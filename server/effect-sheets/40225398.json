@@ -1,0 +1,58 @@
+{
+  "code": 40225398,
+  "textHash": "a544f0892ba29e43770555bbaa8a2ad8be24972424c50b39524e715484a7232b",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "soft",
+      "window": "During the Battle Phase, after this card attacks a Defense Position monster",
+      "cost": "",
+      "effect": "Once per Battle Phase, if this card attacks a Defense Position monster, it can make a second attack in a row.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "battle",
+        "to": "self",
+        "attacks": 2,
+        "piercing": false,
+        "noDamageToYou": false,
+        "while": [
+          {
+            "if": "last_attack",
+            "on": "defense"
+          }
+        ]
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card attacks a Defense Position monster",
+      "cost": "",
+      "effect": "If this card attacks a Defense Position monster, inflict piercing battle damage to your opponent.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "battle",
+        "to": "self",
+        "attacks": 1,
+        "piercing": true,
+        "noDamageToYou": false,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -2,15 +2,18 @@
 // model can act on. Nothing here decides what a card's text means; it only refuses what the board can't allow.
 
 import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
-import { statsOf } from './continuous.ts';
+import { restriction, statsOf } from './continuous.ts';
+import { specialSummonForbidden } from './script.ts';
 import { locate, monsterZonesFor, other } from './state.ts';
-import { type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
+import { type CardData, type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
 
 export type OpResult = { ok: true; events: DuelEvent[] } | { ok: false; error: string };
 
 export interface OpContext {
   /** The player whose effect this is. */
   player: Seat;
+  /** The card whose effect this is. */
+  source: string;
   /** Targets are declared while activating, not while resolving. */
   stage: 'activation' | 'resolution';
   /** [0, 1), for shuffles. */
@@ -21,13 +24,37 @@ export function applyOp(state: DuelState, op: Op, ctx: OpContext): OpResult {
   try {
     check(!state.result, 'The duel is over.');
     const run = new Run(state);
-    apply(run, op, ctx);
+    const shielded = shield(run, op, ctx);
+    if (shielded) apply(run, shielded, ctx);
     endIfLpGone(run);
     return { ok: true, events: run.events };
   } catch (e) {
     if (e instanceof Illegal) return { ok: false, error: e.message };
     throw e;
   }
+}
+
+/** The ops that change a card already in play, and so can't touch a card unaffected by the effect. */
+const AFFECTING = ['move', 'modify_stats', 'change_position', 'take_control', 'negate_effects', 'add_counters', 'remove_counters', 'detach', 'link'];
+
+/**
+ * The op without the cards it can't touch: those unaffected by this effect (Freezing Chains of the Ice Barrier) and,
+ * for `destroy`, those that can't be destroyed by it (Dai-sojo of the Ice Barrier). Null when nothing is left to do.
+ * A once-per-turn protection that applies is used up.
+ */
+function shield(run: Run, op: Op, ctx: OpContext): Op | null {
+  const state = run.state;
+  const spared = (id: string, what: 'be_affected' | 'be_destroyed_by_effect') => {
+    if (!locate(state, id)) return false;
+    const f = restriction(state, id, what, ctx.source);
+    if (f?.effect.once) run.emit({ type: 'protectionUsed', player: f.seat, card: f.source, effect: f.index });
+    return f !== null;
+  };
+  if (op.op === 'destroy') {
+    const cards = op.cards.filter((id) => !spared(id, 'be_affected') && !spared(id, 'be_destroyed_by_effect'));
+    return cards.length ? { ...op, cards } : null;
+  }
+  return AFFECTING.includes(op.op) && 'card' in op && spared(op.card, 'be_affected') ? null : op;
 }
 
 function known(state: DuelState, id: string) {
@@ -53,10 +80,11 @@ function apply(run: Run, op: Op, ctx: OpContext) {
         (to === 'graveyard' && at.zone === 'graveyard') ||
         (to === 'banished' && at.zone === 'banished');
       check(!already, `${cardOf(state, op.card).name} is already there.`);
-      check(!(at.zone === 'deck' && to.startsWith('deck_') && to !== 'deck_top'), 'That card is already in the Deck.');
+      check(!(at.zone === 'deck' && to === 'deck_shuffled'), 'That card is already in the Deck.');
       run.emit({ type: 'moved', card: op.card, owner, from: at.zone, to });
-      // Taking a card from the Deck other than drawing it, or adding one at no fixed place, shuffles the Deck.
-      const searched = at.zone === 'deck' && state.players[at.seat].deck[0] !== op.card;
+      // Taking a card from the Deck other than drawing it, or adding one at no fixed place, shuffles the Deck. Putting
+      // a card from the Deck on its top or bottom (Dark Tinker) doesn't.
+      const searched = at.zone === 'deck' && !to.startsWith('deck_') && state.players[at.seat].deck[0] !== op.card;
       if (to === 'deck_shuffled' || searched) shuffle(run, searched ? at.seat : owner, ctx, to === 'deck_top' ? op.card : null);
       return;
     }
@@ -67,11 +95,36 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(at.zone !== 'monsters', `${card.name} is already on the field.`);
       check(at.zone !== 'spellTraps', `${card.name} is in a Spell & Trap Zone.`);
       check(at.zone !== 'extra', 'Monsters in the Extra Deck are Summoned by their own procedures, not by this op.');
+      check(!specialSummonForbidden(state, ctx.player, op.card), `An effect stops that player Special Summoning ${card.name} this turn.`);
       const free = monsterZonesFor(state, op.controller, false);
       check(free.length > 0, 'That player has no empty Main Monster Zone.');
       check(free.includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
       run.emit({ type: 'specialSummoned', player: op.controller, card: op.card, zone: op.zone, position: op.position });
+      if (op.banish_when_leaves) run.emit({ type: 'banishWhenLeaves', card: op.card });
       if (at.zone === 'deck') shuffle(run, at.seat, ctx, null);
+      return;
+    }
+    case 'take_control': {
+      const { at, card } = onField(state, op.card);
+      check(at.zone === 'monsters', 'Only monsters can change control.');
+      check(at.seat !== op.controller, 'That player already controls it.');
+      check(op.until === null || op.until === 'end_phase', 'until is "end_phase" or null.');
+      check(monsterZonesFor(state, op.controller, false).includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
+      run.emit({ type: 'controlChanged', card: card.id, to: op.controller, zone: op.zone, until: op.until });
+      return;
+    }
+    case 'summon_token': {
+      const t = op.token;
+      check(t.name.trim() !== '' && /token/i.test(t.name), 'A Token is named "... Token".');
+      check([t.level, t.atk, t.def].every((n) => Number.isInteger(n) && n >= 0) && t.level >= 1 && t.level <= 12, 'A Token has a Level from 1 to 12 and whole ATK and DEF, 0 or more.');
+      check(!specialSummonForbidden(state, ctx.player, null), 'An effect stops that player Special Summoning this turn.');
+      check(monsterZonesFor(state, op.controller, false).includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
+      // Tokens with the same printed stats share their card data (a code below 0); each Token is a new instance.
+      const data: Omit<CardData, 'code'> = { name: t.name, type: 'Token', kind: 'monster', extraDeck: false, text: '', level: t.level, atk: t.atk, def: t.def, attribute: t.attribute.toUpperCase(), race: t.race };
+      const same = Object.values(state.cards).find(({ code: _, ...c }) => JSON.stringify(c) === JSON.stringify(data));
+      const token: CardData = { code: same?.code ?? Math.min(0, ...Object.keys(state.cards).map(Number)) - 1, ...data };
+      const id = `token${Object.keys(state.instances).filter((i) => i.startsWith('token')).length + 1}`;
+      run.emit({ type: 'tokenSummoned', player: op.controller, card: id, token, zone: op.zone, position: op.position });
       return;
     }
     case 'destroy': {
@@ -192,7 +245,8 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       return;
     }
     case 'forbid':
-      run.emit({ type: 'forbidden', player: op.player, what: op.what });
+      check(op.what === 'special_summon' || op.filter === null, 'Only a Special Summon ban takes a filter.');
+      run.emit({ type: 'forbidden', player: op.player, what: op.what, filter: op.filter });
       return;
     case 'detach': {
       const at = known(state, op.card);

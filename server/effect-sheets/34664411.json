@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Your Main Phase, targeting a face-up monster on the field",
       "cost": "",
@@ -24,6 +25,8 @@
             "types": [],
             "races": [],
             "attributes": [],
+            "named": null,
+            "extraDeck": null,
             "faceUp": true,
             "position": null,
             "level": null,
@@ -37,6 +40,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "link",
@@ -56,6 +60,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is equipped to a monster",
       "cost": "",
@@ -79,12 +84,14 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
+      "from": "graveyard",
       "opt": "none",
       "window": "If this face-up card you control is destroyed by your opponent's card effect and sent to your Graveyard",
       "cost": "",
       "effect": "Draw 1 card.",
       "targets": null,
       "when": {
+        "event": "destroyed_by_effect",
         "self": true,
         "filter": {
           "side": "you",
@@ -93,6 +100,8 @@
           "types": [],
           "races": [],
           "attributes": [],
+          "named": null,
+          "extraDeck": null,
           "faceUp": true,
           "position": null,
           "level": null,
@@ -100,10 +109,8 @@
           "def": null
         },
         "how": [],
-        "from": "graveyard",
         "canMiss": false,
-        "by": "opponent",
-        "event": "destroyed_by_effect"
+        "by": "opponent"
       },
       "script": {
         "conditions": [],
@@ -112,6 +119,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "draw",
@@ -127,5 +135,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

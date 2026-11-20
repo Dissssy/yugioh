@@ -1,0 +1,39 @@
+{
+  "code": 70703416,
+  "textHash": "abefa1f60cc3c23cb412db012e69bea216989cb4438753222203307f2d7f29f0",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field and you control another \"Ice Barrier\" monster",
+      "cost": "",
+      "effect": "While you control another \"Ice Barrier\" monster, monsters your opponent controls lose 500 ATK/DEF.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "hard",
+      "window": "During your Main Phase",
+      "cost": "",
+      "effect": "Send 1 Level 3 or lower \"Ice Barrier\" monster from your Deck to the GY, and if you do, this card's Level becomes the same as that monster's, until the end of this turn.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

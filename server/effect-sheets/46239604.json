@@ -1,0 +1,89 @@
+{
+  "code": 46239604,
+  "textHash": "7be64d8d95f103560ec2002dc244560a4867cd0c32d5cc05835b7ff8a331259c",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is on the field",
+      "cost": "",
+      "effect": "This card's name becomes \"Des Frog\" while it is on the field.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "name",
+        "name": "Des Frog"
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "Monsters your opponent controls cannot target monsters for attacks, except this one.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "others": true,
+        "cannot": [
+          "be_attacked"
+        ],
+        "by": null,
+        "compare": null,
+        "once": false,
+        "while": []
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": false,
+      "from": "graveyard",
+      "opt": "none",
+      "window": "When this card is sent from the field to the Graveyard",
+      "cost": "",
+      "effect": "You can add 1 \"Frog\" monster from your Deck or Graveyard to your hand, except \"Dupe Frog\".",
+      "targets": null,
+      "when": {
+        "event": "sent_to_graveyard",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": true,
+        "by": null
+      },
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

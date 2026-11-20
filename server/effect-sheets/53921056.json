@@ -1,0 +1,31 @@
+{
+  "code": 53921056,
+  "textHash": "953f63de66b95e6e139997837cc6d7c2e0efbab8660f4e0a5029f083c42353b6",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "soft",
+      "window": "During your End Phase, while this card is face-up on the field",
+      "cost": "",
+      "effect": "Select 1 \"Ice Barrier\" monster in your Graveyard, except \"General Gantala of the Ice Barrier\", and Special Summon it.",
+      "targets": "1 \"Ice Barrier\" monster in your Graveyard, except \"General Gantala of the Ice Barrier\"",
+      "when": {
+        "event": "end_phase",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null
+      },
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}
