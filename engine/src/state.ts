@@ -1,6 +1,8 @@
 // Folding events into state. Every change to a duel goes through evolve, so replaying the log rebuilds any past board.
 
 import { produce } from 'immer';
+import { continuousOnField } from './continuous.ts';
+import { fits } from './script.ts';
 import {
   EXTRA_MONSTER_ZONES,
   MONSTER_ZONES,
@@ -231,7 +233,9 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const p = s.players[event.player];
         take(p.hand, event.card);
         p.monsters[event.zone] = fieldCard(event.card, s.turn, event.type === 'normalSummoned');
-        s.normalSummons++;
+        const extra = event.type === 'normalSummoned' ? event.extra : null;
+        if (extra) s.usedThisTurn.push({ player: event.player, card: extra.card, code: s.instances[extra.card]!.code, effect: extra.effect });
+        else s.normalSummons++;
         if (event.type === 'normalSummoned') summoned(s, event.card, event.player, 'normal', group);
         return;
       }
@@ -277,6 +281,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
           const m = onField(s, s.attack!.attacker);
           m.attacks = m.attacks!.count > 1 ? { ...m.attacks!, count: m.attacks!.count - 1 } : null;
         }
+        if (s.attack?.damageStep) s.happened.push({ event: 'damage_step_end', card: s.attack.attacker, player: s.turnPlayer, target: s.attack.target, group });
         s.attack = null;
         return;
       }
@@ -299,7 +304,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
           const at = locate(s, event.card);
           if (at?.zone === 'spellTraps') Object.assign(onField(s, event.card), { faceUp: true, activatedTurn: s.turn });
         }
-        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause, negated: false, setAgain: false });
+        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause, negated: false, setAgain: false, taxed: false });
         s.usedThisTurn.push({ player: event.player, card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         const step = s.step;
         // A trigger joins the chain with the others; any other activation hands the opponent priority.
@@ -384,6 +389,17 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'replacementOffered':
         s.step = { at: 'replace', card: event.card, player: event.player, then: event.then };
         return;
+      case 'taxDemanded':
+        s.chain.at(-1)!.taxed = true;
+        s.step = { at: 'tax', player: event.player, by: event.by, then: (s.step as { then: Then }).then };
+        return;
+      case 'taxAnswered': {
+        const step = s.step;
+        if (step.at !== 'tax') throw new Error('Nothing to answer');
+        if (event.negated) s.chain.at(-1)!.negated = true;
+        s.step = { at: 'resolve', then: step.then };
+        return;
+      }
       case 'replacementChosen': {
         const step = s.step;
         if (step.at !== 'replace') throw new Error('Nothing to replace');
@@ -563,12 +579,18 @@ function tie(state: DuelState, id: string) {
 /** Cards always go to their owner's Graveyard. A Token that leaves the field is gone. */
 function sendToGraveyard(state: DuelState, id: string) {
   const at = locate(state, id)!;
-  const banish = removeFromPlay(state, id);
+  const instead = (at.zone === 'monsters' || at.zone === 'spellTraps') && banishedInstead(state, id);
+  const banish = removeFromPlay(state, id) || instead;
   if (isToken(state, id)) return;
   const owner = state.players[state.instances[id]!.owner];
   if (banish) return void owner.banished.push(id);
   owner.graveyard.push(id);
   if (at.zone === 'monsters' || at.zone === 'spellTraps') state.happened.push({ event: 'sent_to_graveyard', card: id, player: at.seat, group: state.resolvedLinks });
+}
+
+/** Whether a continuous effect banishes this card on the field instead of letting it go to the GY (General Wayne). */
+function banishedInstead(state: DuelState, id: string): boolean {
+  return continuousOnField(state).some((f) => f.effect.apply === 'banish_instead' && f.source !== id && fits(state, id, f.effect.filter, f.seat));
 }
 
 /** Whether a card is a Token: made on the field by an effect, and gone once it leaves. */

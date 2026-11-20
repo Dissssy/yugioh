@@ -15,7 +15,10 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "discard_or_negate",
+        "while": []
+      },
       "status": "unverified"
     }
   ],

@@ -355,7 +355,7 @@ export class Duels {
    */
   private async useProcedure(duel: LiveDuel, intent: DuelEvent, used: DuelEvent) {
     if (used.type !== 'procedureUsed') throw new Error('Expected a procedureUsed event');
-    const link: ChainLink = { player: used.player, card: used.card, effect: used.effect, targets: [], choice: null, cause: null, negated: false, setAgain: false };
+    const link: ChainLink = { player: used.player, card: used.card, effect: used.effect, targets: [], choice: null, cause: null, negated: false, setAgain: false, taxed: false };
     const overturned = duel.state.rulings.find((r) => r.legal && r.player === link.player && r.card === link.card && r.effect === link.effect);
     await this.runJudge(duel, 'activation', evolve(duel.state, used), link, overturned?.summary ?? null, ({ record, events }) => {
       const judged: DuelEvent = { type: 'judged', record };

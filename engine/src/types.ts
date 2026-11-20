@@ -91,7 +91,8 @@ export interface When {
    * damage to its controller's opponent. `battle_destroying`: a monster destroys another by battle (the event's card is the one that destroyed it: "When this card destroys a monster by battle"). `activated`: a card or effect is activated (Counter Traps).
    * `destroyed_by_effect`: a card on the field is destroyed by a card effect; the filter is checked against the card as
    * it was on the field, for its side and whether it was face-up. `damage_step_start`: the start of the Damage Step (the
-   * event's card is the attacker). `end_phase`: the End Phase starts. `sent_to_graveyard`: a card is sent from the field
+   * event's card is the attacker). `damage_step_end`: the end of the Damage Step (with `self`, this card attacked or
+   * was attacked). `end_phase`: the End Phase starts. `sent_to_graveyard`: a card is sent from the field
    * to the GY, by any means (destroyed, Tributed, used as Synchro Material, sent). `flipped`: a face-down monster is
    * flipped face-up (Flip Summoned, attacked, or changed by an effect); code gives every FLIP effect this `when`.
    */
@@ -105,6 +106,7 @@ export interface When {
     | 'battle_damage'
     | 'activated'
     | 'damage_step_start'
+    | 'damage_step_end'
     | 'end_phase'
     | 'sent_to_graveyard'
     | 'flipped';
@@ -254,6 +256,13 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  *   activate no more than `perTurn` of them each turn, or can activate them only once they were Set on an earlier turn
  *   (`setFirst`); or can't Tribute Summon (`tribute_summon`, `filter` null).
  * - `negate_linked`: the linked monster's effects are negated (Fiendish Chain).
+ * - `negate_battled_flips`: FLIP effects of monsters this card destroys by battle are negated (Blade Knight).
+ * - `discard_or_negate`: when an effect activated by an Effect Monster on the opponent's field resolves, the opponent
+ *   discards 1 card or the effect is negated, their choice (General Raiho of the Ice Barrier).
+ * - `extra_normal_summon`: its controller can Normal Summon (not Set) 1 monster from the hand that fits `filter` in
+ *   addition to their Normal Summon or Set; the effect's `opt` limits how often (General Grunard of the Ice Barrier).
+ * - `banish_instead`: cards that fit `filter`, checked on the field, are banished instead of going from the field to
+ *   the GY (General Wayne of the Ice Barrier).
  * - `self_destruct`: this card remains on the field after it resolves, and is destroyed in the End Phase of its
  *   controller's opponent's `opponentTurns`th turn after its activation (Swords of Revealing Light).
  * - `tie`: more about this card's tie to its linked monster (every linked card is destroyed when its monster leaves the
@@ -283,6 +292,10 @@ export type Continuous =
       while: Condition[];
     }
   | { apply: 'negate_linked' }
+  | { apply: 'negate_battled_flips'; while: Condition[] }
+  | { apply: 'banish_instead'; filter: CardFilter }
+  | { apply: 'extra_normal_summon'; filter: CardFilter; while: Condition[] }
+  | { apply: 'discard_or_negate'; while: Condition[] }
   /** "This card's name becomes `name` while it is on the field." */
   | { apply: 'name'; name: string }
   /**
@@ -299,10 +312,10 @@ export type Continuous =
    */
   | { apply: 'replace_destruction'; detach: number };
 
-export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle', 'be_destroyed_by_effect', 'be_affected'] as const;
+export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle', 'be_destroyed_by_effect', 'be_affected', 'activate_effects'] as const;
 /**
  * What a restricted card can't do: declare an attack, change its battle position, be targeted for an attack, be
- * destroyed by battle or by an effect, or be affected by activated effects ("unaffected by").
+ * destroyed by battle or by an effect, be affected by activated effects ("unaffected by"), or activate its effects.
  */
 export type Restriction = (typeof RESTRICTIONS)[number];
 
@@ -422,6 +435,8 @@ export interface ChainLink {
   negated: boolean;
   /** Its card is Set again instead of going to the GY when it resolves (`set_again`). */
   setAgain: boolean;
+  /** Its controller was already asked to discard or have it negated (General Raiho), so isn't asked again. */
+  taxed: boolean;
 }
 
 /**
@@ -441,6 +456,8 @@ export type Happening =
   | { event: 'destroyed_by_effect'; card: string; player: Seat; by: Seat; faceUp: boolean; group: number }
   /** The Damage Step of `card`'s attack starts; `target` is the monster it attacks, null for a direct attack. */
   | { event: 'damage_step_start'; card: string; player: Seat; target: string | null; group: number }
+  /** The Damage Step of `card`'s attack ends, after its damage calculation; `target` as for its start. */
+  | { event: 'damage_step_end'; card: string; player: Seat; target: string | null; group: number }
   | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number }
   /** A card left the field for the GY, by any means; `player` controlled it. */
   | { event: 'sent_to_graveyard'; card: string; player: Seat; group: number }
@@ -473,7 +490,9 @@ export type DuelStep =
   | { at: 'resolve'; then: Then }
   | { at: 'continue'; then: Then }
   /** `card` would be destroyed by battle; `player`, its controller, decides whether to detach materials instead. */
-  | { at: 'replace'; card: string; player: Seat; then: Then };
+  | { at: 'replace'; card: string; player: Seat; then: Then }
+  /** The resolving link's controller must discard 1 card or have its effect negated, because of `by` (General Raiho). */
+  | { at: 'tax'; player: Seat; by: string; then: Then };
 
 /** A card on the field. */
 export interface FieldCard {
@@ -616,6 +635,8 @@ export type Intent =
   | { type: 'rollback'; accept: boolean }
   /** Answers a `replace` step: the materials to detach instead of the destruction, or none to let it be destroyed. */
   | { type: 'replace'; materials: string[] }
+  /** Answer General Raiho: discard this card from the hand, or null to let the effect be negated. */
+  | { type: 'tax'; discard: string | null }
   | { type: 'rps'; hand: Hand }
   /** The rock-paper-scissors winner goes first, or lets the opponent go first. */
   | { type: 'chooseOrder'; goFirst: boolean }
@@ -796,7 +817,8 @@ export type DuelEvent =
   | { type: 'phaseChanged'; phase: Phase }
   | { type: 'drew'; player: Seat; count: number }
   | { type: 'tributed'; player: Seat; cards: string[] }
-  | { type: 'normalSummoned'; player: Seat; card: string; zone: number }
+  /** `extra`: the continuous effect that allowed it on top of the turn's Normal Summons (General Grunard), else null. */
+  | { type: 'normalSummoned'; player: Seat; card: string; zone: number; extra: { card: string; effect: number } | null }
   | { type: 'monsterSet'; player: Seat; card: string; zone: number }
   | { type: 'spellTrapSet'; player: Seat; card: string; zone: number }
   | { type: 'flipSummoned'; player: Seat; card: string }
@@ -852,6 +874,10 @@ export type DuelEvent =
   | { type: 'damageStepStarted' }
   | { type: 'replacementOffered'; card: string; player: Seat; then: Then }
   | { type: 'replacementChosen'; card: string; materials: string[] }
+  /** The resolving link's controller must discard or have it negated, because of `by` (General Raiho). */
+  | { type: 'taxDemanded'; player: Seat; by: string }
+  /** They answered: `negated` if they let the effect be negated (a discard is its own event, before this). */
+  | { type: 'taxAnswered'; negated: boolean }
   | { type: 'normalSummonGranted'; player: Seat }
   /** The chain link resolved: it leaves the chain, and a Normal or Quick-Play Spell or Normal Trap goes to the GY. */
   | { type: 'linkResolved' }
@@ -894,7 +920,7 @@ export interface PlayerView {
    * window answers ("Axe Raider's attack"). The other player sees the same, whether or not the player can respond.
    */
   /** For `replace`, `cause` names the monster that would be destroyed. */
-  waiting: { player: Seat; for: 'respond' | 'triggers' | 'replace'; cause: string | null } | null;
+  waiting: { player: Seat; for: 'respond' | 'triggers' | 'replace' | 'tax'; cause: string | null } | null;
   /** Deciding who goes first, before turn 1; null once the duel is under way. */
   start: StartView | null;
   /** An offer to rewind to before an overturned ruling: what the appeal said, how many log entries it undoes, who accepted. */
@@ -1076,6 +1102,8 @@ export type LegalAction =
   | { type: 'rollback' }
   /** Detach `count` of `materials` from `card` instead of its destruction, or not. */
   | { type: 'replace'; card: string; materials: string[]; count: number }
+  /** Discard 1 of `hand` or let the effect of `card` be negated, because of `by`. */
+  | { type: 'tax'; card: string; by: string; hand: string[] }
   | { type: 'rps' }
   | { type: 'chooseOrder' }
   | { type: 'surrender' };

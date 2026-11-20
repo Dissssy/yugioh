@@ -295,6 +295,8 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
         return send.mutate({ type: action.type });
       case 'replace':
         return send.mutate({ type: 'replace', materials: action.materials.slice(0, action.count) });
+      case 'tax':
+        return send.mutate({ type: 'tax', discard: null });
       case 'rollback':
         return send.mutate({ type: 'rollback', accept: true });
     }
@@ -600,6 +602,21 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
     </span>
   );
   const topLink = view.chain.at(-1);
+  const tax = has('tax');
+  /** General Raiho: discard 1 card (one button per card name in hand) or let the resolving effect be negated. */
+  const taxNote = tax && (
+    <span className="choice-prompt" role="group">
+      <span className="choice-text">
+        {waiting?.cause ?? 'A card'}: discard 1 card, or {(topLink && dataOf(topLink.card)?.name) ?? 'your monster'}'s effect is negated.
+      </span>
+      {[...new Map(tax.hand.map((id) => [cardName(id), id])).entries()].map(([name, id]) => (
+        <button key={id} className="primary" onClick={() => send.mutate({ type: 'tax', discard: id })}>
+          Discard {name}
+        </button>
+      ))}
+      <button onClick={() => send.mutate({ type: 'tax', discard: null })}>Let it be negated</button>
+    </span>
+  );
   const respondNote =
     waiting &&
     (waiting.player === me && pass ? (
@@ -694,7 +711,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
       readOnly={readOnly}
     />
   );
-  const stripPrompt = prompt || choiceBar || judgeNote || rollbackNote || replaceNote || respondNote || null;
+  const stripPrompt = prompt || choiceBar || judgeNote || rollbackNote || replaceNote || taxNote || respondNote || null;
 
   /** Runs a shortcut (docs/keyboard.md); false when it does nothing now, so the key keeps its usual meaning. */
   function shortcut(key: Shortcut): boolean {
@@ -997,6 +1014,8 @@ function actionLabel(a: LegalAction, view: PlayerView): string {
       return a.direct ? 'Attack directly' : 'Attack';
     case 'replace':
       return 'Detach instead of being destroyed';
+    case 'tax':
+      return 'Let the effect be negated';
     case 'rollback':
       return 'Rewind';
     case 'activate': {

@@ -60,7 +60,33 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "negate_battled_flips",
+        "while": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "monsters",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": null,
+              "extraDeck": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 0,
+            "max": 0
+          }
+        ]
+      },
       "status": "unverified"
     }
   ],

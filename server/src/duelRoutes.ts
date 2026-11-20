@@ -31,6 +31,7 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('rps'), hand: z.enum(HANDS) }),
   z.object({ type: z.literal('chooseOrder'), goFirst: z.boolean() }),
   z.object({ type: z.literal('replace'), materials: z.array(z.string()) }),
+  z.object({ type: z.literal('tax'), discard: id.nullable() }),
   z.object({ type: z.literal('rollback'), accept: z.boolean() }),
   z.object({ type: z.literal('surrender') }),
 ]);

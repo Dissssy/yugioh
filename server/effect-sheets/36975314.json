@@ -77,7 +77,19 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": "linked",
+        "others": false,
+        "cannot": [
+          "attack",
+          "activate_effects"
+        ],
+        "by": null,
+        "compare": null,
+        "once": false,
+        "while": []
+      },
       "status": "unverified"
     },
     {

@@ -15,7 +15,53 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "stats",
+        "to": {
+          "side": "opponent",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "atk": -500,
+        "def": -500,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "monsters",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Ice Barrier",
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 1,
+            "max": null
+          }
+        ]
+      },
       "status": "unverified"
     },
     {

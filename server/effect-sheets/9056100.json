@@ -15,7 +15,27 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "extra_normal_summon",
+        "filter": {
+          "side": "you",
+          "place": "hand",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": "Ice Barrier",
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "while": []
+      },
       "status": "unverified"
     }
   ],
