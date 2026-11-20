@@ -111,7 +111,7 @@ export function PhaseStrip({
   prompt: ReactNode;
 }) {
   return (
-    <div className={`phase-strip${yours ? ' yours' : ''}`}>
+    <div className={`phase-strip${yours ? ' yours' : ''}`} data-area="strip">
       <div className="strip-turn">{side}</div>
       {extraZones[0]}
       <div className="strip-middle">{middle}</div>

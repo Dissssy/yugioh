@@ -53,7 +53,7 @@ The hand should feel like holding cards.
 
 - **Fanned arc.** Cards overlap and rotate slightly along an arc. Overlap grows as the hand gets bigger, so a 7-card hand still fits.
 - **Hover lifts.** The hovered card rises, straightens and grows a little; its neighbours slide aside to show it fully. Springs, not fixed-time tweens, so moving the mouse across the hand ripples smoothly.
-- **Reorder by dragging within the hand.** Other cards slide out of the way as you move (Motion `layout`). Arrow keys move a focused card. Hand order is a local preference, kept in the browser per duel, not sent to the server. New cards arrive at the right end.
+- **Reorder by dragging within the hand.** Other cards slide out of the way as you move (Motion `layout`). By keyboard, Move in a card's menu shifts it with Left and Right ([keyboard.md](keyboard.md)). Hand order is a local preference, kept in the browser per duel, not sent to the server. New cards arrive at the right end.
 - **Playable glow.** Cards with at least one legal action get a soft outline. Cards with none look normal; they aren't greyed out, so you can still read them.
 - **The opponent's hand** is a fan of backs at the top. It animates when they draw, play or discard, and never when they reorder or hover (see "Hidden information").
 

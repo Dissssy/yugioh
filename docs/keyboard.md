@@ -1,6 +1,6 @@
 # Keyboard controls
 
-Status, 2026-11-19: plan, not built. Build it once the board's layout stops changing after playtesting (Ethan, 2026-11-19). The design below doesn't depend on the layout, so later layout changes won't break it. Part of the order in [next-steps.md](next-steps.md).
+Status, 2026-11-20: built, with the recommended answers to the decisions below (Ethan asked for it right after replays). Notes marked **Built** say where the code differs from the plan. The design doesn't depend on the layout, so later layout changes won't break it. Part of the order in [next-steps.md](next-steps.md).
 
 The goal is a whole duel with no mouse: playing cards, choices and targets, chains, piles, the log, chat, contesting and asking the judge.
 
@@ -75,6 +75,15 @@ Shift+Tab is a Shift press too. Zoom opens only when Shift is held alone for abo
 
 **Rock-paper-scissors, going first, rollback offers:** their buttons are in the strip, so Tab and Enter reach them; they need no keys of their own.
 
+**Built:**
+- The code is `web/src/board/nav.ts` (`useKeyboardNav`, `nearest`) and `web/src/board/keys.tsx` (the key table `KEYS` and the help overlay). One window keydown listener moves focus; Board runs the letter shortcuts from the same table.
+- Board items carry `data-nav` (a card's zone key, a hand card's ID, a pile's key) and, while a choice is open, `data-pick` on what may be picked; the arrows keep to `data-pick` then. An empty zone is focusable only while a card may go there. LP plates aren't focusable: a direct attack happens at once from the menu.
+- The strip area is the phase strip, the compact bar, the rock-paper-scissors and going-first panel and the result screen. The chat area is the chat box, or the replay controls on a replay page; there Up and Down leave the text box or seek bar, Left and Right stay in it.
+- **C** confirms an answer to the judge (not in the plan's list).
+- Menus stay flat (Synchro and Xyz Summons already list one item per position), so they need no nested menus: Up, Down, 1 to 9, Right to choose, Left or Esc to close and go back to the card. Items are numbered when there are several. **Move in hand** shows only when the menu was opened by keyboard.
+- When a choice starts from the keyboard, focus goes to its first option (the first lit zone, the first attack target, the first tribute).
+- Shift zooms the focused card when the keyboard was used last, and only after Shift is held alone for 150 ms.
+
 ## Design
 
 - **`useKeyboardNav`** (a hook in `web/src/board/`) holds whether the player is in keyboard mode, the focused element per area, and the arrow handling. Every focusable board element gets a `data-nav` key: the existing drop key (`dropKey`) where there is one, the card's instance ID otherwise. `nearest(from, direction, candidates)` picks the element whose box is closest in that direction, preferring ones that overlap the current one's row or column. Candidates depend on the board's mode: everything, the pickable cards, the lit zones, or the attack targets. That mode is already in the board's `mode` reducer, so the hook reads it rather than keeping its own.
@@ -87,7 +96,11 @@ Shift+Tab is a Shift press too. Zoom opens only when Shift is held alone for abo
 
 A Playwright script plays a whole duel by keyboard alone against an AI test seat with the random fake model (as in `server/test/opponent.test.ts`), run locally as in the local browser testing notes. It catches any action the keyboard can't reach.
 
+**Built:** checked by hand on 2026-11-20 with a Playwright script against a second browser playing the other seat: rock-paper-scissors and going first through the strip, a Normal Summon from the hand menu into a zone picked with the arrows, declining a trigger and passing a window with P, the Battle Phase with N, a direct attack and an attack on a chosen target, the help overlay, the log, and ending the turn with E. The web app has no test runner yet, so the script isn't in the repository.
+
 ## Decisions for Ethan
+
+Built with the recommendations; any of them is easy to change.
 
 | Question | Recommendation | Other options |
 | --- | --- | --- |

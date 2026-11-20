@@ -23,6 +23,8 @@ import { PileViewer } from './PileViewer.tsx';
 import { ReportRuling } from './ReportRuling.tsx';
 import { StartPanel } from './StartPanel.tsx';
 import { systemReducesMotion, useDuelSettings } from './settings.ts';
+import { KeyHelp, shortcutOf, type Shortcut } from './keys.tsx';
+import { typing, useKeyboardNav } from './nav.ts';
 import { ReplayBar } from './ReplayBar.tsx';
 import { useDuel } from './useDuel.ts';
 import { useReplay } from './useReplay.ts';
@@ -65,6 +67,9 @@ const AIM_THRESHOLD_PX = 8;
 
 const idle: Mode = { kind: 'idle' };
 
+/** Modes in which the player is choosing on the board, where a choice's Cancel and the keyboard's limits apply. */
+const CHOOSING: Mode['kind'][] = ['tributes', 'target', 'discard', 'zone', 'materials', 'extraZone'];
+
 /** How long to wait for card images before showing the board anyway. */
 const PRELOAD_TIMEOUT_MS = 4000;
 
@@ -95,6 +100,12 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
   const [escalated, setEscalated] = useState<number[]>([]);
   /** Whether the chat box sends to the judge, and about which card. */
   const [asking, setAsking] = useState<Asking | null>(null);
+  /** Bumped to put focus in the chat box. */
+  const [chatFocus, bumpChatFocus] = useReducer((n: number) => n + 1, 0);
+  /** The hand card being moved by keyboard (Move in hand). */
+  const [moving, setMoving] = useState<string | null>(null);
+  const [showKeys, setShowKeys] = useState(false);
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
   /** How many answers from the judge the log held when this player last asked, until the next one arrives. */
   const [awaiting, setAwaiting] = useState<number | null>(null);
   /** Set when an aimed attack ends on the attacker, so the click that follows doesn't open its menu. */
@@ -106,6 +117,21 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
   const [table, setTable] = useState<HTMLDivElement | null>(null);
   const look = useBoardSize(table);
   const ready = usePreload(shown?.view ?? null, look.imageSize);
+  /** A choice in progress, which the arrows keep to: what you're choosing on the board, or the judge's question. */
+  const restrict = CHOOSING.includes(mode.kind) || choice !== null;
+  const nav = useKeyboardNav(root, restrict);
+  /** The latest shortcut and Esc handling, for the one key listener below. */
+  const keys = useRef<{ shortcut: (s: Shortcut) => boolean; escape: () => void }>({ shortcut: () => false, escape: () => undefined });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || typing(e)) return;
+      if (e.key === 'Escape') return keys.current.escape();
+      const shortcut = shortcutOf(e);
+      if (shortcut && keys.current.shortcut(shortcut)) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const send = useMutation({
     mutationFn: (intent: Intent) => api(`/duels/${duelId}/intents`, { method: 'POST', body: JSON.stringify(intent) }),
@@ -415,7 +441,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
     window.addEventListener('pointerup', up);
   }
 
-  const choosing = mode.kind === 'tributes' || mode.kind === 'target' || mode.kind === 'discard' || mode.kind === 'zone' || mode.kind === 'materials' || mode.kind === 'extraZone';
+  const choosing = CHOOSING.includes(mode.kind);
   const pickable = (id: string) =>
     (mode.kind === 'tributes' && mode.action.tributeFrom.includes(id)) ||
     (mode.kind === 'discard' && myHand.includes(id)) ||
@@ -437,6 +463,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
           ]
             .filter(Boolean)
             .join(' '),
+    pickable: (id) => id !== null && (pickable(id) || ((mode.kind === 'tributes' || mode.kind === 'discard' || mode.kind === 'materials') && mode.chosen.includes(id))),
   };
 
   const prompt = choosing && (
@@ -660,6 +687,38 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
   );
   const stripPrompt = prompt || choiceBar || judgeNote || rollbackNote || replaceNote || respondNote || null;
 
+  /** Runs a shortcut (docs/keyboard.md); false when it does nothing now, so the key keeps its usual meaning. */
+  function shortcut(key: Shortcut): boolean {
+    if (key === 'help') return (setShowKeys(true), true);
+    if (key === 'log') return nav.focusArea('log', true);
+    if (replay) return false;
+    switch (key) {
+      case 'pass':
+        // With nothing to respond with, the window closes by itself, as the disabled Pass button says.
+        if (!pass || waiting?.player !== me || (waiting.for === 'respond' && !actions.some((a) => a.type === 'activate'))) return false;
+        return (start(pass), true);
+      case 'next':
+        return nextStep !== undefined && !ending && (start(nextStep), true);
+      case 'end':
+        return canEnd && !ending && (setEnding(true), true);
+      case 'confirm':
+        if (!choice?.complete || choice.prompt.zones.length > 0 || answer.isPending) return false;
+        return (answer.mutate({ prompt: choice.prompt.id, picks: choice.picks }), true);
+      case 'chat':
+      case 'ask':
+        setAsking(key === 'ask' ? { about: null } : null);
+        bumpChatFocus();
+        return true;
+    }
+  }
+  keys.current = {
+    shortcut,
+    // Esc backs out of a choice on the board, once nothing is open over it (a menu, a pile, the keys).
+    escape: () => {
+      if (choosing && !pile && !showKeys) setMode(idle);
+    },
+  };
+
   return (
     <MotionConfig reducedMotion={reduceMotion ? 'always' : 'never'}>
       <BoardLookProvider value={look}>
@@ -668,14 +727,20 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
             suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}
             pinnedFooter={replay ? undefined : (card) => (
               <>
-                <button className="quiet report-ruling" onClick={() => setAsking((a) => ({ about: card, focus: (a?.focus ?? 0) + 1 }))}>
+                <button
+                  className="quiet report-ruling"
+                  onClick={() => {
+                    setAsking({ about: card });
+                    bumpChatFocus();
+                  }}
+                >
                   Ask the judge about this card
                 </button>
                 <ReportRuling key={card.code} duelId={duelId} card={card} />
               </>
             )}
           >
-            <div className={`duel${look.stacked ? ' stacked' : ''}${look.compact ? ' compact' : ''}${look.tight ? ' tight' : ''}${look.typing ? ' typing' : ''}${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
+            <div ref={setRoot} className={`duel${look.stacked ? ' stacked' : ''}${look.compact ? ' compact' : ''}${look.tight ? ' tight' : ''}${look.typing ? ' typing' : ''}${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
               <div className="table" ref={setTable}>
                 {!ready ? (
                   <div className="duel-loading">Loading cards…</div>
@@ -703,7 +768,17 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                     <Field {...myField} />
                     <div className="hand-row own-row">
                       <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={!view.start && view.turnPlayer === me} />
-                      <OwnHand duelId={duelId} seat={me} cards={view.players[me].hand} marks={marks} onCard={clickOwn} drag={handDrag} held={held} />
+                      <OwnHand
+                        duelId={duelId}
+                        seat={me}
+                        cards={view.players[me].hand}
+                        marks={marks}
+                        onCard={clickOwn}
+                        drag={handDrag}
+                        held={held}
+                        moving={moving}
+                        onMoved={() => setMoving(null)}
+                      />
                     </div>
                   </>
                 )}
@@ -728,7 +803,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                 )}
 
                 {result && cue === null && !replay && (
-                  <motion.div className="result-overlay" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                  <motion.div className="result-overlay" data-area="strip" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
                     <strong>{result.winner === null ? 'Draw' : result.winner === me ? 'Victory' : 'Defeat'}</strong>
                     {resultText && <span>{resultText}</span>}
                     <span className="row">
@@ -744,7 +819,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
               </div>
 
               {look.compact && ready && (
-                <div className={`duel-bar${yourTurn ? ' yours' : ''}`}>
+                <div className={`duel-bar${yourTurn ? ' yours' : ''}`} data-area="strip">
                   <div className="bar-turn">
                     {turnLabel}
                     {dial}
@@ -786,7 +861,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                       <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
                     </label>
                     {hasAccount && <OpponentCardsSetting />}
-                    <p className="muted small">Hold Shift over a card to zoom in. Right-click a card, or press and hold it, to pin its details. Drag cards in your hand to reorder them.</p>
+                    <p className="muted small">Hold Shift over a card to zoom in. Right-click a card, or press and hold it, to pin its details. Drag cards in your hand to reorder them. Press ? for the keyboard controls.</p>
                   </div>
                 )}
                 {!connected && <p className="error">Reconnecting…</p>}
@@ -806,6 +881,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                     answering={awaiting !== null && answers <= awaiting}
                     asking={asking}
                     onAsking={setAsking}
+                    focus={chatFocus}
                   />
                 )}
               </aside>
@@ -813,7 +889,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
               {mode.kind === 'menu' && (
                 <ActionMenu
                   anchor={mode.anchor}
-                  items={actionsFor(mode.id).flatMap((a) =>
+                  items={[...actionsFor(mode.id).flatMap((a) =>
                     a.type === 'extraSummon'
                       ? (['attack', 'defense'] as const).map((position) => ({
                           label: `${a.how === 'synchro' ? 'Synchro' : 'Xyz'} Summon in ${position === 'attack' ? 'Attack' : 'Defense'} Position`,
@@ -823,7 +899,9 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                           },
                         }))
                       : [{ label: actionLabel(a, view), run: () => start(a) }],
-                  )}
+                  ),
+                  // Reordering the hand by keyboard, where dragging isn't available.
+                  ...(myHand.includes(mode.id) && nav.usingKeyboard() && !replay ? [{ label: 'Move in hand', run: () => (setMode(idle), setMoving(mode.id)) }] : [])]}
                   notes={notesFor(mode.id)}
                   onClose={() => setMode(idle)}
                 />
@@ -837,6 +915,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
               )}
               {drag?.kind === 'aim' && <Arrows kind="aim" arrows={[drag]} />}
               {targetArrows.length > 0 && <Arrows kind="target" arrows={targetArrows} />}
+              {showKeys && <KeyHelp onClose={() => setShowKeys(false)} />}
               {openPile && (
                 <PileViewer
                   title={openPile.title}

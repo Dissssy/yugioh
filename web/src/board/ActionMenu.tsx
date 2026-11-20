@@ -24,7 +24,13 @@ export function ActionMenu({
   });
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Esc (or Left) closes the menu and gives focus back to the card it opened from.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' && !(e.key === 'ArrowLeft' && refs.floating.current?.contains(e.target as Node))) return;
+      e.preventDefault();
+      onClose();
+      anchor.focus();
+    };
     const onDown = (e: PointerEvent) => {
       const target = e.target as Node;
       if (!refs.floating.current?.contains(target) && !anchor.contains(target)) onClose();
@@ -37,11 +43,26 @@ export function ActionMenu({
     };
   }, [anchor, onClose, refs]);
 
+  /** Up and Down move through the items and reasons, 1 to 9 choose an item, Right chooses the focused one. */
+  const menuKeys = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const entries = [...e.currentTarget.querySelectorAll<HTMLElement>('button, summary')];
+    const at = entries.indexOf(document.activeElement as HTMLElement);
+    const digit = Number(e.key);
+    if (Number.isInteger(digit) && digit >= 1 && digit <= items.length) items[digit - 1]!.run();
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') entries[(at + (e.key === 'ArrowDown' ? 1 : -1) + entries.length) % entries.length]?.focus();
+    else if (e.key === 'ArrowRight') entries[at]?.click();
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
     <FloatingPortal>
-      <div ref={refs.setFloating} style={floatingStyles} className="action-menu" role="menu">
+      <div ref={refs.setFloating} style={floatingStyles} className="action-menu" role="menu" onKeyDown={menuKeys}>
         {items.map((item, i) => (
           <button key={item.label} role="menuitem" onClick={item.run} autoFocus={i === 0}>
+            {items.length > 1 && <span className="menu-number">{i + 1}</span>}
             {item.label}
           </button>
         ))}

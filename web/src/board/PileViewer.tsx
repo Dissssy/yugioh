@@ -1,8 +1,9 @@
 import type { CardView } from '@yugioh/engine';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CardFace, dataOf, idOf } from './Card.tsx';
 import { useCardHover } from './CardTooltip.tsx';
 import { useChoice } from './choice.tsx';
+import { ARROWS, nearest } from './nav.ts';
 
 /**
  * A Graveyard, banished pile or Extra Deck opened over the board: large cards, searchable by name. While the judge
@@ -33,11 +34,35 @@ export function PileViewer({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+  const grid = useRef<HTMLDivElement>(null);
+  // Opened by keyboard or not, focus starts on the first card to pick, else the first card, unless the search box took it.
+  useEffect(() => {
+    if (document.activeElement?.tagName === 'INPUT') return;
+    const el = grid.current;
+    (el?.querySelector<HTMLElement>('.sheet-card.pickable') ?? el?.querySelector<HTMLElement>('.sheet-card'))?.focus();
+  }, []);
+  /** Arrows move through the grid; typing goes to the search box. */
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const cardsIn = [...(grid.current?.querySelectorAll<HTMLElement>('.sheet-card') ?? [])];
+    const target = e.target as HTMLElement;
+    const direction = ARROWS[e.key];
+    if (target.tagName === 'INPUT') {
+      if (direction === 'down') (cardsIn[0]?.focus(), e.preventDefault());
+      return;
+    }
+    if (direction && cardsIn.includes(target)) {
+      nearest(target, direction, cardsIn)?.focus();
+      e.preventDefault();
+    } else if (e.key.length === 1 && e.key !== ' ' && target.closest('.sheet-grid')) {
+      e.currentTarget.querySelector<HTMLInputElement>('input')?.focus();
+    }
+  };
   const shown = cards.filter((c) => dataOf(c)?.name.toLowerCase().includes(search.toLowerCase()) ?? search === '');
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className={`sheet${choice ? ' choosing' : ''}`} role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div className={`sheet${choice ? ' choosing' : ''}`} role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()} onKeyDown={onKeyDown}>
         <div className="row">
           <h3>
             {title} ({cards.length})
@@ -50,7 +75,7 @@ export function PileViewer({
         {cards.length === 0 ? (
           <p className="muted">Empty.</p>
         ) : (
-          <div className="sheet-grid">
+          <div className="sheet-grid" ref={grid}>
             {shown.map((c, i) => {
               const id = idOf(c);
               const picking = choice?.state(id) ?? null;
@@ -69,7 +94,7 @@ export function PileViewer({
                   <CardFace card={dataOf(c)} size="full" />
                 </button>
               ) : (
-                <div key={id ?? i} className="sheet-card" {...hover(dataOf(c))}>
+                <div key={id ?? i} className="sheet-card" tabIndex={-1} {...hover(dataOf(c))}>
                   <CardFace card={dataOf(c)} size="full" />
                 </div>
               );

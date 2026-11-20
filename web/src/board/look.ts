@@ -4,6 +4,8 @@ import type { ImageSize } from './Card.tsx';
 /** How a card should look given what the player is doing: selected, playable, pickable for a choice, and so on. */
 export interface CardMarks {
   classes(id: string | null): string;
+  /** Whether the card may be picked (or unpicked) in the choice being made, which the keyboard keeps to. */
+  pickable(id: string | null): boolean;
 }
 
 /** Board-wide sizing: the zone edge in pixels and which image size is sharp enough at it. */

@@ -1,6 +1,5 @@
 import { MONSTER_ZONES, type CardView, type FieldCardView, type PlayerSideView, type Seat } from '@yugioh/engine';
 import { motion } from 'motion/react';
-import type { KeyboardEvent } from 'react';
 import { CardFace, dataOf, idOf } from './Card.tsx';
 import { useCardHover } from './CardTooltip.tsx';
 import { pileKey, useChoice, type PileKind } from './choice.tsx';
@@ -57,7 +56,13 @@ export function Field(props: FieldProps) {
       onOpen={() => onPile('graveyard')}
       extra={
         side.banished.length > 0 && (
-          <button className={`banished-chip${options('banished') > 0 ? ' pickable' : ''}`} onClick={() => onPile('banished')}>
+          <button
+            className={`banished-chip${options('banished') > 0 ? ' pickable' : ''}`}
+            onClick={() => onPile('banished')}
+            tabIndex={-1}
+            data-nav={`${seat}:banished`}
+            data-pick={options('banished') > 0 ? '' : undefined}
+          >
             Banished {side.banished.length}
           </button>
         )
@@ -137,10 +142,12 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
     <div
       className={`zone${extra ? ' extra-zone' : ''}${extra && turned && !mine ? ' turned' : ''}${state ? ` open${mine ? '' : ' foe'}` : ''}${state === 'over' ? ' over' : ''}`}
       data-drop={dropKey(seat, row, index)}
+      // An empty zone is a place to focus only while a card may go there; a card covers the zone it's in.
+      data-nav={pick && !card ? dropKey(seat, row, index) : undefined}
+      data-pick={pick && !card ? '' : undefined}
       aria-label={label}
       onClickCapture={pick}
-      onKeyDown={pick ? (e) => e.key === 'Enter' && pick(e) : undefined}
-      tabIndex={pick ? 0 : undefined}
+      tabIndex={pick && !card ? -1 : undefined}
       role={pick ? 'button' : undefined}
     >
       {card && card.materials.length > 0 && <Materials cards={card.materials} />}
@@ -154,6 +161,7 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
           view={card}
           slot={dropKey(seat, row, index)}
           marks={marks}
+          target={state !== null}
           onClick={mine ? onCard : undefined}
           onPress={mine ? onCardPress : undefined}
         />
@@ -189,8 +197,9 @@ function Materials({ cards }: { cards: CardView[] }) {
             style={{ translate: `calc(-1 * ${step}) calc(-1 * ${fanned ? '0px' : step})`, zIndex: -1 - i }}
             {...hover(data)}
             onClick={pick}
-            onKeyDown={pick ? (e: KeyboardEvent<HTMLDivElement>) => e.key === 'Enter' && pick() : undefined}
-            tabIndex={pick ? 0 : undefined}
+            data-nav={pick && id ? `material:${id}` : undefined}
+            data-pick={pick ? '' : undefined}
+            tabIndex={pick ? -1 : undefined}
             role={pick ? 'button' : undefined}
             aria-label={`Xyz Material: ${data?.name ?? 'a card'}`}
             aria-pressed={picking ? picking === 'picked' : undefined}
@@ -224,12 +233,15 @@ function FieldCard({
   view,
   slot,
   marks,
+  target,
   onClick,
   onPress,
 }: {
   view: FieldCardView;
   slot: string;
   marks: CardMarks;
+  /** Its zone may be picked now (an attack target, say): picking the card picks the zone. */
+  target: boolean;
   onClick?: (id: string, el: HTMLElement) => void;
   onPress?: (id: string, e: React.PointerEvent<HTMLElement>) => void;
 }) {
@@ -247,12 +259,13 @@ function FieldCard({
       layoutId={id ?? undefined}
       className={`slot ${marks.classes(id)} ${picking ?? ''}`}
       animate={{ rotate: view.position === 'defense' ? 90 : 0 }}
-      {...hover(data)}
+      {...hover(data, view.stats)}
       onPointerDown={onPress && id ? (e) => onPress(id, e) : undefined}
       onClick={act ? (e) => act(e.currentTarget) : undefined}
-      onKeyDown={act ? (e: KeyboardEvent<HTMLDivElement>) => e.key === 'Enter' && act(e.currentTarget) : undefined}
-      tabIndex={act ? 0 : undefined}
-      role={act ? 'button' : undefined}
+      data-nav={slot}
+      data-pick={picking || target || marks.pickable(id) ? '' : undefined}
+      tabIndex={-1}
+      role={act || target ? 'button' : undefined}
       aria-label={data ? `${data.name}, ${view.faceUp ? '' : 'Set, '}${view.position} position` : 'Face-down card'}
       aria-pressed={picking ? picking === 'picked' : undefined}
     >
@@ -286,6 +299,7 @@ function Pile({
   const hover = useCardHover();
   const { imageSize } = useBoardLook();
   const topId = top ? idOf(top) : null;
+  const nav = { 'data-nav': pile, 'data-pick': options > 0 ? '' : undefined };
   const data = top ? dataOf(top) : null;
   const face = top ? (
     <motion.div layout layoutId={topId ?? undefined} className="fx" data-pile={pile} {...hover(data)}>
@@ -297,7 +311,7 @@ function Pile({
   return (
     <div className={`zone pile${options > 0 ? ' pickable' : ''}${playable ? ' playable' : ''}`}>
       {onOpen ? (
-        <button className="plain pile-button" onClick={onOpen} aria-label={`${label}, ${count} cards${options > 0 ? `, ${options} to choose from` : ''}`}>
+        <button className="plain pile-button" onClick={onOpen} tabIndex={-1} {...nav} aria-label={`${label}, ${count} cards${options > 0 ? `, ${options} to choose from` : ''}`}>
           {face}
         </button>
       ) : (

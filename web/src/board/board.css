@@ -101,6 +101,18 @@ main:has(.duel) { max-width: none; padding: 0; }
 .fx { border-radius: 5px; }
 .slot { position: relative; border-radius: 6px; cursor: pointer; transition: filter 0.15s; }
 .slot:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+/* The keyboard's focus (docs/keyboard.md): its own ring, apart from the playable glow and pick marks. */
+[data-nav]:focus-visible, .sheet-card:focus-visible, .duel-log :is(li, summary):focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+.slot[data-nav]:focus-visible { outline-color: var(--fg); }
+.zone[data-nav]:focus-visible { outline-offset: -3px; }
+.hand-card.moving .fx { box-shadow: 0 0 0 3px var(--fg); }
+.menu-number { display: inline-block; min-width: 1.4em; margin-right: 6px; font-size: 0.8em; color: var(--muted); }
+.key-help section { margin-top: 12px; }
+.key-help h4 { margin: 0 0 6px; }
+.key-help dl { display: grid; grid-template-columns: 11em 1fr; gap: 4px 16px; margin: 0; }
+.key-help dl > div { display: contents; }
+.key-help dd { margin: 0; }
+.key-help kbd { font: inherit; font-size: 0.9em; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; white-space: nowrap; }
 .slot.playable .fx { box-shadow: 0 0 0 2px var(--glow), 0 0 10px 1px var(--glow); }
 .slot.selected .fx { box-shadow: 0 0 0 3px var(--accent), 0 0 14px 3px var(--accent); }
 .slot.pickable .fx { box-shadow: 0 0 0 3px var(--accent), 0 0 12px 2px var(--accent); animation: pulse 1.2s ease-in-out infinite; }
@@ -376,6 +388,8 @@ button.phase.go { border: 0; background: none; color: var(--fg); text-decoration
 .counters-chip { position: absolute; bottom: 2px; left: 2px; z-index: 3; min-width: 1.4em; padding: 0 5px; border-radius: 999px; font-size: 0.7em; font-weight: 700; text-align: center; background: #6b4fd8; color: #fff; pointer-events: none; }
 .stats-badge .up { color: #2f9e44; }
 .stats-badge .down { color: var(--danger); }
+.stats-now .up { color: #2f9e44; font-weight: 700; }
+.stats-now .down { color: var(--danger); font-weight: 700; }
 .report-ruling { margin-top: 8px; font-size: 0.85em; }
 form.report-ruling { display: flex; flex-direction: column; gap: 6px; }
 form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit; }

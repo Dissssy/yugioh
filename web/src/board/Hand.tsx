@@ -34,7 +34,7 @@ export interface HandDrag {
 
 /**
  * Your hand: a fan of cards, each dragged with one gesture. Along the hand the drag reorders it; lifted above the
- * hand it becomes a drop onto the field. Arrow keys move the focused card. Hovering a card lifts it and parts its neighbours. The order is yours
+ * hand it becomes a drop onto the field. By keyboard, Move in a card's menu shifts it with Left and Right. Hovering a card lifts it and parts its neighbours. The order is yours
  * alone, kept in this browser for the duel and never sent to the server.
  */
 export function OwnHand({
@@ -45,6 +45,8 @@ export function OwnHand({
   onCard,
   drag,
   held,
+  moving,
+  onMoved,
 }: {
   duelId: string;
   seat: Seat;
@@ -54,6 +56,10 @@ export function OwnHand({
   drag: HandDrag;
   /** A card waiting over a zone (`id`, held over the drop target `key`) while you choose how to play it. */
   held: { id: string; key: string } | null;
+  /** The card being moved along the hand by keyboard (Move in its menu): Left and Right shift it. */
+  moving: string | null;
+  /** The move by keyboard is over (Enter or Esc). */
+  onMoved: () => void;
 }) {
   const { zone } = useBoardLook();
   const [saved, setSaved] = useState(() => loadOrder(duelId));
@@ -114,7 +120,9 @@ export function OwnHand({
           marks={marks}
           onHover={(on) => setHovered((h) => (on ? id : h === id ? null : h))}
           onCard={onCard}
+          moving={moving === id}
           onStep={(by) => move(id, i + by)}
+          onMoved={onMoved}
           drag={cardDrag}
           heldAt={held?.id === id ? held.key : null}
         />
@@ -131,7 +139,9 @@ function HandCard({
   marks,
   onHover,
   onCard,
+  moving,
   onStep,
+  onMoved,
   drag,
   heldAt,
 }: {
@@ -142,8 +152,10 @@ function HandCard({
   marks: CardMarks;
   onHover: (on: boolean) => void;
   onCard: (id: string, el: HTMLElement) => void;
+  moving: boolean;
   /** Move this card along the hand by one place, from the keyboard. */
   onStep: (by: -1 | 1) => void;
+  onMoved: () => void;
   drag: HandDrag;
   heldAt: string | null;
 }) {
@@ -176,6 +188,10 @@ function HandCard({
     return glide(centre.x - (r.left + r.width / 2 - x.get()), centre.y - (r.top + r.height / 2 - y.get()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heldAt]);
+  // Moving the card along the hand moves its element, which can drop focus.
+  useEffect(() => {
+    if (moving) el.current?.focus();
+  }, [moving, place.marginLeft, place.rotate]);
   return (
     <motion.div
       ref={el}
@@ -183,8 +199,8 @@ function HandCard({
       layoutId={id}
       drag
       dragMomentum={false}
-      tabIndex={0}
-      className={`hand-card slot ${marks.classes(id)} ${picking ?? ''}${heldAt ? ' held' : ''}`}
+      tabIndex={-1}
+      className={`hand-card slot${moving ? ' moving' : ''} ${marks.classes(id)} ${picking ?? ''}${heldAt ? ' held' : ''}`}
       style={{ marginLeft: place.marginLeft, x, y }}
       animate={{ scale: heldAt ? 1.08 : 1 }}
       transition={spring}
@@ -210,11 +226,19 @@ function HandCard({
         if (!drag.end(id, at(info.point))) glide(0, 0);
       }}
       onClick={(e) => !dragged.current && click(e.currentTarget)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') click(e.currentTarget);
-        if (e.key === 'ArrowLeft') onStep(-1);
-        if (e.key === 'ArrowRight') onStep(1);
-      }}
+      onKeyDown={
+        moving
+          ? (e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') onStep(e.key === 'ArrowLeft' ? -1 : 1);
+              else if (e.key === 'Enter' || e.key === 'Escape') onMoved();
+              else return;
+              // The board's own keys (moving focus, opening the menu) wait until the move is over.
+              e.preventDefault();
+            }
+          : undefined
+      }
+      data-nav={id}
+      data-pick={picking || marks.pickable(id) ? '' : undefined}
       aria-label={`${data.name}, in your hand`}
       aria-pressed={picking ? picking === 'picked' : undefined}
     >
@@ -232,7 +256,6 @@ function HandCard({
   );
 }
 
-/** The opponent's hand: card backs in a fan that only moves when a public event happens. */
 /** The opponent's hand: card backs, or the cards themselves in a replay with every card face up. */
 export function FoeHand({ seat, cards }: { seat: Seat; cards: CardView[] }) {
   const { zone } = useBoardLook();
@@ -245,7 +268,14 @@ export function FoeHand({ seat, cards }: { seat: Seat; cards: CardView[] }) {
         return (
           <motion.div key={i} layout className="hand-card" style={{ marginLeft: place.marginLeft }} transition={spring}>
             <motion.div animate={{ rotate: -place.rotate, y: -place.y }} transition={spring}>
-              <div className="fx" data-hand-index={`${seat}:${i}`} {...hover(dataOf(cards[i]!))}>
+              <div
+                className="fx"
+                data-hand-index={`${seat}:${i}`}
+                {...hover(dataOf(cards[i]!))}
+                // Face up only in a replay with every card shown, where it can be looked at by keyboard too.
+                data-nav={dataOf(cards[i]!) ? `${seat}:hand:${i}` : undefined}
+                tabIndex={dataOf(cards[i]!) ? -1 : undefined}
+              >
                 <CardFace card={dataOf(cards[i]!)} />
               </div>
             </motion.div>
