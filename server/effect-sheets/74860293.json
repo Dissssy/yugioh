@@ -23,7 +23,46 @@
         "canMiss": true,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "place": "field",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": "non_tuner_materials",
+          "others": false,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

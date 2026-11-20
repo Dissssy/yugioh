@@ -282,7 +282,7 @@ const anyCard = (side: CardFilter['side'], place: CardFilter['place'], kinds: Ca
 const reincarnation: Script = {
   conditions: [],
   cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 1, rank: null }, to: 'graveyard' }],
-  targets: { filter: anyCard('you', 'graveyard', ['monster']), min: 1, max: 1, event: false },
+  targets: { filter: anyCard('you', 'graveyard', ['monster']), min: 1, max: 1, others: true, event: false },
   options: [{ label: '', cost: [], steps: [{ do: 'move', cards: { from: 'targets' }, to: 'hand' }] }],
   unapplied: null,
 };

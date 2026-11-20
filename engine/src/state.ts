@@ -369,7 +369,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         take(s.players[event.player].extra, event.card);
         const materials = event.how === 'xyz' ? [...event.materials] : [];
         s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position, materials };
-        summoned(s, event.card, event.player, event.how, group);
+        summoned(s, event.card, event.player, event.how, group, event.materials);
         return;
       }
       case 'destroyed':
@@ -472,8 +472,8 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
 /** After a sequence with nothing left to do: back to the open game, or on to what comes next. */
 const next = (then: Then): DuelState['step'] => (then.do === 'open' ? { at: 'open' } : { at: 'continue', then });
 
-function summoned(s: DuelState, id: string, player: Seat, how: SummonKind, group: number) {
-  onField(s, id).summoned = { how, turn: s.turn };
+function summoned(s: DuelState, id: string, player: Seat, how: SummonKind, group: number, materials: string[] = []) {
+  onField(s, id).summoned = { how, turn: s.turn, materials };
   s.happened.push({ event: 'summoned', card: id, player, how, group } satisfies Happening);
 }
 

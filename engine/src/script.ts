@@ -211,10 +211,19 @@ export function feasibleOptions(state: DuelState, script: Script, seat: Seat, ca
   return script.options.flatMap((o, i) => (optionProblem(state, script, o, seat, card) ? [] : [i]));
 }
 
+/** The most cards a script may target: a number, or as many as the non-Tuners used for this card's Synchro Summon. */
+export function targetMax(state: DuelState, script: Script, card: string): number {
+  const max = script.targets?.max ?? 0;
+  if (max !== 'non_tuner_materials') return max;
+  const at = locate(state, card);
+  const materials = at?.zone === 'monsters' ? (state.players[at.seat].monsters[at.index]!.summoned?.materials ?? []) : [];
+  return materials.filter((id) => !state.cards[state.instances[id]!.code]!.type.includes('Tuner')).length;
+}
+
 /** The cards a script may target: those that fit, and for "target that monster" only the card its event happened to. */
 export function targetable(state: DuelState, script: Script, seat: Seat, card: string, cause: Happening | null): string[] {
   if (!script.targets) return [];
-  const fitting = cardsFitting(state, script.targets.filter, seat, card);
+  const fitting = cardsFitting(state, script.targets.filter, seat, script.targets.others ? card : '');
   return script.targets.event ? fitting.filter((id) => cause && cause.event !== 'phase' && id === cause.card) : fitting;
 }
 

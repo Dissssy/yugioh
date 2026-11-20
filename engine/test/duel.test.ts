@@ -97,6 +97,7 @@ const cards: Record<number, CardData> = {
   48: { ...monster(48, 'Quickdraw Synchron', 1, 700, 1400), type: 'Tuner Effect Monster' },
   49: { ...monster(49, 'Ronintoadin', 4, 1600, 1200), type: 'Effect Monster', attribute: 'WATER', race: 'Aqua' },
   50: { ...monster(50, 'Dark Tinker', 1, 300, 300), type: 'Effect Monster' },
+  51: { ...spell(51, 'Mystical Space Typhoon'), race: 'Quick-Play' },
 };
 
 function spell(code: number, name: string): CardData {
@@ -207,6 +208,7 @@ const sheets: Record<number, EffectSheet> = {
   46: sheet(46, continuous(restrict({ to: filter({ side: 'you' }), cannot: ['be_affected'], by: filter({ side: 'opponent', place: 'any', faceUp: null, kinds: ['monster'], extraDeck: true }) }))),
   47: sheet(47, continuous({ apply: 'name', name: 'Des Frog' })),
   48: sheet(48, continuous({ apply: 'synchro_material', substitutes: 'Synchron', never: false, onlyFor: null, onlyForTuner: 'Synchron' })),
+  51: sheet(51, { ...effect('activation'), speed: 2 }),
   49: sheet(49, continuous({ apply: 'synchro_material', substitutes: null, never: true, onlyFor: null, onlyForTuner: null })),
   50: sheet(50, {
     ...effect('trigger'),
@@ -793,6 +795,15 @@ describe('battle changes, locks and protection', () => {
     w.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
     expect(spells(w, 0)).toEqual(['a0']);
 
+    // A Quick-Play Set on your turn waits for your next turn, not your opponent's.
+    const q = new Table(stacked([51, 41, ...filler(38)], filler(40, 2)));
+    q.push({ type: 'specialSummoned', player: 0, card: 'a1', zone: 0, position: 'attack' });
+    q.play(0, { type: 'setSpellTrap', card: 'a0', zone: 0 }).play(0, { type: 'endTurn', discard: [] });
+    q.play(1, { type: 'enterBattle' });
+    expect(q.state).toMatchObject({ turnPlayer: 1, phase: 'battle', step: { at: 'open' } });
+    q.play(1, { type: 'endTurn', discard: [] });
+    expect(spells(q, 0)).toEqual(['a0']);
+
     const m = new Table(stacked([9, 9, ...filler(38)], [43, ...filler(39, 2)]));
     m.push({ type: 'specialSummoned', player: 1, card: 'b0', zone: 0, position: 'attack' });
     expect(spells(m, 0)).toEqual(['a0', 'a1']);
@@ -991,7 +1002,7 @@ describe('control and Tokens', () => {
     const script: Script = {
       conditions: [],
       cost: [],
-      targets: { filter: filter({ side: 'opponent' }), min: 1, max: 1, event: false },
+      targets: { filter: filter({ side: 'opponent' }), min: 1, max: 1, others: true, event: false },
       options: [
         { label: 'Change its position', cost: [], steps: [] },
         { label: 'Take control of it', cost: [tribute], steps: [{ do: 'take_control', cards: { from: 'targets' }, until: 'end_phase' }] },

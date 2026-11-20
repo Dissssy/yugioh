@@ -168,7 +168,8 @@ export function lockProblem(state: DuelState, seat: Seat, id: string): string | 
       continue;
     }
     if (lock.setFirst) {
-      if (set && state.players[at.seat].spellTraps[at.index]!.placedTurn < state.turn) continue;
+      // "Cannot activate them until their next turn": from the controller's first turn after the one it was Set on.
+      if (set && state.turn > state.players[at.seat].spellTraps[at.index]!.placedTurn + (state.turnPlayer === at.seat ? 0 : 1)) continue;
       return `${by}: ${card.kind === 'spell' ? 'Spells' : 'these cards'} must be Set first and activated on a later turn.`;
     }
     return `${by} stops you activating that.`;

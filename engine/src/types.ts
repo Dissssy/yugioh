@@ -135,10 +135,12 @@ export interface Script {
   /** Paid on activation, in order. */
   cost: Step[];
   /**
-   * Chosen by the activating player on activation, after the cost; null if the effect doesn't target. `event`: only
-   * the card the effect's `when` event happened to may be targeted ("Target that monster").
+   * Chosen by the activating player on activation, after the cost; null if the effect doesn't target. `max` may be
+   * `non_tuner_materials`: the non-Tuner monsters used for this card's Synchro Summon (Junk Destroyer). `others`: this
+   * card itself can't be a target. `event`: only the card the effect's `when` event happened to may be targeted
+   * ("Target that monster").
    */
-  targets: { filter: CardFilter; min: number; max: number; event: boolean } | null;
+  targets: { filter: CardFilter; min: number; max: number | 'non_tuner_materials'; others: boolean; event: boolean } | null;
   /**
    * What the effect does. One option, or several when the text says "activate 1 of these effects" (picked on
    * activation by `label`). An option's own `cost` is paid after the script's, once it is picked ("Tribute 1 monster,
@@ -506,7 +508,7 @@ export interface FieldCard {
   /** The attacks it declared on the last turn it attacked, and the battle position of the last one's target (null: a direct attack). */
   attacks: { turn: number; count: number; on: Position | null } | null;
   /** How and on which turn it was last Summoned; null if it was Set and not flipped since. */
-  summoned: { how: SummonKind; turn: number } | null;
+  summoned: { how: SummonKind; turn: number; materials: string[] } | null;
   /** Xyz Materials attached to it, first attached first. They go to the GY when it leaves the field. */
   materials: string[];
   /** For a Spell/Trap, the turn its card was activated; null while Set. */

@@ -7,6 +7,7 @@ import {
   nextStep,
   replay,
   statsOf,
+  targetMax,
   viewFor,
   type CardData,
   type CardFilter,
@@ -65,6 +66,8 @@ const cards: Record<number, CardData> = {
   24: monster(24, 'General Raiho', 2100, 1000),
   25: monster(25, 'Blade Knight', 1600, 1000),
   26: monster(26, 'Silencer', 1000, 1000),
+  27: { ...monster(27, 'Junk Synchron', 1300, 500, 3), type: 'Tuner Effect Monster' },
+  28: { ...monster(28, 'Junk Destroyer', 2600, 2500, 8), type: 'Synchro Effect Monster', extraDeck: true },
 };
 
 const filter = (f: Partial<CardFilter>): CardFilter => ({
@@ -110,7 +113,7 @@ const sheets: Record<number, EffectSheet> = {
       speed: 2,
       when: when({ event: 'summoned', how: ['normal', 'flip'], filter: filter({ side: 'opponent', atk: { min: 1000, max: null } }) }),
       script: script({
-        targets: { filter: filter({ side: 'opponent', atk: { min: 1000, max: null } }), min: 1, max: 1, event: true },
+        targets: { filter: filter({ side: 'opponent', atk: { min: 1000, max: null } }), min: 1, max: 1, others: true, event: true },
         options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'targets' } }] }],
       }),
     }),
@@ -140,7 +143,7 @@ const sheets: Record<number, EffectSheet> = {
       mandatory: true,
       when: when({ event: 'summoned', self: true }),
       script: script({
-        targets: { filter: filter({ side: 'opponent', faceUp: true }), min: 1, max: 1, event: false },
+        targets: { filter: filter({ side: 'opponent', faceUp: true }), min: 1, max: 1, others: true, event: false },
         options: [
           {
             label: '',
@@ -197,7 +200,7 @@ const sheets: Record<number, EffectSheet> = {
     effect({
       kind: 'flip',
       mandatory: true,
-      script: script({ targets: { filter: filter({}), min: 1, max: 1, event: false }, options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'targets' } }] }] }),
+      script: script({ targets: { filter: filter({}), min: 1, max: 1, others: false, event: false }, options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'targets' } }] }] }),
     }),
   ),
 };
@@ -523,6 +526,13 @@ describe('FLIP effects', () => {
     expect(nextStep(t.state)).toMatchObject({ kind: 'trigger', trigger: { card: 'a0', mandatory: true, cause: { event: 'flipped', card: 'a0' } } });
   });
 
+  it('may target the monster itself when nothing else is on the field', () => {
+    const t = new Table(stacked(pad([13, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'setMonster', card: 'a0', tributes: [], zone: 0 }).endTurn(0).endTurn(1);
+    t.play(0, { type: 'flipSummon', card: 'a0' });
+    expect(nextStep(t.state)).toMatchObject({ kind: 'trigger', trigger: { card: 'a0' } });
+  });
+
   it('fire after the battle that flipped the monster, even once it was destroyed', () => {
     const t = new Table(stacked(pad([1, 2, 2, 2, 2, 2]), pad([13, 2, 2, 2, 2, 2])));
     t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
@@ -587,6 +597,18 @@ describe('continuous effects', () => {
     t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 });
     expect(t.state.step).toEqual({ at: 'open' });
     expect(t.activations(1)).toEqual([]);
+  });
+});
+
+describe('targets', () => {
+  it('can number the non-Tuners used for the Synchro Summon (Junk Destroyer)', () => {
+    const t = new Table(stacked(pad([27, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 0 });
+    // As if a1 were Synchro Summoned with the Tuner a0 and two non-Tuners.
+    const state = structuredClone(t.state);
+    state.players[0].monsters[0]!.summoned = { how: 'synchro', turn: 1, materials: ['a0', 'a2', 'a3'] };
+    const destroyUpTo = script({ targets: { filter: filter({}), min: 1, max: 'non_tuner_materials', others: false, event: false } });
+    expect(targetMax(state, destroyUpTo, 'a1')).toBe(2);
   });
 });
 

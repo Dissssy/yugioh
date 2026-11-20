@@ -23,6 +23,7 @@ import {
   scriptOf,
   statsOf,
   targetable,
+  targetMax,
   visibleTo,
   type DuelEvent,
   type DuelState,
@@ -402,7 +403,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         const used = new Set(ops.flatMap((o) => ('cards' in o ? o.cards : 'card' in o ? [o.card] : [])));
         // Legality is judged before the cost: only cards that fit then, and weren't used to pay it, can be targeted.
         const options = targetable(before, script, seat, self, link.cause).filter((id) => !used.has(id) && fits(state, id, script.targets!.filter, seat));
-        const max = Math.min(script.targets.max, options.length);
+        const max = Math.min(targetMax(before, script, self), options.length);
         if (options.length < script.targets.min) throw new Refused('No card left to target after the cost.');
         const count = script.targets.min === max ? `${max}` : `${script.targets.min} to ${max}`;
         // "Target that monster" leaves nothing to choose.
