@@ -14,7 +14,71 @@
       "effect": "Spell Cards cannot be activated until the End Phase of your next turn, as long as this card remains face-up on the field.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "place": "hand",
+                "kinds": [
+                  "monster"
+                ],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": "Ice Barrier",
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "lock",
+                "player": "both",
+                "filter": {
+                  "side": "either",
+                  "place": "any",
+                  "kinds": [
+                    "spell"
+                  ],
+                  "types": [],
+                  "races": [],
+                  "attributes": [],
+                  "named": null,
+                  "extraDeck": null,
+                  "faceUp": null,
+                  "position": null,
+                  "level": null,
+                  "atk": null,
+                  "def": null
+                },
+                "until": "your_next_end_phase",
+                "whileFaceUp": true
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

@@ -97,6 +97,11 @@ const cards: Record<number, CardData> = {
   48: { ...monster(48, 'Quickdraw Synchron', 1, 700, 1400), type: 'Tuner Effect Monster' },
   49: { ...monster(49, 'Ronintoadin', 4, 1600, 1200), type: 'Effect Monster', attribute: 'WATER', race: 'Aqua' },
   50: { ...monster(50, 'Dark Tinker', 1, 300, 300), type: 'Effect Monster' },
+  51: { ...spell(51, 'Mystical Space Typhoon'), race: 'Quick-Play' },
+  52: { ...spell(52, 'Lantern'), race: 'Continuous' },
+  53: { ...monster(53, 'Turret Warrior', 5, 1200, 2000), type: 'Effect Monster' },
+  54: { ...monster(54, 'Prior of the Ice Barrier', 4, 1000, 400), type: 'Effect Monster', attribute: 'WATER' },
+  55: { ...monster(55, 'Ice Lord', 8, 2800, 2000), type: 'Effect Monster', attribute: 'WATER' },
 };
 
 function spell(code: number, name: string): CardData {
@@ -183,11 +188,34 @@ const sheets: Record<number, EffectSheet> = {
     ...scripted({
       conditions: [{ if: 'count', filter: filter({ side: 'you', attributes: ['WATER'] }), min: 1, max: null }],
       options: [
-        { label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }, { do: 'forbid', player: 'you', what: 'special_summon', filter: fromHand }] },
+        { label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }, { do: 'forbid', player: 'you', what: 'special_summon', filter: fromHand, wholeTurn: false }] },
       ],
     }),
   }),
   32: { ...sheet(32, effect('condition')), normalSummon: false },
+  53: sheet(53, {
+    ...effect('condition'),
+    ...scripted({
+      cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', kinds: ['monster'], races: ['Warrior'] }), min: 1, max: 1, rank: null }, to: 'graveyard' }],
+      options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }] }],
+    }),
+  }),
+  54: sheet(54, {
+    ...effect('condition'),
+    ...scripted({
+      options: [
+        {
+          label: '',
+          cost: [],
+          steps: [
+            { do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false },
+            { do: 'forbid', player: 'you', what: 'special_summon', filter: filter({ place: 'any', side: 'you', faceUp: null, level: { min: 5, max: null } }), wholeTurn: true },
+          ],
+        },
+      ],
+    }),
+  }),
+  55: { ...sheet(55, { ...effect('condition'), ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }] }] }) }), normalSummon: false },
   33: sheet(33, { ...effect('condition'), ...scripted({ conditions: [{ if: 'outnumbered', by: 4 }], options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }] }] }) }),
   35: sheet(35, continuous(battleChange({ attacks: 2 }))),
   36: sheet(36, continuous(battleChange({ attacks: 2, while: [{ if: 'last_attack', on: 'defense' }] })), continuous(battleChange({ piercing: true }))),
@@ -207,6 +235,8 @@ const sheets: Record<number, EffectSheet> = {
   46: sheet(46, continuous(restrict({ to: filter({ side: 'you' }), cannot: ['be_affected'], by: filter({ side: 'opponent', place: 'any', faceUp: null, kinds: ['monster'], extraDeck: true }) }))),
   47: sheet(47, continuous({ apply: 'name', name: 'Des Frog' })),
   48: sheet(48, continuous({ apply: 'synchro_material', substitutes: 'Synchron', never: false, onlyFor: null, onlyForTuner: 'Synchron' })),
+  51: sheet(51, { ...effect('activation'), speed: 2 }),
+  52: sheet(52, effect('activation'), effect('ignition')),
   49: sheet(49, continuous({ apply: 'synchro_material', substitutes: null, never: true, onlyFor: null, onlyForTuner: null })),
   50: sheet(50, {
     ...effect('trigger'),
@@ -793,12 +823,27 @@ describe('battle changes, locks and protection', () => {
     w.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
     expect(spells(w, 0)).toEqual(['a0']);
 
+    // A Quick-Play Set on your turn waits for your next turn, not your opponent's.
+    const q = new Table(stacked([51, 41, ...filler(38)], filler(40, 2)));
+    q.push({ type: 'specialSummoned', player: 0, card: 'a1', zone: 0, position: 'attack' });
+    q.play(0, { type: 'setSpellTrap', card: 'a0', zone: 0 }).play(0, { type: 'endTurn', discard: [] });
+    q.play(1, { type: 'enterBattle' });
+    expect(q.state).toMatchObject({ turnPlayer: 1, phase: 'battle', step: { at: 'open' } });
+    q.play(1, { type: 'endTurn', discard: [] });
+    expect(spells(q, 0)).toEqual(['a0']);
+
     const m = new Table(stacked([9, 9, ...filler(38)], [43, ...filler(39, 2)]));
     m.push({ type: 'specialSummoned', player: 1, card: 'b0', zone: 0, position: 'attack' });
     expect(spells(m, 0)).toEqual(['a0', 'a1']);
     m.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 0 }).push({ type: 'linkResolved' });
     expect(spells(m, 0)).toEqual([]);
     expect(viewFor(m.state, 0).blocked.find((b) => b.card === 'a1')?.reason).toMatch(/only 1/);
+
+    // The limit is on Spell/Trap Cards: a face-up Continuous Spell's own effect is still free to use, and isn't counted.
+    const c = new Table(stacked([52, 9, ...filler(38)], [43, ...filler(39, 2)]));
+    c.push({ type: 'specialSummoned', player: 1, card: 'b0', zone: 0, position: 'attack' });
+    c.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 0 }).push({ type: 'linkResolved' });
+    expect(legalActions(c.state, 0).flatMap((a) => (a.type === 'activate' ? [`${a.card}:${a.effect}`] : []))).toEqual(['a0:1']);
   });
 
   it('keep cards from being destroyed by Spell and Trap effects, or affected by Extra Deck monsters', () => {
@@ -915,6 +960,42 @@ describe('summoning procedures', () => {
     expect(legalActions(t.state, 0).some((a) => a.type === 'extraSummon')).toBe(false);
   });
 
+  it('are offered when the Tribute they cost frees the only Monster Zone', () => {
+    const t = new Table(stacked([53, ...filler(39)], filler(40, 2)));
+    ['a1', 'a2', 'a3', 'a4', 'a5'].forEach((card, zone) => t.push({ type: 'specialSummoned', player: 0, card, zone, position: 'attack' }));
+    expect(procedures(t)).toMatchObject([{ card: 'a0', effect: 0 }]);
+  });
+
+  it("can't be used after the thing their whole-turn ban forbids was already done this turn", () => {
+    const t = new Table(stacked([54, 3, ...filler(38)], filler(40, 2)));
+    expect(scriptProblem(t.state, 0, 'a0', 0, null)).toBeNull();
+    t.push({ type: 'specialSummoned', player: 0, card: 'a1', zone: 0, position: 'attack' });
+    expect(scriptProblem(t.state, 0, 'a0', 0, null)).toMatch(/already Special Summoned a card with Level 5 or more/);
+    // It still counts once the monster has left the field.
+    t.push({ type: 'moved', card: 'a1', owner: 0, from: 'monsters', to: 'graveyard' });
+    expect(scriptProblem(t.state, 0, 'a0', 0, null)).toMatch(/already/);
+    t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [] });
+    expect(scriptProblem(t.state, 0, 'a0', 0, null)).toBeNull();
+  });
+
+  it('must be used before another effect can Special Summon the monster, and again once it is back in the hand', () => {
+    const t = new Table(stacked([55, ...filler(39)], filler(40, 2)));
+    const revive = (card: string) => applyOp(t.state, { op: 'special_summon', card, controller: 0, position: 'attack', zone: 0, banish_when_leaves: false }, { player: 0, source: '', stage: 'resolution', random: () => 0 });
+    t.push({ type: 'discarded', player: 0, cards: ['a0'] });
+    expect(revive('a0')).toMatchObject({ ok: false, error: /own procedure/ });
+    t.push({ type: 'moved', card: 'a0', owner: 0, from: 'graveyard', to: 'hand' });
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: null });
+    op(t, { op: 'special_summon', card: 'a0', controller: 0, position: 'attack', zone: 0, banish_when_leaves: false });
+    t.push(procedureDone(t.state, 'a0'));
+    t.push({ type: 'moved', card: 'a0', owner: 0, from: 'monsters', to: 'graveyard' });
+    expect(revive('a0')).toMatchObject({ ok: true });
+    t.push({ type: 'moved', card: 'a0', owner: 0, from: 'graveyard', to: 'hand' }, { type: 'discarded', player: 0, cards: ['a0'] });
+    expect(revive('a0')).toMatchObject({ ok: false });
+    // An Extra Deck monster sent to the GY without its Synchro Summon can't be revived either.
+    t.push({ type: 'moved', card: 'ax0', owner: 0, from: 'extra', to: 'graveyard' });
+    expect(revive('ax0')).toMatchObject({ ok: false, error: /Synchro Summoned/ });
+  });
+
   it('count the cards each player controls for "4 or more cards than you"', () => {
     const t = new Table(stacked([33, ...filler(39)], filler(40, 2)));
     const foe = (i: number) => t.push({ type: 'specialSummoned', player: 1, card: `b${i}`, zone: i, position: 'attack' });
@@ -991,7 +1072,7 @@ describe('control and Tokens', () => {
     const script: Script = {
       conditions: [],
       cost: [],
-      targets: { filter: filter({ side: 'opponent' }), min: 1, max: 1, event: false },
+      targets: { filter: filter({ side: 'opponent' }), min: 1, max: 1, others: true, event: false },
       options: [
         { label: 'Change its position', cost: [], steps: [] },
         { label: 'Take control of it', cost: [tribute], steps: [{ do: 'take_control', cards: { from: 'targets' }, until: 'end_phase' }] },

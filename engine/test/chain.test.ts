@@ -7,6 +7,9 @@ import {
   nextStep,
   replay,
   statsOf,
+  targetMax,
+  applyOp,
+  costSubstitute,
   viewFor,
   type CardData,
   type CardFilter,
@@ -65,6 +68,11 @@ const cards: Record<number, CardData> = {
   24: monster(24, 'General Raiho', 2100, 1000),
   25: monster(25, 'Blade Knight', 1600, 1000),
   26: monster(26, 'Silencer', 1000, 1000),
+  27: { ...monster(27, 'Junk Synchron', 1300, 500, 3), type: 'Tuner Effect Monster' },
+  28: { ...monster(28, 'Junk Destroyer', 2600, 2500, 8), type: 'Synchro Effect Monster', extraDeck: true },
+  29: monster(29, 'Moulinglacia', 2800, 2200),
+  30: monster(30, 'Revealer', 1100, 1500),
+  31: monster(31, 'Ice Caller', 1000, 1000),
 };
 
 const filter = (f: Partial<CardFilter>): CardFilter => ({
@@ -110,7 +118,7 @@ const sheets: Record<number, EffectSheet> = {
       speed: 2,
       when: when({ event: 'summoned', how: ['normal', 'flip'], filter: filter({ side: 'opponent', atk: { min: 1000, max: null } }) }),
       script: script({
-        targets: { filter: filter({ side: 'opponent', atk: { min: 1000, max: null } }), min: 1, max: 1, event: true },
+        targets: { filter: filter({ side: 'opponent', atk: { min: 1000, max: null } }), min: 1, max: 1, others: true, event: true },
         options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'targets' } }] }],
       }),
     }),
@@ -140,7 +148,7 @@ const sheets: Record<number, EffectSheet> = {
       mandatory: true,
       when: when({ event: 'summoned', self: true }),
       script: script({
-        targets: { filter: filter({ side: 'opponent', faceUp: true }), min: 1, max: 1, event: false },
+        targets: { filter: filter({ side: 'opponent', faceUp: true }), min: 1, max: 1, others: true, event: false },
         options: [
           {
             label: '',
@@ -188,6 +196,18 @@ const sheets: Record<number, EffectSheet> = {
   22: sheet(22, effect({ kind: 'continuous', opt: 'soft', continuous: { apply: 'extra_normal_summon', filter: filter({ side: 'you', place: 'hand', named: 'Ice' }), while: [] } })),
   24: sheet(24, effect({ kind: 'continuous', continuous: { apply: 'discard_or_negate', while: [] } })),
   25: sheet(25, effect({ kind: 'continuous', continuous: { apply: 'negate_battled_flips', while: [] } })),
+  30: sheet(30, effect({ kind: 'continuous', from: 'graveyard', opt: 'hard', continuous: { apply: 'cost_substitute', for: filter({ place: 'any', named: 'Ice' }) } })),
+  31: sheet(
+    31,
+    effect({
+      kind: 'ignition',
+      script: script({
+        cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', place: 'hand' }), min: 1, max: 1, rank: null }, to: 'graveyard' }],
+        options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1 }] }],
+      }),
+    }),
+  ),
+  29: sheet(29, effect({ kind: 'continuous', continuous: { apply: 'forbid_on_leaving', what: 'battle_phase' } })),
   26: sheet(
     26,
     effect({ kind: 'continuous', continuous: { apply: 'restrict', to: filter({ side: 'opponent' }), others: false, cannot: ['activate_effects'], by: null, compare: null, once: false, while: [] } }),
@@ -197,7 +217,7 @@ const sheets: Record<number, EffectSheet> = {
     effect({
       kind: 'flip',
       mandatory: true,
-      script: script({ targets: { filter: filter({}), min: 1, max: 1, event: false }, options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'targets' } }] }] }),
+      script: script({ targets: { filter: filter({}), min: 1, max: 1, others: false, event: false }, options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'targets' } }] }] }),
     }),
   ),
 };
@@ -230,6 +250,7 @@ function stacked(deck0: number[], deck1: number[]): DuelEvent[] {
   ];
 }
 
+const ctx0 = (source: string) => ({ player: 0 as Seat, source, stage: 'resolution' as const, random: () => 0 });
 const pad = (codes: number[]) => [...codes, ...Array<number>(40 - codes.length).fill(2)];
 
 /** Plays a duel the way the server does: after each move, code-only steps run and players with nothing to activate pass. */
@@ -523,6 +544,13 @@ describe('FLIP effects', () => {
     expect(nextStep(t.state)).toMatchObject({ kind: 'trigger', trigger: { card: 'a0', mandatory: true, cause: { event: 'flipped', card: 'a0' } } });
   });
 
+  it('may target the monster itself when nothing else is on the field', () => {
+    const t = new Table(stacked(pad([13, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'setMonster', card: 'a0', tributes: [], zone: 0 }).endTurn(0).endTurn(1);
+    t.play(0, { type: 'flipSummon', card: 'a0' });
+    expect(nextStep(t.state)).toMatchObject({ kind: 'trigger', trigger: { card: 'a0' } });
+  });
+
   it('fire after the battle that flipped the monster, even once it was destroyed', () => {
     const t = new Table(stacked(pad([1, 2, 2, 2, 2, 2]), pad([13, 2, 2, 2, 2, 2])));
     t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
@@ -587,6 +615,86 @@ describe('continuous effects', () => {
     t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 });
     expect(t.state.step).toEqual({ at: 'open' });
     expect(t.activations(1)).toEqual([]);
+  });
+});
+
+describe('leaving the field', () => {
+  it("skips its controller's next Battle Phase (Moulinglacia)", () => {
+    const t = new Table(stacked(pad([29, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.push({ type: 'destroyed', cards: ['a0'], by: 1 });
+    // Seat 1's own Battle Phase is unaffected; seat 0's next one is skipped, and the one after is back.
+    expect(legalActions(t.state, 1).some((a) => a.type === 'enterBattle')).toBe(true);
+    t.endTurn(1);
+    expect(legalActions(t.state, 0).some((a) => a.type === 'enterBattle')).toBe(false);
+    t.endTurn(0).play(1, { type: 'endTurn', discard: t.state.players[1].hand.slice(6) });
+    expect(legalActions(t.state, 0).some((a) => a.type === 'enterBattle')).toBe(true);
+  });
+});
+
+describe('locks an effect leaves behind', () => {
+  it("hold until the End Phase of its controller's next turn, while the card stays face-up (Spellbreaker)", () => {
+    const spells = (t: Table, seat: Seat) => legalActions(t.state, seat).flatMap((a) => (a.type === 'activate' ? [a.card] : []));
+    const t = new Table(stacked(pad([2, 10, 2, 2, 2, 2]), pad([10, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    const locked = applyOp(t.state, { op: 'lock', player: 'both', filter: filter({ place: 'any', kinds: ['spell'] }), until: 'your_next_end_phase', while_face_up: true }, ctx0('a0'));
+    if (!locked.ok) throw new Error(locked.error);
+    t.push(...locked.events);
+    expect(spells(t, 0)).toEqual([]);
+    t.endTurn(0);
+    expect(spells(t, 1)).toEqual([]);
+    t.endTurn(1);
+    expect(spells(t, 0)).toEqual([]);
+    // It ends once the card leaves the field.
+    t.push({ type: 'destroyed', cards: ['a0'], by: 1 });
+    expect(spells(t, 0)).toEqual(['a1']);
+  });
+});
+
+describe('cost substitutes', () => {
+  it('let a card in the GY stand in for a card of the cost from the hand, once (Revealer of the Ice Barrier)', () => {
+    const t = new Table(stacked(pad([31, 30, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    t.push({ type: 'discarded', player: 0, cards: ['a2', 'a3', 'a4'] });
+    // One card in hand pays the cost; with it gone too, only the Revealer in the GY can.
+    expect(t.activations(0)).toEqual(['a0']);
+    t.push({ type: 'discarded', player: 0, cards: ['a1'] });
+    expect(costSubstitute(t.state, 0, 'a0')).toEqual({ card: 'a1', effect: 0 });
+    expect(t.activations(0)).toEqual(['a0']);
+    const used = applyOp(t.state, { op: 'substitute_cost', card: 'a1', effect: 0 }, ctx0('a0'));
+    if (!used.ok) throw new Error(used.error);
+    t.push(...used.events);
+    expect(t.state.players[0].banished).toEqual(['a1']);
+    expect(costSubstitute(t.state, 0, 'a0')).toBeNull();
+  });
+});
+
+describe('pledges', () => {
+  it('cost their damage in the End Phase unless the player Normal Summons a card of that name (Where Arf Thou?)', () => {
+    const kept = new Table(stacked(pad([1, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    kept.push({ type: 'pledged', player: 0, names: ['Axe Raider'], damage: 2000 });
+    kept.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    expect(kept.state.players[0].lp).toBe(8000);
+
+    const broken = new Table(stacked(pad([1, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    broken.push({ type: 'pledged', player: 0, names: ['Axe Raider'], damage: 2000 });
+    broken.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 0 }).endTurn(0);
+    expect(broken.state.players[0].lp).toBe(6000);
+    // It lasts only the turn it was made.
+    broken.endTurn(1);
+    expect(broken.state.pledges).toEqual([]);
+  });
+});
+
+describe('targets', () => {
+  it('can number the non-Tuners used for the Synchro Summon (Junk Destroyer)', () => {
+    const t = new Table(stacked(pad([27, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 0 });
+    // As if a1 were Synchro Summoned with the Tuner a0 and two non-Tuners.
+    const state = structuredClone(t.state);
+    state.players[0].monsters[0]!.summoned = { how: 'synchro', turn: 1, materials: ['a0', 'a2', 'a3'] };
+    const destroyUpTo = script({ targets: { filter: filter({}), min: 1, max: 'non_tuner_materials', others: false, event: false } });
+    expect(targetMax(state, destroyUpTo, 'a1')).toBe(2);
   });
 });
 

@@ -3,7 +3,7 @@
 
 import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
 import { restriction, statsOf } from './continuous.ts';
-import { specialSummonForbidden } from './script.ts';
+import { specialSummonForbidden, specialSummonProblem } from './script.ts';
 import { locate, monsterZonesFor, other } from './state.ts';
 import { type CardData, type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
 
@@ -95,7 +95,8 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(at.zone !== 'monsters', `${card.name} is already on the field.`);
       check(at.zone !== 'spellTraps', `${card.name} is in a Spell & Trap Zone.`);
       check(at.zone !== 'extra', 'Monsters in the Extra Deck are Summoned by their own procedures, not by this op.');
-      check(!specialSummonForbidden(state, ctx.player, op.card), `An effect stops that player Special Summoning ${card.name} this turn.`);
+      const problem = specialSummonProblem(state, ctx.player, op.card);
+      check(!problem, problem ?? '');
       const free = monsterZonesFor(state, op.controller, false);
       check(free.length > 0, 'That player has no empty Main Monster Zone.');
       check(free.includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
@@ -244,6 +245,22 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'setAgain' });
       return;
     }
+    case 'substitute_cost': {
+      const at = known(state, op.card);
+      check(at.zone === 'graveyard' && at.seat === ctx.player, `${cardOf(state, op.card).name} is not in your GY.`);
+      run.emit({ type: 'moved', card: op.card, owner: at.seat, from: 'graveyard', to: 'banished' });
+      run.emit({ type: 'substituted', player: ctx.player, card: op.card, effect: op.effect });
+      return;
+    }
+    case 'lock': {
+      const untilTurn = op.until === 'this_end_phase' ? state.turn : state.turnPlayer === ctx.player ? state.turn + 2 : state.turn + 1;
+      run.emit({ type: 'locked', source: ctx.source, seat: ctx.player, player: op.player, filter: op.filter, untilTurn, whileFaceUp: op.while_face_up });
+      return;
+    }
+    case 'pledge_normal_summon':
+      check(op.cards.length > 0 && op.damage > 0, 'Name the cards the pledge is about, and a positive damage.');
+      run.emit({ type: 'pledged', player: op.player, names: [...new Set(op.cards.map((id) => cardOf(state, id).name))], damage: op.damage });
+      return;
     case 'forbid':
       check(op.what === 'special_summon' || op.filter === null, 'Only a Special Summon ban takes a filter.');
       run.emit({ type: 'forbidden', player: op.player, what: op.what, filter: op.filter });

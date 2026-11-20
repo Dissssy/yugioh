@@ -135,10 +135,12 @@ export interface Script {
   /** Paid on activation, in order. */
   cost: Step[];
   /**
-   * Chosen by the activating player on activation, after the cost; null if the effect doesn't target. `event`: only
-   * the card the effect's `when` event happened to may be targeted ("Target that monster").
+   * Chosen by the activating player on activation, after the cost; null if the effect doesn't target. `max` may be
+   * `non_tuner_materials`: the non-Tuner monsters used for this card's Synchro Summon (Junk Destroyer). `others`: this
+   * card itself can't be a target. `event`: only the card the effect's `when` event happened to may be targeted
+   * ("Target that monster").
    */
-  targets: { filter: CardFilter; min: number; max: number; event: boolean } | null;
+  targets: { filter: CardFilter; min: number; max: number | 'non_tuner_materials'; others: boolean; event: boolean } | null;
   /**
    * What the effect does. One option, or several when the text says "activate 1 of these effects" (picked on
    * activation by `label`). An option's own `cost` is paid after the script's, once it is picked ("Tribute 1 monster,
@@ -230,9 +232,24 @@ export type Step =
   | { do: 'summon_token'; player: 'you' | 'opponent'; token: Token; count: number; position: Position | 'choice' }
   /**
    * For the rest of this turn, that player can't declare attacks, can't conduct their Battle Phase, or can't Special
-   * Summon the monsters that fit `filter` (null for any monster). `filter` is null for the others.
+   * Summon the monsters that fit `filter` (null for any monster). `filter` is null for the others. With `wholeTurn`
+   * ("the turn you activate this card") the ban covers the whole turn, so the effect can't be used once the player
+   * already did that this turn.
    */
-  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null };
+  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null; wholeTurn: boolean }
+  /**
+   * "During the End Phase of this turn, take `damage` damage if you did not Normal Summon the added monster, or a card
+   * with the same name": about the cards the step before it moved (Where Arf Thou?).
+   */
+  | { do: 'pledge_normal_summon'; damage: number }
+  /**
+   * A lock an effect leaves behind: `player` can't activate cards that fit `filter`, until the End Phase of this turn or
+   * of your next turn, and with `whileFaceUp` only as long as this card stays face-up on the field (Spellbreaker).
+   */
+  | { do: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; whileFaceUp: boolean };
+
+export const LOCK_UNTIL = ['this_end_phase', 'your_next_end_phase'] as const;
+export type LockUntil = (typeof LOCK_UNTIL)[number];
 
 export const FORBIDDEN = ['declare_attack', 'battle_phase', 'special_summon'] as const;
 /** What a lingering restriction stops a player doing this turn (Threatening Roar, Reinforce Truth, Silent Angler). */
@@ -259,6 +276,11 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  * - `negate_battled_flips`: FLIP effects of monsters this card destroys by battle are negated (Blade Knight).
  * - `discard_or_negate`: when an effect activated by an Effect Monster on the opponent's field resolves, the opponent
  *   discards 1 card or the effect is negated, their choice (General Raiho of the Ice Barrier).
+ * - `cost_substitute`: from its owner's GY, this card can be banished instead of 1 card the owner would discard or send
+ *   from the hand to the GY as the cost of an effect of a card that fits `for` (Revealer of the Ice Barrier). The
+ *   effect's `opt` limits how often.
+ * - `forbid_on_leaving`: when this face-up card leaves the field, its controller can't do `what` during their next turn
+ *   ("If this face-up card leaves the field, skip the Battle Phase of your next turn": battle_phase; Moulinglacia).
  * - `extra_normal_summon`: its controller can Normal Summon (not Set) 1 monster from the hand that fits `filter` in
  *   addition to their Normal Summon or Set; the effect's `opt` limits how often (General Grunard of the Ice Barrier).
  * - `banish_instead`: cards that fit `filter`, checked on the field, are banished instead of going from the field to
@@ -296,6 +318,8 @@ export type Continuous =
   | { apply: 'banish_instead'; filter: CardFilter }
   | { apply: 'extra_normal_summon'; filter: CardFilter; while: Condition[] }
   | { apply: 'discard_or_negate'; while: Condition[] }
+  | { apply: 'forbid_on_leaving'; what: Forbidden }
+  | { apply: 'cost_substitute'; for: CardFilter }
   /** "This card's name becomes `name` while it is on the field." */
   | { apply: 'name'; name: string }
   /**
@@ -346,8 +370,11 @@ export type Selection =
   | { from: 'targets' }
   | { from: 'choose'; filter: CardFilter; min: number; max: number; rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null }
   | { from: 'all'; filter: CardFilter }
-  /** `count` cards that fit, picked at random by code ("discard 2 random cards from your opponent's hand"); fewer if fewer fit. */
-  | { from: 'random'; filter: CardFilter; count: number }
+  /**
+   * `count` cards that fit, picked at random by code ("discard 2 random cards from your opponent's hand"); fewer if
+   * fewer fit. The effect needs at least `min` to fit (0 for "up to").
+   */
+  | { from: 'random'; filter: CardFilter; min: number; count: number }
   /** The monster battling this card, if it fits ("At the start of the Damage Step, if this card attacks a face-up Defense Position monster: destroy that monster"). */
   | { from: 'battling'; filter: CardFilter };
 
@@ -506,7 +533,7 @@ export interface FieldCard {
   /** The attacks it declared on the last turn it attacked, and the battle position of the last one's target (null: a direct attack). */
   attacks: { turn: number; count: number; on: Position | null } | null;
   /** How and on which turn it was last Summoned; null if it was Set and not flipped since. */
-  summoned: { how: SummonKind; turn: number } | null;
+  summoned: { how: SummonKind; turn: number; materials: string[] } | null;
   /** Xyz Materials attached to it, first attached first. They go to the GY when it leaves the field. */
   materials: string[];
   /** For a Spell/Trap, the turn its card was activated; null while Set. */
@@ -554,6 +581,20 @@ export interface DuelState {
   modifiers: Modifier[];
   /** What resolved effects stopped each player doing this turn; they lapse when the turn ends. */
   forbidden: { player: Seat; what: Forbidden; filter: CardFilter | null; turn: number }[];
+  /** What each player did this turn that a `forbid` can ban: Special Summons (with the monster), Battle Phases and attacks. */
+  didThisTurn: { player: Seat; what: Forbidden; card: string | null }[];
+  /**
+   * Monsters that must be Special Summoned a certain way (by their procedure, or a Synchro or Xyz Summon) and were. Only
+   * these can be Special Summoned by other effects later, until they go back to the hand, Deck or Extra Deck.
+   */
+  properlySummoned: string[];
+  /** Damage each player takes in this turn's End Phase unless they Normal Summon a card with one of these names first. */
+  pledges: { player: Seat; names: string[]; damage: number }[];
+  /**
+   * Locks effects left behind (Spellbreaker): `seat` controls `source`; the lock holds until the End Phase of turn
+   * `untilTurn` starts, and with `whileFaceUp` only while `source` stays face-up on the field.
+   */
+  lingering: { source: string; seat: Seat; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; untilTurn: number; whileFaceUp: boolean }[];
   chain: ChainLink[];
   step: DuelStep;
   /** Events since the last triggers were put on the chain, for triggers to watch. */
@@ -664,6 +705,12 @@ export type Op =
   /** Detaches this Xyz Material: it goes to its owner's GY. */
   | { op: 'detach'; card: string }
   | { op: 'forbid'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  /** `player` takes `damage` in this turn's End Phase unless they Normal Summon a card with the name of one of `cards`. */
+  | { op: 'pledge_normal_summon'; player: Seat; cards: string[]; damage: number }
+  /** See the `lock` step; `player` is relative to the effect's controller. */
+  | { op: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; while_face_up: boolean }
+  /** Banish `card` from its owner's GY instead of 1 card of the cost, by its `cost_substitute` effect `effect`. */
+  | { op: 'substitute_cost'; card: string; effect: number }
   /** `controller` takes control of this monster, into `zone` (an empty Main Monster Zone of theirs). */
   | { op: 'take_control'; card: string; controller: Seat; zone: number; until: 'end_phase' | null }
   | { op: 'summon_token'; controller: Seat; token: Token; position: Position; zone: number }
@@ -855,6 +902,10 @@ export type DuelEvent =
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
   | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  | { type: 'pledged'; player: Seat; names: string[]; damage: number }
+  /** A `cost_substitute` effect was used (its card is banished by a `moved` event before this). */
+  | { type: 'substituted'; player: Seat; card: string; effect: number }
+  | { type: 'locked'; source: string; seat: Seat; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; untilTurn: number; whileFaceUp: boolean }
   /** `to` now controls the monster, in `zone`. A Token's card data comes with its event, since it isn't in any Deck. */
   | { type: 'controlChanged'; card: string; to: Seat; zone: number; until: 'end_phase' | null }
   | { type: 'tokenSummoned'; player: Seat; card: string; token: CardData; zone: number; position: Position }

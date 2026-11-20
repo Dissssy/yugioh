@@ -532,7 +532,11 @@ describe('a Summoning procedure', () => {
       { type: 'drew', player: 0, count: 5 },
       { type: 'turnStarted', player: 1, turn: 1 },
       { type: 'phaseChanged', phase: 'main1' },
+      // Medium (Level 7) arrives on an earlier turn: Prior can't be used the turn a Level 5+ was Special Summoned.
       { type: 'specialSummoned', player: 1, card: medium, zone: 0, position: 'attack' },
+      { type: 'turnStarted', player: 0, turn: 2 },
+      { type: 'turnStarted', player: 1, turn: 3 },
+      { type: 'phaseChanged', phase: 'main1' },
     ];
     for (const card of [angler, prior]) if (!start.players[1].deck.slice(0, 5).includes(card)) events.push({ type: 'moved', card, owner: 1, from: 'deck', to: 'hand' });
     await h.db.delete(matchEvents).where(eq(matchEvents.matchId, duel.id));
