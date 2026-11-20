@@ -348,8 +348,11 @@ export type Selection =
   | { from: 'targets' }
   | { from: 'choose'; filter: CardFilter; min: number; max: number; rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null }
   | { from: 'all'; filter: CardFilter }
-  /** `count` cards that fit, picked at random by code ("discard 2 random cards from your opponent's hand"); fewer if fewer fit. */
-  | { from: 'random'; filter: CardFilter; count: number }
+  /**
+   * `count` cards that fit, picked at random by code ("discard 2 random cards from your opponent's hand"); fewer if
+   * fewer fit. The effect needs at least `min` to fit (0 for "up to").
+   */
+  | { from: 'random'; filter: CardFilter; min: number; count: number }
   /** The monster battling this card, if it fits ("At the start of the Damage Step, if this card attacks a face-up Defense Position monster: destroy that monster"). */
   | { from: 'battling'; filter: CardFilter };
 

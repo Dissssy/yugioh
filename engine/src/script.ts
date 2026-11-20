@@ -148,7 +148,8 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, fre
     return `There aren't ${step.count} ${step.counter === 'spell' ? 'Spell Counter' : 'counter'}${step.count === 1 ? '' : 's'} to remove.`;
   }
   if (sel.from === 'battling' && battling(state, sel.filter, seat, card).length === 0) return `This card isn't battling a ${describeFilter(sel.filter)}.`;
-  if ((sel.from === 'all' || sel.from === 'random') && cardsFitting(state, sel.filter, seat, card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
+  if (sel.from === 'all' && cardsFitting(state, sel.filter, seat, card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
+  if (sel.from === 'random' && cardsFitting(state, sel.filter, seat, card).length < sel.min) return `There is no ${describeFilter(sel.filter)}.`;
   if (sel.from === 'choose' && chooseFrom(state, sel, seat, card).length < sel.min) {
     return sel.min === 1 ? `There is no ${describeFilter(sel.filter)}.` : `There are fewer than ${sel.min} of: ${describeFilter(sel.filter)}.`;
   }

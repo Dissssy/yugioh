@@ -124,11 +124,40 @@
                 },
                 "position": "choice",
                 "banishWhenLeaves": false
+              },
+              {
+                "do": "forbid",
+                "player": "you",
+                "what": "special_summon",
+                "filter": {
+                  "side": "either",
+                  "place": "any",
+                  "kinds": [
+                    "monster"
+                  ],
+                  "types": [],
+                  "races": [],
+                  "attributes": [
+                    "DARK",
+                    "DIVINE",
+                    "EARTH",
+                    "FIRE",
+                    "LIGHT",
+                    "WIND"
+                  ],
+                  "named": null,
+                  "extraDeck": null,
+                  "faceUp": null,
+                  "position": null,
+                  "level": null,
+                  "atk": null,
+                  "def": null
+                }
               }
             ]
           }
         ],
-        "unapplied": "also you cannot Special Summon monsters for the rest of this turn, except WATER monsters"
+        "unapplied": null
       },
       "continuous": null,
       "status": "unverified"

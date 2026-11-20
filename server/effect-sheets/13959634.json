@@ -112,6 +112,7 @@
                     "atk": null,
                     "def": null
                   },
+                  "min": 1,
                   "count": 2
                 },
                 "to": "graveyard"
