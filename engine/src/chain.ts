@@ -4,6 +4,7 @@
 
 import { cardOf, continuation, legalActions, onceOk, ruledIllegal } from './rules.ts';
 import { fits, scriptProblem } from './script.ts';
+import { lockProblem, negated } from './continuous.ts';
 import { locate, summonMatches, summonName } from './state.ts';
 import type { DuelEvent, DuelState, Happening, Seat, When } from './types.ts';
 
@@ -59,8 +60,8 @@ export function pendingTriggers(state: DuelState): PendingTrigger[] {
       if (step.handled.includes(`${id}:${index}`) || (!effect.mandatory && step.passed.includes(at.seat))) return;
       // A monster whose effects are negated triggers nothing.
       const onField = at.zone === 'monsters' || at.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
-      const place = onField ? effect.from === 'field' && onField.faceUp && !onField.effectsNegated : at.zone === effect.from;
-      if (!place || !onceOk(state, id, sheet.code, index, effect.opt) || ruledIllegal(state, at.seat, id, index)) return;
+      const place = onField ? effect.from === 'field' && onField.faceUp && !negated(state, id) : at.zone === effect.from;
+      if (!place || lockProblem(state, at.seat, id) || !onceOk(state, id, sheet.code, index, effect.opt) || ruledIllegal(state, at.seat, id, index)) return;
       const cause = state.happened.find((h) => (!when.canMiss || h.group >= last) && whenMatches(state, when, h, id, at.seat));
       if (!cause || scriptProblem(state, at.seat, id, index, cause)) return;
       found.push({ player: at.seat, card: id, effect: index, mandatory: effect.mandatory, cause });

@@ -9,9 +9,9 @@
       "mandatory": false,
       "from": "field",
       "opt": "none",
-      "window": "Set Continuous Trap; can be activated on either player's turn while there is a face-up Effect Monster on the field",
+      "window": "Either player's turn, when a face-up Effect Monster is on the field",
       "cost": "",
-      "effect": "Activate this card by targeting 1 Effect Monster on the field; this card is tied to that monster and applies its effects to it while it is on the field.",
+      "effect": "Activate this card by targeting 1 Effect Monster on the field; this card becomes tied to that monster.",
       "targets": "1 Effect Monster on the field",
       "when": null,
       "script": {
@@ -30,6 +30,7 @@
             "races": [],
             "attributes": [],
             "named": null,
+            "extraDeck": null,
             "faceUp": true,
             "position": null,
             "level": null,
@@ -71,7 +72,9 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "negate_linked"
+      },
       "status": "unverified"
     },
     {
@@ -94,6 +97,8 @@
           "attack"
         ],
         "by": null,
+        "compare": null,
+        "once": false,
         "while": []
       },
       "status": "unverified"

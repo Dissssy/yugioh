@@ -9,7 +9,7 @@
       "mandatory": false,
       "from": "field",
       "opt": "hard",
-      "window": "Main Phase of your turn, when you could activate a Spell Card; you can only activate 1 \"Freezing Chains of the Ice Barrier\" per turn",
+      "window": "Main Phase of your turn (Continuous Spell activation); you can only activate 1 \"Freezing Chains of the Ice Barrier\" per turn",
       "cost": "",
       "effect": "When this card is activated: You can target 1 Level 4 or lower \"Ice Barrier\" monster in your GY; Special Summon it.",
       "targets": "1 Level 4 or lower \"Ice Barrier\" monster in your GY (optional)",
@@ -30,7 +30,73 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": {
+          "side": "you",
+          "place": "monsters",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": "Ice Barrier",
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "others": false,
+        "cannot": [
+          "be_affected"
+        ],
+        "by": {
+          "side": "opponent",
+          "place": "any",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": true,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "compare": null,
+        "once": false,
+        "while": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "monsters",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Ice Barrier",
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 3,
+            "max": null
+          }
+        ]
+      },
       "status": "unverified"
     }
   ],

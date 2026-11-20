@@ -81,7 +81,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
   });
 
   const apply = (op: Op) => {
-    const applied = applyOp(state, op, { player: seat, stage, random: deps.random });
+    const applied = applyOp(state, op, { player: seat, source: self, stage, random: deps.random });
     if (!applied.ok) throw new Refused(`${op.op} was refused: ${applied.error}`);
     state = applied.events.reduce(evolve, state);
     events.push(...applied.events);
@@ -183,7 +183,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
               : (await ask({ prompt: `${name}: Special Summon it in which position?`, cards: [], choices: ['Attack Position', 'Defense Position'], min: 1, max: 1 }))[0] === 'Defense Position'
                 ? 'defense'
                 : 'attack';
-          const placed = await placeInto(state, { op: 'special_summon', card: id, controller: seat, position }, { player: seat, stage, random: deps.random }, deps.ask);
+          const placed = await placeInto(state, { op: 'special_summon', card: id, controller: seat, position }, { player: seat, source: self, stage, random: deps.random }, deps.ask);
           if (!placed.ok) throw new Refused(`special_summon was refused: ${placed.error}`);
           if (placed.picks) transcript.push({ question: 'Monster Zone', picks: placed.picks });
           apply(placed.op);
@@ -248,7 +248,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         for (const id of await select(step.cards, 'take control of', monsterZonesFor(state, seat, false).length)) {
           const at = locate(state, id);
           if (at?.zone !== 'monsters' || at.seat === seat) continue;
-          const placed = await placeInto(state, { op: 'take_control', card: id, controller: seat, until: step.until }, { player: seat, stage, random: deps.random }, deps.ask);
+          const placed = await placeInto(state, { op: 'take_control', card: id, controller: seat, until: step.until }, { player: seat, source: self, stage, random: deps.random }, deps.ask);
           if (!placed.ok) throw new Refused(`take_control was refused: ${placed.error}`);
           if (placed.picks) transcript.push({ question: 'Monster Zone', picks: placed.picks });
           apply(placed.op);
@@ -267,7 +267,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
               : (await ask({ prompt: `${name}: Special Summon ${step.token.name} in which position?`, cards: [], choices: ['Attack Position', 'Defense Position'], min: 1, max: 1 }))[0] === 'Defense Position'
                 ? 'defense'
                 : 'attack';
-          const placed = await placeInto(state, { op: 'summon_token', controller: player, token: step.token, position }, { player: seat, stage, random: deps.random }, deps.ask);
+          const placed = await placeInto(state, { op: 'summon_token', controller: player, token: step.token, position }, { player: seat, source: self, stage, random: deps.random }, deps.ask);
           if (!placed.ok) throw new Refused(`summon_token was refused: ${placed.error}`);
           if (placed.picks) transcript.push({ question: 'Monster Zone', picks: placed.picks });
           apply(placed.op);

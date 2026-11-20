@@ -7,11 +7,11 @@
       "kind": "condition",
       "speed": 1,
       "mandatory": false,
-      "from": "field",
+      "from": "hand",
       "opt": "none",
-      "window": "Main Phase, while this card is in your hand and your opponent controls 4 or more cards than you do",
+      "window": "Your Main Phase, while this card is in your hand and your opponent controls 4 or more cards than you do",
       "cost": "",
-      "effect": "If your opponent controls 4 or more cards than you do, you can Special Summon this card (from your hand).",
+      "effect": "Special Summon this card from your hand.",
       "targets": null,
       "when": null,
       "script": {
@@ -55,7 +55,32 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "lock",
+        "player": "opponent",
+        "cannot": "activate",
+        "filter": {
+          "side": "either",
+          "place": "any",
+          "kinds": [
+            "spell",
+            "trap"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "perTurn": 1,
+        "setFirst": false,
+        "while": []
+      },
       "status": "unverified"
     }
   ],

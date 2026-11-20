@@ -15,7 +15,19 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "battle",
+        "to": "self",
+        "attacks": 2,
+        "piercing": false,
+        "noDamageToYou": false,
+        "while": [
+          {
+            "if": "last_attack",
+            "on": "defense"
+          }
+        ]
+      },
       "status": "unverified"
     },
     {
@@ -24,13 +36,20 @@
       "mandatory": false,
       "from": "field",
       "opt": "none",
-      "window": "While this card is face-up on the field, when it attacks a Defense Position monster",
+      "window": "When this card attacks a Defense Position monster",
       "cost": "",
       "effect": "If this card attacks a Defense Position monster, inflict piercing battle damage to your opponent.",
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "battle",
+        "to": "self",
+        "attacks": 1,
+        "piercing": true,
+        "noDamageToYou": false,
+        "while": []
+      },
       "status": "unverified"
     }
   ],

@@ -67,6 +67,7 @@ const filter = (f: Partial<CardFilter>): CardFilter => ({
   races: [],
   attributes: [],
   named: null,
+  extraDeck: null,
   faceUp: null,
   position: null,
   level: null,

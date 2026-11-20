@@ -2,7 +2,7 @@
 // model can act on. Nothing here decides what a card's text means; it only refuses what the board can't allow.
 
 import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
-import { statsOf } from './continuous.ts';
+import { restriction, statsOf } from './continuous.ts';
 import { specialSummonForbidden } from './script.ts';
 import { locate, monsterZonesFor, other } from './state.ts';
 import { type CardData, type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
@@ -12,6 +12,8 @@ export type OpResult = { ok: true; events: DuelEvent[] } | { ok: false; error: s
 export interface OpContext {
   /** The player whose effect this is. */
   player: Seat;
+  /** The card whose effect this is. */
+  source: string;
   /** Targets are declared while activating, not while resolving. */
   stage: 'activation' | 'resolution';
   /** [0, 1), for shuffles. */
@@ -22,13 +24,37 @@ export function applyOp(state: DuelState, op: Op, ctx: OpContext): OpResult {
   try {
     check(!state.result, 'The duel is over.');
     const run = new Run(state);
-    apply(run, op, ctx);
+    const shielded = shield(run, op, ctx);
+    if (shielded) apply(run, shielded, ctx);
     endIfLpGone(run);
     return { ok: true, events: run.events };
   } catch (e) {
     if (e instanceof Illegal) return { ok: false, error: e.message };
     throw e;
   }
+}
+
+/** The ops that change a card already in play, and so can't touch a card unaffected by the effect. */
+const AFFECTING = ['move', 'modify_stats', 'change_position', 'take_control', 'negate_effects', 'add_counters', 'remove_counters', 'detach', 'link'];
+
+/**
+ * The op without the cards it can't touch: those unaffected by this effect (Freezing Chains of the Ice Barrier) and,
+ * for `destroy`, those that can't be destroyed by it (Dai-sojo of the Ice Barrier). Null when nothing is left to do.
+ * A once-per-turn protection that applies is used up.
+ */
+function shield(run: Run, op: Op, ctx: OpContext): Op | null {
+  const state = run.state;
+  const spared = (id: string, what: 'be_affected' | 'be_destroyed_by_effect') => {
+    if (!locate(state, id)) return false;
+    const f = restriction(state, id, what, ctx.source);
+    if (f?.effect.once) run.emit({ type: 'protectionUsed', player: f.seat, card: f.source, effect: f.index });
+    return f !== null;
+  };
+  if (op.op === 'destroy') {
+    const cards = op.cards.filter((id) => !spared(id, 'be_affected') && !spared(id, 'be_destroyed_by_effect'));
+    return cards.length ? { ...op, cards } : null;
+  }
+  return AFFECTING.includes(op.op) && 'card' in op && spared(op.card, 'be_affected') ? null : op;
 }
 
 function known(state: DuelState, id: string) {

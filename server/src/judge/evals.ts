@@ -849,6 +849,33 @@ export const CASES: EvalCase[] = [
     effect: 1,
     legal: false,
   },
+  {
+    name: 'mind drain stops monster effects in the hand',
+    board: [{ hand: ['Speaker for the Ice Barriers'], monsters: ['Medium of the Ice Barrier'] }, { faceUp: ['Mind Drain'] }],
+    activate: 'Speaker for the Ice Barriers',
+    effect: 1,
+    legal: false,
+  },
+  {
+    name: 'warlock of the ice barrier makes spells be set first',
+    board: [{ hand: ['Monster Reincarnation', 'Twister'], gy: ['Sonic Chick'] }, { monsters: ['Warlock of the Ice Barrier', 'Medium of the Ice Barrier'] }],
+    activate: 'Monster Reincarnation',
+    legal: false,
+  },
+  {
+    name: 'dai-sojo keeps ice barrier monsters from spell destruction',
+    board: [{ hand: ['Fissure'] }, { monsters: ['Dai-sojo of the Ice Barrier'] }],
+    activate: 'Fissure',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dai-sojo of the Ice Barrier', '1:monsters'), expectAt(b, 'Fissure', '0:gy')),
+  },
+  {
+    name: 'fiendish chain ties itself to an effect monster',
+    board: [{ set: ['Fiendish Chain'] }, { monsters: ['Speed Warrior'] }],
+    activate: 'Fiendish Chain',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Fiendish Chain', '0:spellTraps'), expectAt(b, 'Speed Warrior', '1:monsters')),
+  },
 ];
 
 /** Builds a case's board: every listed card is put in place from its owner's Deck. */

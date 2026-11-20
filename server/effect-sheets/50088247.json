@@ -28,6 +28,7 @@
               "races": [],
               "attributes": [],
               "named": "Ice Barrier",
+              "extraDeck": null,
               "faceUp": true,
               "position": null,
               "level": null,
@@ -66,6 +67,7 @@
                   "races": [],
                   "attributes": [],
                   "named": null,
+                  "extraDeck": null,
                   "faceUp": null,
                   "position": null,
                   "level": {

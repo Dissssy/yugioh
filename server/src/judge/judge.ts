@@ -211,7 +211,7 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
           refused = reply(c.id, `The choice names ${named}, which a player can't see. Word it without naming hidden cards.`, true);
           continue;
         }
-        const opCtx = { player: link.player, stage, random: deps.random };
+        const opCtx = { player: link.player, source: link.card, stage, random: deps.random };
         let op = parsed.op;
         if (op.op === 'special_summon' || op.op === 'take_control' || op.op === 'summon_token') {
           const { zone: _, ...unplaced } = op;

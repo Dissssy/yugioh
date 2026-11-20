@@ -15,7 +15,38 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "lock",
+        "player": "opponent",
+        "cannot": "tribute_summon",
+        "filter": null,
+        "perTurn": null,
+        "setFirst": false,
+        "while": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "monsters",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Ice Barrier",
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 1,
+            "max": null
+          }
+        ]
+      },
       "status": "unverified"
     },
     {
@@ -24,12 +55,80 @@
       "mandatory": false,
       "from": "field",
       "opt": "hard",
-      "window": "Your Main Phase, while this card is face-up on the field",
+      "window": "Your Main Phase",
       "cost": "Discard 1 card",
       "effect": "Special Summon 1 \"Ice Barrier\" Tuner from your Deck, also you cannot Special Summon monsters for the rest of this turn, except WATER monsters.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "place": "hand",
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "place": "deck",
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [
+                      "Tuner"
+                    ],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Ice Barrier",
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null
+                },
+                "position": "choice"
+              }
+            ]
+          }
+        ],
+        "unapplied": "also you cannot Special Summon monsters for the rest of this turn, except WATER monsters"
+      },
       "continuous": null,
       "status": "unverified"
     },
@@ -41,7 +140,7 @@
       "opt": "hard",
       "window": "While this card is in your GY, when you would discard, or send a card(s) from your hand to the GY, to activate an \"Ice Barrier\" monster's effect",
       "cost": "",
-      "effect": "You can banish this card from your GY instead of 1 of those cards.",
+      "effect": "If you would discard, or send a card(s) from your hand to the GY, to activate an \"Ice Barrier\" monster's effect, you can banish this card from your GY instead of 1 of those cards.",
       "targets": null,
       "when": null,
       "script": null,

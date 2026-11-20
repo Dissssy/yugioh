@@ -15,7 +15,60 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": {
+          "side": "either",
+          "place": "monsters",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": {
+            "min": 4,
+            "max": null
+          },
+          "atk": null,
+          "def": null
+        },
+        "others": false,
+        "cannot": [
+          "attack"
+        ],
+        "by": null,
+        "compare": null,
+        "once": false,
+        "while": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "monsters",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Ice Barrier",
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 1,
+            "max": null
+          }
+        ]
+      },
       "status": "unverified"
     }
   ],

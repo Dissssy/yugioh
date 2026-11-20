@@ -157,7 +157,11 @@ export type Condition =
   /** This card has between `min` and `max` Xyz Materials (null: no bound); "while it has no material" is max 0. */
   | { if: 'materials'; min: number | null; max: number | null }
   /** The opponent controls at least `by` more cards than this player ("If your opponent controls 4 or more cards than you do"). */
-  | { if: 'outnumbered'; by: number };
+  | { if: 'outnumbered'; by: number }
+  /** This card is battling: attacking an opponent's monster, or the attack's target; during the Damage Step only if `damageStep`. */
+  | { if: 'battling'; as: 'attacker' | 'target'; damageStep: boolean }
+  /** This card attacked this turn, and its last attack was on a monster in this battle position (Twin-Sword Marauder). */
+  | { if: 'last_attack'; on: Position };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
 /** A Token's printed stats ("Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)). */
@@ -228,7 +232,17 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  * - `stats`: the cards in `to` gain `atk`/`def` (times the count of `per`: the cards that fit it, or this card's Xyz
  *   Materials), and their Level changes by `levelDelta` or becomes `levelSet`.
  * - `restrict`: the cards in `to` (not this card itself when `others`) can't do these things. For
- *   `be_destroyed_by_battle`, `by` is the monster they battle ("with a monster that has 1900 or more ATK"); null for any.
+ *   `be_destroyed_by_battle`, `by` is the monster they battle ("with a monster that has 1900 or more ATK"); for `be_destroyed_by_effect` and `be_affected` (by activated effects), the card whose effect
+ *   it is; null for any. `compare`: only cards whose `stat` is at least this card's `self` ("monsters your opponent
+ *   controls with ATK greater than or equal to this card's DEF"). `once`: once per turn, only the first time it would
+ *   apply (Fortress Warrior's "Once per turn, this card cannot be destroyed by battle").
+ * - `battle`: the cards in `to` can attack `attacks` times each Battle Phase, inflict piercing battle damage when they
+ *   attack a Defense Position monster (`piercing`), and their controller takes no battle damage from attacks involving
+ *   them (`noDamageToYou`).
+ * - `lock`: `player` can't activate cards that fit `filter` ("you" is this card's controller; null: any card), or can
+ *   activate no more than `perTurn` of them each turn, or can activate them only once they were Set on an earlier turn
+ *   (`setFirst`); or can't Tribute Summon (`tribute_summon`, `filter` null).
+ * - `negate_linked`: the linked monster's effects are negated (Fiendish Chain).
  * - `self_destruct`: this card remains on the field after it resolves, and is destroyed in the End Phase of its
  *   controller's opponent's `opponentTurns`th turn after its activation (Swords of Revealing Light).
  * - `tie`: more about this card's tie to its linked monster (every linked card is destroyed when its monster leaves the
@@ -237,7 +251,27 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  */
 export type Continuous =
   | { apply: 'stats'; to: Affected; atk: number; def: number; per: CardFilter | 'materials' | null; levelDelta: number; levelSet: number | null; while: Condition[] }
-  | { apply: 'restrict'; to: Affected; others: boolean; cannot: Restriction[]; by: CardFilter | null; while: Condition[] }
+  | {
+      apply: 'restrict';
+      to: Affected;
+      others: boolean;
+      cannot: Restriction[];
+      by: CardFilter | null;
+      compare: { stat: 'atk' | 'def'; self: 'atk' | 'def' } | null;
+      once: boolean;
+      while: Condition[];
+    }
+  | { apply: 'battle'; to: Affected; attacks: number; piercing: boolean; noDamageToYou: boolean; while: Condition[] }
+  | {
+      apply: 'lock';
+      player: 'you' | 'opponent' | 'both';
+      cannot: 'activate' | 'tribute_summon';
+      filter: CardFilter | null;
+      perTurn: number | null;
+      setFirst: boolean;
+      while: Condition[];
+    }
+  | { apply: 'negate_linked' }
   | { apply: 'self_destruct'; opponentTurns: number }
   | { apply: 'tie'; destroyLinked: boolean; defenseBreaks: boolean }
   /**
@@ -246,8 +280,11 @@ export type Continuous =
    */
   | { apply: 'replace_destruction'; detach: number };
 
-export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle'] as const;
-/** What a restricted monster can't do: declare an attack, change its battle position, be targeted for an attack, or be destroyed by battle. */
+export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle', 'be_destroyed_by_effect', 'be_affected'] as const;
+/**
+ * What a restricted card can't do: declare an attack, change its battle position, be targeted for an attack, be
+ * destroyed by battle or by an effect, or be affected by activated effects ("unaffected by").
+ */
 export type Restriction = (typeof RESTRICTIONS)[number];
 
 /**
@@ -296,6 +333,8 @@ export interface CardFilter {
   /** Text the card's name must contain: "Ice Barrier" for an "Ice Barrier" monster; null for any name. */
   named: string | null;
   attributes: string[];
+  /** A monster that belongs in the Extra Deck (Fusion, Synchro, Xyz); null for either. */
+  extraDeck: boolean | null;
   faceUp: boolean | null;
   position: Position | null;
   /** Current values for a face-up monster, printed ones elsewhere. A card without the stat never fits a range on it. */
@@ -422,7 +461,8 @@ export interface FieldCard {
   placedTurn: number;
   /** Last turn its position changed, by a change of position or a Flip Summon. */
   positionChangedTurn: number | null;
-  attackedTurn: number | null;
+  /** The attacks it declared on the last turn it attacked, and the battle position of the last one's target (null: a direct attack). */
+  attacks: { turn: number; count: number; on: Position | null } | null;
   /** How and on which turn it was last Summoned; null if it was Set and not flipped since. */
   summoned: { how: SummonKind; turn: number } | null;
   /** Xyz Materials attached to it, first attached first. They go to the GY when it leaves the field. */
@@ -477,10 +517,13 @@ export interface DuelState {
   /** Chain links resolved so far in the duel, the `group` of new happenings. */
   resolvedLinks: number;
   /** The attack being made, from its declaration until damage is done. */
-  /** `replaced`: for each monster that would be destroyed in this battle, the materials detached instead (empty: none). */
-  attack: { attacker: string; target: string | null; replaced: Record<string, string[]> } | null;
-  /** Effects used this turn, for once-per-turn clauses. */
-  usedThisTurn: { card: string; code: number; effect: number }[];
+  /**
+   * `replaced`: for each monster that would be destroyed in this battle, the materials detached instead (empty: none).
+   * `damageStep`: the attack has entered the Damage Step.
+   */
+  attack: { attacker: string; target: string | null; replaced: Record<string, string[]>; damageStep: boolean } | null;
+  /** Effects used this turn by each player, for once-per-turn clauses and "only activate 1 ... each turn". */
+  usedThisTurn: { player: Seat; card: string; code: number; effect: number }[];
   /**
    * Rulings on activations that stand for the board as it is now, until any event changes it (another illegal ruling
    * or an appeal changes nothing). An activation the judge ruled illegal is refused without asking it again
@@ -775,6 +818,8 @@ export type DuelEvent =
    * a chain: the cost and the Special Summon follow at once, then a checkpoint.
    */
   | { type: 'procedureUsed'; player: Seat; card: string; effect: number }
+  /** A once-per-turn protection of this card's effect kept a monster on the field (Fortress Warrior). */
+  | { type: 'protectionUsed'; player: Seat; card: string; effect: number }
   /** The attack moves into its Damage Step. */
   | { type: 'damageStepStarted' }
   | { type: 'replacementOffered'; card: string; player: Seat; then: Then }

@@ -2,7 +2,7 @@
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
 import { scriptOf, scriptProblem, specialSummonForbidden } from './script.ts';
-import { continuousOnField, levelNow, replacement, restricted, statsOf } from './continuous.ts';
+import { attacksAllowed, continuousOnField, type InForce, type Restrict, levelNow, lockProblem, negated, piercing, replacement, restricted, restriction, shieldsBattleDamage, statsOf, tributeSummonLocked } from './continuous.ts';
 import { evolve, isToken, locate, monsterZoneFree, monsterZonesFor, onField, other } from './state.ts';
 import {
   HAND_LIMIT,
@@ -185,7 +185,7 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
           const zones = [...Array(MONSTER_ZONES).keys()].filter((i) => monsterZoneFree(state, seat, i) || (tributes > 0 && tributeFrom.includes(p.monsters[i]?.id ?? '')));
           const fits = tributes > 0 ? monsters.length >= tributes && zones.length > 0 : zones.length > 0;
           if (!normalSummonUsed(state) && !card.extraDeck && canNormalSummon(state, card) && fits) {
-            actions.push({ type: 'normalSummon', card: id, tributes, tributeFrom, zones });
+            if (tributes === 0 || !tributeSummonLocked(state, seat)) actions.push({ type: 'normalSummon', card: id, tributes, tributeFrom, zones });
             actions.push({ type: 'setMonster', card: id, tributes, tributeFrom, zones });
           }
         } else if (freeZones(p.spellTraps).length > 0) {
@@ -372,10 +372,12 @@ function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
       // A monster's effect, or any card's effect used from the GY (Terror of Trishula).
       if (effect.from !== 'field' && at.zone !== effect.from) return no(`Only while it is in your ${effect.from === 'hand' ? 'hand' : 'GY'}.`);
       if (effect.from === 'field' && !m?.faceUp) return no('Only while it is face-up on the field.');
-      if (m?.effectsNegated) return no('Its effects are negated.');
+      if (m && negated(state, id)) return no('Its effects are negated.');
     } else {
       return no('This effect is not activated.');
     }
+    const locked = lockProblem(state, seat, id);
+    if (locked) return no(locked);
     if (timing) return no(timing);
     if (effect.speed < minSpeed) {
       return no(minSpeed === 3 ? 'Only a Counter Trap can respond to a Counter Trap.' : `A Spell Speed ${effect.speed} effect can't be activated in response to Spell Speed ${minSpeed}.`);
@@ -472,7 +474,7 @@ export function blockedAttacks(state: DuelState, seat: Seat): Blocked[] {
       ? 'A face-down monster can\'t attack.'
       : m.position !== 'attack'
         ? 'Only a monster in Attack Position can attack.'
-        : m.attackedTurn === state.turn
+        : !attackLeft(state, m)
           ? 'It already attacked this turn.'
           : forbidden(state, seat, 'declare_attack')
             ? "An effect stopped you declaring attacks this turn."
@@ -525,7 +527,7 @@ function canFlipSummon(state: DuelState, m: FieldCard) {
 }
 
 function canChangePosition(state: DuelState, m: FieldCard) {
-  return m.faceUp && notJustPlaced(state, m) && positionUnchanged(state, m) && m.attackedTurn !== state.turn && !restricted(state, m.id, 'change_position');
+  return m.faceUp && notJustPlaced(state, m) && positionUnchanged(state, m) && m.attacks?.turn !== state.turn && !restricted(state, m.id, 'change_position');
 }
 
 /** Whether a resolved effect stopped the player doing this for the rest of the turn. */
@@ -533,8 +535,11 @@ const forbidden = (state: DuelState, seat: Seat, what: Forbidden) => state.forbi
 
 function canAttack(state: DuelState, m: FieldCard) {
   const seat = locate(state, m.id)!.seat;
-  return m.faceUp && m.position === 'attack' && m.attackedTurn !== state.turn && !restricted(state, m.id, 'attack') && !forbidden(state, seat, 'declare_attack');
+  return m.faceUp && m.position === 'attack' && attackLeft(state, m) && !restricted(state, m.id, 'attack') && !forbidden(state, seat, 'declare_attack');
 }
+
+/** Whether a monster has an attack left this turn: most have one, some more (Hayabusa Knight). */
+const attackLeft = (state: DuelState, m: FieldCard) => m.attacks?.turn !== state.turn || m.attacks.count < attacksAllowed(state, m.id);
 
 /** The opponent's Monster Zones the player's monsters may attack: every monster there that can be targeted for an attack. */
 function attackTargets(state: DuelState, seat: Seat): number[] {
@@ -604,6 +609,7 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
       check(card.kind === 'monster' && !card.extraDeck, 'Only Main Deck monsters can be Normal Summoned or Set.');
       check(canNormalSummon(state, card), `${card.name} cannot be Normal Summoned or Set.`);
       const needed = tributesFor(card);
+      check(intent.type === 'setMonster' || needed === 0 || !tributeSummonLocked(state, seat), "An effect stops you Tribute Summoning.");
       const tributes = new Set(intent.tributes);
       check(tributes.size === intent.tributes.length, 'Each tribute must be a different monster.');
       check(tributes.size === needed, `${card.name} needs ${needed} tribute${needed === 1 ? '' : 's'}.`);
@@ -778,6 +784,7 @@ function damage(run: Run) {
     const replaced = run.state.attack!.replaced;
     const asking = result.destroyed.find((id) => replacement(run.state, id) !== null && !(id in replaced));
     if (asking) return run.emit({ type: 'replacementOffered', card: asking, player: locate(run.state, asking)!.seat, then: { do: 'damage' } });
+    for (const f of result.protectedOnce) run.emit({ type: 'protectionUsed', player: f.seat, card: f.source, effect: f.index });
     for (const id of result.destroyed) for (const m of replaced[id] ?? []) run.emit({ type: 'moved', card: m, owner: run.state.instances[m]!.owner, from: 'materials', to: 'graveyard' });
     const lost = result.destroyed.filter((id) => !replaced[id]?.length);
     if (lost.length > 0) run.emit({ type: 'destroyedByBattle', cards: lost });
@@ -788,17 +795,27 @@ function damage(run: Run) {
   if (!run.state.result) run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
 }
 
+type Damage = { player: Seat; amount: number; by: string };
+
 /**
  * Damage calculation between an attacker and a face-up target: the monsters destroyed (not those an effect protects,
- * Sonic Chick) and the battle damage dealt.
+ * Sonic Chick), the battle damage dealt (piercing, or none to a player whose monster shields them), and the
+ * once-per-turn protections this battle used up (Fortress Warrior).
  */
-function battle(state: DuelState, attackerId: string, target: string): { destroyed: string[]; damage: { player: Seat; amount: number; by: string } | null } {
+function battle(state: DuelState, attackerId: string, target: string): { destroyed: string[]; damage: Damage | null; protectedOnce: InForce<Restrict>[] } {
   const seat = state.turnPlayer;
   const foe = other(seat);
   const atk = statsOf(state, attackerId).atk;
   const stats = statsOf(state, target);
-  const protectedFrom = (id: string) => restricted(state, id, 'be_destroyed_by_battle', id === attackerId ? target : attackerId);
-  const result = (destroyed: string[], damage: { player: Seat; amount: number; by: string } | null) => ({ destroyed: destroyed.filter((id) => !protectedFrom(id)), damage });
+  const result = (destroyed: string[], damage: Damage | null) => {
+    const protections = destroyed.map((id) => restriction(state, id, 'be_destroyed_by_battle', id === attackerId ? target : attackerId));
+    const shielded = damage && shieldsBattleDamage(state, damage.player === seat ? attackerId : target);
+    return {
+      destroyed: destroyed.filter((_, i) => !protections[i]),
+      damage: shielded ? null : damage,
+      protectedOnce: protections.filter((f) => f !== null && f.effect.once) as InForce<Restrict>[],
+    };
+  };
   if (onField(state, target).position === 'attack') {
     const def = stats.atk;
     if (atk > def) return result([target], { player: foe, amount: atk - def, by: attackerId });
@@ -806,7 +823,7 @@ function battle(state: DuelState, attackerId: string, target: string): { destroy
     return result(atk > 0 ? [attackerId, target] : [], null);
   }
   const def = stats.def;
-  if (atk > def) return result([target], null);
+  if (atk > def) return result([target], piercing(state, attackerId) ? { player: foe, amount: atk - def, by: attackerId } : null);
   return result([], atk < def ? { player: seat, amount: def - atk, by: target } : null);
 }
 

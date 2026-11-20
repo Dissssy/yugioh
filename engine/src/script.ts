@@ -4,7 +4,7 @@
 import { cardOf } from './rules.ts';
 import { levelNow, statsOf } from './continuous.ts';
 import { levelOf, locate, monsterZonesFor, other, summonMatches, summonName } from './state.ts';
-import type { CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
+import type { CardData, CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
 export function scriptOf(state: DuelState, card: string, effect: number): Script | null {
@@ -14,6 +14,17 @@ export function scriptOf(state: DuelState, card: string, effect: number): Script
 
 const inRange = (value: number | null, range: Range | null) =>
   range === null || (value !== null && (range.min === null || value >= range.min) && (range.max === null || value <= range.max));
+
+/** Whether a card's printed identity fits the filter: its kind, type line, monster type, name, Attribute and Deck. */
+export function identityFits(card: CardData, filter: CardFilter): boolean {
+  if (filter.kinds.length && !filter.kinds.includes(card.kind)) return false;
+  const words = card.type.toLowerCase().split(/\s+/);
+  if (!filter.types.every((t) => words.includes(t.toLowerCase()))) return false;
+  if (filter.races.length && !filter.races.some((r) => r.toLowerCase() === card.race.toLowerCase())) return false;
+  if (filter.named !== null && !card.name.toLowerCase().includes(filter.named.toLowerCase())) return false;
+  if (filter.attributes.length && !filter.attributes.some((a) => a.toUpperCase() === card.attribute)) return false;
+  return filter.extraDeck === null || card.extraDeck === filter.extraDeck;
+}
 
 /** Whether a card fits a filter, for the effect of player `seat`. A face-down card shows only whether it is a monster or a Spell/Trap. */
 export function fits(state: DuelState, id: string, filter: CardFilter, seat: Seat): boolean {
@@ -28,18 +39,13 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   if (filter.faceUp !== null && (!field || field.faceUp !== filter.faceUp)) return false;
   if (filter.position !== null && (at.zone !== 'monsters' || field!.position !== filter.position)) return false;
   if (field && !field.faceUp) {
-    const identity = filter.types.length + filter.races.length + filter.attributes.length > 0 || filter.named !== null || filter.level || filter.atk || filter.def;
+    const identity = filter.types.length + filter.races.length + filter.attributes.length > 0 || filter.named !== null || filter.extraDeck !== null || filter.level || filter.atk || filter.def;
     if (identity) return false;
     if (filter.kinds.length === 0) return true;
     return at.zone === 'monsters' ? filter.kinds.includes('monster') : filter.kinds.includes('spell') && filter.kinds.includes('trap');
   }
   const card = cardOf(state, id);
-  if (filter.kinds.length && !filter.kinds.includes(card.kind)) return false;
-  const words = card.type.toLowerCase().split(/\s+/);
-  if (!filter.types.every((t) => words.includes(t.toLowerCase()))) return false;
-  if (filter.races.length && !filter.races.some((r) => r.toLowerCase() === card.race.toLowerCase())) return false;
-  if (filter.named !== null && !card.name.toLowerCase().includes(filter.named.toLowerCase())) return false;
-  if (filter.attributes.length && !filter.attributes.some((a) => a.toUpperCase() === card.attribute)) return false;
+  if (!identityFits(card, filter)) return false;
   // Current stats on the field, printed ones elsewhere. ATK and DEF are only worked out when the filter asks, since an
   // effect that counts monsters by Level (Tenshin) changes ATK itself.
   const monster = at.zone === 'monsters';
@@ -83,6 +89,7 @@ export function describeFilter(f: CardFilter, they = false): string {
   if (f.named !== null) words.push(`"${f.named}"`);
   if (f.races.length) words.push(f.races.join(' or '));
   words.push(...f.types);
+  if (f.extraDeck !== null) words.push(f.extraDeck ? 'Extra Deck' : 'Main Deck');
   const kinds = [...f.kinds].sort();
   words.push(
     kinds.length === 0 ? 'card' : kinds.join() === 'spell,trap' ? 'Spell/Trap' : kinds.map((k) => (k === 'monster' ? 'monster' : k === 'spell' ? 'Spell' : 'Trap')).join(' or '),
@@ -243,6 +250,17 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
       const summoned = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.summoned : null;
       if (summoned && summoned.turn === state.turn && summonMatches(summoned.how, c.how)) return null;
       return `It needs this card to have been ${c.how.length ? `${c.how.map((h) => summonName[h]).join(' or ')} ` : ''}Summoned this turn.`;
+    }
+    case 'battling': {
+      const a = state.attack;
+      const battling = c.as === 'attacker' ? a?.attacker === card && a.target !== null : a?.target === card;
+      if (battling && (!c.damageStep || a!.damageStep)) return null;
+      return `It needs this card to be ${c.as === 'attacker' ? "attacking an opponent's monster" : 'the attack target'}${c.damageStep ? ' in the Damage Step' : ''}.`;
+    }
+    case 'last_attack': {
+      const at = locate(state, card);
+      const attacks = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.attacks : null;
+      return attacks?.turn === state.turn && attacks.on === c.on ? null : `It needs this card's last attack this turn to have been on a ${c.on === 'attack' ? 'Attack' : 'Defense'} Position monster.`;
     }
   }
 }

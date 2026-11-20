@@ -9,13 +9,28 @@
       "mandatory": false,
       "from": "field",
       "opt": "none",
-      "window": "During the Damage Step, if this card attacks an opponent's monster",
+      "window": "While this card is attacking an opponent's monster, during the Damage Step only",
       "cost": "",
       "effect": "If this card attacks an opponent's monster, this card gains 300 ATK during the Damage Step only.",
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 300,
+        "def": 0,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": [
+          {
+            "if": "battling",
+            "as": "attacker",
+            "damageStep": true
+          }
+        ]
+      },
       "status": "unverified"
     },
     {
@@ -24,13 +39,28 @@
       "mandatory": false,
       "from": "field",
       "opt": "none",
-      "window": "During the Damage Step, if this card is attacked by an opponent's monster",
+      "window": "While this card is attacked by an opponent's monster, during the Damage Step only",
       "cost": "",
       "effect": "If this card is attacked by an opponent's monster, this card loses 500 ATK during the Damage Step only.",
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": -500,
+        "def": 0,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": [
+          {
+            "if": "battling",
+            "as": "target",
+            "damageStep": true
+          }
+        ]
+      },
       "status": "unverified"
     },
     {

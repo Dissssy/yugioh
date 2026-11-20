@@ -9,13 +9,64 @@
       "mandatory": false,
       "from": "field",
       "opt": "none",
-      "window": "While this card is face-up on the field and you control another face-up \"Ice Barrier\" monster",
+      "window": "While you control another face-up \"Ice Barrier\" monster",
       "cost": "",
       "effect": "Monsters your opponent controls cannot declare an attack if their ATK is greater than or equal to this card's DEF.",
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": {
+          "side": "opponent",
+          "place": "monsters",
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "others": false,
+        "cannot": [
+          "attack"
+        ],
+        "by": null,
+        "compare": {
+          "stat": "atk",
+          "self": "def"
+        },
+        "once": false,
+        "while": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "monsters",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Ice Barrier",
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 1,
+            "max": null
+          }
+        ]
+      },
       "status": "unverified"
     }
   ],

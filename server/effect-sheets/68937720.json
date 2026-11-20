@@ -9,9 +9,9 @@
       "mandatory": false,
       "from": "field",
       "opt": "none",
-      "window": "Any time a Set Trap can be activated (either player's turn).",
-      "cost": "Activate this card by paying 1000 LP.",
-      "effect": "Activates this Continuous Trap; the activation itself does nothing further (its ongoing effect applies while it is face-up on the field).",
+      "window": "Either player's turn, once Set (Continuous Trap)",
+      "cost": "Pay 1000 LP",
+      "effect": "Activate this card by paying 1000 LP. The activation does nothing by itself; this card remains on the field to apply its continuous effect.",
       "targets": null,
       "when": null,
       "script": {
@@ -43,13 +43,37 @@
       "mandatory": false,
       "from": "field",
       "opt": "none",
-      "window": "While this card is face-up on the field.",
+      "window": "While this card is face-up on the field",
       "cost": "",
       "effect": "Effects of monsters in the hand cannot be activated.",
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "lock",
+        "player": "both",
+        "cannot": "activate",
+        "filter": {
+          "side": "either",
+          "place": "hand",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "perTurn": null,
+        "setFirst": false,
+        "while": []
+      },
       "status": "unverified"
     }
   ],

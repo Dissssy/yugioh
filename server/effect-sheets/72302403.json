@@ -58,6 +58,7 @@
           "races": [],
           "attributes": [],
           "named": null,
+          "extraDeck": null,
           "faceUp": null,
           "position": null,
           "level": null,
@@ -69,6 +70,8 @@
           "attack"
         ],
         "by": null,
+        "compare": null,
+        "once": false,
         "while": []
       },
       "status": "unverified"

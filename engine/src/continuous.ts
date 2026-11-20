@@ -2,45 +2,70 @@
 // here is stored: every read derives what applies from the cards face-up on the field now, so an effect stops the
 // moment its card leaves or its condition fails.
 
-import { cardsFitting, conditionProblem, fits, materialsOf } from './script.ts';
+import { cardsFitting, conditionProblem, fits, identityFits, materialsOf } from './script.ts';
 import { levelOf, locate } from './state.ts';
-import type { Continuous, DuelState, Restriction, Seat } from './types.ts';
+import type { CardFilter, Continuous, DuelState, FieldCard, Restriction, Seat } from './types.ts';
 
-type Applied = Extract<Continuous, { apply: 'stats' | 'restrict' }>;
+type Applied = Extract<Continuous, { apply: 'stats' | 'restrict' | 'battle' | 'lock' }>;
 type Stats = Extract<Continuous, { apply: 'stats' }>;
+export type Restrict = Extract<Continuous, { apply: 'restrict' }>;
+type Battle = Extract<Continuous, { apply: 'battle' }>;
+type Lock = Extract<Continuous, { apply: 'lock' }>;
 
-/** A continuous effect in force: the card it comes from, that card's controller, and what it does. */
+/** A continuous effect in force: the card it comes from, that card's controller, the effect's index, and what it does. */
 export interface InForce<C extends Continuous = Applied> {
   source: string;
   seat: Seat;
+  index: number;
   effect: C;
 }
 
-/** Every continuous effect on a face-up card on the field. A Spell or Trap's apply once its activation has resolved. */
-export function continuousOnField(state: DuelState): InForce<Continuous>[] {
-  const found: InForce<Continuous>[] = [];
-  for (const seat of [0, 1] as const) {
-    for (const zone of ['monsters', 'spellTraps'] as const) {
-      for (const c of state.players[seat][zone]) {
-        if (!c?.faceUp || c.effectsNegated || (zone === 'spellTraps' && state.chain.some((l) => l.card === c.id))) continue;
-        for (const e of state.sheets[state.instances[c.id]!.code]?.effects ?? []) {
-          if (e.kind === 'continuous' && e.continuous && e.status !== 'flagged') found.push({ source: c.id, seat, effect: e.continuous });
-        }
-      }
-    }
-  }
-  return found;
+/** Face-up cards on the field, with their controllers. A Spell or Trap still on the chain hasn't resolved yet. */
+function faceUpOnField(state: DuelState): { card: FieldCard; seat: Seat }[] {
+  return ([0, 1] as const).flatMap((seat) =>
+    (['monsters', 'spellTraps'] as const).flatMap((zone) =>
+      state.players[seat][zone].flatMap((card) => (card?.faceUp && !(zone === 'spellTraps' && state.chain.some((l) => l.card === card.id)) ? [{ card, seat }] : [])),
+    ),
+  );
 }
 
-/** The continuous effects that apply to cards now: those whose `while` conditions hold. */
+/**
+ * Whether a card on the field has its effects negated: by a resolved effect, or by a card tied to it whose effect
+ * negates it (Fiendish Chain). The tying card's own negation counts only when a resolved effect did it, so two such
+ * cards can't negate each other in a loop.
+ */
+export function negated(state: DuelState, id: string): boolean {
+  const at = locate(state, id);
+  if (at?.zone !== 'monsters' && at?.zone !== 'spellTraps') return false;
+  if (state.players[at.seat][at.zone][at.index]!.effectsNegated) return true;
+  return faceUpOnField(state).some(
+    ({ card }) =>
+      card.linked === id &&
+      !card.effectsNegated &&
+      (state.sheets[state.instances[card.id]!.code]?.effects ?? []).some((e) => e.continuous?.apply === 'negate_linked' && e.status !== 'flagged'),
+  );
+}
+
+/** Every continuous effect on a face-up card on the field whose effects aren't negated. */
+export function continuousOnField(state: DuelState): InForce<Continuous>[] {
+  return faceUpOnField(state).flatMap(({ card, seat }) =>
+    negated(state, card.id)
+      ? []
+      : (state.sheets[state.instances[card.id]!.code]?.effects ?? []).flatMap((e, index) =>
+          e.kind === 'continuous' && e.continuous && e.status !== 'flagged' ? [{ source: card.id, seat, index, effect: e.continuous }] : [],
+        ),
+  );
+}
+
+/** The continuous effects that apply to cards and players now: those whose `while` conditions hold. */
 export function inForce(state: DuelState): InForce[] {
   return continuousOnField(state).filter(
-    (f): f is InForce => (f.effect.apply === 'stats' || f.effect.apply === 'restrict') && f.effect.while.every((w) => !conditionProblem(state, w, f.seat, f.source)),
+    (f): f is InForce => 'while' in f.effect && f.effect.while.every((w) => !conditionProblem(state, w, f.seat, f.source)),
   );
 }
 
 /** Whether an effect in force applies to this card. */
-function affects(state: DuelState, f: InForce, id: string): boolean {
+function affects(state: DuelState, f: InForce<Stats | Restrict | Battle>, id: string): boolean {
   const to = f.effect.to;
   if (to === 'self') return id === f.source;
   if (to === 'linked') {
@@ -67,7 +92,7 @@ export function replacement(state: DuelState, id: string): number | null {
 function statsOn(state: DuelState, id: string): InForce<Stats>[] {
   const at = locate(state, id);
   if (at?.zone !== 'monsters' || !state.players[at.seat].monsters[at.index]!.faceUp) return [];
-  return inForce(state).filter((f): f is InForce<Stats> => f.effect.apply === 'stats' && affects(state, f, id));
+  return inForce(state).filter((f): f is InForce<Stats> => f.effect.apply === 'stats' && affects(state, f as InForce<Stats>, id));
 }
 
 /** How many times a stat change applies: once, or once per card that fits `per` or per Xyz Material of its card. */
@@ -77,18 +102,82 @@ function times(state: DuelState, f: InForce<Stats>): number {
 }
 
 /**
- * Whether a continuous effect stops this card doing `what`. For `be_destroyed_by_battle`, `against` is the monster it
- * battles.
+ * The continuous effect that stops this card doing `what`, if one does. `against` is the monster it battles, for
+ * `be_destroyed_by_battle`, or the card whose effect it is, for `be_destroyed_by_effect` and `be_affected`. A `once`
+ * effect already used this turn stops nothing.
  */
-export function restricted(state: DuelState, id: string, what: Restriction, against: string | null = null): boolean {
-  return inForce(state).some(
-    (f) =>
-      f.effect.apply === 'restrict' &&
-      f.effect.cannot.includes(what) &&
-      affects(state, f, id) &&
-      (what !== 'be_destroyed_by_battle' || !f.effect.by || (against !== null && fits(state, against, f.effect.by, f.seat))),
+export function restriction(state: DuelState, id: string, what: Restriction, against: string | null = null): InForce<Restrict> | null {
+  const stat = (card: string, s: 'atk' | 'def') => statsOf(state, card)[s];
+  return (
+    inForce(state).find(
+      (f): f is InForce<Restrict> =>
+        f.effect.apply === 'restrict' &&
+        f.effect.cannot.includes(what) &&
+        affects(state, f as InForce<Restrict>, id) &&
+        (!f.effect.by || (against !== null && fits(state, against, f.effect.by, f.seat))) &&
+        (!f.effect.compare || stat(id, f.effect.compare.stat) >= stat(f.source, f.effect.compare.self)) &&
+        (!f.effect.once || !state.usedThisTurn.some((u) => u.card === f.source && u.effect === f.index)),
+    ) ?? null
   );
 }
+
+export const restricted = (state: DuelState, id: string, what: Restriction, against: string | null = null) => restriction(state, id, what, against) !== null;
+
+/** The battle changes in force on a face-up monster. */
+function battleOn(state: DuelState, id: string): Battle[] {
+  return inForce(state).flatMap((f) => (f.effect.apply === 'battle' && affects(state, f as InForce<Battle>, id) ? [f.effect] : []));
+}
+
+/** How many attacks a monster can declare each Battle Phase: 1, or more if an effect says so (Hayabusa Knight). */
+export const attacksAllowed = (state: DuelState, id: string) => Math.max(1, ...battleOn(state, id).map((b) => b.attacks));
+/** Whether a monster attacking a Defense Position monster inflicts piercing battle damage. */
+export const piercing = (state: DuelState, id: string) => battleOn(state, id).some((b) => b.piercing);
+/** Whether its controller takes no battle damage from attacks involving this monster (Fortress Warrior). */
+export const shieldsBattleDamage = (state: DuelState, id: string) => battleOn(state, id).some((b) => b.noDamageToYou);
+
+/** The locks in force on a player. */
+function locksOn(state: DuelState, seat: Seat): InForce<Lock>[] {
+  return inForce(state).filter(
+    (f): f is InForce<Lock> => f.effect.apply === 'lock' && (f.effect.player === 'both' || (f.effect.player === 'you') === (f.seat === seat)),
+  );
+}
+
+/**
+ * Why a lock stops the player activating this card's effects now (Mind Drain, Medium of the Ice Barrier, Warlock of
+ * the Ice Barrier); null if none does. A `perTurn` lock counts the player's activations this turn of cards that fit.
+ */
+export function lockProblem(state: DuelState, seat: Seat, id: string): string | null {
+  const card = state.cards[state.instances[id]!.code]!;
+  const at = locate(state, id)!;
+  const set = at.zone === 'spellTraps' && !state.players[at.seat].spellTraps[at.index]!.faceUp;
+  // A player knows their own Set cards, so a lock on Spells applies to a Set Spell too.
+  const fitting = (filter: CardFilter, lockSeat: Seat) =>
+    set
+      ? identityFits(card, filter) && ['any', 'field', 'spellTraps'].includes(filter.place) && (filter.side === 'either' || (filter.side === 'you') === (at.seat === lockSeat))
+      : fits(state, id, filter, lockSeat);
+  for (const f of locksOn(state, seat)) {
+    const lock = f.effect;
+    if (lock.cannot !== 'activate' || (lock.filter && !fitting(lock.filter, f.seat))) continue;
+    const by = state.cards[state.instances[f.source]!.code]!.name;
+    if (lock.perTurn !== null) {
+      const used = state.usedThisTurn.filter((u) => {
+        const kind = state.sheets[u.code]?.effects[u.effect]?.kind;
+        return u.player === seat && kind !== 'condition' && kind !== 'continuous' && (!lock.filter || identityFits(state.cards[u.code]!, lock.filter));
+      }).length;
+      if (used >= lock.perTurn) return `${by} allows only ${lock.perTurn} such activation${lock.perTurn === 1 ? '' : 's'} each turn.`;
+      continue;
+    }
+    if (lock.setFirst) {
+      if (set && state.players[at.seat].spellTraps[at.index]!.placedTurn < state.turn) continue;
+      return `${by}: ${card.kind === 'spell' ? 'Spells' : 'these cards'} must be Set first and activated on a later turn.`;
+    }
+    return `${by} stops you activating that.`;
+  }
+  return null;
+}
+
+/** Whether a lock stops the player Tribute Summoning (Revealer of the Ice Barrier). */
+export const tributeSummonLocked = (state: DuelState, seat: Seat) => locksOn(state, seat).some((f) => f.effect.cannot === 'tribute_summon');
 
 /**
  * A face-up monster's current Level: the printed one (none for an Xyz Monster), a continuous "becomes", then

@@ -30,6 +30,7 @@
           "races": [],
           "attributes": [],
           "named": null,
+          "extraDeck": null,
           "faceUp": null,
           "position": null,
           "level": null,
@@ -39,6 +40,8 @@
           },
           "def": null
         },
+        "compare": null,
+        "once": false,
         "while": []
       },
       "status": "unverified"

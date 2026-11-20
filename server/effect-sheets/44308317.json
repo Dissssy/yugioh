@@ -25,6 +25,7 @@
           "races": [],
           "attributes": [],
           "named": null,
+          "extraDeck": null,
           "faceUp": null,
           "position": "defense",
           "level": null,
@@ -36,6 +37,8 @@
           "change_position"
         ],
         "by": null,
+        "compare": null,
+        "once": false,
         "while": [
           {
             "if": "count",
@@ -49,13 +52,14 @@
               "races": [],
               "attributes": [],
               "named": "Ice Barrier",
+              "extraDeck": null,
               "faceUp": true,
               "position": null,
               "level": null,
               "atk": null,
               "def": null
             },
-            "min": 2,
+            "min": 1,
             "max": null
           }
         ]
@@ -87,6 +91,7 @@
               "races": [],
               "attributes": [],
               "named": "Ice Barrier",
+              "extraDeck": null,
               "faceUp": true,
               "position": null,
               "level": null,
@@ -144,6 +149,7 @@
               "races": [],
               "attributes": [],
               "named": "Ice Barrier",
+              "extraDeck": null,
               "faceUp": true,
               "position": null,
               "level": null,

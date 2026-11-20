@@ -98,6 +98,8 @@ const condition = z.union([
       z.object({ if: z.literal('summoned_this_turn'), how: z.array(summonKind) }),
       z.object({ if: z.literal('materials'), min: z.number().int().nullable(), max: z.number().int().nullable() }),
       z.object({ if: z.literal('outnumbered'), by: z.number().int().min(1) }),
+      z.object({ if: z.literal('battling'), as: z.enum(['attacker', 'target']), damageStep: z.boolean() }),
+      z.object({ if: z.literal('last_attack'), on: z.enum(['attack', 'defense']) }),
 ]) satisfies z.ZodType<Condition>;
 
 const script = z.object({
@@ -120,7 +122,27 @@ const continuous = z.union([
     levelSet: z.number().int().nullable(),
     while: z.array(condition),
   }),
-  z.object({ apply: z.literal('restrict'), to: affected, others: z.boolean(), cannot: z.array(z.enum(RESTRICTIONS)), by: cardFilter.nullable(), while: z.array(condition) }),
+  z.object({
+    apply: z.literal('restrict'),
+    to: affected,
+    others: z.boolean(),
+    cannot: z.array(z.enum(RESTRICTIONS)),
+    by: cardFilter.nullable(),
+    compare: z.object({ stat: z.enum(['atk', 'def']), self: z.enum(['atk', 'def']) }).nullable(),
+    once: z.boolean(),
+    while: z.array(condition),
+  }),
+  z.object({ apply: z.literal('battle'), to: affected, attacks: z.number().int().min(1).max(3), piercing: z.boolean(), noDamageToYou: z.boolean(), while: z.array(condition) }),
+  z.object({
+    apply: z.literal('lock'),
+    player: z.enum(['you', 'opponent', 'both']),
+    cannot: z.enum(['activate', 'tribute_summon']),
+    filter: cardFilter.nullable(),
+    perTurn: z.number().int().min(1).nullable(),
+    setFirst: z.boolean(),
+    while: z.array(condition),
+  }),
+  z.object({ apply: z.literal('negate_linked') }),
   z.object({ apply: z.literal('self_destruct'), opponentTurns: z.number().int().min(1) }),
   z.object({ apply: z.literal('tie'), destroyLinked: z.boolean(), defenseBreaks: z.boolean() }),
   z.object({ apply: z.literal('replace_destruction'), detach: z.number().int().min(1) }),
@@ -314,7 +336,7 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 
 "You" is the player activating the effect. Code already handles phases, once-per-turn clauses, spell speed and the event in "when", so a script says only what the card itself adds.
 
-- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n, "max": n | null} needs at least min and at most max cards that fit ("While there are 5 or more monsters in your GY": min 5, max null; "If you control a Synchro Monster": min 1; "while you have 1 or less cards in your hand": min 0, max 1). {"if": "turn", "whose": "you" | "opponent"} for "during your turn" ("during your Battle Phase" is this plus a phase condition). {"if": "position", "position": "attack" | "defense"} for "while this card is in face-up Defense Position". {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon). {"if": "materials", "min": n | null, "max": n | null} needs this Xyz Monster to have that many Xyz Materials ("while this card has no Xyz Material": min null, max 0). {"if": "outnumbered", "by": n} for "If your opponent controls n or more cards than you do" (cards on the field).
+- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n, "max": n | null} needs at least min and at most max cards that fit ("While there are 5 or more monsters in your GY": min 5, max null; "If you control a Synchro Monster": min 1; "while you have 1 or less cards in your hand": min 0, max 1). This card itself is never counted, so "If you control another "Ice Barrier" monster" is min 1, in a script and in a continuous effect's "while" alike. {"if": "turn", "whose": "you" | "opponent"} for "during your turn" ("during your Battle Phase" is this plus a phase condition). {"if": "position", "position": "attack" | "defense"} for "while this card is in face-up Defense Position". {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon). {"if": "materials", "min": n | null, "max": n | null} needs this Xyz Monster to have that many Xyz Materials ("while this card has no Xyz Material": min null, max 0). {"if": "outnumbered", "by": n} for "If your opponent controls n or more cards than you do" (cards on the field). {"if": "battling", "as": "attacker" | "target", "damageStep": bool} while this card is attacking an opponent's monster ("attacker") or is the attack's target ("target"), only in the Damage Step if damageStep ("during the Damage Step only"). {"if": "last_attack", "on": "attack" | "defense"} if this card's last attack this turn was on a monster in that position.
 - cost: steps paid on activation, in order ("Discard 1 card" is a move to graveyard of 1 card chosen from your hand; "Pay 500 LP" is change_lp kind cost; "Tribute this card" is a move of self to graveyard).
 - targets: {"filter", "min", "max", "event"} for "target 1 ..." ("up to 3" is min 1 max 3), or null. The player picks them on activation, after paying the cost; resolution steps reach them with {"from": "targets"}, and a target that no longer fits the filter isn't affected. event true for "target that monster", where the target is the card the "when" event happened to (Trap Hole); else false.
 - options: what the effect does. One option (label "") unless the text says "activate 1 of these effects", then one per bullet with the bullet's wording as label; the player picks one on activation. Each option has its own cost, paid after the script's cost once the option is picked: a cost only one bullet has ("● Tribute 1 monster, then target ...") goes there; else [].
@@ -328,7 +350,13 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 
 {"apply": "stats", "to", "atk", "def", "per", "levelDelta", "levelSet", "while"}: while this card is face-up on the field and every "while" condition holds (the conditions above, with "you" as this card's controller), the monsters in "to" gain atk and def (negative for a loss) and their Level changes by levelDelta, or becomes levelSet (else null). "to" is "self", "linked" (the monster this card is equipped or tied to: "the equipped monster", a Continuous Trap's "that monster"), or a filter of the face-up monsters it applies to. "per" multiplies atk and def: null for a flat amount, a filter to count cards ("for each face-up Level 2 monster you control", counting this card too if it fits), or "materials" for "for each Xyz Material attached to this card". Examples: "All monsters you control gain 200 ATK during your Battle Phase only": to {"side": "you", "place": "monsters", "faceUp": true, ...}, atk 200, while [{"if": "turn", "whose": "you"}, {"if": "phase", "phases": ["battle"]}]. "This card is Level 4 while in face-up Defense Position": to "self", levelSet 4, while [{"if": "position", "position": "defense"}].
 
-{"apply": "restrict", "to", "others", "cannot", "by", "while"}: the monsters in "to" can't do what "cannot" lists: "attack" (declare an attack), "change_position", "be_attacked" (be targeted for an attack), "be_destroyed_by_battle". others true leaves this card itself out ("except this one"). by: for be_destroyed_by_battle, a filter the monster it battles must fit ("with a monster that has 1900 or more ATK": atk {"min": 1900, "max": null}), else null. "Your opponent's monsters cannot declare an attack": to {"side": "opponent", "place": "monsters", ...}, cannot ["attack"]. "Your opponent cannot target Warrior monsters for attacks, except this one": to {"side": "you", "place": "monsters", "faceUp": true, "races": ["Warrior"], ...}, others true, cannot ["be_attacked"].
+{"apply": "restrict", "to", "others", "cannot", "by", "compare", "once", "while"}: the cards in "to" can't do what "cannot" lists: "attack" (declare an attack), "change_position", "be_attacked" (be targeted for an attack), "be_destroyed_by_battle", "be_destroyed_by_effect" (by a card effect), "be_affected" (unaffected by activated card effects). others true leaves this card itself out ("except this one"). by: for be_destroyed_by_battle, a filter the monster it battles must fit ("with a monster that has 1900 or more ATK": atk {"min": 1900, "max": null}); for be_destroyed_by_effect and be_affected, a filter the card whose effect it is must fit ("cannot be destroyed by Spell or Trap Card effects": kinds ["spell", "trap"], place "any"; "unaffected by the activated effects of your opponent's monsters that were Special Summoned from the Extra Deck": side "opponent", place "any", kinds ["monster"], extraDeck true); else null. compare {"stat", "self"}: only cards in "to" whose stat is at least this card's ("monsters your opponent controls cannot declare an attack if their ATK is greater than or equal to this card's DEF": stat "atk", self "def"), else null. once true for "Once per turn, this card cannot be destroyed by battle" (the first time each turn only). Monster conditions like "Level 4 or higher monsters cannot declare an attack" go in the "to" filter (side "either", level {"min": 4, "max": null}). "Your opponent's monsters cannot declare an attack": to {"side": "opponent", "place": "monsters", ...}, cannot ["attack"]. "Your opponent cannot target Warrior monsters for attacks, except this one": to {"side": "you", "place": "monsters", "faceUp": true, "races": ["Warrior"], ...}, others true, cannot ["be_attacked"].
+
+{"apply": "battle", "to", "attacks", "piercing", "noDamageToYou", "while"}: the monsters in "to" can make "attacks" attacks each Battle Phase (2 for "can make a second attack during each Battle Phase", else 1), inflict piercing battle damage when attacking a Defense Position monster (piercing), and their controller takes no battle damage from attacks involving them ("You take no battle damage from attacks involving this card": noDamageToYou). "Once per Battle Phase, if this card attacks a Defense Position monster, it can make a second attack in a row": to "self", attacks 2, while [{"if": "last_attack", "on": "defense"}].
+
+{"apply": "lock", "player", "cannot", "filter", "perTurn", "setFirst", "while"}: a player-wide lock. player "you", "opponent" or "both". cannot "activate": that player can't activate the cards that fit filter (null for any card; "you" in it is this card's controller): "Effects of monsters in the hand cannot be activated": player "both", filter side "either", place "hand", kinds ["monster"]. perTurn n: they can activate at most n such cards each turn instead ("Your opponent can only activate 1 Spell/Trap Card each turn": player "opponent", kinds ["spell", "trap"], place "any", perTurn 1). setFirst true: they can activate such cards only once Set on an earlier turn ("both players must Set Spell Cards before activating them, and cannot activate them until their next turn": player "both", kinds ["spell"], place "any", setFirst true). cannot "tribute_summon" ("your opponent cannot Tribute Summon"): filter null, perTurn null, setFirst false.
+
+{"apply": "negate_linked"}: "negate the effects of that face-up monster" for a card linked to a monster (Fiendish Chain).
 
 {"apply": "tie", "destroyLinked", "defenseBreaks"}: for an Equip Spell or Continuous Trap linked to a monster (see the link step). Code always destroys a linked card when its monster leaves the field, so "When that monster is destroyed, destroy this card" needs only this entry with both false. destroyLinked true for "When this card leaves the field, destroy that monster"; defenseBreaks true for "If the target is changed to Defense Position, destroy it and this card". Write these as kind "continuous" even when worded "When ...".
 {"apply": "replace_destruction", "detach"}: "If this face-up card would be destroyed, you can detach 1 Xyz Material from this card instead" (detach 1). Code asks its controller each time it would be destroyed, by battle or by an effect.
@@ -366,7 +394,7 @@ Selections:
 - {"from": "random", "filter", "count"}: count cards that fit, picked at random by code, or all of them if fewer fit ("Discard 2 random cards from your opponent's hand (or their entire hand, if less than 2)": filter side "opponent", place "hand", count 2; "place 1 random card from their hand on top of their Deck": a move of count 1 to deck_top). The effect needs at least one.
 - {"from": "all", "filter"}: every card that fits ("destroy all face-up monsters your opponent controls"); the activation needs at least one.
 
-Filters ({"side", "place", "kinds", "types", "races", "attributes", "named", "faceUp", "position", "level", "atk", "def"}; empty lists and nulls don't restrict):
+Filters ({"side", "place", "kinds", "types", "races", "attributes", "named", "extraDeck", "faceUp", "position", "level", "atk", "def"}; empty lists and nulls don't restrict):
 - side: "you", "opponent" or "either": who controls a card on the field, or whose hand, Deck, GY or banished cards it is in.
 - place: "field", "monsters", "spellTraps", "hand", "deck", "graveyard", "banished", or "any" (wherever it is: "When a monster effect is activated" matches one activated from the hand or GY too).
 - kinds: any of "monster", "spell", "trap". "Spell/Trap" is ["spell", "trap"]; "card" is [].
@@ -374,6 +402,7 @@ Filters ({"side", "place", "kinds", "types", "races", "attributes", "named", "fa
 - races: any of these monster types ("Warrior", "Spellcaster") or Spell/Trap properties ("Quick-Play", "Continuous").
 - attributes: any of "LIGHT", "DARK", "EARTH", "WATER", "FIRE", "WIND", "DIVINE".
 - named: text the card's name must contain, for an archetype or a named card: "Ice Barrier" for an "Ice Barrier" monster, "Synchron" for a "Synchron" monster; else null.
+- extraDeck: true for a monster that belongs in the Extra Deck (Fusion, Synchro, Xyz; "Special Summoned from the Extra Deck" for one on the field), false for a Main Deck monster, else null.
 - faceUp: true for "face-up", false for "face-down", else null. A face-down card never fits a filter on its type, race, attribute or stats, and fits kinds ["spell", "trap"] only as a pair.
 - position: "attack" or "defense", or null.
 - level, atk, def: {"min", "max"} with nulls for open ends. Xyz and Link Monsters have no Level, so a filter for cards whose Level an effect changes needs level {"min": 1, "max": null}. "Level 2 or lower" is {"min": null, "max": 2}; "1500 or less ATK" is {"min": null, "max": 1500}. A filter can't test original ATK.

@@ -9,13 +9,20 @@
       "mandatory": false,
       "from": "field",
       "opt": "none",
-      "window": "While this card is face-up on the field, during each Battle Phase",
+      "window": "Always, while this card is face-up on the field.",
       "cost": "",
       "effect": "This card can make a second attack during each Battle Phase.",
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "battle",
+        "to": "self",
+        "attacks": 2,
+        "piercing": false,
+        "noDamageToYou": false,
+        "while": []
+      },
       "status": "unverified"
     }
   ],

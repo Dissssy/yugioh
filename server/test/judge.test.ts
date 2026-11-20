@@ -270,6 +270,7 @@ const anyCard = (side: CardFilter['side'], place: CardFilter['place'], kinds: Ca
   races: [],
   attributes: [],
   named: null,
+  extraDeck: null,
   faceUp: null,
   position: null,
   level: null,

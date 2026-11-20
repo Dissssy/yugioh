@@ -260,16 +260,22 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         }
         return;
       }
-      case 'attackDeclared':
-        onField(s, event.attacker).attackedTurn = s.turn;
-        s.attack = { attacker: event.attacker, target: event.target, replaced: {} };
+      case 'attackDeclared': {
+        const attacker = onField(s, event.attacker);
+        const on = event.target ? onField(s, event.target).position : null;
+        attacker.attacks = { turn: s.turn, count: attacker.attacks?.turn === s.turn ? attacker.attacks.count + 1 : 1, on };
+        s.attack = { attacker: event.attacker, target: event.target, replaced: {}, damageStep: false };
         s.happened.push({ event: 'attack_declared', card: event.attacker, player: event.player, target: event.target, group });
         if (event.target) s.happened.push({ event: 'attacked', card: event.target, player: other(event.player), attacker: event.attacker, group });
         return;
+      }
       case 'attackEnded': {
         const attacker = s.attack && locate(s, s.attack.attacker);
         // A replay: the attack never happened, so the monster may attack again.
-        if (event.replay && attacker?.zone === 'monsters') onField(s, s.attack!.attacker).attackedTurn = null;
+        if (event.replay && attacker?.zone === 'monsters') {
+          const m = onField(s, s.attack!.attacker);
+          m.attacks = m.attacks!.count > 1 ? { ...m.attacks!, count: m.attacks!.count - 1 } : null;
+        }
         s.attack = null;
         return;
       }
@@ -292,7 +298,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
           if (at?.zone === 'spellTraps') Object.assign(onField(s, event.card), { faceUp: true, activatedTurn: s.turn });
         }
         s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause, negated: false, setAgain: false });
-        s.usedThisTurn.push({ card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
+        s.usedThisTurn.push({ player: event.player, card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         const step = s.step;
         // A trigger joins the chain with the others; any other activation hands the opponent priority.
         if (step.at === 'triggers') step.handled.push(`${event.card}:${event.effect}`);
@@ -379,6 +385,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         return;
       }
       case 'damageStepStarted':
+        s.attack!.damageStep = true;
         s.happened.push({ event: 'damage_step_start', card: s.attack!.attacker, player: s.turnPlayer, target: s.attack!.target, group });
         return;
       case 'lpChanged': {
@@ -393,7 +400,8 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.forbidden.push({ player: event.player, what: event.what, filter: event.filter, turn: s.turn });
         return;
       case 'procedureUsed':
-        s.usedThisTurn.push({ card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
+      case 'protectionUsed':
+        s.usedThisTurn.push({ player: event.player, card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         return;
       case 'linked':
         onField(s, event.card).linked = event.to;
@@ -462,7 +470,7 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     faceUp,
     placedTurn: turn,
     positionChangedTurn: null,
-    attackedTurn: null,
+    attacks: null,
     summoned: null,
     materials: [],
     activatedTurn: null,
