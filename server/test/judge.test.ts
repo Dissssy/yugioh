@@ -4,6 +4,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
 import { decide, evolve, fits, legalActions, replay, scriptProblem, type CardData, type CardFilter, type DuelEvent, type DuelState, type EffectSheet, type Script, type Seat, zonePick } from '@yugioh/engine';
 import { rule } from '../src/judge/script.ts';
+import { TOOLS } from '../src/judge/tools.ts';
 import { judge, type JudgeDeps, type ModelCall, type Question } from '../src/judge/judge.ts';
 import { listSheetCodes, readSheetFiles, textHash } from '../src/sheets.ts';
 import { buildBoard, CASES, runCase } from '../src/judge/evals.ts';
@@ -431,5 +432,20 @@ describe('effect sheets', () => {
         expect(e.speed, `${c.name} effect ${i} (${e.kind})`).toBe(expected);
       }
     }
+  });
+});
+
+describe('judge tool definitions', () => {
+  // The API refuses every judge call when these are exceeded: "too many parameters with union types".
+  it('stay within the strict tool limits', () => {
+    const strict = TOOLS.filter((t) => t.strict);
+    const unions = (node: unknown): number => {
+      if (Array.isArray(node)) return node.reduce((n: number, v) => n + unions(v), 0);
+      if (!node || typeof node !== 'object') return 0;
+      const self = 'anyOf' in node || Array.isArray((node as { type?: unknown }).type) ? 1 : 0;
+      return self + Object.values(node).reduce((n: number, v) => n + unions(v), 0);
+    };
+    expect(strict.length).toBeLessThanOrEqual(20);
+    expect(strict.reduce((n, t) => n + unions(t.input_schema), 0)).toBeLessThanOrEqual(16);
   });
 });

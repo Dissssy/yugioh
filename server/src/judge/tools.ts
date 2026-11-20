@@ -1,6 +1,8 @@
 // The judge's tools: one per op, plus ask_player and finish. The same Zod schemas give the tool definitions sent to
-// Claude and the runtime check of each call. Tools are strict, so every call parses, except those marked `loose`: the
-// API allows 20 strict tools, so ones with a card ID or two and little else go without (parseOp still checks them).
+// Claude and the runtime check of each call. Tools are strict, so every call parses, except those marked `loose`. The
+// API allows 20 strict tools and 16 union-typed (nullable or anyOf) parameters across them, so tools with a card ID or
+// two and little else, and forbid with its many-nullable card filter, go without (parseOp still checks them). A test
+// holds both limits.
 
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
@@ -8,7 +10,7 @@ import { DESTINATIONS, FORBIDDEN, UNTIL, type Op } from '@yugioh/engine';
 import { cardFilter } from './cardFilter.ts';
 
 const card = z.string().describe('A card instance ID from the state, such as "k3f9a0b2".');
-const seat = z.union([z.literal(0), z.literal(1)]).describe('Player 0 or player 1.');
+const seat = z.literal([0, 1]).describe('Player 0 or player 1.');
 const position = z.enum(['attack', 'defense']);
 
 export const opTools = {
@@ -97,6 +99,7 @@ export const opTools = {
     input: z.object({}),
   },
   forbid: {
+    loose: true,
     description:
       'For the rest of this turn, stop a player declaring attacks ("your opponent cannot declare an attack this turn"), conducting their Battle Phase ("you cannot conduct your Battle Phase this turn") or Special Summoning ("you cannot Special Summon monsters from your hand for the rest of this turn"). filter: for special_summon, the monsters it stops ("from your hand": place "hand"; "Level 5 or higher monsters": place "any", level min 5; null for any monster); null for the others. side "you" in it is that player.',
     input: z.object({ player: seat, what: z.enum(FORBIDDEN), filter: cardFilter.nullable() }),
