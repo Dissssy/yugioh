@@ -400,6 +400,10 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `${who(event.player)} ${event.accept ? 'accepted' : 'declined'} the rewind`;
     case 'rolledBack':
       return 'Both players agreed: the duel went back to before the overturned ruling';
+    case 'taxDemanded':
+      return `${name(event.by)}: ${who(event.player)} must discard 1 card or have the effect negated`;
+    case 'taxAnswered':
+      return event.negated ? 'The effect was negated' : null;
     case 'replacementChosen':
       return event.materials.length ? `${name(event.card)} detaches ${names(event.materials)} instead of being destroyed` : null;
     case 'linked':

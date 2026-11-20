@@ -120,6 +120,11 @@ export function movesFor(view: PlayerView): Move[] {
           { text: `Detach ${action.count} Xyz Material from ${name(action.card)} instead of it being destroyed`, intent: { type: 'replace', materials: action.materials.slice(0, action.count) } },
           { text: `Let ${name(action.card)} be destroyed`, intent: { type: 'replace', materials: [] } },
         ];
+      case 'tax':
+        return [
+          ...action.hand.map((id) => ({ text: `Discard ${name(id)} so ${name(action.card)}'s effect resolves (${name(action.by)})`, intent: { type: 'tax' as const, discard: id } })),
+          { text: `Let ${name(action.card)}'s effect be negated (${name(action.by)})`, intent: { type: 'tax' as const, discard: null } },
+        ];
       case 'rollback':
       case 'rps':
       case 'chooseOrder':

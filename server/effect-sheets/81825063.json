@@ -15,7 +15,27 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "banish_instead",
+        "filter": {
+          "side": "opponent",
+          "place": "field",
+          "kinds": [
+            "spell",
+            "trap"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        }
+      },
       "status": "unverified"
     },
     {

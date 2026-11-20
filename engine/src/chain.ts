@@ -4,7 +4,7 @@
 
 import { cardOf, continuation, legalActions, onceOk, ruledIllegal } from './rules.ts';
 import { fits, scriptProblem } from './script.ts';
-import { lockProblem, negated } from './continuous.ts';
+import { flipNegatedByBattle, lockProblem, negated, taxedBy } from './continuous.ts';
 import { locate, summonMatches, summonName } from './state.ts';
 import type { DuelEvent, DuelState, Happening, Seat, When } from './types.ts';
 
@@ -25,6 +25,8 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
     return !f || ((f.side === 'either' || mine === (f.side === 'you')) && (f.faceUp === null || f.faceUp === h.faceUp));
   }
   if (h.event === 'summoned' && !summonMatches(h.how, when.how)) return false;
+  // "If this card attacked or was attacked": either monster in the battle.
+  if (h.event === 'damage_step_end' && when.self) return h.card === card || h.target === card;
   if (when.self && h.card !== card) return false;
   return !when.filter || fits(state, h.card, when.filter, seat);
 }
@@ -66,7 +68,7 @@ export function pendingTriggers(state: DuelState): PendingTrigger[] {
       if (step.handled.includes(`${id}:${index}`) || (!effect.mandatory && step.passed.includes(at.seat))) return;
       // A monster whose effects are negated triggers nothing.
       const onField = at.zone === 'monsters' || at.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
-      const place = onField ? effect.from === 'field' && onField.faceUp && !negated(state, id) : flip || at.zone === effect.from;
+      const place = onField ? effect.from === 'field' && onField.faceUp && !negated(state, id) : flip ? !flipNegatedByBattle(state, id) : at.zone === effect.from;
       if (!place || lockProblem(state, at.seat, id) || !onceOk(state, id, sheet.code, index, effect.opt) || ruledIllegal(state, at.seat, id, index)) return;
       const cause = state.happened.find((h) => (!when.canMiss || h.group >= last) && whenMatches(state, when, h, id, at.seat));
       if (!cause || scriptProblem(state, at.seat, id, index, cause)) return;
@@ -116,20 +118,26 @@ export function nextStep(state: DuelState): Next | null {
       const canAct = legalActions(state, step.priority).some((a) => a.type === 'activate');
       return { kind: 'wait', player: step.priority, autoPass: !canAct, floor: step.priority !== step.actor };
     }
-    case 'resolve':
+    case 'resolve': {
+      const link = state.chain.at(-1)!;
+      const by = taxedBy(state, link);
+      if (by) return { kind: 'events', events: [{ type: 'taxDemanded', player: link.player, by }] };
       // A negated activation resolves doing nothing, so code finishes it.
-      return state.chain.at(-1)?.negated ? { kind: 'events', events: [{ type: 'linkResolved' }] } : { kind: 'resolve' };
+      return link.negated ? { kind: 'events', events: [{ type: 'linkResolved' }] } : { kind: 'resolve' };
+    }
     case 'continue':
       return { kind: 'events', events: continuation(state, step.then) };
     case 'replace':
+    case 'tax':
       return { kind: 'wait', player: step.player, autoPass: false, floor: false };
   }
 }
 
 /** Who the duel waits on in a triggers step or a response window, as a player's view (or a spectator's, null) shows it. */
-export function waitingFor(state: DuelState, seat: Seat | null): { player: Seat; for: 'respond' | 'triggers' | 'replace'; cause: string | null } | null {
+export function waitingFor(state: DuelState, seat: Seat | null): { player: Seat; for: 'respond' | 'triggers' | 'replace' | 'tax'; cause: string | null } | null {
   const step = state.step;
   if (step.at === 'replace') return { player: step.player, for: 'replace', cause: cardOf(state, step.card).name };
+  if (step.at === 'tax') return { player: step.player, for: 'tax', cause: cardOf(state, step.by).name };
   if (step.at === 'respond') {
     // With a chain building, players respond to its last link.
     const last = state.chain.at(-1);
@@ -167,6 +175,8 @@ export function describeCause(state: DuelState, cause: Happening | null): string
       return `the destruction of ${name(cause.card)}`;
     case 'damage_step_start':
       return `the start of the Damage Step`;
+    case 'damage_step_end':
+      return `the end of the Damage Step`;
     case 'sent_to_graveyard':
       return `${name(cause.card)} going to the GY`;
     case 'flipped':

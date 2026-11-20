@@ -24,6 +24,8 @@ The engine's `nextStep(state)` (`engine/src/chain.ts`) says what happens next, a
 - `resolve`: the top link resolves.
 - `wait`: a player has to decide. If they hold nothing that could be activated, the server passes for them after the response floor.
 
+General Raiho adds a `tax` step: before a monster effect activated on the field resolves, its controller discards 1 card or lets the effect be negated. Chainsaw Insect's `damage_step_end` happens as an attack that reached the Damage Step ends, with the battle's other triggers.
+
 FLIP effects are triggers whose event is always their own card being `flipped` face-up: by a Flip Summon, by an attack (after damage calculation, so Man-Eater Bug destroyed by that battle still activates from the GY), or by an effect that changes its position. Sheets leave their `when` null; code supplies it.
 
 Triggers go on the chain in SEGOC order: the turn player's mandatory, the opponent's mandatory, the turn player's optional, the opponent's optional. An optional trigger is offered to its controller with **Don't activate**.

@@ -58,6 +58,13 @@ const cards: Record<number, CardData> = {
   11: monster(11, 'Big Wall', 0, 3000),
   12: monster(12, 'Trident Warrior', 1700, 1400),
   13: monster(13, 'Man-Eater Bug', 450, 600, 2),
+  20: monster(20, 'General Wayne', 1800, 1000),
+  21: monster(21, 'Chainsaw Insect', 2400, 0),
+  22: monster(22, 'General Grunard', 2800, 1000),
+  23: monster(23, 'Ice Soldier', 1000, 1000),
+  24: monster(24, 'General Raiho', 2100, 1000),
+  25: monster(25, 'Blade Knight', 1600, 1000),
+  26: monster(26, 'Silencer', 1000, 1000),
 };
 
 const filter = (f: Partial<CardFilter>): CardFilter => ({
@@ -176,6 +183,15 @@ const sheets: Record<number, EffectSheet> = {
   9: sheet(9, effect({ kind: 'activation', speed: 2 })),
   10: sheet(10, effect({ kind: 'activation', speed: 1 })),
   12: sheet(12, effect({ kind: 'trigger', when: when({ event: 'summoned', self: true, canMiss: true, by: null }) })),
+  20: sheet(20, effect({ kind: 'continuous', continuous: { apply: 'banish_instead', filter: filter({ side: 'opponent', place: 'field', kinds: ['spell', 'trap'] }) } })),
+  21: sheet(21, effect({ kind: 'trigger', mandatory: true, when: when({ event: 'damage_step_end', self: true }) })),
+  22: sheet(22, effect({ kind: 'continuous', opt: 'soft', continuous: { apply: 'extra_normal_summon', filter: filter({ side: 'you', place: 'hand', named: 'Ice' }), while: [] } })),
+  24: sheet(24, effect({ kind: 'continuous', continuous: { apply: 'discard_or_negate', while: [] } })),
+  25: sheet(25, effect({ kind: 'continuous', continuous: { apply: 'negate_battled_flips', while: [] } })),
+  26: sheet(
+    26,
+    effect({ kind: 'continuous', continuous: { apply: 'restrict', to: filter({ side: 'opponent' }), others: false, cannot: ['activate_effects'], by: null, compare: null, once: false, while: [] } }),
+  ),
   13: sheet(
     13,
     effect({
@@ -517,6 +533,70 @@ describe('FLIP effects', () => {
     t.trigger();
     t.resolve({ type: 'targeted', cards: ['a0'] }, { type: 'destroyed', cards: ['a0'], by: 1 });
     expect(t.state.players[0].graveyard).toContain('a0');
+  });
+});
+
+describe('continuous effects', () => {
+  it("banish the opponent's Spells and Traps leaving the field instead of sending them to the GY (General Wayne)", () => {
+    const t = new Table(stacked(pad([20, 2, 2, 2, 2, 2]), pad([10, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.play(1, { type: 'activate', card: 'b0', effect: 0, zone: 0 }).resolve();
+    expect(t.state.players[1].banished).toContain('b0');
+    expect(t.state.players[1].graveyard).not.toContain('b0');
+  });
+
+  it('let a monster Normal Summon one more fitting monster, once a turn, but not Set it (General Grunard)', () => {
+    const t = new Table(stacked(pad([22, 23, 23, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    const summons = (type: string) => legalActions(t.state, 0).filter((a) => a.type === type && 'card' in a).map((a) => (a as { card: string }).card);
+    expect(summons('normalSummon')).toEqual(['a1', 'a2']);
+    expect(summons('setMonster')).toEqual([]);
+    t.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 1 });
+    expect(summons('normalSummon')).toEqual([]);
+  });
+
+  it('make the opponent discard or have a monster effect negated as it resolves (General Raiho)', () => {
+    const t = new Table(stacked(pad([12, 2, 2, 2, 2, 2]), pad([24, 2, 2, 2, 2, 2])));
+    t.endTurn(0);
+    t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 }).endTurn(1);
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).play(0, { type: 'activate', card: 'a0', effect: 0, zone: null });
+    expect(t.state.step).toMatchObject({ at: 'tax', player: 0, by: 'b0' });
+    expect(nextStep(t.state)).toMatchObject({ kind: 'wait', player: 0 });
+    const declined = new Table(t.events);
+    t.play(0, { type: 'tax', discard: 'a1' });
+    expect(t.state.players[0].graveyard).toContain('a1');
+    expect(nextStep(t.state)?.kind).toBe('resolve');
+    declined.play(0, { type: 'tax', discard: null });
+    expect(declined.state.chain).toEqual([]);
+    expect(declined.state.step).toEqual({ at: 'open' });
+  });
+
+  it('negate the FLIP effect of a monster destroyed by battle with this card (Blade Knight)', () => {
+    const t = new Table(stacked(pad([25, 2, 2, 2, 2, 2]), pad([13, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.play(1, { type: 'setMonster', card: 'b0', tributes: [], zone: 0 }).endTurn(1);
+    t.play(0, { type: 'enterBattle' }).play(0, { type: 'attack', attacker: 'a0', target: 0 });
+    expect(t.state.players[1].graveyard).toContain('b0');
+    expect(t.state.chain).toEqual([]);
+    expect(t.state.step).toEqual({ at: 'open' });
+  });
+
+  it('stop monsters activating their effects', () => {
+    const t = new Table(stacked(pad([26, 2, 2, 2, 2, 2]), pad([12, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 });
+    expect(t.state.step).toEqual({ at: 'open' });
+    expect(t.activations(1)).toEqual([]);
+  });
+});
+
+describe('the end of the Damage Step', () => {
+  it('fires a trigger of a monster that attacked (Chainsaw Insect)', () => {
+    const t = new Table(stacked(pad([21, 2, 2, 2, 2, 2]), pad([11, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.play(1, { type: 'setMonster', card: 'b0', tributes: [], zone: 0 }).endTurn(1);
+    t.play(0, { type: 'enterBattle' }).play(0, { type: 'attack', attacker: 'a0', target: 0 });
+    expect(nextStep(t.state)).toMatchObject({ kind: 'trigger', trigger: { card: 'a0', cause: { event: 'damage_step_end', card: 'a0', target: 'b0' } } });
   });
 });
 

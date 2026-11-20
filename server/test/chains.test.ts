@@ -72,7 +72,7 @@ async function setUp() {
     toHand(1, ids.zubaba),
     { type: 'spellTrapSet', player: 1, card: ids.mirrorForce, zone: 0 },
     { type: 'spellTrapSet', player: 1, card: ids.trapHole, zone: 1 },
-    { type: 'normalSummoned', player: 1, card: ids.zubaba, zone: 0 },
+    { type: 'normalSummoned', player: 1, card: ids.zubaba, zone: 0, extra: null },
     { type: 'turnStarted', player: 0, turn: 3 },
     { type: 'phaseChanged', phase: 'main1' },
     toHand(0, ids.speedWarrior),
@@ -183,7 +183,7 @@ describe('scripted triggers', () => {
     s = await runLink(s);
     expect(statsOf(s, ids.copycat)).toMatchObject({ atk: 1600, def: 900 });
 
-    s = evolve(s, { type: 'normalSummoned', player: 0, card: ids.magnaDrago, zone: 1 });
+    s = evolve(s, { type: 'normalSummoned', player: 0, card: ids.magnaDrago, zone: 1, extra: null });
     s = evolve(s, { type: 'effectActivated', player: 0, card: ids.magnaDrago, effect: 0, zone: null, cause: null });
     s = await runLink(s);
     expect(statsOf(s, ids.magnaDrago).atk).toBe(1600);

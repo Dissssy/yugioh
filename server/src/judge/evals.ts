@@ -1004,7 +1004,7 @@ export async function runCase(c: EvalCase, board: DuelState, model: ModelCall | 
   if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   let scratch = intent.events.slice(1).reduce(evolve, state);
   const procedure = isProcedure(state, id, c.effect ?? 0);
-  const link = procedure ? { player: seat, card: id, effect: c.effect ?? 0, targets: [], choice: null, cause: null, negated: false, setAgain: false } : scratch.chain.at(-1)!;
+  const link = procedure ? { player: seat, card: id, effect: c.effect ?? 0, targets: [], choice: null, cause: null, negated: false, setAgain: false, taxed: false } : scratch.chain.at(-1)!;
   const checked = await rule({ stage: 'activation', state: scratch, link }, deps);
   const records = [checked.record];
   const result = (passed: boolean, detail: string): EvalResult => ({ name: c.name, passed, detail, records });

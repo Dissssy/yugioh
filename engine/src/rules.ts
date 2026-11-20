@@ -1,8 +1,8 @@
 // The game rules as code: what a player may do now, and the events an intent produces.
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
-import { identityFits, scriptOf, scriptProblem, specialSummonForbidden } from './script.ts';
-import { attacksAllowed, continuousOnField, type InForce, type Restrict, levelNow, lockProblem, nameOf, negated, synchroMaterialRules, piercing, replacement, restricted, restriction, shieldsBattleDamage, statsOf, tributeSummonLocked } from './continuous.ts';
+import { fits, identityFits, scriptOf, scriptProblem, specialSummonForbidden } from './script.ts';
+import { attacksAllowed, continuousOnField, inForce, type InForce, type Restrict, levelNow, lockProblem, nameOf, negated, synchroMaterialRules, piercing, replacement, restricted, restriction, shieldsBattleDamage, statsOf, tributeSummonLocked } from './continuous.ts';
 import { evolve, isToken, locate, monsterZoneFree, monsterZonesFor, onField, other } from './state.ts';
 import {
   HAND_LIMIT,
@@ -148,6 +148,20 @@ function beginTurn(run: Run, player: Seat, turn: number) {
 
 export const normalSummonUsed = (state: DuelState) => state.normalSummons >= state.normalSummonLimit;
 
+/**
+ * Once the turn's Normal Summons are used: the continuous effect that lets the player Normal Summon this card from their
+ * hand anyway (General Grunard), if one can now.
+ */
+export function extraNormalSummon(state: DuelState, seat: Seat, id: string): { card: string; effect: number } | null {
+  if (!normalSummonUsed(state)) return null;
+  const f = inForce(state).find((f) => {
+    if (f.seat !== seat || f.effect.apply !== 'extra_normal_summon' || !fits(state, id, f.effect.filter, seat)) return false;
+    const code = state.instances[f.source]!.code;
+    return onceOk(state, f.source, code, f.index, state.sheets[code]!.effects[f.index]!.opt);
+  });
+  return f ? { card: f.source, effect: f.index } : null;
+}
+
 export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
   if (state.result) return [];
   const actions: LegalAction[] = [];
@@ -168,7 +182,9 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
     if (step.priority === seat) actions.push(...usable(state, seat), { type: 'pass' });
   }
   if (state.rollback && !state.rollback.accepted.includes(seat)) actions.push({ type: 'rollback' });
-  if (step.at === 'replace') {
+  if (step.at === 'tax') {
+    if (step.player === seat) actions.push({ type: 'tax', card: state.chain.at(-1)!.card, by: step.by, hand: [...state.players[seat].hand] });
+  } else if (step.at === 'replace') {
     const count = replacement(state, step.card);
     if (step.player === seat && count !== null) actions.push({ type: 'replace', card: step.card, materials: onField(state, step.card).materials, count });
   } else if (step.at === 'open' && state.turnPlayer === seat) {
@@ -184,9 +200,10 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
           // A tribute leaves its zone free for the monster it makes way for; a Main Deck monster never goes to an Extra Monster Zone.
           const zones = [...Array(MONSTER_ZONES).keys()].filter((i) => monsterZoneFree(state, seat, i) || (tributes > 0 && tributeFrom.includes(p.monsters[i]?.id ?? '')));
           const fits = tributes > 0 ? monsters.length >= tributes && zones.length > 0 : zones.length > 0;
-          if (!normalSummonUsed(state) && !card.extraDeck && canNormalSummon(state, card) && fits) {
-            if (tributes === 0 || !tributeSummonLocked(state, seat)) actions.push({ type: 'normalSummon', card: id, tributes, tributeFrom, zones });
-            actions.push({ type: 'setMonster', card: id, tributes, tributeFrom, zones });
+          if (!card.extraDeck && canNormalSummon(state, card) && fits) {
+            const fresh = !normalSummonUsed(state);
+            if ((fresh || extraNormalSummon(state, seat, id)) && (tributes === 0 || !tributeSummonLocked(state, seat))) actions.push({ type: 'normalSummon', card: id, tributes, tributeFrom, zones });
+            if (fresh) actions.push({ type: 'setMonster', card: id, tributes, tributeFrom, zones });
           }
         } else if (freeZones(p.spellTraps).length > 0) {
           actions.push({ type: 'setSpellTrap', card: id, zones: freeZones(p.spellTraps) });
@@ -586,6 +603,14 @@ export function decide(state: DuelState, seat: Seat, intent: Intent): Decision {
       run.emit({ type: 'rollbackAnswered', player: seat, accept: intent.accept });
       return { ok: true, events: run.events };
     }
+    if (intent.type === 'tax') {
+      const offer = legalActions(state, seat).find((a) => a.type === 'tax');
+      check(offer, 'Nothing is asking you that now.');
+      check(intent.discard === null || offer.hand.includes(intent.discard), 'Discard a card from your hand.');
+      if (intent.discard) run.emit({ type: 'discarded', player: seat, cards: [intent.discard] });
+      run.emit({ type: 'taxAnswered', negated: intent.discard === null });
+      return { ok: true, events: run.events };
+    }
     if (intent.type === 'replace') {
       const offer = legalActions(state, seat).find((a) => a.type === 'replace');
       check(offer, 'Nothing is asking you that now.');
@@ -612,8 +637,9 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
     case 'normalSummon':
     case 'setMonster': {
       check(isMainPhase(state), 'You can only summon in a Main Phase.');
-      check(!normalSummonUsed(state), 'You already used your Normal Summons and Sets this turn.');
       check(p.hand.includes(intent.card), 'That card is not in your hand.');
+      const extra = intent.type === 'normalSummon' ? extraNormalSummon(state, seat, intent.card) : null;
+      check(!normalSummonUsed(state) || extra !== null, 'You already used your Normal Summons and Sets this turn.');
       const card = cardOf(state, intent.card);
       check(card.kind === 'monster' && !card.extraDeck, 'Only Main Deck monsters can be Normal Summoned or Set.');
       check(canNormalSummon(state, card), `${card.name} cannot be Normal Summoned or Set.`);
@@ -629,7 +655,8 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
       if (needed > 0) run.emit({ type: 'tributed', player: seat, cards: [...tributes] });
       check(isZone(intent.zone, MONSTER_ZONES), 'Choose one of your Main Monster Zones.');
       check(monsterZoneFree(run.state, seat, intent.zone), 'That Monster Zone is not empty.');
-      run.emit({ type: intent.type === 'normalSummon' ? 'normalSummoned' : 'monsterSet', player: seat, card: intent.card, zone: intent.zone });
+      if (intent.type === 'normalSummon') run.emit({ type: 'normalSummoned', player: seat, card: intent.card, zone: intent.zone, extra });
+      else run.emit({ type: 'monsterSet', player: seat, card: intent.card, zone: intent.zone });
       if (intent.type === 'normalSummon') run.emit({ type: 'checkpoint', cause: run.state.happened.at(-1)!, then: { do: 'open' } });
       return;
     }

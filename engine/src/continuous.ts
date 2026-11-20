@@ -4,9 +4,9 @@
 
 import { cardsFitting, conditionProblem, fits, identityFits, materialsOf } from './script.ts';
 import { levelOf, locate } from './state.ts';
-import type { CardFilter, Continuous, DuelState, FieldCard, Restriction, Seat } from './types.ts';
+import type { CardFilter, ChainLink, Continuous, DuelState, FieldCard, Restriction, Seat } from './types.ts';
 
-type Applied = Extract<Continuous, { apply: 'stats' | 'restrict' | 'battle' | 'lock' }>;
+type Applied = Extract<Continuous, { apply: 'stats' | 'restrict' | 'battle' | 'lock' | 'negate_battled_flips' | 'extra_normal_summon' | 'discard_or_negate' }>;
 type Stats = Extract<Continuous, { apply: 'stats' }>;
 export type Restrict = Extract<Continuous, { apply: 'restrict' }>;
 type Battle = Extract<Continuous, { apply: 'battle' }>;
@@ -173,7 +173,25 @@ export function lockProblem(state: DuelState, seat: Seat, id: string): string | 
     }
     return `${by} stops you activating that.`;
   }
-  return null;
+  const r = restriction(state, id, 'activate_effects');
+  return r ? `${state.cards[state.instances[r.source]!.code]!.name} stops it activating its effects.` : null;
+}
+
+/** Whether the monster that destroyed `id` by battle negates its FLIP effects (Blade Knight). */
+export function flipNegatedByBattle(state: DuelState, id: string): boolean {
+  const negators = new Set(inForce(state).flatMap((f) => (f.effect.apply === 'negate_battled_flips' ? [f.source] : [])));
+  return state.happened.some((h) => h.event === 'battle_destroying' && h.target === id && negators.has(h.card));
+}
+
+/**
+ * The card that makes the controller of the resolving link discard or have it negated (General Raiho), if one does: a
+ * monster effect activated on the field, against a card of the other player in force.
+ */
+export function taxedBy(state: DuelState, link: ChainLink): string | null {
+  const card = state.cards[state.instances[link.card]!.code]!;
+  const effect = state.sheets[card.code]?.effects[link.effect];
+  if (link.negated || link.taxed || card.kind !== 'monster' || effect?.from !== 'field') return null;
+  return inForce(state).find((f) => f.effect.apply === 'discard_or_negate' && f.seat !== link.player)?.source ?? null;
 }
 
 /** Whether a lock stops the player Tribute Summoning (Revealer of the Ice Barrier). */

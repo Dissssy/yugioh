@@ -151,6 +151,8 @@ function describeHappening(state: DuelState, h: Happening): string {
       return `the start of player ${h.player}'s ${h.phase === 'battle' ? 'Battle Phase' : 'End Phase'}`;
     case 'destroyed_by_effect':
       return `player ${h.player}'s ${h.faceUp ? 'face-up' : 'face-down'} ${label(h.card)} was destroyed by player ${h.by}'s card effect`;
+    case 'damage_step_end':
+      return `the Damage Step of player ${h.player}'s ${label(h.card)}'s attack ${h.target ? `on ${label(h.target)}` : 'directly'} ended`;
     case 'damage_step_start':
       return `the Damage Step of player ${h.player}'s ${label(h.card)}'s attack ${h.target ? `on ${label(h.target)}` : 'directly'} started`;
     case 'sent_to_graveyard':

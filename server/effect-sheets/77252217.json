@@ -9,12 +9,37 @@
       "mandatory": true,
       "from": "field",
       "opt": "none",
-      "window": "At the end of the Damage Step, if this card attacked or was attacked (this event is not in the engine's event list, so this effect never fires)",
+      "window": "At the end of the Damage Step, if this card attacked or was attacked",
       "cost": "",
       "effect": "Your opponent draws 1 card.",
       "targets": null,
-      "when": null,
-      "script": null,
+      "when": {
+        "event": "damage_step_end",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "draw",
+                "player": "opponent",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }
