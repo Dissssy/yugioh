@@ -174,7 +174,7 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(card.position !== op.position || !card.faceUp, `It is already in ${op.position} position.`);
       run.emit({ type: 'positionChanged', player: at.seat, card: op.card, position: op.position });
       // A face-down monster changed to a position by an effect turns face-up, as when attacked.
-      if (!card.faceUp) run.emit({ type: 'flippedByAttack', card: op.card });
+      if (!card.faceUp) run.emit({ type: 'flipped', card: op.card });
       return;
     }
     case 'draw': {

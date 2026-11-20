@@ -6,7 +6,7 @@
     {
       "kind": "flip",
       "speed": 1,
-      "mandatory": false,
+      "mandatory": true,
       "from": "field",
       "opt": "none",
       "window": "When this card is flipped face-up",
@@ -14,7 +14,45 @@
       "effect": "Destroy the targeted Spell/Trap Card.",
       "targets": "1 Spell/Trap Card on the field",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "place": "spellTraps",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }
