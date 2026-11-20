@@ -151,8 +151,8 @@ function reviewText(state: DuelState, event: DuelEvent): string {
       return `${label(event.card)} moved from ${who(event.owner)}'s ${event.from} to ${event.to}`;
     case 'phaseChanged':
       return phaseNames[event.phase];
-    case 'flippedByAttack':
-      return `${label(event.card)} was flipped face-up by the attack`;
+    case 'flipped':
+      return `${label(event.card)} was flipped face-up`;
     case 'linkResolved':
       return 'The chain link resolved';
     case 'checkpoint':
@@ -426,7 +426,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `You asked the judge: "${event.question}" ${event.answer}`;
     case 'escalated':
       return `The appeal looked at your question: ${event.explanation}`;
-    case 'flippedByAttack':
+    case 'flipped':
     case 'linkResolved':
       return null;
   }

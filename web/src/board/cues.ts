@@ -20,7 +20,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   monsterSet: 400,
   spellTrapSet: 400,
   flipSummoned: 500,
-  flippedByAttack: 450,
+  flipped: 450,
   positionChanged: 400,
   attackDeclared: 550,
   battleDamage: 650,
@@ -147,7 +147,7 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
       return;
     }
     case 'flipSummoned':
-    case 'flippedByAttack': {
+    case 'flipped': {
       const el = card(e.card);
       if (el) void animate(el, { rotateY: [90, 0] }, { duration: s * 0.7, ease: 'easeOut' });
       return;

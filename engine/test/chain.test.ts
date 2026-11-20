@@ -57,6 +57,7 @@ const cards: Record<number, CardData> = {
   10: card(10, 'Pot', 'spell', 'Normal'),
   11: monster(11, 'Big Wall', 0, 3000),
   12: monster(12, 'Trident Warrior', 1700, 1400),
+  13: monster(13, 'Man-Eater Bug', 450, 600, 2),
 };
 
 const filter = (f: Partial<CardFilter>): CardFilter => ({
@@ -175,6 +176,14 @@ const sheets: Record<number, EffectSheet> = {
   9: sheet(9, effect({ kind: 'activation', speed: 2 })),
   10: sheet(10, effect({ kind: 'activation', speed: 1 })),
   12: sheet(12, effect({ kind: 'trigger', when: when({ event: 'summoned', self: true, canMiss: true, by: null }) })),
+  13: sheet(
+    13,
+    effect({
+      kind: 'flip',
+      mandatory: true,
+      script: script({ targets: { filter: filter({}), min: 1, max: 1, event: false }, options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'targets' } }] }] }),
+    }),
+  ),
 };
 
 /** Seat 0 goes first with `deck0` (top first, IDs a0, a1, ...), seat 1 with `deck1` (b0, b1, ...). */
@@ -486,6 +495,28 @@ describe('triggers', () => {
     };
     expect(play('first').state.step).toEqual({ at: 'open' });
     expect(legalActions(play('last').state, 0)).toContainEqual({ type: 'activate', card: 'a2', effect: 0, zones: null, text: 'trigger effect' });
+  });
+});
+
+describe('FLIP effects', () => {
+  it('fire when the monster is Flip Summoned', () => {
+    const t = new Table(stacked(pad([13, 2, 2, 2, 2, 2]), pad([1, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'setMonster', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 }).endTurn(1);
+    t.play(0, { type: 'flipSummon', card: 'a0' });
+    expect(nextStep(t.state)).toMatchObject({ kind: 'trigger', trigger: { card: 'a0', mandatory: true, cause: { event: 'flipped', card: 'a0' } } });
+  });
+
+  it('fire after the battle that flipped the monster, even once it was destroyed', () => {
+    const t = new Table(stacked(pad([1, 2, 2, 2, 2, 2]), pad([13, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.play(1, { type: 'setMonster', card: 'b0', tributes: [], zone: 0 }).endTurn(1);
+    t.play(0, { type: 'enterBattle' }).play(0, { type: 'attack', attacker: 'a0', target: 0 });
+    expect(t.state.players[1].graveyard).toContain('b0');
+    expect(nextStep(t.state)).toMatchObject({ kind: 'trigger', trigger: { card: 'b0', player: 1, cause: { event: 'flipped', card: 'b0' } } });
+    t.trigger();
+    t.resolve({ type: 'targeted', cards: ['a0'] }, { type: 'destroyed', cards: ['a0'], by: 1 });
+    expect(t.state.players[0].graveyard).toContain('a0');
   });
 });
 

@@ -92,7 +92,8 @@ export interface When {
    * `destroyed_by_effect`: a card on the field is destroyed by a card effect; the filter is checked against the card as
    * it was on the field, for its side and whether it was face-up. `damage_step_start`: the start of the Damage Step (the
    * event's card is the attacker). `end_phase`: the End Phase starts. `sent_to_graveyard`: a card is sent from the field
-   * to the GY, by any means (destroyed, Tributed, used as Synchro Material, sent).
+   * to the GY, by any means (destroyed, Tributed, used as Synchro Material, sent). `flipped`: a face-down monster is
+   * flipped face-up (Flip Summoned, attacked, or changed by an effect); code gives every FLIP effect this `when`.
    */
   event:
     | 'summoned'
@@ -105,7 +106,8 @@ export interface When {
     | 'activated'
     | 'damage_step_start'
     | 'end_phase'
-    | 'sent_to_graveyard';
+    | 'sent_to_graveyard'
+    | 'flipped';
   /** Only when it happens to this card itself ("When this card is Normal Summoned"). */
   self: boolean;
   /** The card it happens to must fit this as it is after the event ("this face-up Attack Position card"); null for any card. */
@@ -441,7 +443,9 @@ export type Happening =
   | { event: 'damage_step_start'; card: string; player: Seat; target: string | null; group: number }
   | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number }
   /** A card left the field for the GY, by any means; `player` controlled it. */
-  | { event: 'sent_to_graveyard'; card: string; player: Seat; group: number };
+  | { event: 'sent_to_graveyard'; card: string; player: Seat; group: number }
+  /** A face-down monster turned face-up: Flip Summoned, attacked, or changed to a position by an effect. */
+  | { event: 'flipped'; card: string; player: Seat; group: number };
 
 /** What happens once a sequence of triggers, responses and chains is over. */
 /** `damage_step`: the attack's Damage Step starts; `damage`: its damage calculation. */
@@ -798,7 +802,8 @@ export type DuelEvent =
   | { type: 'flipSummoned'; player: Seat; card: string }
   | { type: 'positionChanged'; player: Seat; card: string; position: Position }
   | { type: 'attackDeclared'; player: Seat; attacker: string; target: string | null }
-  | { type: 'flippedByAttack'; card: string }
+  /** A face-down monster turns face-up, attacked or changed to a position by an effect (a Flip Summon is its own event). */
+  | { type: 'flipped'; card: string }
   /** `by` is the monster that inflicted it. */
   | { type: 'battleDamage'; player: Seat; amount: number; by: string }
   /** The attack is over. `replay`: its target left, so the attacker may attack again. */

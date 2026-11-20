@@ -155,6 +155,8 @@ function describeHappening(state: DuelState, h: Happening): string {
       return `the Damage Step of player ${h.player}'s ${label(h.card)}'s attack ${h.target ? `on ${label(h.target)}` : 'directly'} started`;
     case 'sent_to_graveyard':
       return `player ${h.player}'s ${label(h.card)} was sent from the field to the GY`;
+    case 'flipped':
+      return `player ${h.player}'s ${label(h.card)} was flipped face-up`;
   }
 }
 

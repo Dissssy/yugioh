@@ -787,7 +787,7 @@ function damage(run: Run) {
   if (!stillAttacking(state, attackerId) || (target !== null && !targetStands(state, target))) run.emit({ type: 'attackEnded', replay: false });
   else if (target === null) run.emit({ type: 'battleDamage', player: foe, amount: statsOf(state, attackerId).atk, by: attackerId });
   else {
-    if (!onField(state, target).faceUp) run.emit({ type: 'flippedByAttack', card: target });
+    if (!onField(state, target).faceUp) run.emit({ type: 'flipped', card: target });
     const result = battle(run.state, attackerId, target);
     // A monster that would be destroyed but can detach materials instead waits for its controller to decide.
     const replaced = run.state.attack!.replaced;

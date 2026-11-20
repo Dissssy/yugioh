@@ -247,6 +247,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         card.position = 'attack';
         card.positionChangedTurn = s.turn;
         summoned(s, event.card, event.player, 'flip', group);
+        s.happened.push({ event: 'flipped', card: event.card, player: event.player, group });
         return;
       }
       case 'positionChanged': {
@@ -279,8 +280,9 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.attack = null;
         return;
       }
-      case 'flippedByAttack':
+      case 'flipped':
         onField(s, event.card).faceUp = true;
+        s.happened.push({ event: 'flipped', card: event.card, player: locate(s, event.card)!.seat, group });
         return;
       case 'battleDamage': {
         const p = s.players[event.player];

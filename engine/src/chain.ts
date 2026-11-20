@@ -29,6 +29,9 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
   return !when.filter || fits(state, h.card, when.filter, seat);
 }
 
+/** Every FLIP effect waits for its own card to be flipped face-up, and never misses the timing. */
+const FLIP: When = { event: 'flipped', self: true, filter: null, how: [], canMiss: false, by: null };
+
 /** A trigger that fired and isn't on the chain yet. */
 export interface PendingTrigger {
   player: Seat;
@@ -42,6 +45,8 @@ export interface PendingTrigger {
  * The triggers waiting to go on the chain, in the order they go: the turn player's mandatory ones, the opponent's,
  * then the turn player's optional ones and the opponent's (simultaneous effects go on the chain, "SEGOC"). A trigger
  * whose script can't do what it must on this board doesn't fire; a player who passed declines their optional ones.
+ * FLIP effects are triggers too, and still go on the chain if their monster left the field after it was flipped
+ * (destroyed by the battle that flipped it).
  */
 export function pendingTriggers(state: DuelState): PendingTrigger[] {
   const step = state.step;
@@ -55,12 +60,13 @@ export function pendingTriggers(state: DuelState): PendingTrigger[] {
     const at = locate(state, id);
     if (!sheet || !at) continue;
     sheet.effects.forEach((effect, index) => {
-      const when = effect.when;
-      if (effect.kind !== 'trigger' || !when || when.event === 'activated') return;
+      const flip = effect.kind === 'flip';
+      const when = flip ? FLIP : effect.when;
+      if ((effect.kind !== 'trigger' && !flip) || !when || when.event === 'activated') return;
       if (step.handled.includes(`${id}:${index}`) || (!effect.mandatory && step.passed.includes(at.seat))) return;
       // A monster whose effects are negated triggers nothing.
       const onField = at.zone === 'monsters' || at.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
-      const place = onField ? effect.from === 'field' && onField.faceUp && !negated(state, id) : at.zone === effect.from;
+      const place = onField ? effect.from === 'field' && onField.faceUp && !negated(state, id) : flip || at.zone === effect.from;
       if (!place || lockProblem(state, at.seat, id) || !onceOk(state, id, sheet.code, index, effect.opt) || ruledIllegal(state, at.seat, id, index)) return;
       const cause = state.happened.find((h) => (!when.canMiss || h.group >= last) && whenMatches(state, when, h, id, at.seat));
       if (!cause || scriptProblem(state, at.seat, id, index, cause)) return;
@@ -163,6 +169,8 @@ export function describeCause(state: DuelState, cause: Happening | null): string
       return `the start of the Damage Step`;
     case 'sent_to_graveyard':
       return `${name(cause.card)} going to the GY`;
+    case 'flipped':
+      return `${name(cause.card)} being flipped face-up`;
   }
 }
 
