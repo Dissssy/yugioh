@@ -153,6 +153,8 @@ function describeHappening(state: DuelState, h: Happening): string {
       return `player ${h.player}'s ${h.faceUp ? 'face-up' : 'face-down'} ${label(h.card)} was destroyed by player ${h.by}'s card effect`;
     case 'damage_step_start':
       return `the Damage Step of player ${h.player}'s ${label(h.card)}'s attack ${h.target ? `on ${label(h.target)}` : 'directly'} started`;
+    case 'sent_to_graveyard':
+      return `player ${h.player}'s ${label(h.card)} was sent from the field to the GY`;
   }
 }
 

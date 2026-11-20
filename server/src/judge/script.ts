@@ -183,7 +183,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
               : (await ask({ prompt: `${name}: Special Summon it in which position?`, cards: [], choices: ['Attack Position', 'Defense Position'], min: 1, max: 1 }))[0] === 'Defense Position'
                 ? 'defense'
                 : 'attack';
-          const placed = await placeInto(state, { op: 'special_summon', card: id, controller: seat, position }, { player: seat, source: self, stage, random: deps.random }, deps.ask);
+          const placed = await placeInto(state, { op: 'special_summon', card: id, controller: seat, position, banish_when_leaves: step.banishWhenLeaves }, { player: seat, source: self, stage, random: deps.random }, deps.ask);
           if (!placed.ok) throw new Refused(`special_summon was refused: ${placed.error}`);
           if (placed.picks) transcript.push({ question: 'Monster Zone', picks: placed.picks });
           apply(placed.op);
@@ -256,6 +256,23 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
           movedHere.add(id);
         }
         return taken.length ? `${state.players[seat].name} took control of ${list(taken.map((id) => shown(id, before)))}${step.until === 'end_phase' ? ' until the End Phase' : ''}.` : null;
+      }
+      case 'arrange_top': {
+        const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
+        const whose = player === seat ? 'your' : "your opponent's";
+        const top = state.players[player].deck.slice(0, step.count);
+        let bottom = 0;
+        // Each card is named only to the player who looks; the rest stay on top in the same order.
+        for (const id of top) {
+          const choices = step.bottom ? ['Top', 'Bottom'] : ['Top'];
+          const [pick] = await ask({ prompt: `${name}: ${cardOf(state, id).name} is on top of ${whose} Deck. Put it back on the top or the bottom?`, cards: [], choices, min: 1, max: 1 });
+          if (pick !== 'Bottom') continue;
+          apply({ op: 'move', card: id, to: 'deck_bottom' });
+          bottom++;
+        }
+        if (!top.length) return null;
+        const looked = `${state.players[seat].name} looked at the top ${top.length === 1 ? 'card' : `${top.length} cards`} of ${player === seat ? 'their' : "their opponent's"} Deck`;
+        return `${looked}${bottom ? ` and put ${bottom === 1 ? 'one' : bottom} on the bottom` : ''}.`;
       }
       case 'summon_token': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;

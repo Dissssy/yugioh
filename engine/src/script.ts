@@ -2,7 +2,7 @@
 // Code decides these exactly, so an activation a script rules out is never offered.
 
 import { cardOf } from './rules.ts';
-import { levelNow, statsOf } from './continuous.ts';
+import { levelNow, nameOf, statsOf } from './continuous.ts';
 import { levelOf, locate, monsterZonesFor, other, summonMatches, summonName } from './state.ts';
 import type { CardData, CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
@@ -15,13 +15,16 @@ export function scriptOf(state: DuelState, card: string, effect: number): Script
 const inRange = (value: number | null, range: Range | null) =>
   range === null || (value !== null && (range.min === null || value >= range.min) && (range.max === null || value <= range.max));
 
-/** Whether a card's printed identity fits the filter: its kind, type line, monster type, name, Attribute and Deck. */
-export function identityFits(card: CardData, filter: CardFilter): boolean {
+/**
+ * Whether a card's printed identity fits the filter: its kind, type line, monster type, name (`name` if an effect
+ * changed it), Attribute and Deck.
+ */
+export function identityFits(card: CardData, filter: CardFilter, name = card.name): boolean {
   if (filter.kinds.length && !filter.kinds.includes(card.kind)) return false;
   const words = card.type.toLowerCase().split(/\s+/);
   if (!filter.types.every((t) => words.includes(t.toLowerCase()))) return false;
   if (filter.races.length && !filter.races.some((r) => r.toLowerCase() === card.race.toLowerCase())) return false;
-  if (filter.named !== null && !card.name.toLowerCase().includes(filter.named.toLowerCase())) return false;
+  if (filter.named !== null && !name.toLowerCase().includes(filter.named.toLowerCase())) return false;
   if (filter.attributes.length && !filter.attributes.some((a) => a.toUpperCase() === card.attribute)) return false;
   return filter.extraDeck === null || card.extraDeck === filter.extraDeck;
 }
@@ -45,7 +48,7 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
     return at.zone === 'monsters' ? filter.kinds.includes('monster') : filter.kinds.includes('spell') && filter.kinds.includes('trap');
   }
   const card = cardOf(state, id);
-  if (!identityFits(card, filter)) return false;
+  if (!identityFits(card, filter, field ? nameOf(state, id) : card.name)) return false;
   // Current stats on the field, printed ones elsewhere. ATK and DEF are only worked out when the filter asks, since an
   // effect that counts monsters by Level (Tenshin) changes ATK itself.
   const monster = at.zone === 'monsters';

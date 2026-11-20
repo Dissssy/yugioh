@@ -93,6 +93,10 @@ const cards: Record<number, CardData> = {
   44: { ...monster(44, 'Dai-sojo of the Ice Barrier', 4, 1600, 1100), type: 'Effect Monster', attribute: 'WATER' },
   45: { ...spell(45, 'Fiendish Chain'), type: 'Trap Card', kind: 'trap', race: 'Continuous' },
   46: { ...monster(46, 'Freezing Chains', 4, 1000, 1000), type: 'Effect Monster', attribute: 'WATER' },
+  47: { ...monster(47, 'Dupe Frog', 2, 100, 2000), type: 'Effect Monster', attribute: 'WATER', race: 'Aqua' },
+  48: { ...monster(48, 'Quickdraw Synchron', 1, 700, 1400), type: 'Tuner Effect Monster' },
+  49: { ...monster(49, 'Ronintoadin', 4, 1600, 1200), type: 'Effect Monster', attribute: 'WATER', race: 'Aqua' },
+  50: { ...monster(50, 'Dark Tinker', 1, 300, 300), type: 'Effect Monster' },
 };
 
 function spell(code: number, name: string): CardData {
@@ -179,12 +183,12 @@ const sheets: Record<number, EffectSheet> = {
     ...scripted({
       conditions: [{ if: 'count', filter: filter({ side: 'you', attributes: ['WATER'] }), min: 1, max: null }],
       options: [
-        { label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice' }, { do: 'forbid', player: 'you', what: 'special_summon', filter: fromHand }] },
+        { label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }, { do: 'forbid', player: 'you', what: 'special_summon', filter: fromHand }] },
       ],
     }),
   }),
   32: { ...sheet(32, effect('condition')), normalSummon: false },
-  33: sheet(33, { ...effect('condition'), ...scripted({ conditions: [{ if: 'outnumbered', by: 4 }], options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice' }] }] }) }),
+  33: sheet(33, { ...effect('condition'), ...scripted({ conditions: [{ if: 'outnumbered', by: 4 }], options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }] }] }) }),
   35: sheet(35, continuous(battleChange({ attacks: 2 }))),
   36: sheet(36, continuous(battleChange({ attacks: 2, while: [{ if: 'last_attack', on: 'defense' }] })), continuous(battleChange({ piercing: true }))),
   37: sheet(37, continuous(battleChange({ noDamageToYou: true })), continuous(restrict({ cannot: ['be_destroyed_by_battle'], once: true }))),
@@ -201,7 +205,16 @@ const sheets: Record<number, EffectSheet> = {
   44: sheet(44, continuous(restrict({ to: filter({ side: 'you', named: 'Ice Barrier' }), cannot: ['be_destroyed_by_effect'], by: filter({ place: 'any', faceUp: null, kinds: ['spell', 'trap'] }) }))),
   45: sheet(45, effect('activation'), continuous({ apply: 'negate_linked' })),
   46: sheet(46, continuous(restrict({ to: filter({ side: 'you' }), cannot: ['be_affected'], by: filter({ side: 'opponent', place: 'any', faceUp: null, kinds: ['monster'], extraDeck: true }) }))),
-  34: sheet(34, { ...effect('ignition', 'hard'), from: 'graveyard', ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice' }] }] }) }),
+  47: sheet(47, continuous({ apply: 'name', name: 'Des Frog' })),
+  48: sheet(48, continuous({ apply: 'synchro_material', substitutes: 'Synchron', never: false, onlyFor: null, onlyForTuner: 'Synchron' })),
+  49: sheet(49, continuous({ apply: 'synchro_material', substitutes: null, never: true, onlyFor: null, onlyForTuner: null })),
+  50: sheet(50, {
+    ...effect('trigger'),
+    from: 'graveyard',
+    when: { event: 'sent_to_graveyard', self: true, filter: null, how: [], canMiss: false, by: null },
+    ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'arrange_top', player: 'you', count: 1, bottom: true }] }] }),
+  }),
+  34: sheet(34, { ...effect('ignition', 'hard'), from: 'graveyard', ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }] }] }) }),
   21: {
     ...sheet(
       21,
@@ -819,6 +832,52 @@ describe('battle changes, locks and protection', () => {
   });
 });
 
+describe('leaving the field, names and Synchro Material', () => {
+  const op = (t: Table, o: Op) => {
+    const r = applyOp(t.state, o, { player: 0, source: '', stage: 'resolution', random: () => 0 });
+    if (!r.ok) throw new Error(r.error);
+    return t.push(...r.events);
+  };
+
+  it('banish a monster Special Summoned "but banish it when it leaves the field", wherever it would go', () => {
+    const t = new Table(stacked([1, 1, ...filler(38)], filler(40, 2)));
+    op(t, { op: 'special_summon', card: 'a0', controller: 0, position: 'attack', zone: 0, banish_when_leaves: true });
+    op(t, { op: 'special_summon', card: 'a1', controller: 0, position: 'attack', zone: 1, banish_when_leaves: true });
+    op(t, { op: 'destroy', cards: ['a0'] });
+    op(t, { op: 'move', card: 'a1', to: 'hand' });
+    expect(t.state.players[0].banished).toEqual(['a0', 'a1']);
+    expect(t.state.players[0].graveyard).toEqual([]);
+  });
+
+  it('fire a trigger in the GY when its card is sent there from the field, and put the top card on the bottom without a shuffle', () => {
+    const t = new Table(stacked([50, ...filler(39)], filler(40, 2)));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    op(t, { op: 'move', card: 'a0', to: 'graveyard' }).push({ type: 'checkpoint', cause: null, then: { do: 'open' } });
+    expect(pendingTriggers(t.state)).toMatchObject([{ card: 'a0', effect: 0, cause: { event: 'sent_to_graveyard' } }]);
+    const top = t.state.players[0].deck[0]!;
+    const rest = t.state.players[0].deck.slice(1);
+    op(t, { op: 'move', card: top, to: 'deck_bottom' });
+    expect(t.state.players[0].deck).toEqual([...rest, top]);
+  });
+
+  it("use a name an effect gives while on the field", () => {
+    const t = new Table(stacked([47, ...filler(39)], filler(40, 2)));
+    const desFrog = (place: CardFilter['place']) => cardsFitting(t.state, { ...filter({ side: 'you', place, faceUp: null }), named: 'Des Frog' }, 0, '');
+    expect(desFrog('hand')).toEqual([]);
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    expect(desFrog('monsters')).toEqual(['a0']);
+  });
+
+  it('let a Tuner stand in for a named one, and keep monsters that say so from being Synchro Material', () => {
+    const t = new Table(stacked([48, 1, 49, 13, ...filler(36)], filler(40, 2)));
+    ['a0', 'a1', 'a2', 'a3'].forEach((card, zone) => t.push({ type: 'specialSummoned', player: 0, card, zone, position: 'attack' }));
+    const synchro = (id: string) => legalActions(t.state, 0).find((a) => a.type === 'extraSummon' && a.card === id);
+    // Junk Warrior needs Junk Synchron: Quickdraw Synchron (Level 1) stands in with Axe Raider, but not with
+    // Ronintoadin (also Level 4), which is never Synchro Material.
+    expect(synchro('ax0')).toEqual(expect.objectContaining({ options: [expect.objectContaining({ materials: ['a0', 'a1'] })] }));
+  });
+});
+
 describe('summoning procedures', () => {
   const procedures = (t: Table) => legalActions(t.state, 0).filter((a) => a.type === 'activate');
   const op = (t: Table, o: Op) => {
@@ -837,11 +896,11 @@ describe('summoning procedures', () => {
     expect(t.state.chain).toEqual([]);
     expect(t.state.step.at).toBe('open');
     // The server pays the cost and makes the Summon from the script, then the checkpoint follows.
-    op(t, { op: 'special_summon', card: 'a0', controller: 0, position: 'defense', zone: 1 });
+    op(t, { op: 'special_summon', card: 'a0', controller: 0, position: 'defense', zone: 1, banish_when_leaves: false });
     op(t, { op: 'forbid', player: 0, what: 'special_summon', filter: fromHand });
     t.push(procedureDone(t.state, 'a0'));
     expect(t.state.players[0].monsters[1]).toMatchObject({ id: 'a0', position: 'defense', summoned: { how: 'special', turn: 1 } });
-    expect(applyOp(t.state, { op: 'special_summon', card: 'a3', controller: 0, position: 'attack', zone: 2 }, { player: 0, source: '', stage: 'resolution', random: () => 0 })).toMatchObject({ ok: false, error: /stops/ });
+    expect(applyOp(t.state, { op: 'special_summon', card: 'a3', controller: 0, position: 'attack', zone: 2, banish_when_leaves: false }, { player: 0, source: '', stage: 'resolution', random: () => 0 })).toMatchObject({ ok: false, error: /stops/ });
     expect(logFor(t.events, 1).map((e) => e.text)).toContain("Yusei can't Special Summon a monster in their hand this turn");
     // The Normal Summon is still there, but not for a monster that can't be Normal Summoned.
     expect(legalActions(t.state, 0).filter((a) => a.type === 'normalSummon').map((a) => 'card' in a && a.card)).toEqual(['a3', 'a4']);
@@ -1343,13 +1402,13 @@ describe('activating effects', () => {
     expect(refused({ op: 'change_lp', player: 0, amount: 9000, kind: 'cost' })).toMatch(/more than/);
     expect(refused({ op: 'modify_stats', card: 'a1', atk: 500, def: 0, atk_set: null, def_set: null, level_delta: 0, level_set: null, until: 'end_of_turn' })).toMatch(/not on the field/);
     expect(refused({ op: 'declare_targets', cards: ['a1'] })).toMatch(/activated/);
-    expect(refused({ op: 'special_summon', card: 'ax0', controller: 0, position: 'attack', zone: 0 })).toMatch(/Extra Deck/);
-    expect(refused({ op: 'special_summon', card: 'a6', controller: 0, position: 'attack', zone: 5 })).toMatch(/isn't an empty Main Monster Zone/);
+    expect(refused({ op: 'special_summon', card: 'ax0', controller: 0, position: 'attack', zone: 0, banish_when_leaves: false })).toMatch(/Extra Deck/);
+    expect(refused({ op: 'special_summon', card: 'a6', controller: 0, position: 'attack', zone: 5, banish_when_leaves: false })).toMatch(/isn't an empty Main Monster Zone/);
   });
 
   it('special summons from the Deck and shuffles it, and searches stay hidden from the opponent', () => {
     const t = new Table(stacked([1, 1, 1, 1, 1, 2, 5, 3, ...filler(32)], filler(40, 2)));
-    ops(t, [{ op: 'special_summon', card: 'a6', controller: 0, position: 'defense', zone: 3 }]);
+    ops(t, [{ op: 'special_summon', card: 'a6', controller: 0, position: 'defense', zone: 3, banish_when_leaves: false }]);
     expect(t.state.players[0].monsters[3]).toMatchObject({ id: 'a6', faceUp: true, position: 'defense' });
     expect(t.state.players[0].deck).toHaveLength(34);
     ops(t, [{ op: 'move', card: 'a7', to: 'hand' }]);

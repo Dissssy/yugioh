@@ -161,6 +161,8 @@ export function describeCause(state: DuelState, cause: Happening | null): string
       return `the destruction of ${name(cause.card)}`;
     case 'damage_step_start':
       return `the start of the Damage Step`;
+    case 'sent_to_graveyard':
+      return `${name(cause.card)} going to the GY`;
   }
 }
 

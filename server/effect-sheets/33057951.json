@@ -56,7 +56,8 @@
                 "cards": {
                   "from": "targets"
                 },
-                "position": "defense"
+                "position": "defense",
+                "banishWhenLeaves": false
               }
             ]
           }

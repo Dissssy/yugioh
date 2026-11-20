@@ -54,7 +54,8 @@ const phase = z.enum(['draw', 'standby', 'main1', 'battle', 'main2', 'end']);
 const step = z.union([
   z.object({ do: z.literal('destroy'), cards: selection }),
   z.object({ do: z.literal('move'), cards: selection, to: z.enum(DESTINATIONS) }),
-  z.object({ do: z.literal('special_summon'), cards: selection, position: z.enum(['attack', 'defense', 'choice']) }),
+  z.object({ do: z.literal('special_summon'), cards: selection, position: z.enum(['attack', 'defense', 'choice']), banishWhenLeaves: z.boolean() }),
+  z.object({ do: z.literal('arrange_top'), player: z.enum(['you', 'opponent']), count: z.number().int().min(1), bottom: z.boolean() }),
   z.object({
     do: z.literal('modify_stats'),
     cards: selection,
@@ -143,13 +144,15 @@ const continuous = z.union([
     while: z.array(condition),
   }),
   z.object({ apply: z.literal('negate_linked') }),
+  z.object({ apply: z.literal('name'), name: z.string().min(1) }),
+  z.object({ apply: z.literal('synchro_material'), substitutes: z.string().nullable(), never: z.boolean(), onlyFor: cardFilter.nullable(), onlyForTuner: z.string().nullable() }),
   z.object({ apply: z.literal('self_destruct'), opponentTurns: z.number().int().min(1) }),
   z.object({ apply: z.literal('tie'), destroyLinked: z.boolean(), defenseBreaks: z.boolean() }),
   z.object({ apply: z.literal('replace_destruction'), detach: z.number().int().min(1) }),
 ]) satisfies z.ZodType<Continuous>;
 
 const when = z.object({
-  event: z.enum(['summoned', 'attack_declared', 'attacked', 'destroyed_by_battle', 'destroyed_by_effect', 'battle_destroying', 'battle_damage', 'activated', 'damage_step_start', 'end_phase']),
+  event: z.enum(['summoned', 'attack_declared', 'attacked', 'destroyed_by_battle', 'destroyed_by_effect', 'battle_destroying', 'battle_damage', 'activated', 'damage_step_start', 'end_phase', 'sent_to_graveyard']),
   self: z.boolean(),
   filter: cardFilter.nullable(),
   how: z.array(summonKind),
@@ -358,6 +361,10 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 
 {"apply": "negate_linked"}: "negate the effects of that face-up monster" for a card linked to a monster (Fiendish Chain).
 
+{"apply": "name", "name"}: "This card's name becomes "Des Frog" while it is on the field" (name "Des Frog").
+
+{"apply": "synchro_material", "substitutes", "never", "onlyFor", "onlyForTuner"}: this card as Synchro Material. substitutes: "For a Synchro Summon, you can substitute this card for any 1 "Synchron" Tuner" is "Synchron", else null. never true for "Cannot be used as a Synchro Material". onlyFor: a filter the Synchro Monster must fit ("cannot be used as a Synchro Material Monster, except for the Synchro Summon of a WATER monster": side "either", place "any", attributes ["WATER"]), else null. onlyForTuner: "except for the Synchro Summon of a monster that lists a "Synchron" Tuner as material" is "Synchron", else null.
+
 {"apply": "tie", "destroyLinked", "defenseBreaks"}: for an Equip Spell or Continuous Trap linked to a monster (see the link step). Code always destroys a linked card when its monster leaves the field, so "When that monster is destroyed, destroy this card" needs only this entry with both false. destroyLinked true for "When this card leaves the field, destroy that monster"; defenseBreaks true for "If the target is changed to Defense Position, destroy it and this card". Write these as kind "continuous" even when worded "When ...".
 {"apply": "replace_destruction", "detach"}: "If this face-up card would be destroyed, you can detach 1 Xyz Material from this card instead" (detach 1). Code asks its controller each time it would be destroyed, by battle or by an effect.
 
@@ -366,7 +373,8 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 Steps (each "cards" is a selection):
 - {"do": "destroy", "cards"}: destroy cards on the field.
 - {"do": "move", "cards", "to"}: to "hand", "graveyard", "banished", "deck_top", "deck_bottom" or "deck_shuffled". Add to hand, send, discard, banish, return to the Deck.
-- {"do": "special_summon", "cards", "position"}: "attack", "defense", or "choice" when the text names no position (the player picks).
+- {"do": "special_summon", "cards", "position", "banishWhenLeaves"}: "attack", "defense", or "choice" when the text names no position (the player picks). banishWhenLeaves true for "but banish it when it leaves the field" / "If you do, banish it when it leaves the field".
+- {"do": "arrange_top", "player", "count", "bottom"}: the activating player looks at the top count cards of that player's Deck and puts each back on top, or on the bottom if bottom is true ("look at the top card of your Deck. Return that card to either the top or the bottom of the Deck": player "you", count 1, bottom true).
 - {"do": "modify_stats", "cards", "atk", "def", "levelDelta", "levelSet", "until"}: ATK/DEF deltas, Level delta, or levelSet to make it that Level (else null). until: "end_of_turn" (also "until the End Phase"), "end_of_battle_phase", "next_standby_phase" ("until your next Standby Phase") or "while_on_field" (no end given).
 - {"do": "set_stats", "cards", "atk", "def", "until"}: ATK and/or DEF "become" a value (null leaves that stat alone). Each value is {"of": "self" | "targets" | "cost", "stat": "atk" | "def", "original": bool, "times": n}: a stat read when the effect resolves from this card, its first target or the first card paid as its cost, the printed ("original") or current value, multiplied by times. "Make its ATK become double its original ATK": {"of": "self", "stat": "atk", "original": true, "times": 2}. "This card's ATK/DEF become equal to that monster's original ATK/DEF": atk {"of": "targets", "stat": "atk", "original": true, "times": 1}, def likewise.
 - {"do": "gain_stats", "cards", "atk", "def", "until"}: ATK and/or DEF gain a value read when the step resolves (each a value as in set_stats, or null). "It gains ATK equal to the Tributed monster's original ATK" (in a procedure whose cost Tributed it): atk {"of": "cost", "stat": "atk", "original": true, "times": 1}, def null, until "while_on_field".
@@ -410,7 +418,7 @@ Filters ({"side", "place", "kinds", "types", "races", "attributes", "named", "ex
 # When
 
 {"event", "self", "filter", "how", "canMiss", "by"}, every property required:
-- event: "summoned" (a monster is Summoned), "attack_declared" (a monster declares an attack; the event's card is the attacker), "attacked" (a monster is targeted for an attack: "When this card is targeted for an attack"; the event's card is the target), "destroyed_by_battle", "battle_destroying" (a monster destroys another by battle: "When this card destroys a monster by battle"; the event's card is the destroyer, so self is true), "battle_damage" (a monster inflicts battle damage to its controller's opponent),, "activated" (a card or effect is activated: "When a Trap Card is activated", "When a monster effect is activated"; the event's card is the one whose activation it is, and the filter says which: kinds ["trap"], or kinds ["monster"] with place "any"), "destroyed_by_effect" (a card on the field is destroyed by a card effect: "If this face-up card is destroyed by your opponent's card effect"; the filter is checked as the card was on the field, only its side and faceUp), "damage_step_start" (the start of the Damage Step; the event's card is the attacker, so "if this card attacks" is self true) or "end_phase" (the End Phase starts: "During the End Phase"; self false, filter null; "of the turn this card was Summoned" is a summoned_this_turn condition). An event outside this list (sent to the GY by an effect, flipped, targeted, leaves the field): when null, and the effect never fires; say so in its window.
+- event: "summoned" (a monster is Summoned), "attack_declared" (a monster declares an attack; the event's card is the attacker), "attacked" (a monster is targeted for an attack: "When this card is targeted for an attack"; the event's card is the target), "destroyed_by_battle", "battle_destroying" (a monster destroys another by battle: "When this card destroys a monster by battle"; the event's card is the destroyer, so self is true), "battle_damage" (a monster inflicts battle damage to its controller's opponent),, "activated" (a card or effect is activated: "When a Trap Card is activated", "When a monster effect is activated"; the event's card is the one whose activation it is, and the filter says which: kinds ["trap"], or kinds ["monster"] with place "any"), "destroyed_by_effect" (a card on the field is destroyed by a card effect: "If this face-up card is destroyed by your opponent's card effect"; the filter is checked as the card was on the field, only its side and faceUp), "damage_step_start" (the start of the Damage Step; the event's card is the attacker, so "if this card attacks" is self true), "end_phase" (the End Phase starts: "During the End Phase"; self false, filter null; "of the turn this card was Summoned" is a summoned_this_turn condition) or "sent_to_graveyard" (a card goes from the field to the GY by any means: "When this card you control is sent to the Graveyard", "When this card is sent from the field to the Graveyard"; the effect's from is "graveyard"). An event outside this list (sent to the GY from the hand or Deck, flipped, targeted, leaves the field): when null, and the effect never fires; say so in its window.
 - self: true when it must happen to this card ("When this card is Normal Summoned", "If this card inflicts battle damage").
 - filter: the card it happens to must fit this filter (with self, for "When this face-up Attack Position card is targeted for an attack": faceUp true, position "attack") as it is after the event ("When your opponent Normal Summons a monster with 1000 or more ATK": side "opponent", place "monsters", atk {"min": 1000, "max": null}; "When an opponent's monster declares an attack": side "opponent", place "monsters"); null for any card. "you" and "opponent" are from this card's controller's view.
 - how: for "summoned", which Summons count: any of "normal" (a Tribute Summon is one), "flip", "special" (any Special Summon, Synchro and Xyz Summons included), "synchro", "xyz"; [] for "Summoned" with no kind. "If this card is Synchro Summoned" is ["synchro"].

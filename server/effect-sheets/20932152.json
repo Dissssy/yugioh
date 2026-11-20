@@ -7,7 +7,7 @@
       "kind": "condition",
       "speed": 1,
       "mandatory": false,
-      "from": "field",
+      "from": "hand",
       "opt": "none",
       "window": "Your Main Phase, while this card is in your hand",
       "cost": "sending 1 monster from your hand to the GY",
@@ -56,7 +56,8 @@
                 "cards": {
                   "from": "self"
                 },
-                "position": "choice"
+                "position": "choice",
+                "banishWhenLeaves": false
               }
             ]
           }
@@ -72,13 +73,19 @@
       "mandatory": false,
       "from": "field",
       "opt": "none",
-      "window": "For a Synchro Summon",
+      "window": "When used as material for a Synchro Summon",
       "cost": "",
       "effect": "For a Synchro Summon, you can substitute this card for any 1 \"Synchron\" Tuner.",
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "synchro_material",
+        "substitutes": "Synchron",
+        "never": false,
+        "onlyFor": null,
+        "onlyForTuner": null
+      },
       "status": "unverified"
     },
     {
@@ -93,7 +100,13 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "synchro_material",
+        "substitutes": null,
+        "never": false,
+        "onlyFor": null,
+        "onlyForTuner": "Synchron"
+      },
       "status": "unverified"
     }
   ],

@@ -18,8 +18,9 @@ export const opTools = {
     input: z.object({ card, to: z.enum(DESTINATIONS) }),
   },
   special_summon: {
-    description: 'Special Summon a monster face-up from the hand, Deck, GY or banished. Its controller is asked which empty Main Monster Zone it goes to.',
-    input: z.object({ card, controller: seat, position }),
+    description:
+      'Special Summon a monster face-up from the hand, Deck, GY or banished. Its controller is asked which empty Main Monster Zone it goes to. banish_when_leaves: true for "but banish it when it leaves the field".',
+    input: z.object({ card, controller: seat, position, banish_when_leaves: z.boolean() }),
   },
   take_control: {
     loose: true,

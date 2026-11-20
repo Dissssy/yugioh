@@ -122,7 +122,8 @@
                   "max": 1,
                   "rank": null
                 },
-                "position": "choice"
+                "position": "choice",
+                "banishWhenLeaves": false
               }
             ]
           }

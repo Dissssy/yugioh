@@ -89,7 +89,8 @@ export interface When {
    * damage to its controller's opponent. `battle_destroying`: a monster destroys another by battle (the event's card is the one that destroyed it: "When this card destroys a monster by battle"). `activated`: a card or effect is activated (Counter Traps).
    * `destroyed_by_effect`: a card on the field is destroyed by a card effect; the filter is checked against the card as
    * it was on the field, for its side and whether it was face-up. `damage_step_start`: the start of the Damage Step (the
-   * event's card is the attacker). `end_phase`: the End Phase starts.
+   * event's card is the attacker). `end_phase`: the End Phase starts. `sent_to_graveyard`: a card is sent from the field
+   * to the GY, by any means (destroyed, Tributed, used as Synchro Material, sent).
    */
   event:
     | 'summoned'
@@ -101,7 +102,8 @@ export interface When {
     | 'battle_damage'
     | 'activated'
     | 'damage_step_start'
-    | 'end_phase';
+    | 'end_phase'
+    | 'sent_to_graveyard';
   /** Only when it happens to this card itself ("When this card is Normal Summoned"). */
   self: boolean;
   /** The card it happens to must fit this as it is after the event ("this face-up Attack Position card"); null for any card. */
@@ -180,8 +182,13 @@ export type Counter = 'spell';
 export type Step =
   | { do: 'destroy'; cards: Selection }
   | { do: 'move'; cards: Selection; to: Destination }
-  /** `choice`: the activating player picks Attack or Defense Position. */
-  | { do: 'special_summon'; cards: Selection; position: Position | 'choice' }
+  /** `choice`: the activating player picks Attack or Defense Position. `banishWhenLeaves`: "but banish it when it leaves the field". */
+  | { do: 'special_summon'; cards: Selection; position: Position | 'choice'; banishWhenLeaves: boolean }
+  /**
+   * The activating player looks at the top `count` cards of that player's Deck and puts each back on the top (in the
+   * same order), or on the bottom if `bottom` allows (Dark Tinker).
+   */
+  | { do: 'arrange_top'; player: 'you' | 'opponent'; count: number; bottom: boolean }
   | { do: 'modify_stats'; cards: Selection; atk: number; def: number; levelDelta: number; levelSet: number | null; until: Until }
   /** ATK and/or DEF "become" a value (null leaves that stat alone). Gains and losses still apply on top. */
   | { do: 'set_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
@@ -272,6 +279,14 @@ export type Continuous =
       while: Condition[];
     }
   | { apply: 'negate_linked' }
+  /** "This card's name becomes `name` while it is on the field." */
+  | { apply: 'name'; name: string }
+  /**
+   * This card as Synchro Material: it can stand in for a Tuner whose required name contains `substitutes` ("you can
+   * substitute this card for any 1 "Synchron" Tuner"), and it can't be Synchro Material at all (`never`), or only for
+   * a Synchro Monster that fits `onlyFor` or whose required Tuner's name contains `onlyForTuner`.
+   */
+  | { apply: 'synchro_material'; substitutes: string | null; never: boolean; onlyFor: CardFilter | null; onlyForTuner: string | null }
   | { apply: 'self_destruct'; opponentTurns: number }
   | { apply: 'tie'; destroyLinked: boolean; defenseBreaks: boolean }
   /**
@@ -422,7 +437,9 @@ export type Happening =
   | { event: 'destroyed_by_effect'; card: string; player: Seat; by: Seat; faceUp: boolean; group: number }
   /** The Damage Step of `card`'s attack starts; `target` is the monster it attacks, null for a direct attack. */
   | { event: 'damage_step_start'; card: string; player: Seat; target: string | null; group: number }
-  | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number };
+  | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number }
+  /** A card left the field for the GY, by any means; `player` controlled it. */
+  | { event: 'sent_to_graveyard'; card: string; player: Seat; group: number };
 
 /** What happens once a sequence of triggers, responses and chains is over. */
 /** `damage_step`: the attack's Damage Step starts; `damage`: its damage calculation. */
@@ -477,6 +494,8 @@ export interface FieldCard {
   counters: Partial<Record<Counter, number>>;
   /** A monster whose control was taken "until the End Phase": it goes back to its owner when this turn's End Phase starts. */
   returnsAtEndPhase: boolean;
+  /** Banished, not sent anywhere else, when it leaves the field ("but banish it when it leaves the field"). */
+  banishWhenLeaves: boolean;
 }
 
 export type Zones = (FieldCard | null)[];
@@ -607,7 +626,7 @@ export type Destination = (typeof DESTINATIONS)[number];
 export type Op =
   | { op: 'move'; card: string; to: Destination }
   /** `zone`: the empty Main Monster Zone the controller chose (see `askZone` on the server). */
-  | { op: 'special_summon'; card: string; controller: Seat; position: Position; zone: number }
+  | { op: 'special_summon'; card: string; controller: Seat; position: Position; zone: number; banish_when_leaves: boolean }
   | { op: 'destroy'; cards: string[] }
   | { op: 'change_lp'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { op: 'modify_stats'; card: string; atk: number; def: number; atk_set: number | null; def_set: number | null; level_delta: number; level_set: number | null; until: Until }
@@ -798,6 +817,8 @@ export type DuelEvent =
   | { type: 'moved'; card: string; owner: Seat; from: Place; to: Destination }
   | { type: 'deckShuffled'; player: Seat; order: string[] }
   | { type: 'specialSummoned'; player: Seat; card: string; zone: number; position: Position }
+  /** The monster just Special Summoned is banished when it leaves the field. */
+  | { type: 'banishWhenLeaves'; card: string }
   /** A Synchro or Xyz Summon from the Extra Deck. Synchro materials go to the GY; Xyz materials are attached to it. */
   | { type: 'extraSummoned'; player: Seat; card: string; how: 'synchro' | 'xyz'; materials: string[]; zone: number; position: Position }
   /** `by`: the player whose card effect destroyed them. */

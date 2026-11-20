@@ -80,10 +80,11 @@ function apply(run: Run, op: Op, ctx: OpContext) {
         (to === 'graveyard' && at.zone === 'graveyard') ||
         (to === 'banished' && at.zone === 'banished');
       check(!already, `${cardOf(state, op.card).name} is already there.`);
-      check(!(at.zone === 'deck' && to.startsWith('deck_') && to !== 'deck_top'), 'That card is already in the Deck.');
+      check(!(at.zone === 'deck' && to === 'deck_shuffled'), 'That card is already in the Deck.');
       run.emit({ type: 'moved', card: op.card, owner, from: at.zone, to });
-      // Taking a card from the Deck other than drawing it, or adding one at no fixed place, shuffles the Deck.
-      const searched = at.zone === 'deck' && state.players[at.seat].deck[0] !== op.card;
+      // Taking a card from the Deck other than drawing it, or adding one at no fixed place, shuffles the Deck. Putting
+      // a card from the Deck on its top or bottom (Dark Tinker) doesn't.
+      const searched = at.zone === 'deck' && !to.startsWith('deck_') && state.players[at.seat].deck[0] !== op.card;
       if (to === 'deck_shuffled' || searched) shuffle(run, searched ? at.seat : owner, ctx, to === 'deck_top' ? op.card : null);
       return;
     }
@@ -99,6 +100,7 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(free.length > 0, 'That player has no empty Main Monster Zone.');
       check(free.includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
       run.emit({ type: 'specialSummoned', player: op.controller, card: op.card, zone: op.zone, position: op.position });
+      if (op.banish_when_leaves) run.emit({ type: 'banishWhenLeaves', card: op.card });
       if (at.zone === 'deck') shuffle(run, at.seat, ctx, null);
       return;
     }

@@ -62,7 +62,8 @@
                   "max": 1,
                   "rank": null
                 },
-                "position": "attack"
+                "position": "attack",
+                "banishWhenLeaves": false
               }
             ]
           }

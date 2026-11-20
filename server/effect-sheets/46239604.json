@@ -15,7 +15,10 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "name",
+        "name": "Des Frog"
+      },
       "status": "unverified"
     },
     {
@@ -35,9 +38,7 @@
         "to": {
           "side": "you",
           "place": "monsters",
-          "kinds": [
-            "monster"
-          ],
+          "kinds": [],
           "types": [],
           "races": [],
           "attributes": [],
@@ -64,13 +65,20 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
-      "from": "field",
+      "from": "graveyard",
       "opt": "none",
-      "window": "When this card is sent from the field to the Graveyard (this event is not in the engine's event list, so the trigger never fires)",
+      "window": "When this card is sent from the field to the Graveyard",
       "cost": "",
       "effect": "You can add 1 \"Frog\" monster from your Deck or Graveyard to your hand, except \"Dupe Frog\".",
       "targets": null,
-      "when": null,
+      "when": {
+        "event": "sent_to_graveyard",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": true,
+        "by": null
+      },
       "script": null,
       "continuous": null,
       "status": "unverified"

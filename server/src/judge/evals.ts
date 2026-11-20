@@ -876,6 +876,14 @@ export const CASES: EvalCase[] = [
     legal: true,
     check: (b) => all(expectAt(b, 'Fiendish Chain', '0:spellTraps'), expectAt(b, 'Speed Warrior', '1:monsters')),
   },
+  {
+    name: 'ronintoadin revives itself by banishing a frog',
+    board: [{ gy: ['Ronintoadin', 'Dupe Frog'] }, {}],
+    activate: 'Ronintoadin',
+    effect: 2,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Ronintoadin', '0:monsters'), expectAt(b, 'Dupe Frog', '0:banished')),
+  },
 ];
 
 /** Builds a case's board: every listed card is put in place from its owner's Deck. */

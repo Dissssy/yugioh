@@ -1,8 +1,8 @@
 // The game rules as code: what a player may do now, and the events an intent produces.
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
-import { scriptOf, scriptProblem, specialSummonForbidden } from './script.ts';
-import { attacksAllowed, continuousOnField, type InForce, type Restrict, levelNow, lockProblem, negated, piercing, replacement, restricted, restriction, shieldsBattleDamage, statsOf, tributeSummonLocked } from './continuous.ts';
+import { identityFits, scriptOf, scriptProblem, specialSummonForbidden } from './script.ts';
+import { attacksAllowed, continuousOnField, type InForce, type Restrict, levelNow, lockProblem, nameOf, negated, synchroMaterialRules, piercing, replacement, restricted, restriction, shieldsBattleDamage, statsOf, tributeSummonLocked } from './continuous.ts';
 import { evolve, isToken, locate, monsterZoneFree, monsterZonesFor, onField, other } from './state.ts';
 import {
   HAND_LIMIT,
@@ -227,7 +227,7 @@ function extraSummonAction(state: DuelState, seat: Seat, id: string): ExtraSummo
   const card = cardOf(state, id);
   const materials = state.sheets[card.code]?.materials;
   if (!materials || specialSummonForbidden(state, seat, id)) return null;
-  const sets = materials.summon === 'xyz' ? xyzMaterials(state, seat, materials) : card.level === null ? [] : synchroMaterials(state, seat, materials, card.level);
+  const sets = materials.summon === 'xyz' ? xyzMaterials(state, seat, materials) : card.level === null ? [] : synchroMaterials(state, seat, materials, card);
   const options = sets.flatMap((set) => {
     const zones = zonesAfterLeaving(state, seat, set);
     return zones.length > 0 ? [{ materials: set, zones }] : [];
@@ -252,14 +252,23 @@ function xyzMaterials(state: DuelState, seat: Seat, materials: Extract<Materials
 }
 
 /**
- * Every set of materials for a Synchro Monster of `level`: one face-up Tuner (the one named, if any) and enough face-up
- * non-Tuners, whose current Levels add up exactly. Each set lists the Tuner first, then the rest in field order.
+ * Every set of materials for this Synchro Monster: one face-up Tuner (the one named, if any, or a monster that can
+ * substitute for it) and enough face-up non-Tuners, whose current Levels add up to its Level exactly. Monsters that
+ * can't be Synchro Material for it are left out. Each set lists the Tuner first, then the rest in field order.
  */
-function synchroMaterials(state: DuelState, seat: Seat, materials: Extract<Materials, { summon: 'synchro' }>, level: number): string[][] {
-  const faceUp = ownMonsters(state, seat).filter((m) => m.faceUp && levelNow(state, m.id) !== null);
+function synchroMaterials(state: DuelState, seat: Seat, materials: Extract<Materials, { summon: 'synchro' }>, synchro: CardData): string[][] {
+  const level = synchro.level!;
+  const has = (text: string | null, part: string) => text !== null && text.toLowerCase().includes(part.toLowerCase());
+  const usable = (id: string) =>
+    synchroMaterialRules(state, id).every(
+      (r) => !r.never && (!r.onlyFor || identityFits(synchro, r.onlyFor)) && (r.onlyForTuner === null || has(materials.tuner, r.onlyForTuner)),
+    );
+  const faceUp = ownMonsters(state, seat).filter((m) => m.faceUp && levelNow(state, m.id) !== null && usable(m.id));
   const isTuner = (id: string) => /\bTuner\b/.test(cardOf(state, id).type);
   const levelOf = (id: string) => levelNow(state, id)!;
-  const tuners = faceUp.filter((m) => isTuner(m.id) && (materials.tuner === null || cardOf(state, m.id).name === materials.tuner));
+  const named = (id: string) =>
+    materials.tuner === null || nameOf(state, id) === materials.tuner || synchroMaterialRules(state, id).some((r) => r.substitutes !== null && has(materials.tuner, r.substitutes));
+  const tuners = faceUp.filter((m) => isTuner(m.id) && named(m.id));
   const others = faceUp.filter((m) => !isTuner(m.id)).map((m) => m.id);
   const { min, max } = materials.nonTuners;
   const sets: string[][] = [];

@@ -219,3 +219,16 @@ export function statsOf(state: DuelState, id: string): { atk: number; def: numbe
   }
   return { atk: Math.max(0, atk + atkDelta), def: Math.max(0, def + defDelta), level: levelNow(state, id) };
 }
+
+/** A card's name now: one a continuous effect of its own gives it while it is on the field (Dupe Frog), else the printed one. */
+export function nameOf(state: DuelState, id: string): string {
+  const own = continuousOnField(state).find((f) => f.source === id && f.effect.apply === 'name');
+  return own?.effect.apply === 'name' ? own.effect.name : state.cards[state.instances[id]!.code]!.name;
+}
+
+type SynchroMaterial = Extract<Continuous, { apply: 'synchro_material' }>;
+
+/** What a monster on the field says about itself as Synchro Material (Quickdraw Synchron), if anything. */
+export function synchroMaterialRules(state: DuelState, id: string): SynchroMaterial[] {
+  return continuousOnField(state).flatMap((f) => (f.source === id && f.effect.apply === 'synchro_material' ? [f.effect] : []));
+}

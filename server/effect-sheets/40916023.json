@@ -58,7 +58,8 @@
                 "cards": {
                   "from": "self"
                 },
-                "position": "choice"
+                "position": "choice",
+                "banishWhenLeaves": false
               }
             ]
           }

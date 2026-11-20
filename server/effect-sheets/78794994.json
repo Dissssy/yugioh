@@ -77,7 +77,8 @@
                 "cards": {
                   "from": "targets"
                 },
-                "position": "choice"
+                "position": "choice",
+                "banishWhenLeaves": false
               },
               {
                 "do": "link",

@@ -404,6 +404,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
           : `${who(event.player)} can't Special Summon ${event.filter ? `a ${describeFilter(event.filter, true)}` : 'monsters'} this turn`;
     case 'procedureUsed':
       return null;
+    case 'banishWhenLeaves':
+      return `${name(event.card)} will be banished when it leaves the field`;
     case 'protectionUsed':
       return `${name(event.card)} used its once-per-turn protection`;
     case 'controlChanged':

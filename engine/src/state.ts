@@ -313,15 +313,17 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.chain.at(-1)!.choice = event.choice;
         return;
       case 'moved': {
-        removeFromPlay(s, event.card);
+        if (event.to === 'graveyard') return sendToGraveyard(s, event.card);
+        const banish = removeFromPlay(s, event.card);
         const owner = s.players[event.owner];
         const card = s.cards[s.instances[event.card]!.code]!;
         if (isToken(s, event.card)) return;
-        if (card.extraDeck && event.to !== 'graveyard' && event.to !== 'banished') owner.extra.push(event.card);
+        if (banish) owner.banished.push(event.card);
+        else if (card.extraDeck && event.to !== 'banished') owner.extra.push(event.card);
         else if (event.to === 'hand') owner.hand.push(event.card);
         else if (event.to === 'deck_top') owner.deck.unshift(event.card);
         else if (event.to === 'deck_bottom' || event.to === 'deck_shuffled') owner.deck.push(event.card);
-        else owner[event.to === 'graveyard' ? 'graveyard' : 'banished'].push(event.card);
+        else owner.banished.push(event.card);
         return;
       }
       case 'deckShuffled': {
@@ -332,6 +334,9 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         p.deck = [...event.order];
         return;
       }
+      case 'banishWhenLeaves':
+        onField(s, event.card).banishWhenLeaves = true;
+        return;
       case 'controlChanged': {
         const card = onField(s, event.card);
         removeFromPlay(s, event.card, false);
@@ -478,6 +483,7 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     effectsNegated: false,
     counters: {},
     returnsAtEndPhase: false,
+    banishWhenLeaves: false,
   };
 }
 
@@ -518,7 +524,8 @@ export function onField(state: DuelState, id: string): FieldCard {
  * Takes a card out of wherever it is. A card leaving the field loses its modifiers, and its Xyz Materials go to their
  * owners' GYs; with `leaves` false (a change of control) it keeps everything.
  */
-function removeFromPlay(state: DuelState, id: string, leaves = true) {
+/** Takes a card out of where it is. Returns whether it must be banished instead, having left the field. */
+function removeFromPlay(state: DuelState, id: string, leaves = true): boolean {
   const at = locate(state, id);
   if (!at) throw new Error(`Unknown card ${id}`);
   const p = state.players[at.seat];
@@ -526,14 +533,17 @@ function removeFromPlay(state: DuelState, id: string, leaves = true) {
     const card = p[at.zone][at.index]!;
     p[at.zone][at.index] = null;
     // A change of control moves the card without it leaving the field.
-    if (!leaves) return;
+    if (!leaves) return false;
     state.modifiers = state.modifiers.filter((m) => m.card !== id);
     for (const m of card.materials) state.players[state.instances[m]!.owner].graveyard.push(m);
     // Cards linked to a monster go when it goes; a card that takes its monster with it (Birthright) does so.
     for (const c of tiedTo(state, id)) sendToGraveyard(state, c.id);
     if (card.linked && tie(state, id)?.destroyLinked && locate(state, card.linked)?.zone === 'monsters') sendToGraveyard(state, card.linked);
-  } else if (at.zone === 'materials') take(p.monsters[at.index]!.materials, id);
+    return card.banishWhenLeaves;
+  }
+  if (at.zone === 'materials') take(p.monsters[at.index]!.materials, id);
   else take(p[at.zone], id);
+  return false;
 }
 
 /** The Spells and Traps on the field linked to this monster. */
@@ -550,8 +560,13 @@ function tie(state: DuelState, id: string) {
 
 /** Cards always go to their owner's Graveyard. A Token that leaves the field is gone. */
 function sendToGraveyard(state: DuelState, id: string) {
-  removeFromPlay(state, id);
-  if (!isToken(state, id)) state.players[state.instances[id]!.owner].graveyard.push(id);
+  const at = locate(state, id)!;
+  const banish = removeFromPlay(state, id);
+  if (isToken(state, id)) return;
+  const owner = state.players[state.instances[id]!.owner];
+  if (banish) return void owner.banished.push(id);
+  owner.graveyard.push(id);
+  if (at.zone === 'monsters' || at.zone === 'spellTraps') state.happened.push({ event: 'sent_to_graveyard', card: id, player: at.seat, group: state.resolvedLinks });
 }
 
 /** Whether a card is a Token: made on the field by an effect, and gone once it leaves. */

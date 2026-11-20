@@ -52,7 +52,8 @@
                 "cards": {
                   "from": "targets"
                 },
-                "position": "attack"
+                "position": "attack",
+                "banishWhenLeaves": false
               },
               {
                 "do": "link",

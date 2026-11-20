@@ -61,7 +61,8 @@
                 "cards": {
                   "from": "targets"
                 },
-                "position": "defense"
+                "position": "defense",
+                "banishWhenLeaves": false
               },
               {
                 "do": "negate_effects",

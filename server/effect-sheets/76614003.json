@@ -7,14 +7,40 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
-      "from": "field",
+      "from": "graveyard",
       "opt": "none",
-      "window": "When this card you control is sent to the Graveyard (this event isn't in the engine's event list, so the trigger never fires)",
+      "window": "When this card you control is sent to the Graveyard",
       "cost": "",
       "effect": "Look at the top card of your Deck. Return that card to either the top or the bottom of the Deck.",
       "targets": null,
-      "when": null,
-      "script": null,
+      "when": {
+        "event": "sent_to_graveyard",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "arrange_top",
+                "player": "you",
+                "count": 1,
+                "bottom": true
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }
