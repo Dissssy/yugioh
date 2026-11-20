@@ -43,7 +43,7 @@ main:has(.duel) { max-width: none; padding: 0; }
   gap: var(--gap);
   overflow: hidden;
 }
-.field { display: grid; grid-template-columns: repeat(7, var(--zone)); grid-template-rows: repeat(2, var(--zone)); gap: var(--gap); }
+.playmat { display: grid; grid-template-columns: repeat(7, var(--zone)); grid-template-rows: repeat(2, var(--zone)); gap: var(--gap); }
 .zone {
   position: relative;
   display: grid;
@@ -152,18 +152,47 @@ main:has(.duel) { max-width: none; padding: 0; }
 }
 .phase-strip.yours { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .strip-turn { grid-column: 1 / 3; display: flex; padding: 0 10px; min-width: 0; }
-.turn-controls { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 6px; min-width: 0; }
+.strip-side { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 6px; min-width: 0; width: 100%; }
 .turn-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.strip-chain { display: flex; align-items: center; justify-content: center; min-width: 0; }
+.strip-middle { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .strip-prompt { grid-column: 6 / 8; display: flex; align-items: center; padding: 0 10px; min-width: 0; }
 .strip-prompt > * { flex-wrap: wrap; }
 .zone.extra-zone { border-style: solid; border-color: color-mix(in srgb, var(--fg) 22%, transparent); }
-.phases { display: flex; flex-wrap: wrap; gap: 2px; list-style: none; margin: 0; padding: 0; }
-.phases li { position: relative; }
-.phase-pill { position: absolute; inset: 0; border-radius: 999px; background: var(--accent); }
-.phase { position: relative; display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 0.85em; font-weight: 600; color: var(--muted); }
-.phases li.current .phase { color: white; }
-button.phase.go { border: 1px solid var(--accent); color: var(--accent); background: none; }
+/* The phase dial: the phases on a strip that scrolls to keep the current one under the notch, fading to each side. */
+.phase-dial { --dial-item: calc(var(--zone) / 3); display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
+.dial-frame { position: relative; }
+.dial-frame::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  translate: -50% 0;
+  border: 5px solid transparent;
+  border-top-color: var(--accent);
+  pointer-events: none;
+}
+.dial {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  list-style: none;
+  margin: 0;
+  padding: 6px calc(50% - var(--dial-item) / 2) 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+}
+.dial::-webkit-scrollbar { display: none; }
+.dial li { flex: none; width: var(--dial-item); display: grid; place-items: center; scroll-snap-align: center; }
+.phase { padding: 0; font-size: 0.85em; font-weight: 600; color: var(--muted); transition: color 0.2s, scale 0.2s; }
+.dial li.current .phase { color: var(--accent); scale: 1.3; }
+button.phase.go { border: 0; background: none; color: var(--fg); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+/* A button that can't be used now: Pass with nothing to respond with, Next and End off your turn. */
+.duel button:disabled { opacity: 0.45; cursor: default; }
+.dial-buttons { display: flex; gap: 4px; }
+.dial-buttons button { flex: 1; min-width: 0; padding: 3px 0; font-size: 0.85em; }
 .choice-prompt { display: flex; gap: 12px; align-items: center; font-weight: 600; }
 
 /* Banners */
@@ -335,7 +364,7 @@ form.report-ruling { display: flex; flex-direction: column; gap: 6px; }
 form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .report-ruling .report-actions { display: flex; justify-content: flex-end; gap: 6px; }
 /* The opponent's cards point at them, as across a real table, unless the viewer's settings say otherwise. */
-.field.turned .card, .extra-zone.turned .card { rotate: 180deg; }
+.playmat.turned .card, .extra-zone.turned .card { rotate: 180deg; }
 
 /* The chain waiting to resolve, link 1 first, between the Extra Monster Zones */
 .chain-list { display: flex; flex-direction: column; gap: 4px; align-items: stretch; font-size: 0.8em; min-width: 0; max-width: 100%; }
@@ -346,8 +375,8 @@ form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit
 /* A compact board: the turn controls and what the duel is waiting for move to a bar above the log. */
 .duel-bar { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--fg) 5%, transparent); }
 .duel-bar.yours { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.duel-bar .turn-controls { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 6px 10px; }
-.duel-bar .turn-controls button:last-child:not(.phase) { margin-left: auto; }
+.bar-turn { display: flex; flex-direction: column; gap: 6px; }
+.duel-bar .phase-dial { --dial-item: 48px; }
 .bar-prompt > * { flex-wrap: wrap; }
 .bar-prompt .choice-text { -webkit-line-clamp: 4; }
 

@@ -1,6 +1,6 @@
 import './board.css';
 import { useMutation } from '@tanstack/react-query';
-import type { Intent, LegalAction, PlayerView, Position, Seat } from '@yugioh/engine';
+import { zonePick, type Intent, type LegalAction, type PlayerView, type Position, type Seat } from '@yugioh/engine';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -18,7 +18,7 @@ import { dropKey, ExtraMonsterZone, Field, type FieldProps, type Row } from './F
 import { FoeHand, OwnHand, type HandDrag } from './Hand.tsx';
 import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
 import { LpPlate } from './LpPlate.tsx';
-import { PhaseStrip, TurnControls } from './PhaseStrip.tsx';
+import { PhaseDial, PhaseStrip, TurnLabel } from './PhaseStrip.tsx';
 import { PileViewer } from './PileViewer.tsx';
 import { ReportRuling } from './ReportRuling.tsx';
 import { StartPanel } from './StartPanel.tsx';
@@ -142,6 +142,30 @@ export function Board({ duelId }: { duelId: string }) {
   useEffect(() => {
     setMode(idle);
   }, [shown?.view.turn, shown?.view.phase]);
+
+  /** Ending the turn with End: through each phase left, one at a time, each with its response window. */
+  const [ending, setEnding] = useState(false);
+  /** The phase End last moved on from, so a board not yet caught up with that move doesn't send it twice. */
+  const endedFrom = useRef<string | null>(null);
+  const endingTurn = shown?.view.turn;
+  useEffect(() => {
+    setEnding(false);
+    endedFrom.current = null;
+  }, [endingTurn]);
+  useEffect(() => {
+    if (!ending || !shown) return;
+    const v = shown.view;
+    // Something was activated on the way: the player decides what to do about it.
+    if (v.chain.length > 0 || v.result) return setEnding(false);
+    if (shown.cue !== null || send.isPending || judging !== null || endedFrom.current === v.phase) return;
+    const step = nextPhase(v.actions);
+    if (!step) return;
+    endedFrom.current = v.phase;
+    if (step.type !== 'endTurn') return void send.mutate({ type: step.type });
+    setEnding(false);
+    if (step.discard > 0) setMode({ kind: 'discard', count: step.discard, chosen: [] });
+    else send.mutate({ type: 'endTurn', discard: [] });
+  }, [ending, shown, send, judging]);
 
   // A new question opens the pile its cards are in when they're all in one; an answered one closes the viewer.
   const promptId = choice?.prompt.id;
@@ -284,7 +308,10 @@ export function Board({ duelId }: { duelId: string }) {
     if (seat === me && mode.kind === 'place' && mode.zone === zone && fitsZone(mode.options, row, zone).length > 0) return 'over';
     if (seat === me) {
       const options = drag?.kind === 'card' ? placeables(drag.id) : mode.kind === 'zone' ? [mode.action] : [];
-      open = fitsZone(options, row, zone).length > 0 || (mode.kind === 'extraZone' && row === 'm' && mode.zones.includes(zone));
+      open =
+        fitsZone(options, row, zone).length > 0 ||
+        (mode.kind === 'extraZone' && row === 'm' && mode.zones.includes(zone)) ||
+        (row === 'm' && (choice?.prompt.zones.includes(zone) ?? false));
     } else if (row === 'm') {
       const attack = drag?.kind === 'aim' ? drag.action : mode.kind === 'target' ? mode.action : null;
       open = attack?.targets.includes(zone) ?? false;
@@ -293,6 +320,9 @@ export function Board({ duelId }: { duelId: string }) {
   }
 
   function clickZone(seat: Seat, row: Row, zone: number) {
+    if (seat === me && row === 'm' && choice?.prompt.zones.includes(zone) && !answer.isPending) {
+      return answer.mutate({ prompt: choice.prompt.id, picks: [zonePick(zone)] });
+    }
     if (seat === me && mode.kind === 'zone' && fitsZone([mode.action], row, zone).length > 0) place(mode.action, zone);
     if (seat === me && mode.kind === 'extraZone' && row === 'm' && mode.zones.includes(zone)) summonFromExtra(mode.action, mode.position, mode.materials, zone);
     if (seat === foe && mode.kind === 'target' && mode.action.targets.includes(zone)) {
@@ -509,9 +539,16 @@ export function Board({ duelId }: { duelId: string }) {
               ? `Respond to ${dataOf(topLink.card)?.name ?? 'the chain'}?`
               : `Respond to ${waiting.cause ?? 'this'}?`}
         </span>
-        <button className="primary" onClick={() => start(pass)}>
-          {waiting.for === 'triggers' ? "Don't activate" : 'Pass'}
-        </button>
+        {waiting.for === 'respond' && !actions.some((a) => a.type === 'activate') ? (
+          // With nothing to respond with, the window closes by itself once the response floor has passed.
+          <button disabled title="You have nothing to respond with, so the duel moves on by itself.">
+            Pass
+          </button>
+        ) : (
+          <button className="primary" onClick={() => start(pass)}>
+            {waiting.for === 'triggers' ? "Don't activate" : 'Pass'}
+          </button>
+        )}
       </span>
     ) : (
       waiting.player !== me && (
@@ -568,17 +605,20 @@ export function Board({ duelId }: { duelId: string }) {
   const canSurrender = !view.result;
   const result = view.result;
   const resultText = log.findLast((e) => e.event.type === 'duelEnded')?.text;
-  const turnControls = (
-    <TurnControls
-      turn={view.turn}
-      turnLabel={view.start ? 'Deciding who goes first' : yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`}
+  const turnLabel = <TurnLabel turn={view.turn} label={view.start ? 'Deciding who goes first' : yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`} />;
+  const nextStep = choosing ? undefined : nextPhase(actions);
+  const canEnd = yourTurn && !choosing && view.chain.length === 0 && nextPhase(view.actions) !== undefined;
+  const dial = (
+    <PhaseDial
       phase={view.phase}
       goTo={{
         ...(enterBattle && { battle: () => start(enterBattle) }),
         ...(enterMain2 && { main2: () => start(enterMain2) }),
         ...(endTurn && { end: () => start(endTurn) }),
       }}
-      endTurn={endTurn && !choosing ? () => start(endTurn) : null}
+      next={nextStep && !ending ? () => start(nextStep) : null}
+      end={ending ? () => setEnding(false) : canEnd ? () => setEnding(true) : null}
+      ending={ending}
     />
   );
   const stripPrompt = prompt || choiceBar || judgeNote || rollbackNote || replaceNote || respondNote || null;
@@ -604,9 +644,16 @@ export function Board({ duelId }: { duelId: string }) {
                     <Field {...foeField} />
                     <PhaseStrip
                       yours={yourTurn}
-                      controls={look.compact ? null : turnControls}
+                      side={
+                        look.compact ? null : (
+                          <div className="strip-side">
+                            {turnLabel}
+                            {chainNote}
+                          </div>
+                        )
+                      }
                       extraZones={[<ExtraMonsterZone key="left" side="left" mine={myField} foe={foeField} />, <ExtraMonsterZone key="right" side="right" mine={myField} foe={foeField} />]}
-                      chain={chainNote || null}
+                      middle={look.compact ? chainNote || null : dial}
                       prompt={look.compact ? null : stripPrompt}
                     />
                     <Field {...myField} />
@@ -649,7 +696,10 @@ export function Board({ duelId }: { duelId: string }) {
 
               {look.compact && ready && (
                 <div className={`duel-bar${yourTurn ? ' yours' : ''}`}>
-                  {turnControls}
+                  <div className="bar-turn">
+                    {turnLabel}
+                    {dial}
+                  </div>
                   {stripPrompt && <div className="bar-prompt">{stripPrompt}</div>}
                 </div>
               )}
@@ -797,3 +847,12 @@ function actionLabel(a: LegalAction, view: PlayerView): string {
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 const plural = (n: number, word: string) => `${n} more ${word}${n === 1 ? '' : 's'}`;
+
+/** What Next does: move on to the next phase, or end the turn from the last one. */
+function nextPhase(actions: LegalAction[]) {
+  for (const type of ['enterBattle', 'enterMain2', 'endTurn'] as const) {
+    const action = actions.find((a): a is Extract<LegalAction, { type: typeof type }> => a.type === type);
+    if (action) return action;
+  }
+  return undefined;
+}

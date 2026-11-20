@@ -89,7 +89,7 @@ export function Field(props: FieldProps) {
   );
 
   return mine ? (
-    <div className={`field${turned ? ' turned' : ''}`}>
+    <div className={`playmat${turned ? ' turned' : ''}`}>
       {fieldZone}
       {monsters}
       {gy}
@@ -98,7 +98,7 @@ export function Field(props: FieldProps) {
       {deck}
     </div>
   ) : (
-    <div className={`field${turned ? ' turned' : ''}`}>
+    <div className={`playmat${turned ? ' turned' : ''}`}>
       {deck}
       {spellTraps}
       {extra}

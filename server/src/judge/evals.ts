@@ -23,6 +23,7 @@ import {
   triggerEvent,
   replay,
   statsOf,
+  zonePick,
   type CardData,
   type DuelEvent,
   type DuelState,
@@ -808,6 +809,8 @@ export async function runCase(c: EvalCase, board: DuelState, model: ModelCall | 
   const unmatched: string[] = [];
   // A pick names a card, or a phrase found in one of the judge's choices (its wording varies between runs).
   const ask = async (q: Question) => {
+    // Where a Special Summoned monster goes is the player's own choice, not part of the ruling: take the first zone.
+    if (q.zones.length) return [zonePick(q.zones[0]!)];
     const want = picks.shift() ?? [];
     const named = q.cards.filter((o) => want.includes(cardOf(board, o.id).name)).map((o) => o.id);
     const chosen = [...named, ...q.choices.filter((x) => want.some((w) => x.toLowerCase().includes(w.toLowerCase())))];

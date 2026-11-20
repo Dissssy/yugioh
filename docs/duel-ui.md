@@ -33,7 +33,7 @@ Desktop, landscape:
 │ [Opp name · LP 8000]        opponent's hand (fanned backs)  │   Action log │
 │  Extra  │  S/T  S/T  S/T  S/T  S/T  │  Deck                 │   (grouped by│
 │  Field  │  Mon  Mon  Mon  Mon  Mon  │  GY  Banished         │    turn, with│
-│ ─────── DP SP M1 BP M2 EP ─── [Battle] [End turn] ───────── │    Contest   │
+│ Turn 3 · chain │ EMZ │ ‹M1 BP M2› [Next][End] │ EMZ │ prompt │    Contest   │
 │  GY Ban │  Mon  Mon  Mon  Mon  Mon  │  Field                │    buttons)  │
 │  Deck   │  S/T  S/T  S/T  S/T  S/T  │  Extra                │              │
 │ [Your name · LP 7200]         your hand (fanned, face up)   │  [settings]  │
@@ -41,7 +41,7 @@ Desktop, landscape:
 ```
 
 - **Zone placement follows the real playmat:** Field Spell zone and Extra Deck on one side, GY, Banished and Deck on the other, mirrored for the opponent. Players coming from paper or other simulators find things where they expect.
-- **The middle row** is one zone tall. On the left: whose turn it is, the phase stepper (DP, SP, M1, BP, M2, EP) with the current phase lit, and End turn. The next phase is clickable; that replaces the separate "Battle Phase" and "Main Phase 2" buttons. In the middle, the two shared Extra Monster Zones, above the second and fourth Main Monster Zones as on the real playmat, with the chain listed between them. Each shows whichever player's monster is in it, turned like the rest of that player's cards. On the right, what the duel waits for: an instruction, the judge's question, or whom it waits on. (Built 2026-11-19 with the Extra Monster Zones; before that a 52-pixel strip held the phases and the prompt replaced them.)
+- **The middle row** is one zone tall. On the left: whose turn it is, and the chain waiting to resolve. In the middle, the two shared Extra Monster Zones, above the second and fourth Main Monster Zones as on the real playmat, with the phase dial between them: the phases on a strip that scrolls sideways to keep the current one under a notch, its neighbours fading out, and below it **Next** (the next phase, or ending the turn from the last one) and **End** (goes through each phase left one at a time, Battle Phase and Main Phase 2 included, so the opponent gets each phase's response window; it stops by itself when something is activated on the way, and pressing it again stops it). Phases you can move to now are also clickable on the dial. (Dial built 2026-11-20 from players' feedback; before that the phases and End turn sat on the left, the chain between the zones.) Each shows whichever player's monster is in it, turned like the rest of that player's cards. On the right, what the duel waits for: an instruction, the judge's question, or whom it waits on. (Built 2026-11-19 with the Extra Monster Zones; before that a 52-pixel strip held the phases and the prompt replaced them.)
 - **LP plates** sit at the corners next to each name. A change counts the number down over about half a second, flashes red for damage and green for gain, and shows the delta as a floating number.
 - **Piles** (Deck, GY, Banished, Extra) show their top card and a count. Clicking one opens a pile viewer (see "Card details").
 - **Right sidebar:** the action log, then a small settings button. Portrait screens put it below the board instead (see "Phones and tablets").
@@ -90,6 +90,8 @@ One consistent pattern for every "pick some cards" moment: tributes, attack targ
 - A short instruction appears on the right of the middle row ("Choose 1 monster to Tribute", with **Cancel**).
 - Eligible cards glow and pulse gently; everything else dims.
 - Clicking a card marks it with a numbered badge in the order chosen. When the count is reached the choice sends; for "choose up to N" a **Confirm** button appears.
+- Where a monster an effect Special Summons goes is the controller's choice, as in the real game: when more than one Main Monster Zone is empty, the empty ones light up and clicking one answers (added 2026-11-20; before, the engine took the first empty zone).
+- In a response window where you have nothing you could activate, Pass shows greyed out: the window closes by itself after the response floor.
 - For targeting, an arrow (an SVG curve on an overlay above the board) runs from the source card to the pointer and snaps to a target when hovering one.
 - Choices among cards in a pile (search your Deck, pick from a GY, banished cards or the Extra Deck) mark the pile with an outline and a "N to choose" badge. Opening it shows the pile's cards with the same marks, and the question with **Confirm** on top. When every option is in one pile, it opens by itself. Your Deck only opens for such a choice, and then shows only the cards you may pick.
 - A question from the judge or a script (`ask_player`) is answered this way, never in a separate picker: the cards it offers glow where they are, on the field (an opponent's face-down card too), in your hand or in a pile, and the strip shows the question, how many are picked, **Clear** and **Confirm**. Choices that aren't cards ("Attack Position") are buttons in the strip. The duel waits for the answer, so there is no Cancel.
@@ -176,8 +178,8 @@ Later (build step 7): clicking an old entry shows the board as it was then (read
 
 Built 2026-11-19, after Ethan's phone showed the board cut off beside the log. One board for every screen; only where things sit changes (`useBoardSize` in `look.ts` decides, `board.css` lays it out).
 
-- **Portrait screens** (phones, tablets held upright) stack: the board across the full width, then a bar with the turn controls and what the duel waits for, then the log and chat. Zones are sized from the width, so on a 390-pixel phone a zone is about 50 pixels. The board takes at most 62% of the screen's height, leaving the rest to the log.
-- **Small zones** (under 110 pixels, as on a landscape phone or a 720-pixel laptop) keep the log beside the board, but the turn controls and prompts leave the middle row for a bar above the log, where they have room.
+- **Portrait screens** (phones, tablets held upright) stack: the board across the full width, then a bar with the turn, the phase dial and what the duel waits for, then the log and chat. Zones are sized from the width, so on a 390-pixel phone a zone is about 50 pixels. The board takes at most 62% of the screen's height, leaving the rest to the log.
+- **Small zones** (under 110 pixels, as on a landscape phone or a 720-pixel laptop) keep the log beside the board, but the turn, the phase dial and prompts leave the middle row for a bar above the log, where they have room; the chain then takes the middle of the row.
 - **Tight zones** (under 80 pixels) shrink the Life Points plates to a zone's width, showing just the number (the name is its tooltip), so they clear the hand.
 - **Playing by touch** needs no new controls: every action already works by tap. Tap a card for its menu, pick the action, then tap the lit zone or target. Dragging a hand card to a zone and dragging an attacker's arrow to a target also work with a finger (the table takes every touch, so the page never scrolls or zooms under a drag).
 - **The screen is what's visible:** the duel is `100dvh` tall, so a phone's browser bars never hide the chat, and only the log scrolls (it follows new entries unless you scrolled up to read; it never scrolls the page). `interactive-widget=resizes-content` in `index.html` makes Android browsers shrink the page for the on-screen keyboard instead of panning it.

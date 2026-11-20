@@ -158,6 +158,15 @@ function reviewText(state: DuelState, event: DuelEvent): string {
         .join(' | ');
       return `AI (${a.model}) for ${who(a.player)} picked ${picked} of ${a.options.length}. ${a.reason} | Note: ${a.note}${flags ? ` | ${flags}` : ''}`;
     }
+    // Steps the players' log leaves out.
+    case 'damageStepStarted':
+      return 'Damage Step';
+    case 'setAgain':
+      return 'The resolving card will be Set again instead of going to the GY';
+    case 'replacementOffered':
+      return `${who(event.player)} may detach Xyz Material from ${label(event.card)} instead of it being destroyed`;
+    case 'rollbackOffered':
+      return `Rewind offered to before the overturned ruling: ${event.offer.explanation}`;
     default:
       return describe(state, event)!;
   }

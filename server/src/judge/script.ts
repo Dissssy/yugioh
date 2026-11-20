@@ -31,7 +31,7 @@ import {
   type StatValue,
   type Step,
 } from '@yugioh/engine';
-import { checkQuestion, judge, type JudgeCall, type JudgeDeps, type JudgeOutcome, type ModelCall } from './judge.ts';
+import { checkQuestion, judge, summonInto, type JudgeCall, type JudgeDeps, type JudgeOutcome, type ModelCall } from './judge.ts';
 import type { AskPlayer } from './tools.ts';
 
 const counterName = (counter: 'spell', count: number) => `${count} ${counter === 'spell' ? 'Spell Counter' : 'counter'}${count === 1 ? '' : 's'}`;
@@ -172,7 +172,10 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
               : (await ask({ prompt: `${name}: Special Summon it in which position?`, cards: [], choices: ['Attack Position', 'Defense Position'], min: 1, max: 1 }))[0] === 'Defense Position'
                 ? 'defense'
                 : 'attack';
-          apply({ op: 'special_summon', card: id, controller: seat, position });
+          const placed = await summonInto(state, { op: 'special_summon', card: id, controller: seat, position }, { player: seat, stage, random: deps.random }, deps.ask);
+          if (!placed.ok) throw new Refused(`special_summon was refused: ${placed.error}`);
+          if (placed.picks) transcript.push({ question: 'Monster Zone', picks: placed.picks });
+          apply(placed.op);
           summonedHere.add(id);
         }
         return cards.length ? `${list(cards.slice(0, free).map((id) => shown(id, before)))} ${cards.length === 1 ? 'was' : 'were'} Special Summoned.` : null;

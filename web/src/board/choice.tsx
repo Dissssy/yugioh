@@ -78,12 +78,21 @@ export const useChoice = () => useContext(ChoiceContext);
 
 /**
  * The question's instruction, in the middle strip and atop an open pile: what to choose, how many are picked, the
- * choices that aren't cards, and Confirm. The duel waits for the answer, so there is no Cancel; Clear takes back
+ * choices that aren't cards, and Confirm (a question of which zone is answered by clicking the zone). The duel waits for the answer, so there is no Cancel; Clear takes back
  * the picks.
  */
 export function ChoiceBar({ choice, onConfirm, pending, error }: { choice: BoardChoice; onConfirm: () => void; pending: boolean; error: string | null }) {
   const { prompt, picks } = choice;
   const count = prompt.min === prompt.max ? `${prompt.max}` : prompt.min === 0 ? `up to ${prompt.max}` : `${prompt.min} to ${prompt.max}`;
+  // Which zone a monster goes to: clicking one of the lit zones answers it.
+  if (prompt.zones.length > 0) {
+    return (
+      <span className="choice-prompt judge-choice" role="group" aria-label={prompt.text}>
+        <span className="choice-text">{prompt.text}</span>
+        {error && <span className="error">{error}</span>}
+      </span>
+    );
+  }
   return (
     <span className="choice-prompt judge-choice" role="group" aria-label={prompt.text}>
       <span className="choice-text">

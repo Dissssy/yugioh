@@ -20,6 +20,7 @@ import {
   triggerEvent,
   viewFor,
   visibleTo,
+  zonePick,
   type ChainLink,
   type AiRecord,
   type AppealRecord,
@@ -404,7 +405,7 @@ export class Duels {
     if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
     const q = duel.judging?.question;
     if (!q || q.id !== promptId || q.player !== seat) return { ok: false, status: 409, error: 'That question is no longer open.' };
-    const options = new Set([...q.picks, ...q.choices]);
+    const options = new Set([...q.picks, ...q.choices, ...q.zones.map(zonePick)]);
     if (new Set(picks).size !== picks.length || !picks.every((p) => options.has(p))) return { ok: false, status: 422, error: 'Pick from the options given.' };
     if (picks.length < q.min || picks.length > q.max) {
       return { ok: false, status: 422, error: q.min === q.max ? `Pick ${q.min}.` : `Pick ${q.min} to ${q.max}.` };
@@ -617,6 +618,7 @@ function judgingFor(duel: LiveDuel, seat: Seat): JudgingView | null {
             text: q.text,
             cards: q.cards.map((c, i) => ({ pick: q.picks[i]!, card: c.hidden ? { hidden: true as const } : shown(c.id), place: c.place, seat: c.seat, zone: c.zone })),
             choices: q.choices,
+            zones: q.zones,
             min: q.min,
             max: q.max,
           }
