@@ -193,7 +193,8 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.normalSummonLimit = 1;
         s.usedThisTurn = [];
         s.modifiers = s.modifiers.filter((m) => m.until !== 'end_of_turn');
-        s.forbidden = [];
+        // Bans for this turn and later ones ("skip the Battle Phase of your next turn") stay.
+        s.forbidden = s.forbidden.filter((f) => f.turn >= event.turn);
         return;
       case 'phaseChanged':
         s.phase = event.phase;
@@ -549,9 +550,13 @@ function removeFromPlay(state: DuelState, id: string, leaves = true): boolean {
   const p = state.players[at.seat];
   if (at.zone === 'monsters' || at.zone === 'spellTraps') {
     const card = p[at.zone][at.index]!;
+    const leaving = leaves ? continuousOnField(state).filter((f) => f.source === id && f.effect.apply === 'forbid_on_leaving') : [];
     p[at.zone][at.index] = null;
     // A change of control moves the card without it leaving the field.
     if (!leaves) return false;
+    // "If this face-up card leaves the field, skip the Battle Phase of your next turn" (Moulinglacia).
+    const next = state.turnPlayer === at.seat ? state.turn + 2 : state.turn + 1;
+    for (const f of leaving) if (f.effect.apply === 'forbid_on_leaving') state.forbidden.push({ player: at.seat, what: f.effect.what, filter: null, turn: next });
     state.modifiers = state.modifiers.filter((m) => m.card !== id);
     for (const m of card.materials) state.players[state.instances[m]!.owner].graveyard.push(m);
     // Cards linked to a monster go when it goes; a card that takes its monster with it (Birthright) does so.

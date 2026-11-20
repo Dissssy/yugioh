@@ -148,6 +148,7 @@ const continuous = z.union([
   z.object({ apply: z.literal('banish_instead'), filter: cardFilter }),
   z.object({ apply: z.literal('extra_normal_summon'), filter: cardFilter, while: z.array(condition) }),
   z.object({ apply: z.literal('discard_or_negate'), while: z.array(condition) }),
+  z.object({ apply: z.literal('forbid_on_leaving'), what: z.enum(FORBIDDEN) }),
   z.object({ apply: z.literal('name'), name: z.string().min(1) }),
   z.object({ apply: z.literal('synchro_material'), substitutes: z.string().nullable(), never: z.boolean(), onlyFor: cardFilter.nullable(), onlyForTuner: z.string().nullable() }),
   z.object({ apply: z.literal('self_destruct'), opponentTurns: z.number().int().min(1) }),
@@ -368,6 +369,7 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 {"apply": "banish_instead", "filter"}: cards that fit the filter (checked while still on the field) are banished instead of being sent from the field to the GY ("Spells and Traps sent from the field to your opponent's GY are banished instead": kinds ["spell", "trap"], side "opponent", place "field").
 {"apply": "extra_normal_summon", "filter", "while"}: "You can Normal Summon 1 "Ice Barrier" monster in addition to your Normal Summon or Set": once the turn's Normal Summon is used, its controller can still Normal Summon (not Set) a monster from the hand that fits the filter (place "hand", side "you"). The effect's opt says how often ("This effect can only be used once per turn": soft).
 {"apply": "discard_or_negate", "while"}: "When an effect resolves that was activated by an Effect Monster that was on your opponent's side of the field, they must discard 1 card or the effect is negated (their choice)" (General Raiho of the Ice Barrier).
+{"apply": "forbid_on_leaving", "what"}: "If this face-up card leaves the field, skip the Battle Phase of your next turn" is what "battle_phase": its controller can't do that during their next turn.
 
 {"apply": "name", "name"}: "This card's name becomes "Des Frog" while it is on the field" (name "Des Frog").
 

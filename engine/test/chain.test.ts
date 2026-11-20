@@ -68,6 +68,7 @@ const cards: Record<number, CardData> = {
   26: monster(26, 'Silencer', 1000, 1000),
   27: { ...monster(27, 'Junk Synchron', 1300, 500, 3), type: 'Tuner Effect Monster' },
   28: { ...monster(28, 'Junk Destroyer', 2600, 2500, 8), type: 'Synchro Effect Monster', extraDeck: true },
+  29: monster(29, 'Moulinglacia', 2800, 2200),
 };
 
 const filter = (f: Partial<CardFilter>): CardFilter => ({
@@ -191,6 +192,7 @@ const sheets: Record<number, EffectSheet> = {
   22: sheet(22, effect({ kind: 'continuous', opt: 'soft', continuous: { apply: 'extra_normal_summon', filter: filter({ side: 'you', place: 'hand', named: 'Ice' }), while: [] } })),
   24: sheet(24, effect({ kind: 'continuous', continuous: { apply: 'discard_or_negate', while: [] } })),
   25: sheet(25, effect({ kind: 'continuous', continuous: { apply: 'negate_battled_flips', while: [] } })),
+  29: sheet(29, effect({ kind: 'continuous', continuous: { apply: 'forbid_on_leaving', what: 'battle_phase' } })),
   26: sheet(
     26,
     effect({ kind: 'continuous', continuous: { apply: 'restrict', to: filter({ side: 'opponent' }), others: false, cannot: ['activate_effects'], by: null, compare: null, once: false, while: [] } }),
@@ -597,6 +599,20 @@ describe('continuous effects', () => {
     t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 });
     expect(t.state.step).toEqual({ at: 'open' });
     expect(t.activations(1)).toEqual([]);
+  });
+});
+
+describe('leaving the field', () => {
+  it("skips its controller's next Battle Phase (Moulinglacia)", () => {
+    const t = new Table(stacked(pad([29, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.push({ type: 'destroyed', cards: ['a0'], by: 1 });
+    // Seat 1's own Battle Phase is unaffected; seat 0's next one is skipped, and the one after is back.
+    expect(legalActions(t.state, 1).some((a) => a.type === 'enterBattle')).toBe(true);
+    t.endTurn(1);
+    expect(legalActions(t.state, 0).some((a) => a.type === 'enterBattle')).toBe(false);
+    t.endTurn(0).play(1, { type: 'endTurn', discard: t.state.players[1].hand.slice(6) });
+    expect(legalActions(t.state, 0).some((a) => a.type === 'enterBattle')).toBe(true);
   });
 });
 

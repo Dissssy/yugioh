@@ -261,6 +261,8 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  * - `negate_battled_flips`: FLIP effects of monsters this card destroys by battle are negated (Blade Knight).
  * - `discard_or_negate`: when an effect activated by an Effect Monster on the opponent's field resolves, the opponent
  *   discards 1 card or the effect is negated, their choice (General Raiho of the Ice Barrier).
+ * - `forbid_on_leaving`: when this face-up card leaves the field, its controller can't do `what` during their next turn
+ *   ("If this face-up card leaves the field, skip the Battle Phase of your next turn": battle_phase; Moulinglacia).
  * - `extra_normal_summon`: its controller can Normal Summon (not Set) 1 monster from the hand that fits `filter` in
  *   addition to their Normal Summon or Set; the effect's `opt` limits how often (General Grunard of the Ice Barrier).
  * - `banish_instead`: cards that fit `filter`, checked on the field, are banished instead of going from the field to
@@ -298,6 +300,7 @@ export type Continuous =
   | { apply: 'banish_instead'; filter: CardFilter }
   | { apply: 'extra_normal_summon'; filter: CardFilter; while: Condition[] }
   | { apply: 'discard_or_negate'; while: Condition[] }
+  | { apply: 'forbid_on_leaving'; what: Forbidden }
   /** "This card's name becomes `name` while it is on the field." */
   | { apply: 'name'; name: string }
   /**

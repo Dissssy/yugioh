@@ -137,7 +137,10 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "forbid_on_leaving",
+        "what": "battle_phase"
+      },
       "status": "unverified"
     }
   ],
