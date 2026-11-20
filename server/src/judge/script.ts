@@ -126,6 +126,8 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
 
   /** The cards the cost moved, first moved first, for a stat read from the cost. */
   const paid: string[] = [];
+  /** The cards the last move step moved, for a pledge about "the added monster". */
+  let moved: string[] = [];
   /** A stat read when the step resolves: from this card, the first target still on the field (or in a pile, for original stats), or the first card paid as the cost. */
   const valueOf = (v: StatValue): number | null => {
     const id = v.of === 'self' ? self : v.of === 'cost' ? paid[0] : link.targets.find((t) => script.targets && fits(state, t, script.targets.filter, seat));
@@ -169,6 +171,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         const verb = fromHand ? 'discard' : { hand: 'add to the hand', graveyard: 'send to the GY', banished: 'banish' }[step.to as 'hand'] ?? 'return to the Deck';
         const cards = await select(step.cards, verb);
         for (const id of cards) apply({ op: 'move', card: id, to: step.to });
+        moved = cards;
         if (cost) paid.push(...cards);
         if (!cards.length || cost) return null;
         const where = { hand: "to its owner's hand", graveyard: 'to the GY', banished: 'banished' }[step.to as 'hand'] ?? 'to the Deck';
@@ -366,6 +369,11 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         apply({ op: 'forbid', player, what: step.what, filter: step.filter });
         const what = { battle_phase: 'conduct their Battle Phase', declare_attack: 'declare an attack', special_summon: `Special Summon ${step.filter ? `a ${describeFilter(step.filter, true)}` : 'monsters'}` }[step.what];
         return `${state.players[player].name} can't ${what} this turn.`;
+      }
+      case 'pledge_normal_summon': {
+        if (!moved.length) return null;
+        apply({ op: 'pledge_normal_summon', player: seat, cards: moved, damage: step.damage });
+        return `${state.players[seat].name} takes ${step.damage} damage in the End Phase unless they Normal Summon the added monster, or a card with the same name, this turn.`;
       }
       case 'extra_normal_summon':
         apply({ op: 'extra_normal_summon', player: seat });

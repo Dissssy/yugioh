@@ -73,6 +73,7 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     normalSummonLimit: 1,
     modifiers: [],
     forbidden: [],
+    pledges: [],
     chain: [],
     step: { at: 'rps', picks: [null, null], last: null },
     happened: [],
@@ -195,6 +196,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.modifiers = s.modifiers.filter((m) => m.until !== 'end_of_turn');
         // Bans for this turn and later ones ("skip the Battle Phase of your next turn") stay.
         s.forbidden = s.forbidden.filter((f) => f.turn >= event.turn);
+        s.pledges = [];
         return;
       case 'phaseChanged':
         s.phase = event.phase;
@@ -237,7 +239,11 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         const extra = event.type === 'normalSummoned' ? event.extra : null;
         if (extra) s.usedThisTurn.push({ player: event.player, card: extra.card, code: s.instances[extra.card]!.code, effect: extra.effect });
         else s.normalSummons++;
-        if (event.type === 'normalSummoned') summoned(s, event.card, event.player, 'normal', group);
+        if (event.type === 'normalSummoned') {
+          summoned(s, event.card, event.player, 'normal', group);
+          const name = s.cards[s.instances[event.card]!.code]!.name;
+          s.pledges = s.pledges.filter((pl) => pl.player !== event.player || !pl.names.includes(name));
+        }
         return;
       }
       case 'spellTrapSet': {
@@ -419,6 +425,9 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       }
       case 'statsModified':
         s.modifiers.push(event.modifier);
+        return;
+      case 'pledged':
+        s.pledges.push({ player: event.player, names: event.names, damage: event.damage });
         return;
       case 'forbidden':
         s.forbidden.push({ player: event.player, what: event.what, filter: event.filter, turn: s.turn });

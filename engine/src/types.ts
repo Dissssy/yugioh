@@ -234,7 +234,12 @@ export type Step =
    * For the rest of this turn, that player can't declare attacks, can't conduct their Battle Phase, or can't Special
    * Summon the monsters that fit `filter` (null for any monster). `filter` is null for the others.
    */
-  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null };
+  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null }
+  /**
+   * "During the End Phase of this turn, take `damage` damage if you did not Normal Summon the added monster, or a card
+   * with the same name": about the cards the step before it moved (Where Arf Thou?).
+   */
+  | { do: 'pledge_normal_summon'; damage: number };
 
 export const FORBIDDEN = ['declare_attack', 'battle_phase', 'special_summon'] as const;
 /** What a lingering restriction stops a player doing this turn (Threatening Roar, Reinforce Truth, Silent Angler). */
@@ -562,6 +567,8 @@ export interface DuelState {
   modifiers: Modifier[];
   /** What resolved effects stopped each player doing this turn; they lapse when the turn ends. */
   forbidden: { player: Seat; what: Forbidden; filter: CardFilter | null; turn: number }[];
+  /** Damage each player takes in this turn's End Phase unless they Normal Summon a card with one of these names first. */
+  pledges: { player: Seat; names: string[]; damage: number }[];
   chain: ChainLink[];
   step: DuelStep;
   /** Events since the last triggers were put on the chain, for triggers to watch. */
@@ -672,6 +679,8 @@ export type Op =
   /** Detaches this Xyz Material: it goes to its owner's GY. */
   | { op: 'detach'; card: string }
   | { op: 'forbid'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  /** `player` takes `damage` in this turn's End Phase unless they Normal Summon a card with the name of one of `cards`. */
+  | { op: 'pledge_normal_summon'; player: Seat; cards: string[]; damage: number }
   /** `controller` takes control of this monster, into `zone` (an empty Main Monster Zone of theirs). */
   | { op: 'take_control'; card: string; controller: Seat; zone: number; until: 'end_phase' | null }
   | { op: 'summon_token'; controller: Seat; token: Token; position: Position; zone: number }
@@ -863,6 +872,7 @@ export type DuelEvent =
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
   | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  | { type: 'pledged'; player: Seat; names: string[]; damage: number }
   /** `to` now controls the monster, in `zone`. A Token's card data comes with its event, since it isn't in any Deck. */
   | { type: 'controlChanged'; card: string; to: Seat; zone: number; until: 'end_phase' | null }
   | { type: 'tokenSummoned'; player: Seat; card: string; token: CardData; zone: number; position: Position }

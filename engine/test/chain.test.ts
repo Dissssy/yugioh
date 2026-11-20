@@ -616,6 +616,23 @@ describe('leaving the field', () => {
   });
 });
 
+describe('pledges', () => {
+  it('cost their damage in the End Phase unless the player Normal Summons a card of that name (Where Arf Thou?)', () => {
+    const kept = new Table(stacked(pad([1, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    kept.push({ type: 'pledged', player: 0, names: ['Axe Raider'], damage: 2000 });
+    kept.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    expect(kept.state.players[0].lp).toBe(8000);
+
+    const broken = new Table(stacked(pad([1, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    broken.push({ type: 'pledged', player: 0, names: ['Axe Raider'], damage: 2000 });
+    broken.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 0 }).endTurn(0);
+    expect(broken.state.players[0].lp).toBe(6000);
+    // It lasts only the turn it was made.
+    broken.endTurn(1);
+    expect(broken.state.pledges).toEqual([]);
+  });
+});
+
 describe('targets', () => {
   it('can number the non-Tuners used for the Synchro Summon (Junk Destroyer)', () => {
     const t = new Table(stacked(pad([27, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));

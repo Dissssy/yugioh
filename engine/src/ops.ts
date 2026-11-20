@@ -244,6 +244,10 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'setAgain' });
       return;
     }
+    case 'pledge_normal_summon':
+      check(op.cards.length > 0 && op.damage > 0, 'Name the cards the pledge is about, and a positive damage.');
+      run.emit({ type: 'pledged', player: op.player, names: [...new Set(op.cards.map((id) => cardOf(state, id).name))], damage: op.damage });
+      return;
     case 'forbid':
       check(op.what === 'special_summon' || op.filter === null, 'Only a Special Summon ban takes a filter.');
       run.emit({ type: 'forbidden', player: op.player, what: op.what, filter: op.filter });

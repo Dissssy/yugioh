@@ -82,6 +82,7 @@ const step = z.union([
     position: z.enum(['attack', 'defense', 'choice']),
   }),
   z.object({ do: z.literal('forbid'), player, what: z.enum(FORBIDDEN), filter: cardFilter.nullable() }),
+  z.object({ do: z.literal('pledge_normal_summon'), damage: z.number().int().min(1) }),
   z.object({ do: z.literal('link'), cards: selection }),
   z.object({ do: z.literal('negate_activation'), destroy: z.boolean() }),
   z.object({ do: z.literal('negate_effects'), cards: selection }),
@@ -402,6 +403,7 @@ Steps (each "cards" is a selection):
 - {"do": "take_control", "cards", "until"}: you take control of the monsters selected (usually {"from": "targets"}): until "end_phase" for "until the End Phase", null for good ("take control of that monster"). It needs a free Monster Zone of yours.
 - {"do": "summon_token", "player", "token", "count", "position"}: Special Summon count Tokens to that player's field. token {"name", "attribute", "race", "level", "atk", "def"} from the text: "1 "Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)" is {"name": "Ice Barrier Token", "attribute": "WATER", "race": "Aqua", "level": 1, "atk": 0, "def": 0}.
 - {"do": "forbid", "player", "what", "filter"}: for the rest of this turn that player can't "declare_attack" ("your opponent cannot declare an attack this turn"), can't conduct their "battle_phase" ("you cannot conduct your Battle Phase the turn you activate this card"; pair it with the before_battle_phase condition), or can't "special_summon" the monsters that fit filter ("you cannot Special Summon monsters from your hand for the rest of this turn": side "you", place "hand", kinds ["monster"]; "You cannot Special Summon any Level 5 or higher monsters the turn you use this effect": place "any", level min 5; null for any monster; "except WATER monsters": attributes lists every other Attribute, DARK, DIVINE, EARTH, FIRE, LIGHT and WIND). filter is null for the other two. Such a restriction is a step, not unapplied.
+- {"do": "pledge_normal_summon", "damage"}: "During the End Phase of this turn, take 2000 damage if you did not Normal Summon the added monster, or a card with the same name": about the cards the step before it moved (put it right after that move).
 - {"do": "detach", "cards", "count"}: detach count Xyz Materials from an Xyz Monster the selection picks. "Detach 1 Xyz Material from this card" (usually a cost): cards {"from": "self"}, count 1. "Detach 1 Xyz Material from a monster you control": a choose selection of face-up Xyz monsters you control.
 
 Selections:

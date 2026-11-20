@@ -889,6 +889,10 @@ function endTurn(run: Run, chosen: string[]) {
   const discard = [...kept, ...hand.filter((id) => !kept.includes(id)).reverse()].slice(0, excess);
   const expiring = selfDestructing(state);
   for (const id of expiring) run.emit({ type: 'destroyed', cards: [id], by: locate(state, id)!.seat });
+  // A pledge not kept: "take 2000 damage if you did not Normal Summon the added monster" (Where Arf Thou?).
+  for (const pl of state.pledges) run.emit({ type: 'lpChanged', player: pl.player, amount: -pl.damage, kind: 'damage' });
+  endIfLpGone(run);
+  if (run.state.result) return;
   if (discard.length > 0) run.emit({ type: 'discarded', player: seat, cards: discard });
   beginTurn(run, other(seat), state.turn + 1);
 }

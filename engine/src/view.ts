@@ -408,6 +408,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return event.materials.length ? `${name(event.card)} detaches ${names(event.materials)} instead of being destroyed` : null;
     case 'linked':
       return `${name(event.card)} ${state.cards[state.instances[event.card]!.code]!.race === 'Equip' ? 'equipped to' : 'tied to'} ${name(event.to)}`;
+    case 'pledged':
+      return `${who(event.player)} takes ${event.damage} damage in the End Phase unless they Normal Summon the added monster, or a card with the same name, this turn`;
     case 'forbidden':
       return event.what === 'battle_phase'
         ? `${who(event.player)} can't conduct their Battle Phase this turn`
