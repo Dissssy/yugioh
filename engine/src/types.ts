@@ -1,6 +1,8 @@
 // The duel's data: card facts, the event log, the state it folds into, and what players may ask for.
 
 export type Seat = 0 | 1;
+/** Whose hidden cards a viewer sees: one player's own, nobody's (a spectator), or everyone's (a replay with every card face up). */
+export type Sight = Seat | 'none' | 'all';
 
 /** What the engine knows about a card. Copied into the log when a duel starts, so replays never depend on later errata. */
 export interface CardData {

@@ -432,3 +432,5 @@ form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit
 /* Typing with the keyboard up leaves too little screen for both: the log and chat take it, and the board returns after. */
 .duel.stacked.typing > .table, .duel.stacked.typing > .duel-bar { display: none; }
 .duel.stacked.typing { grid-template-rows: minmax(0, 1fr); }
+.watch-note .dot { flex: none; }
+.watch-note { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.85em; }

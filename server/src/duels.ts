@@ -34,11 +34,12 @@ import {
   type JudgeRecord,
   type JudgingView,
   type Seat,
+  type Sight,
 } from '@yugioh/engine';
 import type { DuelSummary, Replay } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
-import { decks, matchEvents, matches, sheetReports, users } from './db/schema.ts';
+import { decks, matchEvents, matches, sheetReports } from './db/schema.ts';
 import { appeal } from './judge/appeal.ts';
 import { askJudge, escalate } from './judge/ask.ts';
 import type { JudgeOutcome, ModelCall, Question } from './judge/judge.ts';
@@ -55,7 +56,7 @@ interface LiveDuel {
   id: string;
   events: DuelEvent[];
   state: DuelState;
-  listeners: Set<{ seat: Seat; send: (update: DuelUpdate) => void }>;
+  listeners: Set<Listener>;
   /** Changes to one duel happen one at a time, in arrival order: intents, judge calls, appeal verdicts. */
   queue: Promise<unknown>;
   /** Writes to the log, one at a time. Chat goes straight here, so players can talk while the judge works. */
@@ -70,6 +71,13 @@ interface LiveDuel {
   escalating: Set<number>;
   /** A pass the server will make for a player with nothing to activate, once the response floor has passed. */
   autoPass: ReturnType<typeof setTimeout> | null;
+}
+
+/** Someone following a duel live: a player (`sight` is their seat) or a spectator (`none`), with `seat` at the bottom. */
+interface Listener {
+  seat: Seat;
+  sight: Sight;
+  send: (update: DuelUpdate) => void;
 }
 
 interface Judging {
@@ -127,18 +135,18 @@ export class Duels {
     this.responseFloorMs = responseFloorMs;
   }
 
-  async create(userId: number, seatKey: string, deckId: number): Promise<string | null> {
+  async create(userId: number, seatKey: string, name: string, deckId: number): Promise<string | null> {
     if (!(await this.db.query.decks.findFirst({ where: eq(decks.id, deckId) }))) return null;
     const id = randomBytes(12).toString('base64url');
-    await this.db.insert(matches).values({ id, createdBy: userId, seat0: seatKey, deck0: deckId });
+    await this.db.insert(matches).values({ id, createdBy: userId, seat0: seatKey, name0: name, deck0: deckId });
     return id;
   }
 
   /** A duel against the AI opponent: the player takes seat 0 and the AI seat 1, and it starts at once. */
   async createAgainstAi(userId: number, seatKey: string, name: string, deckId: number, aiDeckId: number): Promise<string | null> {
-    const id = await this.create(userId, seatKey, deckId);
+    const id = await this.create(userId, seatKey, name, deckId);
     if (!id || !(await this.db.query.decks.findFirst({ where: eq(decks.id, aiDeckId) }))) return null;
-    await this.join(id, aiDeckId, name, async () => ({ key: aiKey('claude'), name: 'Claude' }));
+    await this.join(id, aiDeckId, async () => ({ key: aiKey('claude'), name: 'Claude' }));
     return id;
   }
 
@@ -161,15 +169,17 @@ export class Duels {
   }
 
   async summarize(row: MatchRow, seatKey: string | null, canJoin: boolean): Promise<DuelSummary> {
-    const [creator] = await this.db.select({ username: users.username }).from(users).where(eq(users.id, row.createdBy));
-    const deckName = async (id: number | null) =>
-      id === null ? null : ((await this.db.query.decks.findFirst({ where: eq(decks.id, id) }))?.name ?? null);
+    const deckName = async (id: number) => (await this.db.query.decks.findFirst({ where: eq(decks.id, id) }))?.name ?? '';
     return {
       id: row.id,
       status: row.status,
       createdAt: row.createdAt.toISOString(),
-      createdBy: creator?.username ?? 'a player',
-      decks: [(await deckName(row.deck0)) ?? '', await deckName(row.deck1)],
+      finishedAt: row.finishedAt?.toISOString() ?? null,
+      players: [
+        { name: row.name0, deck: await deckName(row.deck0) },
+        row.name1 === null || row.deck1 === null ? null : { name: row.name1, deck: await deckName(row.deck1) },
+      ],
+      result: row.result,
       yourSeat: seatKey === null ? null : seatKey === row.seat0 ? 0 : seatKey === row.seat1 ? 1 : null,
       canJoin: canJoin && row.status === 'waiting' && seatKey !== row.seat0,
     };
@@ -179,7 +189,7 @@ export class Duels {
    * Takes the empty seat and shuffles the Decks; rock-paper-scissors then decides who goes first. Returns false, having changed nothing, if the
    * seat was already taken or the claimant is the challenger.
    */
-  async join(id: string, deckId: number, challengerName: string, claim: SeatClaim): Promise<boolean> {
+  async join(id: string, deckId: number, claim: SeatClaim): Promise<boolean> {
     return this.db.transaction(async (tx) => {
       const [waiting] = await tx
         .select()
@@ -191,7 +201,7 @@ export class Duels {
       if (player.key === waiting.seat0) return false;
       const [row] = await tx
         .update(matches)
-        .set({ seat1: player.key, deck1: deckId, status: 'active' })
+        .set({ seat1: player.key, name1: player.name, deck1: deckId, status: 'active' })
         .where(eq(matches.id, id))
         .returning();
       if (!row) return false;
@@ -203,7 +213,7 @@ export class Duels {
       const events = startDuel(
         {
           players: [
-            { name: challengerName, main: deck0.main, extra: deck0.extra },
+            { name: row.name0, main: deck0.main, extra: deck0.extra },
             { name: player.name, main: deck1.main, extra: deck1.extra },
           ],
           cards,
@@ -266,8 +276,11 @@ export class Duels {
     return run;
   }
 
-  /** A finished duel as one seat saw it, or with every card face up, step by step (docs/next-steps.md, Replays). */
-  async replay(id: string, from: Seat | 'both', questionsOf: Seat | 'both'): Promise<Replay> {
+  /**
+   * A finished duel as one seat saw it, or with every card face up, step by step (docs/next-steps.md, Replays).
+   * Only `questionsOf`'s questions to the judge show: a player's own, every one (`both`, an admin) or none (null).
+   */
+  async replay(id: string, from: Seat | 'both', questionsOf: Seat | 'both' | null): Promise<Replay> {
     const rows = await this.db.select().from(matchEvents).where(eq(matchEvents.matchId, id)).orderBy(matchEvents.seq);
     return { from, steps: replaySteps(rows.map((r) => r.event as DuelEvent), from, questionsOf) };
   }
@@ -582,7 +595,7 @@ export class Duels {
       void this.enqueue(duel, async () => {
         await this.commit(duel, [{ type: 'sheetUpdated', code, sheet }]);
         // Nobody sees the change in the log, but it can change what each player may do.
-        for (const l of duel.listeners) l.send(syncFor(duel, l.seat));
+        for (const l of duel.listeners) l.send(syncFor(duel, l.seat, l.sight));
       });
     }
   }
@@ -616,50 +629,63 @@ export class Duels {
 
   private async write(duel: LiveDuel, events: DuelEvent[]) {
     const first = duel.events.length;
+    const before = duel.state;
+    const after = events.reduce(evolve, before);
     await this.db.transaction(async (tx) => {
       await tx.insert(matchEvents).values(events.map((event, i) => ({ matchId: duel.id, seq: first + i, event })));
-      if (events.some((e) => e.type === 'duelEnded')) {
-        await tx.update(matches).set({ status: 'finished', finishedAt: new Date() }).where(eq(matches.id, duel.id));
+      if (after.result && !before.result) {
+        await tx
+          .update(matches)
+          .set({ status: 'finished', finishedAt: new Date(), result: { ...after.result, turn: after.turn } })
+          .where(eq(matches.id, duel.id));
       }
     });
-    const before = duel.state;
     duel.events.push(...events);
-    duel.state = events.reduce(evolve, duel.state);
+    duel.state = after;
     this.broadcast(before, events, first, duel);
   }
 
-  /** Sends the seat the whole duel now, and the steps of every change after. Returns the unsubscribe function. */
-  async watch(id: string, seat: Seat, send: (update: DuelUpdate) => void): Promise<() => void> {
+  /**
+   * Sends the whole duel now, and the steps of every change after, with `seat` at the bottom: to its player, or with
+   * `sight` none to a spectator, who sees only what both players can see. Returns the unsubscribe function.
+   */
+  async watch(id: string, seat: Seat, sight: Sight, send: (update: DuelUpdate) => void): Promise<() => void> {
     const duel = await this.load(id);
-    const listener = { seat, send };
+    const listener = { seat, sight, send };
     duel.listeners.add(listener);
-    send(syncFor(duel, seat));
+    send(syncFor(duel, seat, sight));
     return () => duel.listeners.delete(listener);
   }
 
   /**
-   * Sends each seat one step per visible new event: the log entry and the board right after it, so the client
+   * Sends each listener one step per visible new event: the log entry and the board right after it, so the client
    * can animate events in order. Only the last step offers actions, since nobody may act mid-sequence.
    */
   private broadcast(before: DuelState, events: DuelEvent[], first: number, duel: LiveDuel) {
-    const updateFor = (seat: Seat): Extract<DuelUpdate, { type: 'steps' }> => {
+    const updateFor = (seat: Seat, sight: Sight): Extract<DuelUpdate, { type: 'steps' }> => {
       let state = before;
       const steps: SeatStep[] = events.flatMap((event, i) => {
         state = evolve(state, event);
-        const entry = entryFor(state, event, first + i, state.turn, seat);
-        return entry ? [{ entry, view: viewFor(state, seat) }] : [];
+        const entry = entryFor(state, event, first + i, state.turn, sight);
+        return entry ? [{ entry, view: viewFor(state, seat, sight) }] : [];
       });
       // A change nobody sees in the log (a pass) still changes what each player may do.
-      if (!entryFor(state, events.at(-1)!, first + events.length - 1, state.turn, seat)) steps.push({ entry: null, view: viewFor(state, seat) });
+      if (!entryFor(state, events.at(-1)!, first + events.length - 1, state.turn, sight)) steps.push({ entry: null, view: viewFor(state, seat, sight) });
       for (const step of steps.slice(0, -1)) step.view.actions = [];
       return { type: 'steps', steps };
     };
-    const updates = [updateFor(0), updateFor(1)] as const;
-    for (const l of duel.listeners) if (updates[l.seat].steps.length > 0) l.send(updates[l.seat]);
+    // Worked out once for each way of looking at the duel, however many are watching it that way.
+    const updates = new Map<string, Extract<DuelUpdate, { type: 'steps' }>>();
+    for (const l of duel.listeners) {
+      const key = `${l.seat}:${l.sight}`;
+      const update = updates.get(key) ?? updateFor(l.seat, l.sight);
+      updates.set(key, update);
+      if (update.steps.length > 0) l.send(update);
+    }
   }
 
   private broadcastJudging(duel: LiveDuel) {
-    for (const l of duel.listeners) l.send({ type: 'judging', judging: judgingFor(duel, l.seat) });
+    for (const l of duel.listeners) l.send({ type: 'judging', judging: judgingFor(duel, l.sight) });
   }
 }
 
@@ -688,11 +714,17 @@ const REPORTS_PER_SEAT = 5;
 
 const judgeCallsMade = (events: DuelEvent[]) => events.filter((e) => e.type === 'judged' && calledModel(e.record.model)).length;
 
-/** The whole duel as one seat sees it now. */
-const syncFor = (duel: LiveDuel, seat: Seat): DuelUpdate => ({ type: 'sync', view: viewFor(duel.state, seat), log: logFor(duel.events, seat), judging: judgingFor(duel, seat) });
+/** The whole duel now, with `seat` at the bottom, as `sight` sees it. */
+const syncFor = (duel: LiveDuel, seat: Seat, sight: Sight): DuelUpdate => ({
+  type: 'sync',
+  view: viewFor(duel.state, seat, sight),
+  log: logFor(duel.events, sight),
+  judging: judgingFor(duel, sight),
+});
 
-/** The judge's progress as one seat may see it. */
-function judgingFor(duel: LiveDuel, seat: Seat): JudgingView | null {
+/** The judge's progress as a player (or a spectator, `none`) may see it. */
+function judgingFor(duel: LiveDuel, sight: Sight): JudgingView | null {
+  const seat = sight === 0 || sight === 1 ? sight : null;
   const j = duel.judging;
   if (!j) return null;
   const state = duel.state;

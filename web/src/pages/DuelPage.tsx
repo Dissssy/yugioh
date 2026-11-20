@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DuelSummary, Me } from '@yugioh/shared';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, Navigate, useParams } from 'react-router';
 import { api, errorText, loginHref, useDecks } from '../api.ts';
 import { Board } from '../board/Board.tsx';
 import { DeckPicker } from './Duels.tsx';
@@ -26,15 +26,12 @@ export function DuelPage({ me }: { me: Me }) {
   const d = duel.data;
 
   if (d.yourSeat === null) {
-    if (d.status !== 'waiting')
-      return (
-        <Notice title="This duel is full" action={<Link className="button" to="/">Back home</Link>}>
-          {d.createdBy}'s challenge already has two players.
-        </Notice>
-      );
+    // Anyone else holding the link watches: live, or the replay once it's over.
+    if (d.status === 'finished') return <Navigate to={`/duel/${d.id}/replay`} replace />;
+    if (d.status === 'active') return <Board key={d.id} duelId={d.id} watching="live" />;
     if (d.canJoin) return <Join duel={d} me={me} />;
     return (
-      <Notice title={`${d.createdBy} challenges you`}>
+      <Notice title={`${d.players[0].name} challenges you`}>
         Your account needs the admin's approval before you can play. Check back once it's approved.
       </Notice>
     );
@@ -43,7 +40,7 @@ export function DuelPage({ me }: { me: Me }) {
   return <Board duelId={d.id} />;
 }
 
-/** A finished duel played back, for its players and admins (docs/next-steps.md, Replays). */
+/** A finished duel played back, for anyone holding the link (docs/next-steps.md, Replays). */
 export function ReplayPage() {
   const { id = '' } = useParams();
   const duel = useQuery({ queryKey: ['duel', id], queryFn: () => api<DuelSummary>(`/duels/${id}`) });
@@ -60,7 +57,7 @@ export function ReplayPage() {
         A duel can be watched again once it has finished.
       </Notice>
     );
-  return <Board key={id} duelId={id} replay />;
+  return <Board key={id} duelId={id} watching="replay" />;
 }
 
 function Waiting({ duel }: { duel: DuelSummary }) {
@@ -74,7 +71,7 @@ function Waiting({ duel }: { duel: DuelSummary }) {
       <h1>Send this link to your opponent</h1>
       <div className="notice-body">
         <p>
-          You'll play <strong>{duel.decks[0]}</strong>. They can log in, or play as a guest without an account.
+          You'll play <strong>{duel.players[0].deck}</strong>. They can log in, or play as a guest without an account.
         </p>
         <div className="row">
           <input readOnly value={link} onFocus={(e) => e.target.select()} />
@@ -113,10 +110,10 @@ function Join({ duel, me }: { duel: DuelSummary; me: Me }) {
   const ready = chosen !== null && (!asGuest || guestName.trim() !== '');
   return (
     <section className="notice box join">
-      <h1>{duel.createdBy} challenges you</h1>
+      <h1>{duel.players[0].name} challenges you</h1>
       <div className="notice-body">
         <p>
-          They play <strong>{duel.decks[0]}</strong>. Pick the deck you'll play.
+          They play <strong>{duel.players[0].deck}</strong>. Pick the deck you'll play.
         </p>
         <DeckPicker value={chosen} onChange={setDeckId} />
         {asGuest && (

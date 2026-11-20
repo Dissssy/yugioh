@@ -256,18 +256,23 @@ function HandCard({
   );
 }
 
-/** The opponent's hand: card backs, or the cards themselves in a replay with every card face up. */
-export function FoeHand({ seat, cards }: { seat: Seat; cards: CardView[] }) {
+/**
+ * A hand nobody plays from here: the opponent's at the top, or for a spectator the bottom player's too. Card backs,
+ * or the cards themselves in a replay with every card face up.
+ */
+export function ReadOnlyHand({ seat, name, cards, side }: { seat: Seat; name: string; cards: CardView[]; side: 'top' | 'bottom' }) {
   const { zone } = useBoardLook();
   const hover = useCardHover();
   const count = cards.length;
+  /** The top hand fans downward, toward the table. */
+  const flip = side === 'top' ? -1 : 1;
   return (
-    <div className="hand foe" data-hand={seat} aria-label={`Opponent's hand, ${count} cards`}>
+    <div className={`hand ${side === 'top' ? 'foe' : 'watched'}`} data-hand={seat} aria-label={`${name}'s hand, ${count} cards`}>
       {Array.from({ length: count }, (_, i) => {
         const place = fan(i, count, zone, null);
         return (
           <motion.div key={i} layout className="hand-card" style={{ marginLeft: place.marginLeft }} transition={spring}>
-            <motion.div animate={{ rotate: -place.rotate, y: -place.y }} transition={spring}>
+            <motion.div animate={{ rotate: flip * place.rotate, y: flip * place.y }} transition={spring}>
               <div
                 className="fx"
                 data-hand-index={`${seat}:${i}`}

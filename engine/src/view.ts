@@ -4,26 +4,32 @@ import { waitingFor } from './chain.ts';
 import { blockedAttacks, blockedEffects, legalActions, normalSummonUsed } from './rules.ts';
 import { statsOf } from './continuous.ts';
 import { evolve, locate, replay } from './state.ts';
-import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, LogEntry, LogEvent, Phase, Place, PlayerView, Seat, SeatStep, StartView } from './types.ts';
+import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, LogEntry, LogEvent, Phase, Place, PlayerView, Seat, SeatStep, Sight, StartView } from './types.ts';
+
+/** Whether `sight` sees the hidden cards `owner` holds. */
+const knows = (sight: Sight, owner: Seat) => sight === 'all' || sight === owner;
+/** The seat whose own cards `sight` sees, if it is one player's. */
+const seatOf = (sight: Sight): Seat | null => (sight === 0 || sight === 1 ? sight : null);
 
 /**
- * One player's view of the board. `reveal` shows every card face up (hands, Set cards, Extra Decks), for an admin's
- * replay of a finished duel; players never get it.
+ * The board with `seat` at the bottom, showing the hidden cards `sight` sees: by default the seat's own (a player),
+ * none (a spectator), or all (a replay of a finished duel with every card face up). Only a player gets actions.
  */
-export function viewFor(state: DuelState, seat: Seat, reveal = false): PlayerView {
+export function viewFor(state: DuelState, seat: Seat, sight: Sight = seat): PlayerView {
   const shown = (id: string): CardView => ({ id, card: state.cards[state.instances[id]!.code]! });
   const hidden: CardView = { hidden: true };
-  const actions = legalActions(state, seat);
+  const player = sight === seat;
+  const actions = player ? legalActions(state, seat) : [];
   const field = (owner: Seat, monsters: boolean) => (c: FieldCard | null): FieldCardView | null =>
     c && {
-      card: c.faceUp || owner === seat || reveal ? shown(c.id) : hidden,
+      card: c.faceUp || knows(sight, owner) ? shown(c.id) : hidden,
       position: c.position,
       faceUp: c.faceUp,
       stats: monsters && c.faceUp ? statsOf(state, c.id) : null,
       materials: c.materials.map(shown),
       spellCounters: c.counters.spell ?? 0,
     };
-  const deckList = [
+  const deckList = !knows(sight, seat) ? [] : [
     ...new Set(Object.values(state.instances).filter((i) => i.owner === seat).map((i) => i.code)),
   ].sort((a, b) => a - b);
 
@@ -37,7 +43,7 @@ export function viewFor(state: DuelState, seat: Seat, reveal = false): PlayerVie
     result: state.result,
     players: ([0, 1] as const).map((owner) => {
       const p = state.players[owner];
-      const mine = owner === seat || reveal;
+      const mine = knows(sight, owner);
       return {
         name: p.name,
         lp: p.lp,
@@ -51,11 +57,11 @@ export function viewFor(state: DuelState, seat: Seat, reveal = false): PlayerVie
       };
     }) as PlayerView['players'],
     chain: state.chain.map((link) => ({ player: link.player, card: shown(link.card), effect: link.effect, targets: link.targets, choice: link.choice })),
-    waiting: waitingFor(state, seat),
-    start: startFor(state, seat),
+    waiting: waitingFor(state, seatOf(sight)),
+    start: startFor(state, seatOf(sight)),
     rollback: state.rollback && { explanation: state.rollback.explanation, accepted: state.rollback.accepted },
     actions,
-    blocked: [...blockedEffects(state, seat, actions), ...blockedAttacks(state, seat)],
+    blocked: player ? [...blockedEffects(state, seat, actions), ...blockedAttacks(state, seat)] : [],
   };
 }
 
@@ -63,46 +69,48 @@ export function viewFor(state: DuelState, seat: Seat, reveal = false): PlayerVie
  * A whole duel for watching it again: the board before the first visible event (entry null), then one step per
  * event the viewer sees. `from` is the seat at the bottom of the board, or `both` for every card face up (with seat 0
  * at the bottom). Questions to the judge are private (docs/ask-the-judge.md), so only `questionsOf`'s show: a seat,
- * or `both` for an admin. Nothing can be done in a replay, so views offer no actions.
+ * `both` for an admin, or null for someone who didn't play. Nothing can be done in a replay, so views offer no actions.
  */
-export function replaySteps(events: readonly DuelEvent[], from: Seat | 'both', questionsOf: Seat | 'both'): SeatStep[] {
+export function replaySteps(events: readonly DuelEvent[], from: Seat | 'both', questionsOf: Seat | 'both' | null): SeatStep[] {
   const seat = from === 'both' ? 0 : from;
-  const reveal = from === 'both';
+  const sight: Sight = from === 'both' ? 'all' : from;
   let state = replay(events.slice(0, 1));
-  const still = (s: DuelState): PlayerView => ({ ...viewFor(s, seat, reveal), actions: [], blocked: [] });
+  const still = (s: DuelState): PlayerView => ({ ...viewFor(s, seat, sight), actions: [], blocked: [] });
   const steps: SeatStep[] = [{ entry: null, view: still(state) }];
   events.forEach((event, seq) => {
     if (seq === 0) return;
     state = evolve(state, event);
     const asker = event.type === 'asked' || event.type === 'escalated' ? event.record.player : null;
     if (asker !== null && questionsOf !== 'both' && questionsOf !== asker) return;
-    const entry = entryFor(state, event, seq, state.turn, asker ?? seat, reveal);
+    // A question shown here is shown whatever the viewpoint, as its asker saw it.
+    const entry = entryFor(state, event, seq, state.turn, asker ?? sight);
     if (entry) steps.push({ entry, view: still(state) });
   });
   return steps;
 }
 
-/** Rock-paper-scissors as `seat` sees it: never the opponent's pick before both are shown. */
-function startFor(state: DuelState, seat: Seat): StartView | null {
+/** Rock-paper-scissors as `seat` sees it: never the opponent's pick before both are shown. Spectators (null) see no picks. */
+function startFor(state: DuelState, seat: Seat | null): StartView | null {
   const step = state.step;
-  if (step.at === 'rps') return { at: 'rps', yours: step.picks[seat], theirsIn: step.picks[seat === 0 ? 1 : 0] !== null, last: step.last };
+  if (step.at === 'rps')
+    return { at: 'rps', yours: seat === null ? null : step.picks[seat], theirsIn: seat !== null && step.picks[seat === 0 ? 1 : 0] !== null, last: step.last };
   if (step.at === 'order') return { at: 'order', chooser: step.chooser, hands: step.hands };
   return null;
 }
 
-/** The whole duel log as one player sees it. */
-export function logFor(events: readonly DuelEvent[], seat: Seat): LogEntry[] {
+/** The whole duel log as one player (or a spectator, `none`) sees it. */
+export function logFor(events: readonly DuelEvent[], sight: Sight): LogEntry[] {
   let state = replay(events.slice(0, 1));
   return events.flatMap((event, seq) => {
     if (seq > 0) state = evolve(state, event);
-    const entry = entryFor(state, event, seq, state.turn, seat);
+    const entry = entryFor(state, event, seq, state.turn, sight);
     return entry ? [entry] : [];
   });
 }
 
-/** One event as a log entry for one player, or null for events players never see. `state` is the state right after the event. */
-export function entryFor(state: DuelState, event: DuelEvent, seq: number, turn: number, seat: Seat, reveal = false): LogEntry | null {
-  const visible = visibleEvent(state, event, seat, reveal);
+/** One event as a log entry for what `sight` sees, or null for events it never sees. `state` is the state right after the event. */
+export function entryFor(state: DuelState, event: DuelEvent, seq: number, turn: number, sight: Sight): LogEntry | null {
+  const visible = visibleEvent(state, event, sight);
   return visible && { seq, turn, event: visible, text: describe(state, visible) };
 }
 
@@ -214,8 +222,8 @@ function reviewText(state: DuelState, event: DuelEvent): string {
 /** Places both players can see into. */
 const PUBLIC: Place[] = ['monsters', 'spellTraps', 'materials', 'graveyard', 'banished'];
 
-/** Whether a card is visible to `seat` where it is now. */
-export function visibleTo(state: DuelState, id: string, seat: Seat): boolean {
+/** Whether a card is visible to `seat` where it is now; with `seat` null, whether it is visible to everyone. */
+export function visibleTo(state: DuelState, id: string, seat: Seat | null): boolean {
   const at = locate(state, id);
   if (!at) return false;
   if (at.zone === 'graveyard' || at.zone === 'banished' || at.zone === 'materials') return true;
@@ -223,8 +231,8 @@ export function visibleTo(state: DuelState, id: string, seat: Seat): boolean {
   return at.zone !== 'deck' && at.seat === seat;
 }
 
-/** `reveal` names every card, for a replay with everything face up. */
-function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat, reveal = false): LogEvent | null {
+function visibleEvent(state: DuelState, event: DuelEvent, sight: Sight): LogEvent | null {
+  const seat = seatOf(sight);
   switch (event.type) {
     case 'duelStarted':
     case 'intent':
@@ -239,25 +247,25 @@ function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat, reveal = f
       return null;
     case 'asked': {
       const r = event.record;
-      if (r.player !== seat) return null;
+      if (!knows(sight, r.player)) return null;
       return { type: 'asked', player: r.player, question: r.question, card: r.card, answer: r.answer, verdict: r.verdict, failed: r.error !== null };
     }
     case 'escalated':
-      return event.record.player === seat ? { type: 'escalated', asked: event.record.asked, outcome: event.record.outcome, explanation: event.record.explanation } : null;
+      return knows(sight, event.record.player) ? { type: 'escalated', asked: event.record.asked, outcome: event.record.outcome, explanation: event.record.explanation } : null;
     case 'moved': {
       // A card moving between places this player can't see (Deck to hand, say) stays anonymous.
-      const seen = reveal || event.owner === seat || PUBLIC.includes(event.from) || visibleTo(state, event.card, seat);
+      const seen = knows(sight, event.owner) || PUBLIC.includes(event.from) || visibleTo(state, event.card, seat);
       return { ...event, card: seen ? event.card : null };
     }
     case 'judged': {
       const r = event.record;
       // A refused activation from the hand never revealed the card to the opponent, so they see nothing.
-      if (!reveal && !r.legal && r.player !== seat && !visibleTo(state, r.card, seat)) return null;
+      if (!r.legal && !knows(sight, r.player) && !visibleTo(state, r.card, seat)) return null;
       return {
         type: 'judged',
         stage: r.stage,
         player: r.player,
-        card: reveal || visibleTo(state, r.card, seat) || r.player === seat ? r.card : null,
+        card: knows(sight, r.player) || visibleTo(state, r.card, seat) ? r.card : null,
         legal: r.legal,
         summary: r.summary,
         failed: r.error !== null,
@@ -269,7 +277,7 @@ function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat, reveal = f
     }
     case 'monsterSet':
     case 'spellTrapSet':
-      return reveal || event.player === seat ? event : { ...event, card: null };
+      return knows(sight, event.player) ? event : { ...event, card: null };
     case 'attackDeclared': {
       const at = event.target === null ? null : locate(state, event.target);
       return { ...event, targetZone: at?.zone === 'monsters' ? at.index : null };

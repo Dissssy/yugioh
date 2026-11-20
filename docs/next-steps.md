@@ -49,7 +49,8 @@ Two items below need custom decks, and the deck builder (architecture layer 8: s
 - **Page:** `/duel/:id/replay`, for a finished duel; finished duels in the home list and the admin's duel list link to it, and so does the result at the end of a duel. It is the same `Board` with `replay` set: no chat, contest, escalate, surrender or card menus, and the phase dial shows the phases without Next and End. The log builds up as the replay moves on.
 - **Controls** (`ReplayBar` in the sidebar, `useReplay` for the state): **Watch from** either player or **Both** (every card face up, seat 0 at the bottom), a seek bar marked at each turn's start, previous and next turn, step back and forward, play and pause, and a speed of 0.5x to 4x. Stepping forward or playing animates each step as the live board does, held for its usual time divided by the speed; seeking and stepping back show a step at rest. Switching the viewpoint keeps the place in the duel. Steps are the events, as detailed as the log already is; the replay doesn't keep the live timing.
 - **Server:** `GET /api/duels/:id/replay?from=0|1|both` returns `Replay { from, steps }`, where each step is a `SeatStep` (a log entry and the view after it, the same shape the live stream sends). The engine's `replaySteps(events, from, questionsOf)` builds them from the stored log; `viewFor` and `entryFor` take a `reveal` flag for Both. Views offer no actions. The response is gzipped by hand (a long duel is around a megabyte of JSON before gzip).
-- **Who:** the duel's two players and admins, from any viewpoint (Ethan, 2026-11-20). Questions to the judge stay private to the player who asked: a player's replays show only their own questions, whatever the viewpoint; an admin's show everyone's. 404 until the duel has finished.
+- **Who:** anyone holding the duel's link, from any viewpoint (Ethan, 2026-11-20; it was the two players and admins until then). Questions to the judge stay private to the player who asked: a player's replays show only their own questions, whatever the viewpoint; an admin's show everyone's; anyone else's show none. 404 until the duel has finished.
+- **Live spectating:** anyone else who opens `/duel/:id` while it is going watches it live (`GET /api/duels/:id/stream?from=0|1`, sight `none` in the engine): no hands, Set cards, Extra Decks or Deck lists, no questions to the judge, nothing to do. Chat is visible to them. Every duel page and duel card has a Share button that copies the link.
 - **Not built:** clicking an old log entry during a duel to see the board as it was then (duel-ui.md step 7). `replaySteps` cut off at that entry, for the asking seat only, would serve it.
 
 ## Custom playmats
@@ -130,7 +131,7 @@ The full tables with the other options are in each plan.
 | Rulings history | Tuner schedule | Nightly, 10 cards max, plus Tune now |
 | Rulings history | Rulings for judge-only effects | A `rulings` list on the sheet effect |
 | Rulings history | `RESET_SHEETS` off | At launch |
-| Replays | Who can watch | The two players and admins |
+| Replays | Who can watch | Anyone with the link; live duels too, showing only public cards |
 | Replays | What players see | Either seat or both, chosen while watching (Ethan chose this, 2026-11-20) |
 | Playmats | Whose mat is shown | Each player's under their own half |
 | Challenger decks | The opponent sees an offered custom deck | Its name only |

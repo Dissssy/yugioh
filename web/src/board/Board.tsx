@@ -15,7 +15,7 @@ import { ChoiceBar, ChoiceProvider, pileKey, useBoardChoice, type PileKind } fro
 import { cueMs, playCue } from './cues.ts';
 import { ChatInput, DuelLog, type Asking, type Contest, type Escalate } from './DuelLog.tsx';
 import { dropKey, ExtraMonsterZone, Field, type FieldProps, type Row } from './Field.tsx';
-import { FoeHand, OwnHand, type HandDrag } from './Hand.tsx';
+import { OwnHand, ReadOnlyHand, type HandDrag } from './Hand.tsx';
 import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
 import { LpPlate } from './LpPlate.tsx';
 import { PhaseDial, PhaseStrip, TurnLabel } from './PhaseStrip.tsx';
@@ -26,6 +26,8 @@ import { systemReducesMotion, useDuelSettings } from './settings.ts';
 import { KeyHelp, shortcutOf, type Shortcut } from './keys.tsx';
 import { typing, useKeyboardNav } from './nav.ts';
 import { ReplayBar } from './ReplayBar.tsx';
+import { WatchBar } from './WatchBar.tsx';
+import { CopyLink } from '../CopyLink.tsx';
 import { useDuel } from './useDuel.ts';
 import { useReplay } from './useReplay.ts';
 
@@ -73,14 +75,21 @@ const CHOOSING: Mode['kind'][] = ['tributes', 'target', 'discard', 'zone', 'mate
 /** How long to wait for card images before showing the board anyway. */
 const PRELOAD_TIMEOUT_MS = 4000;
 
-/** A duel: the live one this player sits in, or with `replay` a finished one played back, where nothing can be done. */
-export function Board({ duelId, replay = false }: { duelId: string; replay?: boolean }) {
+/**
+ * A duel: the live one this player sits in, or one being watched, where nothing can be done: `live` as it happens,
+ * by someone who isn't playing it, or a finished one played back (`replay`).
+ */
+export function Board({ duelId, watching }: { duelId: string; watching?: 'live' | 'replay' }) {
+  const replay = watching === 'replay';
+  const readOnly = watching !== undefined;
+  /** The seat a spectator has at the bottom. */
+  const [watchFrom, setWatchFrom] = useState<Seat>(0);
   const [settings, updateSettings] = useDuelSettings();
   const hasAccount = useMe().data?.kind === 'user';
   const { opponentCards } = useSettings();
   const reduceMotion = settings.reduceMotion || systemReducesMotion();
   const pace = useCallback((event: Parameters<typeof cueMs>[0], waiting: number) => cueMs(event, waiting, settings, reduceMotion), [settings, reduceMotion]);
-  const live = useDuel(replay ? null : duelId, pace);
+  const live = useDuel(replay ? null : duelId, pace, watching === 'live' ? watchFrom : null);
   const played = useReplay(replay ? duelId : null, pace);
   const { shown, connected, judging } = replay ? { shown: played.shown, connected: true, judging: null } : live;
   const controls = played.controls;
@@ -665,10 +674,10 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
   const enterBattle = has('enterBattle');
   const enterMain2 = has('enterMain2');
   const endTurn = has('endTurn');
-  const canSurrender = !replay && !view.result;
+  const canSurrender = !readOnly && !view.result;
   const result = view.result;
   const resultText = log.findLast((e) => e.event.type === 'duelEnded')?.text;
-  const turnLabel = <TurnLabel turn={view.turn} label={view.start ? 'Deciding who goes first' : yourTurn && !replay ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`} />;
+  const turnLabel = <TurnLabel turn={view.turn} label={view.start ? 'Deciding who goes first' : yourTurn && !readOnly ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`} />;
   const nextStep = choosing ? undefined : nextPhase(actions);
   const canEnd = yourTurn && !choosing && view.chain.length === 0 && nextPhase(view.actions) !== undefined;
   const dial = (
@@ -682,7 +691,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
       next={nextStep && !ending ? () => start(nextStep) : null}
       end={ending ? () => setEnding(false) : canEnd ? () => setEnding(true) : null}
       ending={ending}
-      readOnly={replay}
+      readOnly={readOnly}
     />
   );
   const stripPrompt = prompt || choiceBar || judgeNote || rollbackNote || replaceNote || respondNote || null;
@@ -691,7 +700,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
   function shortcut(key: Shortcut): boolean {
     if (key === 'help') return (setShowKeys(true), true);
     if (key === 'log') return nav.focusArea('log', true);
-    if (replay) return false;
+    if (readOnly) return false;
     switch (key) {
       case 'pass':
         // With nothing to respond with, the window closes by itself, as the disabled Pass button says.
@@ -725,7 +734,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
         <ChoiceProvider value={choice}>
           <CardTooltipProvider
             suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}
-            pinnedFooter={replay ? undefined : (card) => (
+            pinnedFooter={readOnly ? undefined : (card) => (
               <>
                 <button
                   className="quiet report-ruling"
@@ -748,7 +757,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                   <>
                     <div className="hand-row foe-row">
                       <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={!view.start && view.turnPlayer === foe} target={lpTarget()} />
-                      <FoeHand seat={foe} cards={view.players[foe].hand} />
+                      <ReadOnlyHand seat={foe} name={view.players[foe].name} cards={view.players[foe].hand} side="top" />
                     </div>
                     <Field {...foeField} />
                     <PhaseStrip
@@ -768,6 +777,9 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                     <Field {...myField} />
                     <div className="hand-row own-row">
                       <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={!view.start && view.turnPlayer === me} />
+                      {watching === 'live' ? (
+                        <ReadOnlyHand seat={me} name={view.players[me].name} cards={view.players[me].hand} side="bottom" />
+                      ) : (
                       <OwnHand
                         duelId={duelId}
                         seat={me}
@@ -779,6 +791,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                         moving={moving}
                         onMoved={() => setMoving(null)}
                       />
+                      )}
                     </div>
                   </>
                 )}
@@ -793,7 +806,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                       exit={{ opacity: 0, x: '30%' }}
                       transition={{ duration: 0.3, ease: 'easeOut' }}
                     >
-                      {cue.event.player === me && !replay ? 'Your turn' : `${view.players[cue.event.player].name}'s turn`}
+                      {cue.event.player === me && !readOnly ? 'Your turn' : `${view.players[cue.event.player].name}'s turn`}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -804,7 +817,9 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
 
                 {result && cue === null && !replay && (
                   <motion.div className="result-overlay" data-area="strip" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-                    <strong>{result.winner === null ? 'Draw' : result.winner === me ? 'Victory' : 'Defeat'}</strong>
+                    <strong>
+                      {result.winner === null ? 'Draw' : readOnly ? `${view.players[result.winner].name} wins` : result.winner === me ? 'Victory' : 'Defeat'}
+                    </strong>
                     {resultText && <span>{resultText}</span>}
                     <span className="row">
                       <Link className="button" to={`/duel/${duelId}/replay`}>
@@ -832,6 +847,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                 <div className="row panel-top">
                   <Link to="/">← Duels</Link>
                   <span className="spacer" />
+                  <CopyLink path={replay ? `/duel/${duelId}/replay` : `/duel/${duelId}`} label="Share" />
                   <button className="quiet" onClick={() => setShowSettings((s) => !s)} aria-expanded={showSettings}>
                     Settings
                   </button>
@@ -870,9 +886,11 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                 {chat.isError && <p className="error">{errorText(chat.error)}</p>}
                 {ask.isError && <p className="error">{errorText(ask.error)}</p>}
                 {escalateQuestion.isError && <p className="error">{errorText(escalateQuestion.error)}</p>}
-                <DuelLog log={log} onHighlight={setHighlight} contest={replay ? never : contest} escalate={replay ? never : escalate} />
+                <DuelLog log={log} onHighlight={setHighlight} contest={readOnly ? never : contest} escalate={readOnly ? never : escalate} />
                 {controls ? (
                   <ReplayBar controls={controls} names={[view.players[0].name, view.players[1].name]} />
+                ) : watching === 'live' ? (
+                  <WatchBar from={watchFrom} setFrom={setWatchFrom} names={[view.players[0].name, view.players[1].name]} />
                 ) : (
                   <ChatInput
                     send={chat.mutateAsync}
@@ -901,7 +919,7 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
                       : [{ label: actionLabel(a, view), run: () => start(a) }],
                   ),
                   // Reordering the hand by keyboard, where dragging isn't available.
-                  ...(myHand.includes(mode.id) && nav.usingKeyboard() && !replay ? [{ label: 'Move in hand', run: () => (setMode(idle), setMoving(mode.id)) }] : [])]}
+                  ...(myHand.includes(mode.id) && nav.usingKeyboard() && !readOnly ? [{ label: 'Move in hand', run: () => (setMode(idle), setMoving(mode.id)) }] : [])]}
                   notes={notesFor(mode.id)}
                   onClose={() => setMode(idle)}
                 />
@@ -934,12 +952,16 @@ export function Board({ duelId, replay = false }: { duelId: string; replay?: boo
   );
 }
 
-/** Loads the images of your own deck before the board appears, so cards don't pop in mid-duel. The opponent's cards load as they're revealed, since their decklist isn't yours to know. */
+/**
+ * Loads the images of your own deck before the board appears, so cards don't pop in mid-duel. The opponent's cards
+ * load as they're revealed, since their decklist isn't yours to know; a spectator knows neither, so loads none first.
+ */
 function usePreload(view: PlayerView | null, size: 'small' | 'full') {
   const [ready, setReady] = useState(false);
   const deckList = view?.deckList.join();
   useEffect(() => {
-    if (!deckList) return;
+    if (deckList === undefined) return;
+    if (deckList === '') return setReady(true);
     const codes = deckList.split(',').map(Number);
     const urls = codes.flatMap((c) => (size === 'full' ? [imageUrl(c, 'full')] : [imageUrl(c, 'small'), imageUrl(c, 'full')]));
     let done = false;
@@ -987,7 +1009,7 @@ function actionLabel(a: LegalAction, view: PlayerView): string {
   }
 }
 
-/** Nothing in a replay can be contested or escalated. */
+/** Nothing can be contested or escalated by someone watching. */
 const never = { can: () => false, send: () => undefined };
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);

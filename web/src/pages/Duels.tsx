@@ -3,9 +3,8 @@ import type { DuelStatus, DuelSummary } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, errorText, useDecks, useDuels } from '../api.ts';
-import { formatDate } from './Home.tsx';
+import { DuelCard } from '../DuelCard.tsx';
 
-const statusText: Record<DuelStatus, string> = { waiting: 'Waiting', active: 'In progress', finished: 'Finished' };
 const statusOrder: Record<DuelStatus, number> = { active: 0, waiting: 1, finished: 2 };
 
 /** The viewer's duels, live ones first. */
@@ -26,17 +25,7 @@ export function Duels() {
         <ul className="duel-list">
           {sorted.map((d) => (
             <li key={d.id}>
-              <Link to={d.status === 'finished' ? `/duel/${d.id}/replay` : `/duel/${d.id}`} className="duel-row">
-                <span className="duel-title">
-                  <strong>{d.decks[0]}</strong>
-                  <span className="vs">vs</span>
-                  <strong className={d.decks[1] ? '' : 'muted'}>{d.decks[1] ?? 'open seat'}</strong>
-                </span>
-                <span className="muted small">
-                  {d.yourSeat === 0 ? 'Your challenge' : `${d.createdBy}'s challenge`} · {formatDate(d.createdAt)}
-                </span>
-                <span className={`pill ${d.status}`}>{statusText[d.status]}</span>
-              </Link>
+              <DuelCard duel={d} />
             </li>
           ))}
         </ul>

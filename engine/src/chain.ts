@@ -119,8 +119,8 @@ export function nextStep(state: DuelState): Next | null {
   }
 }
 
-/** Who the duel waits on in a triggers step or a response window, as a player's view shows it. */
-export function waitingFor(state: DuelState, seat: Seat): { player: Seat; for: 'respond' | 'triggers' | 'replace'; cause: string | null } | null {
+/** Who the duel waits on in a triggers step or a response window, as a player's view (or a spectator's, null) shows it. */
+export function waitingFor(state: DuelState, seat: Seat | null): { player: Seat; for: 'respond' | 'triggers' | 'replace'; cause: string | null } | null {
   const step = state.step;
   if (step.at === 'replace') return { player: step.player, for: 'replace', cause: cardOf(state, step.card).name };
   if (step.at === 'respond') {
