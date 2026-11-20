@@ -55,7 +55,7 @@ const step = z.union([
   z.object({ do: z.literal('destroy'), cards: selection }),
   z.object({ do: z.literal('move'), cards: selection, to: z.enum(DESTINATIONS) }),
   z.object({ do: z.literal('special_summon'), cards: selection, position: z.enum(['attack', 'defense', 'choice']), banishWhenLeaves: z.boolean() }),
-  z.object({ do: z.literal('arrange_top'), player: z.enum(['you', 'opponent']), count: z.number().int().min(1), bottom: z.boolean() }),
+  z.object({ do: z.literal('arrange_top'), count: z.number().int().min(1), bottom: z.boolean() }),
   z.object({
     do: z.literal('modify_stats'),
     cards: selection,
@@ -374,7 +374,7 @@ Steps (each "cards" is a selection):
 - {"do": "destroy", "cards"}: destroy cards on the field.
 - {"do": "move", "cards", "to"}: to "hand", "graveyard", "banished", "deck_top", "deck_bottom" or "deck_shuffled". Add to hand, send, discard, banish, return to the Deck.
 - {"do": "special_summon", "cards", "position", "banishWhenLeaves"}: "attack", "defense", or "choice" when the text names no position (the player picks). banishWhenLeaves true for "but banish it when it leaves the field" / "If you do, banish it when it leaves the field".
-- {"do": "arrange_top", "player", "count", "bottom"}: the activating player looks at the top count cards of that player's Deck and puts each back on top, or on the bottom if bottom is true ("look at the top card of your Deck. Return that card to either the top or the bottom of the Deck": player "you", count 1, bottom true).
+- {"do": "arrange_top", "count", "bottom"}: the activating player looks at the top count cards of their own Deck and puts each back on top, or on the bottom if bottom is true ("look at the top card of your Deck. Return that card to either the top or the bottom of the Deck": count 1, bottom true). Looking at the opponent's Deck can't be scripted.
 - {"do": "modify_stats", "cards", "atk", "def", "levelDelta", "levelSet", "until"}: ATK/DEF deltas, Level delta, or levelSet to make it that Level (else null). until: "end_of_turn" (also "until the End Phase"), "end_of_battle_phase", "next_standby_phase" ("until your next Standby Phase") or "while_on_field" (no end given).
 - {"do": "set_stats", "cards", "atk", "def", "until"}: ATK and/or DEF "become" a value (null leaves that stat alone). Each value is {"of": "self" | "targets" | "cost", "stat": "atk" | "def", "original": bool, "times": n}: a stat read when the effect resolves from this card, its first target or the first card paid as its cost, the printed ("original") or current value, multiplied by times. "Make its ATK become double its original ATK": {"of": "self", "stat": "atk", "original": true, "times": 2}. "This card's ATK/DEF become equal to that monster's original ATK/DEF": atk {"of": "targets", "stat": "atk", "original": true, "times": 1}, def likewise.
 - {"do": "gain_stats", "cards", "atk", "def", "until"}: ATK and/or DEF gain a value read when the step resolves (each a value as in set_stats, or null). "It gains ATK equal to the Tributed monster's original ATK" (in a procedure whose cost Tributed it): atk {"of": "cost", "stat": "atk", "original": true, "times": 1}, def null, until "while_on_field".

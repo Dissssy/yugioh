@@ -185,10 +185,10 @@ export type Step =
   /** `choice`: the activating player picks Attack or Defense Position. `banishWhenLeaves`: "but banish it when it leaves the field". */
   | { do: 'special_summon'; cards: Selection; position: Position | 'choice'; banishWhenLeaves: boolean }
   /**
-   * The activating player looks at the top `count` cards of that player's Deck and puts each back on the top (in the
-   * same order), or on the bottom if `bottom` allows (Dark Tinker).
+   * The activating player looks at the top `count` cards of their Deck and puts each back on the top (in the same
+   * order), or on the bottom if `bottom` allows (Dark Tinker).
    */
-  | { do: 'arrange_top'; player: 'you' | 'opponent'; count: number; bottom: boolean }
+  | { do: 'arrange_top'; count: number; bottom: boolean }
   | { do: 'modify_stats'; cards: Selection; atk: number; def: number; levelDelta: number; levelSet: number | null; until: Until }
   /** ATK and/or DEF "become" a value (null leaves that stat alone). Gains and losses still apply on top. */
   | { do: 'set_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }

@@ -32,7 +32,6 @@
             "steps": [
               {
                 "do": "arrange_top",
-                "player": "you",
                 "count": 1,
                 "bottom": true
               }

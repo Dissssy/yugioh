@@ -258,21 +258,17 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         return taken.length ? `${state.players[seat].name} took control of ${list(taken.map((id) => shown(id, before)))}${step.until === 'end_phase' ? ' until the End Phase' : ''}.` : null;
       }
       case 'arrange_top': {
-        const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
-        const whose = player === seat ? 'your' : "your opponent's";
-        const top = state.players[player].deck.slice(0, step.count);
-        let bottom = 0;
-        // Each card is named only to the player who looks; the rest stay on top in the same order.
-        for (const id of top) {
-          const choices = step.bottom ? ['Top', 'Bottom'] : ['Top'];
-          const [pick] = await ask({ prompt: `${name}: ${cardOf(state, id).name} is on top of ${whose} Deck. Put it back on the top or the bottom?`, cards: [], choices, min: 1, max: 1 });
-          if (pick !== 'Bottom') continue;
-          apply({ op: 'move', card: id, to: 'deck_bottom' });
-          bottom++;
-        }
+        const top = state.players[seat].deck.slice(0, step.count);
         if (!top.length) return null;
-        const looked = `${state.players[seat].name} looked at the top ${top.length === 1 ? 'card' : `${top.length} cards`} of ${player === seat ? 'their' : "their opponent's"} Deck`;
-        return `${looked}${bottom ? ` and put ${bottom === 1 ? 'one' : bottom} on the bottom` : ''}.`;
+        // The cards are shown only to the player who looks, as the options of the question; the rest stay on top in order.
+        const prompt = step.bottom
+          ? `${name}: the top of the Deck. Pick the cards to put on the bottom; the rest go back on top.`
+          : `${name}: the top of the Deck. Pick none to put them back.`;
+        const picked = await ask({ prompt, cards: top, choices: [], min: 0, max: top.length });
+        const bottom = step.bottom ? top.filter((id) => picked.includes(id)) : [];
+        for (const id of bottom) apply({ op: 'move', card: id, to: 'deck_bottom' });
+        const looked = `${state.players[seat].name} looked at the top ${top.length === 1 ? 'card' : `${top.length} cards`} of their Deck`;
+        return `${looked}${bottom.length ? ` and put ${bottom.length === 1 ? 'one' : bottom.length} on the bottom` : ''}.`;
       }
       case 'summon_token': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
@@ -320,7 +316,9 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       }
       case 'link': {
         const [monster] = (await select(step.cards, 'equip it to')).filter((id) => locate(state, id)?.zone === 'monsters');
-        if (!monster) return null;
+        // A card that left the field (or was flipped face-down) in the chain links to nothing; the rest still applies.
+        const at = locate(state, self);
+        if (!monster || at?.zone !== 'spellTraps' || !state.players[at.seat].spellTraps[at.index]!.faceUp) return null;
         apply({ op: 'link', card: monster });
         return `${name} ${cardOf(state, self).race === 'Equip' ? 'was equipped to' : 'now applies to'} ${shown(monster, before)}.`;
       }

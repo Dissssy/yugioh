@@ -212,7 +212,7 @@ const sheets: Record<number, EffectSheet> = {
     ...effect('trigger'),
     from: 'graveyard',
     when: { event: 'sent_to_graveyard', self: true, filter: null, how: [], canMiss: false, by: null },
-    ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'arrange_top', player: 'you', count: 1, bottom: true }] }] }),
+    ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'arrange_top', count: 1, bottom: true }] }] }),
   }),
   34: sheet(34, { ...effect('ignition', 'hard'), from: 'graveyard', ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }] }] }) }),
   21: {
