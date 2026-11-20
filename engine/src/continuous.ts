@@ -145,9 +145,13 @@ function locksOn(state: DuelState, seat: Seat): InForce<Lock>[] {
 /**
  * Why a lock stops the player activating this card's effects now (Mind Drain, Medium of the Ice Barrier, Warlock of
  * the Ice Barrier); null if none does. A `perTurn` lock counts the player's activations this turn of cards that fit.
+ * A Spell or Trap is locked as a card ("activate 1 Spell/Trap Card"): only its activation, not the effects it has once
+ * face-up; a monster's effects are locked.
  */
-export function lockProblem(state: DuelState, seat: Seat, id: string): string | null {
+export function lockProblem(state: DuelState, seat: Seat, id: string, effect: number): string | null {
   const card = state.cards[state.instances[id]!.code]!;
+  const cardActivation = (code: number, index: number) => state.cards[code]!.kind === 'monster' || state.sheets[code]?.effects[index]?.kind === 'activation';
+  if (!cardActivation(card.code, effect)) return restrictedActivation(state, id);
   const at = locate(state, id)!;
   const set = at.zone === 'spellTraps' && !state.players[at.seat].spellTraps[at.index]!.faceUp;
   // A player knows their own Set cards, so a lock on Spells applies to a Set Spell too.
@@ -162,7 +166,7 @@ export function lockProblem(state: DuelState, seat: Seat, id: string): string | 
     if (lock.perTurn !== null) {
       const used = state.usedThisTurn.filter((u) => {
         const kind = state.sheets[u.code]?.effects[u.effect]?.kind;
-        return u.player === seat && kind !== 'condition' && kind !== 'continuous' && (!lock.filter || identityFits(state.cards[u.code]!, lock.filter));
+        return u.player === seat && kind !== 'condition' && kind !== 'continuous' && cardActivation(u.code, u.effect) && (!lock.filter || identityFits(state.cards[u.code]!, lock.filter));
       }).length;
       if (used >= lock.perTurn) return `${by} allows only ${lock.perTurn} such activation${lock.perTurn === 1 ? '' : 's'} each turn.`;
       continue;
@@ -174,6 +178,11 @@ export function lockProblem(state: DuelState, seat: Seat, id: string): string | 
     }
     return `${by} stops you activating that.`;
   }
+  return restrictedActivation(state, id);
+}
+
+/** Why a restriction on the card itself stops it activating its effects (Crackdown), or null. */
+function restrictedActivation(state: DuelState, id: string): string | null {
   const r = restriction(state, id, 'activate_effects');
   return r ? `${state.cards[state.instances[r.source]!.code]!.name} stops it activating its effects.` : null;
 }

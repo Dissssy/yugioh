@@ -394,15 +394,16 @@ function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
       if (!set) return no('A Trap must be Set first, and activated on a later turn.');
       if (set.faceUp) return no('It is already face-up.');
       if (set.placedTurn === state.turn) return no("A Trap can't be activated the turn it was Set.");
-    } else if ((card.kind === 'monster' || effect.from === 'graveyard') && (effect.kind === 'ignition' || effect.kind === 'quick')) {
-      // A monster's effect, or any card's effect used from the GY (Terror of Trishula).
+    } else if (effect.kind === 'ignition' || effect.kind === 'quick') {
+      // A monster's effect, a face-up Spell or Trap's effect, or any card's effect used from the hand or GY (Terror of Trishula).
+      const fieldCard = m ?? set;
       if (effect.from !== 'field' && at.zone !== effect.from) return no(`Only while it is in your ${effect.from === 'hand' ? 'hand' : 'GY'}.`);
-      if (effect.from === 'field' && !m?.faceUp) return no('Only while it is face-up on the field.');
-      if (m && negated(state, id)) return no('Its effects are negated.');
+      if (effect.from === 'field' && !fieldCard?.faceUp) return no('Only while it is face-up on the field.');
+      if (fieldCard && negated(state, id)) return no('Its effects are negated.');
     } else {
       return no('This effect is not activated.');
     }
-    const locked = lockProblem(state, seat, id);
+    const locked = lockProblem(state, seat, id, index);
     if (locked) return no(locked);
     if (timing) return no(timing);
     if (effect.speed < minSpeed) {

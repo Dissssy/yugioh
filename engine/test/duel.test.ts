@@ -98,6 +98,7 @@ const cards: Record<number, CardData> = {
   49: { ...monster(49, 'Ronintoadin', 4, 1600, 1200), type: 'Effect Monster', attribute: 'WATER', race: 'Aqua' },
   50: { ...monster(50, 'Dark Tinker', 1, 300, 300), type: 'Effect Monster' },
   51: { ...spell(51, 'Mystical Space Typhoon'), race: 'Quick-Play' },
+  52: { ...spell(52, 'Lantern'), race: 'Continuous' },
 };
 
 function spell(code: number, name: string): CardData {
@@ -209,6 +210,7 @@ const sheets: Record<number, EffectSheet> = {
   47: sheet(47, continuous({ apply: 'name', name: 'Des Frog' })),
   48: sheet(48, continuous({ apply: 'synchro_material', substitutes: 'Synchron', never: false, onlyFor: null, onlyForTuner: 'Synchron' })),
   51: sheet(51, { ...effect('activation'), speed: 2 }),
+  52: sheet(52, effect('activation'), effect('ignition')),
   49: sheet(49, continuous({ apply: 'synchro_material', substitutes: null, never: true, onlyFor: null, onlyForTuner: null })),
   50: sheet(50, {
     ...effect('trigger'),
@@ -810,6 +812,12 @@ describe('battle changes, locks and protection', () => {
     m.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 0 }).push({ type: 'linkResolved' });
     expect(spells(m, 0)).toEqual([]);
     expect(viewFor(m.state, 0).blocked.find((b) => b.card === 'a1')?.reason).toMatch(/only 1/);
+
+    // The limit is on Spell/Trap Cards: a face-up Continuous Spell's own effect is still free to use, and isn't counted.
+    const c = new Table(stacked([52, 9, ...filler(38)], [43, ...filler(39, 2)]));
+    c.push({ type: 'specialSummoned', player: 1, card: 'b0', zone: 0, position: 'attack' });
+    c.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 0 }).push({ type: 'linkResolved' });
+    expect(legalActions(c.state, 0).flatMap((a) => (a.type === 'activate' ? [`${a.card}:${a.effect}`] : []))).toEqual(['a0:1']);
   });
 
   it('keep cards from being destroyed by Spell and Trap effects, or affected by Extra Deck monsters', () => {
