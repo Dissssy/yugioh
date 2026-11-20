@@ -522,7 +522,8 @@ export type Destination = (typeof DESTINATIONS)[number];
  */
 export type Op =
   | { op: 'move'; card: string; to: Destination }
-  | { op: 'special_summon'; card: string; controller: Seat; position: Position }
+  /** `zone`: the empty Main Monster Zone the controller chose (see `askZone` on the server). */
+  | { op: 'special_summon'; card: string; controller: Seat; position: Position; zone: number }
   | { op: 'destroy'; cards: string[] }
   | { op: 'change_lp'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { op: 'modify_stats'; card: string; atk: number; def: number; atk_set: number | null; def_set: number | null; level_delta: number; level_set: number | null; until: Until }
@@ -819,9 +820,14 @@ export interface PromptView {
   cards: { pick: string; card: CardView; place: Place; seat: Seat; zone: number | null }[];
   /** Picks that aren't cards, such as "Gain 1200 LP". */
   choices: string[];
+  /** Your empty Main Monster Zones to choose from (answered with `zonePick`), when the question is where a monster goes. */
+  zones: number[];
   min: number;
   max: number;
 }
+
+/** The pick that answers a question with one of its `zones`. */
+export const zonePick = (zone: number) => `zone:${zone}`;
 
 /** Where a card is, without the slot. */
 /** `materials`: attached to an Xyz Monster as Xyz Material. */

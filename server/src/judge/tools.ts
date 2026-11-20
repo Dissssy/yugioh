@@ -17,7 +17,7 @@ export const opTools = {
     input: z.object({ card, to: z.enum(DESTINATIONS) }),
   },
   special_summon: {
-    description: 'Special Summon a monster face-up from the hand, Deck, GY or banished, to the first free Monster Zone of the controller.',
+    description: 'Special Summon a monster face-up from the hand, Deck, GY or banished. Its controller is asked which empty Main Monster Zone it goes to.',
     input: z.object({ card, controller: seat, position }),
   },
   destroy: {

@@ -3,6 +3,7 @@
 
 import {
   EXTRA_MONSTER_ZONES,
+  zonePick,
   type CardView,
   type FieldCardView,
   type Intent,
@@ -143,6 +144,7 @@ export function optionsFor(prompt: NonNullable<JudgingView['prompt']>, you: Seat
       pick: c.pick,
     })),
     ...prompt.choices.map((choice) => ({ text: choice, pick: choice })),
+    ...prompt.zones.map((zone) => ({ text: `your empty Monster Zone ${zone + 1}`, pick: zonePick(zone) })),
   ];
 }
 

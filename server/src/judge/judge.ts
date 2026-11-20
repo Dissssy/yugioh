@@ -9,7 +9,9 @@ import {
   cardOf,
   evolve,
   locate,
+  monsterZonesFor,
   visibleTo,
+  zonePick,
   type ChainLink,
   type DuelEvent,
   type DuelState,
@@ -50,6 +52,8 @@ export interface Question {
   text: string;
   cards: QuestionCard[];
   choices: string[];
+  /** The asked player's empty Main Monster Zones, when the question is where a monster goes (picks are `zonePick`). */
+  zones: number[];
   min: number;
   max: number;
 }
@@ -195,14 +199,24 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
           refused = reply(c.id, `The choice names ${named}, which a player can't see. Word it without naming hidden cards.`, true);
           continue;
         }
-        const applied = applyOp(scratch, parsed.op, { player: link.player, stage, random: deps.random });
+        const opCtx = { player: link.player, stage, random: deps.random };
+        let op = parsed.op;
+        if (op.op === 'special_summon') {
+          const placed = await summonInto(scratch, op, opCtx, deps.ask);
+          if (!placed.ok) {
+            refused = reply(c.id, placed.error, true);
+            continue;
+          }
+          op = placed.op;
+        }
+        const applied = applyOp(scratch, op, opCtx);
         if (!applied.ok) {
           refused = reply(c.id, applied.error, true);
           continue;
         }
         scratch = applied.events.reduce(evolve, scratch);
         events.push(...applied.events);
-        ops.push(parsed.op);
+        ops.push(op);
         reply(c.id, scratch.result ? 'Done. The duel is over; call finish.' : 'Done.');
       }
 
@@ -289,5 +303,27 @@ export function checkQuestion(state: DuelState, q: AskPlayer): Question | { erro
   }
   const leak = hiddenNameIn(state, q.prompt, [p]);
   if (leak) return { error: `The prompt names ${leak}, which player ${p} can't see.` };
-  return { player: p, text: q.prompt, cards, choices: q.choices, min: q.min, max: Math.min(q.max, count) };
+  return { player: p, text: q.prompt, cards, choices: q.choices, zones: [], min: q.min, max: Math.min(q.max, count) };
+}
+
+/**
+ * Special Summons as `op` (without a zone) says, into the Main Monster Zone its controller picks: they are asked when
+ * more than one is empty, once code has checked the summon itself can happen. Returns the op with its zone, or why
+ * it can't be applied.
+ */
+export async function summonInto(
+  state: DuelState,
+  op: Omit<Extract<Op, { op: 'special_summon' }>, 'zone'>,
+  ctx: Parameters<typeof applyOp>[2],
+  ask: JudgeDeps['ask'],
+): Promise<{ ok: true; op: Op; picks: string[] | null } | { ok: false; error: string }> {
+  const free = monsterZonesFor(state, op.controller, false);
+  const check = applyOp(state, { ...op, zone: free[0] ?? 0 }, ctx);
+  if (!check.ok) return check;
+  if (free.length === 1) return { ok: true, op: { ...op, zone: free[0]! }, picks: null };
+  const text = `Special Summon ${visibleTo(state, op.card, op.controller) ? cardOf(state, op.card).name : 'the monster'}: choose a Monster Zone for it.`;
+  const picks = await ask({ player: op.controller, text, cards: [], choices: [], zones: free, min: 1, max: 1 });
+  const zone = free.find((z) => zonePick(z) === picks[0]);
+  if (zone === undefined) return { ok: false, error: 'No Monster Zone was picked.' };
+  return { ok: true, op: { ...op, zone }, picks };
 }

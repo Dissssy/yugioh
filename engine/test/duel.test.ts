@@ -1046,13 +1046,14 @@ describe('activating effects', () => {
     expect(refused({ op: 'change_lp', player: 0, amount: 9000, kind: 'cost' })).toMatch(/more than/);
     expect(refused({ op: 'modify_stats', card: 'a1', atk: 500, def: 0, atk_set: null, def_set: null, level_delta: 0, level_set: null, until: 'end_of_turn' })).toMatch(/not on the field/);
     expect(refused({ op: 'declare_targets', cards: ['a1'] })).toMatch(/activated/);
-    expect(refused({ op: 'special_summon', card: 'ax0', controller: 0, position: 'attack' })).toMatch(/Extra Deck/);
+    expect(refused({ op: 'special_summon', card: 'ax0', controller: 0, position: 'attack', zone: 0 })).toMatch(/Extra Deck/);
+    expect(refused({ op: 'special_summon', card: 'a6', controller: 0, position: 'attack', zone: 5 })).toMatch(/isn't an empty Main Monster Zone/);
   });
 
   it('special summons from the Deck and shuffles it, and searches stay hidden from the opponent', () => {
     const t = new Table(stacked([1, 1, 1, 1, 1, 2, 5, 3, ...filler(32)], filler(40, 2)));
-    ops(t, [{ op: 'special_summon', card: 'a6', controller: 0, position: 'defense' }]);
-    expect(t.state.players[0].monsters[0]).toMatchObject({ id: 'a6', faceUp: true, position: 'defense' });
+    ops(t, [{ op: 'special_summon', card: 'a6', controller: 0, position: 'defense', zone: 3 }]);
+    expect(t.state.players[0].monsters[3]).toMatchObject({ id: 'a6', faceUp: true, position: 'defense' });
     expect(t.state.players[0].deck).toHaveLength(34);
     ops(t, [{ op: 'move', card: 'a7', to: 'hand' }]);
     expect(t.state.players[0].hand).toContain('a7');

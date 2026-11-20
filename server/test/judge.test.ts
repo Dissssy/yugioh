@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
-import { decide, evolve, fits, legalActions, replay, scriptProblem, type CardData, type CardFilter, type DuelEvent, type DuelState, type EffectSheet, type Script, type Seat } from '@yugioh/engine';
+import { decide, evolve, fits, legalActions, replay, scriptProblem, type CardData, type CardFilter, type DuelEvent, type DuelState, type EffectSheet, type Script, type Seat, zonePick } from '@yugioh/engine';
 import { rule } from '../src/judge/script.ts';
 import { judge, type JudgeDeps, type ModelCall, type Question } from '../src/judge/judge.ts';
 import { listSheetCodes, readSheetFiles, textHash } from '../src/sheets.ts';
@@ -372,6 +372,30 @@ describe('the eval suite', () => {
       [{ name: 'finish', input: { legal: true, summary: 'Nothing.' } }],
     ]);
     expect(await runCase(rush, state, lazy.model)).toMatchObject({ passed: false, detail: 'ATK 900' });
+  });
+
+  it('asks the controller which empty Monster Zone a Special Summoned monster goes to', async () => {
+    const data = await fixtureCards();
+    const sheets = await readSheetFiles(data);
+    const truth = CASES.find((c) => c.name === 'reinforce truth summons a level 2 warrior from the deck')!;
+    const state = buildBoard(truth, data, sheets);
+    const card = state.players[0].spellTraps.find((s) => s && data[state.instances[s.id]!.code]!.name === 'Reinforce Truth')!.id;
+    const intent = decide(state, 0, { type: 'activate', card, effect: 0, zone: null });
+    if (!intent.ok) throw new Error(intent.error);
+    const questions: Question[] = [];
+    const ask: JudgeDeps['ask'] = async (q) => {
+      questions.push(q);
+      if (q.zones.length) return [zonePick(3)];
+      return q.cards.length ? [q.cards.find((c) => data[state.instances[c.id]!.code]!.name === 'Speed Warrior')!.id] : [q.choices[0]!];
+    };
+    const scratch = intent.events.slice(1).reduce(evolve, state);
+    const checked = await rule({ stage: 'activation', state: scratch, link: scratch.chain.at(-1)! }, { model: null, ask, random: () => 0.5 });
+    const active = checked.events.reduce(evolve, scratch);
+    const resolved = await rule({ stage: 'resolution', state: active, link: active.chain.at(-1)! }, { model: null, ask, random: () => 0.5 });
+    expect(resolved.record.error).toBeNull();
+    expect(questions.at(-1)).toMatchObject({ player: 0, cards: [], choices: [], zones: [0, 1, 2, 3, 4], min: 1, max: 1 });
+    const after = resolved.events.reduce(evolve, active);
+    expect(data[after.instances[after.players[0].monsters[3]!.id]!.code]!.name).toBe('Speed Warrior');
   });
 });
 
