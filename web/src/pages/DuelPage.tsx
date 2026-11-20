@@ -43,6 +43,26 @@ export function DuelPage({ me }: { me: Me }) {
   return <Board duelId={d.id} />;
 }
 
+/** A finished duel played back, for its players and admins (docs/next-steps.md, Replays). */
+export function ReplayPage() {
+  const { id = '' } = useParams();
+  const duel = useQuery({ queryKey: ['duel', id], queryFn: () => api<DuelSummary>(`/duels/${id}`) });
+  if (duel.isError)
+    return (
+      <Notice title="Duel not found" tone="error" action={<Link className="button" to="/">Back home</Link>}>
+        This duel doesn't exist. Check the link you were sent.
+      </Notice>
+    );
+  if (!duel.data) return <Loading />;
+  if (duel.data.status !== 'finished')
+    return (
+      <Notice title="Not over yet" action={<Link className="button" to={`/duel/${id}`}>Go to the duel</Link>}>
+        A duel can be watched again once it has finished.
+      </Notice>
+    );
+  return <Board key={id} duelId={id} replay />;
+}
+
 function Waiting({ duel }: { duel: DuelSummary }) {
   const link = window.location.href;
   const [copied, setCopied] = useState(false);

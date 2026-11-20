@@ -16,6 +16,7 @@ import {
   logFor,
   nextStep,
   replay,
+  replaySteps,
   startDuel,
   triggerEvent,
   viewFor,
@@ -25,6 +26,7 @@ import {
   type AiRecord,
   type AppealRecord,
   type DuelEvent,
+  type SeatStep,
   type DuelState,
   type DuelUpdate,
   type EffectSheet,
@@ -33,7 +35,7 @@ import {
   type JudgingView,
   type Seat,
 } from '@yugioh/engine';
-import type { DuelSummary } from '@yugioh/shared';
+import type { DuelSummary, Replay } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
 import { decks, matchEvents, matches, sheetReports, users } from './db/schema.ts';
@@ -262,6 +264,12 @@ export class Duels {
     const run = duel.queue.then(task);
     duel.queue = run.catch((error: unknown) => console.error(`Duel ${duel.id}:`, error));
     return run;
+  }
+
+  /** A finished duel as one seat saw it, or with every card face up, step by step (docs/next-steps.md, Replays). */
+  async replay(id: string, from: Seat | 'both', questionsOf: Seat | 'both'): Promise<Replay> {
+    const rows = await this.db.select().from(matchEvents).where(eq(matchEvents.matchId, id)).orderBy(matchEvents.seq);
+    return { from, steps: replaySteps(rows.map((r) => r.event as DuelEvent), from, questionsOf) };
   }
 
   /** Which seat a player holds, if any. Read from the database each time, since seats can change hands (see adoptGuest). */
@@ -636,7 +644,7 @@ export class Duels {
   private broadcast(before: DuelState, events: DuelEvent[], first: number, duel: LiveDuel) {
     const updateFor = (seat: Seat): Extract<DuelUpdate, { type: 'steps' }> => {
       let state = before;
-      const steps: Extract<DuelUpdate, { type: 'steps' }>['steps'] = events.flatMap((event, i) => {
+      const steps: SeatStep[] = events.flatMap((event, i) => {
         state = evolve(state, event);
         const entry = entryFor(state, event, first + i, state.turn, seat);
         return entry ? [{ entry, view: viewFor(state, seat) }] : [];

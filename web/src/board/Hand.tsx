@@ -233,8 +233,11 @@ function HandCard({
 }
 
 /** The opponent's hand: card backs in a fan that only moves when a public event happens. */
-export function FoeHand({ seat, count }: { seat: Seat; count: number }) {
+/** The opponent's hand: card backs, or the cards themselves in a replay with every card face up. */
+export function FoeHand({ seat, cards }: { seat: Seat; cards: CardView[] }) {
   const { zone } = useBoardLook();
+  const hover = useCardHover();
+  const count = cards.length;
   return (
     <div className="hand foe" data-hand={seat} aria-label={`Opponent's hand, ${count} cards`}>
       {Array.from({ length: count }, (_, i) => {
@@ -242,8 +245,8 @@ export function FoeHand({ seat, count }: { seat: Seat; count: number }) {
         return (
           <motion.div key={i} layout className="hand-card" style={{ marginLeft: place.marginLeft }} transition={spring}>
             <motion.div animate={{ rotate: -place.rotate, y: -place.y }} transition={spring}>
-              <div className="fx" data-hand-index={`${seat}:${i}`}>
-                <CardFace card={null} />
+              <div className="fx" data-hand-index={`${seat}:${i}`} {...hover(dataOf(cards[i]!))}>
+                <CardFace card={dataOf(cards[i]!)} />
               </div>
             </motion.div>
           </motion.div>
