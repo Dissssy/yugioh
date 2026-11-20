@@ -1,4 +1,4 @@
-import type { DuelUpdate, JudgingView, LogEntry, LogEvent, PlayerView, SeatStep } from '@yugioh/engine';
+import type { DuelUpdate, JudgingView, LogEntry, LogEvent, PlayerView, Seat, SeatStep } from '@yugioh/engine';
 import { useEffect, useRef, useState } from 'react';
 
 /** What the board shows right now: the view after the current step, the one before it, and the step being played. */
@@ -15,9 +15,10 @@ export interface Shown {
  * The seat's live duel, pushed by the server. Each change arrives as steps (one per event); they are shown one
  * at a time, each held for `pace(event, stepsStillWaiting)` milliseconds. A sync (on connect and after the
  * browser reconnects by itself) replaces everything and drops any steps not yet shown. `judging` is the judge's
- * work on an effect, shown as soon as it arrives. `duelId` null turns it off.
+ * work on an effect, shown as soon as it arrives. `duelId` null turns it off. A spectator's stream, with
+ * `watchFrom` the seat at the bottom, shows only what both players can see.
  */
-export function useDuel(duelId: string | null, pace: (event: LogEvent, waiting: number) => number) {
+export function useDuel(duelId: string | null, pace: (event: LogEvent, waiting: number) => number, watchFrom: Seat | null = null) {
   const [shown, setShown] = useState<Shown | null>(null);
   const [connected, setConnected] = useState(true);
   const [judging, setJudging] = useState<JudgingView | null>(null);
@@ -52,7 +53,7 @@ export function useDuel(duelId: string | null, pace: (event: LogEvent, waiting: 
       timer = setTimeout(playNext, paceRef.current(entry.event, queue.length));
     };
 
-    const source = new EventSource(`/api/duels/${duelId}/stream`);
+    const source = new EventSource(`/api/duels/${duelId}/stream${watchFrom === null ? '' : `?from=${watchFrom}`}`);
     source.onmessage = (e: MessageEvent<string>) => {
       const update = JSON.parse(e.data) as DuelUpdate;
       setConnected(true);
@@ -76,7 +77,7 @@ export function useDuel(duelId: string | null, pace: (event: LogEvent, waiting: 
       clearTimeout(timer);
       source.close();
     };
-  }, [duelId]);
+  }, [duelId, watchFrom]);
 
   return { shown, connected, judging };
 }

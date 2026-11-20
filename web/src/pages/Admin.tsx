@@ -52,7 +52,7 @@ function RecentDuels() {
       <div className="table-scroll">
         <table>
           <thead>
-            <tr><th>Duel</th><th>Created</th><th>Status</th><th>Decks</th><th>Judge calls</th><th>Appeals</th><th>Questions</th><th>AI calls</th><th>Cost</th><th /></tr>
+            <tr><th>Duel</th><th>Created</th><th>Status</th><th>Players</th><th>Judge calls</th><th>Appeals</th><th>Questions</th><th>AI calls</th><th>Cost</th><th /></tr>
           </thead>
           <tbody>
             {duels.data.duels.map((duel) => (
@@ -60,7 +60,7 @@ function RecentDuels() {
                 <td><a href={`/duel/${duel.id}`}><code>{duel.id}</code></a></td>
                 <td className="muted">{formatDate(duel.createdAt)}</td>
                 <td><span className="pill">{duel.status}</span></td>
-                <td className="muted">{duel.createdBy}: {duel.decks[0]} vs {duel.decks[1] ?? '…'}</td>
+                <td className="muted">{duel.players.map((p) => (p ? `${p.name} (${p.deck})` : 'open seat')).join(' vs ')}</td>
                 <td>{duel.judgeCalls}</td>
                 <td>{duel.appeals}</td>
                 <td>{duel.questions}</td>

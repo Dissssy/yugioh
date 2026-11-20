@@ -1,4 +1,4 @@
-import type { CardData, EffectSheet, SeatStep } from '@yugioh/engine';
+import type { CardData, DuelResult, EffectSheet, SeatStep } from '@yugioh/engine';
 import type { UserSettings } from './settings.ts';
 
 // JSON shapes exchanged between the web client and the server.
@@ -47,18 +47,30 @@ export interface DeckSummary {
 export type DuelStatus = 'waiting' | 'active' | 'finished';
 
 /**
- * A duel as listed in the lobby: who is in it and whether the viewer can take the empty seat.
- * Anyone with the link can read it; a signed-out visitor can join as a guest.
+ * A duel as listed in the lobby: who plays it with which deck, how it ended, and whether the viewer can take the
+ * empty seat. Anyone with the link can read it; a signed-out visitor can join as a guest.
  */
 export interface DuelSummary {
   id: string;
   status: DuelStatus;
   createdAt: string;
-  createdBy: string;
-  /** Seat 0 is the challenger; seat 1 is empty while the duel is waiting. */
-  decks: [string, string | null];
+  finishedAt: string | null;
+  /** Seat 0 is the challenger; seat 1 is null while the duel is waiting. */
+  players: [DuelPlayer, DuelPlayer | null];
+  /** Set once the duel has finished. */
+  result: DuelOutcome | null;
   yourSeat: 0 | 1 | null;
   canJoin: boolean;
+}
+
+export interface DuelPlayer {
+  name: string;
+  deck: string;
+}
+
+/** How a duel ended: the winner (null for a draw), why, and on which turn. */
+export interface DuelOutcome extends DuelResult {
+  turn: number;
 }
 
 /** A finished duel to watch again (docs/next-steps.md, Replays). */

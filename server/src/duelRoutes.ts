@@ -44,6 +44,8 @@ const reportBody = z.object({ code: z.number().int(), note: z.string().trim().mi
 
 const deckChoice = z.object({ deckId: z.number().int() });
 const replayFrom = z.enum(['0', '1', 'both']).transform((v) => (v === 'both' ? v : (Number(v) as 0 | 1)));
+/** The seat a spectator has at the bottom of the board. */
+const watchFrom = z.enum(['0', '1']).transform((v) => Number(v) as 0 | 1);
 /** Signed-out visitors also give the name they play under as a guest. */
 const joinBody = deckChoice.extend({ guestName: z.string().trim().min(1).max(30).optional() });
 
@@ -105,7 +107,7 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     if (p.viewer.kind !== 'user') return void res.status(403).json({ error: 'account_required' });
     const body = deckChoice.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
-    const duelId = await duels.create(p.viewer.user.id, p.key, body.data.deckId);
+    const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), body.data.deckId);
     if (!duelId) return void res.status(404).json({ error: 'deck_not_found' });
     res.status(201).json(await duels.summarize((await duels.find(duelId))!, p.key, false));
   });
@@ -141,27 +143,27 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     if (!row) return void res.status(404).json({ error: 'not_found' });
     if (!(await db.query.decks.findFirst({ where: eq(decks.id, body.data.deckId) })))
       return void res.status(404).json({ error: 'deck_not_found' });
-    const { createdBy } = await duels.summarize(row, null, false);
-    if (!(await duels.join(row.id, body.data.deckId, createdBy, claim))) return void res.status(409).json({ error: 'seat_taken' });
+    if (!(await duels.join(row.id, body.data.deckId, claim))) return void res.status(409).json({ error: 'seat_taken' });
     if (created.guestToken) guestCookie.set(res, created.guestToken);
     const started = (await duels.find(row.id))!;
     res.json(await duels.summarize(started, started.seat1, false));
   });
 
-  // The seat's view of the duel, sent now and after every change.
+  // The duel as the viewer may see it, sent now and after every change: a player's own seat, or for anyone else
+  // holding the link, only what both players can see (`?from=0|1` picks the seat at the bottom).
   router.get('/duels/:id/stream', async (req, res) => {
-    const p = player(res);
-    if (!p) return;
+    const from = watchFrom.safeParse(req.query.from ?? '0');
+    if (!from.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
     if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
-    const seat = await duels.seatOf(row.id, p.key);
-    if (seat === null) return void res.status(403).json({ error: 'not_a_player' });
+    const key = playerKey(viewerOf(res));
+    const seat = key === null ? null : await duels.seatOf(row.id, key);
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
       'x-accel-buffering': 'no', // keeps nginx from buffering the stream
     });
-    const stop = await duels.watch(row.id, seat, (update) => res.write(`data: ${JSON.stringify(update)}\n\n`));
+    const stop = await duels.watch(row.id, seat ?? from.data, seat ?? 'none', (update) => res.write(`data: ${JSON.stringify(update)}\n\n`));
     const keepalive = setInterval(() => res.write(': keepalive\n\n'), KEEPALIVE_MS);
     req.on('close', () => {
       clearInterval(keepalive);
@@ -169,7 +171,7 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     });
   });
 
-  // A finished duel to watch again, by its players and admins, from either seat or with every card face up
+  // A finished duel to watch again, by anyone holding the link, from either seat or with every card face up
   // (`?from=0|1|both`). Questions to the judge stay private to the player who asked; admins see them all.
   router.get('/duels/:id/replay', async (req, res) => {
     const viewer = viewerOf(res);
@@ -180,9 +182,8 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     const admin = viewer.kind === 'user' && isAdmin(viewer.user.role);
     const key = playerKey(viewer);
     const seat = key === null ? null : await duels.seatOf(row.id, key);
-    if (!admin && seat === null) return void res.status(403).json({ error: 'not_a_player' });
     // A few hundred steps that each carry the whole board: about a megabyte as JSON, a tenth of that compressed.
-    const body = JSON.stringify(await duels.replay(row.id, from.data, admin ? 'both' : seat!));
+    const body = JSON.stringify(await duels.replay(row.id, from.data, admin ? 'both' : seat));
     res.type('json');
     if (!req.acceptsEncodings('gzip')) return void res.send(body);
     res.set({ 'content-encoding': 'gzip', vary: 'accept-encoding' }).send(gzipSync(body));

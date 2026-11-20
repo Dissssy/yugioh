@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { DuelUpdate, Intent } from '@yugioh/engine';
+import type { DuelUpdate, Intent, PlayerView } from '@yugioh/engine';
 import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelSummary, Me, Replay } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { and, eq } from 'drizzle-orm';
@@ -66,11 +66,11 @@ describe('a challenge link played by a guest', () => {
     });
     expect(created.status).toBe(201);
     duel = created.body;
-    expect(duel).toMatchObject({ status: 'waiting', yourSeat: 0, canJoin: false, createdBy: 'Ethan' });
+    expect(duel).toMatchObject({ status: 'waiting', yourSeat: 0, canJoin: false, players: [{ name: 'Ethan', deck: decks[0]!.name }, null], result: null });
 
     guest = new Browser();
     const preview = await guest.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`);
-    expect(preview.body).toMatchObject({ status: 'waiting', yourSeat: null, canJoin: true, createdBy: 'Ethan' });
+    expect(preview.body).toMatchObject({ status: 'waiting', yourSeat: null, canJoin: true, players: [{ name: 'Ethan' }, null] });
 
     // Joining signed out needs a name to play under.
     const nameless = await guest.json(`${h.baseUrl}/api/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify({ deckId: decks[1]!.id }) });
@@ -81,7 +81,14 @@ describe('a challenge link played by a guest', () => {
       method: 'POST',
       body: JSON.stringify({ deckId: decks[1]!.id, guestName: ' Kaiba ' }),
     });
-    expect(joined.body).toMatchObject({ status: 'active', yourSeat: 1, decks: [decks[0]!.name, decks[1]!.name] });
+    expect(joined.body).toMatchObject({
+      status: 'active',
+      yourSeat: 1,
+      players: [
+        { name: 'Ethan', deck: decks[0]!.name },
+        { name: 'Kaiba (guest)', deck: decks[1]!.name },
+      ],
+    });
     expect(await me(guest)).toEqual({ kind: 'guest', guest: { name: 'Kaiba' } });
     expect((await guest.json<DuelSummary[]>(`${h.baseUrl}/api/duels`)).body).toEqual([expect.objectContaining({ id: duel.id, yourSeat: 1 })]);
 
@@ -89,7 +96,7 @@ describe('a challenge link played by a guest', () => {
     expect((await guest.json(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: decks[0]!.id }) })).status).toBe(403);
   });
 
-  it('turns away a third visitor without creating a guest for them', async () => {
+  it('turns away a third visitor without creating a guest for them, but lets them watch', async () => {
     const late = new Browser();
     const seen = await late.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`);
     expect(seen.body).toMatchObject({ status: 'active', yourSeat: null });
@@ -100,7 +107,17 @@ describe('a challenge link played by a guest', () => {
     expect(again.status).toBe(409);
     expect(await me(late)).toEqual({ kind: 'anonymous' });
     expect(await guestCount()).toBe(1);
-    expect((await late.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`)).status).toBe(401);
+    expect((await late.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream?from=2`)).status).toBe(400);
+    // Anyone holding the link watches, seeing only what both players can: no hands, no Deck list, nothing to do.
+    const watching = new Stream(await late.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream?from=1`));
+    const view = await watching.next();
+    watching.close();
+    expect(view.you).toBe(1);
+    expect(view.deckList).toEqual([]);
+    expect(view.actions).toEqual([]);
+    expect(view.start).toEqual({ at: 'rps', yours: null, theirsIn: false, last: null });
+    expect(view.players.every((p) => p.hand.every((c) => 'hidden' in c) && p.extra.every((c) => 'hidden' in c))).toBe(true);
+    expect(await guestCount()).toBe(1);
   });
 
   it('streams each player their own view and applies intents', async () => {
@@ -177,14 +194,24 @@ describe('a challenge link played by a guest', () => {
     expect(a.turn).toBe(2);
     expect(a.turnPlayer).toBe(view.you === 0 ? 1 : 0);
 
+    // A spectator follows along without seeing either player's hidden cards.
+    const watching = new Stream(await new Browser().fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
+    await watching.next();
     expect((await send(second, { type: 'surrender' })).status).toBe(204);
+    let w: PlayerView;
+    do w = await watching.next();
+    while (!w.result);
+    watching.close();
+    expect(w.result).toEqual({ winner: view.you, reason: 'surrender' });
+    expect(w.players.every((p) => p.hand.every((c) => 'hidden' in c))).toBe(true);
     do a = await mine.next();
     while (!a.result);
     expect(a.result).toEqual({ winner: view.you, reason: 'surrender' });
     mine.close();
     theirs.close();
     const { body: summary } = await admin.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`);
-    expect(summary.status).toBe('finished');
+    expect(summary).toMatchObject({ status: 'finished', result: { winner: view.you, reason: 'surrender', turn: a.turn } });
+    expect(summary.finishedAt).not.toBeNull();
   });
 
   it('puts chat in both logs in order with the duel, even after it ends', async () => {
@@ -229,7 +256,7 @@ describe('a challenge link played by a guest', () => {
     expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, aiCalls: 0, cost: 0 });
   });
 
-  it('replays a finished duel to its players and admins, from either seat or both, keeping questions private', async () => {
+  it('replays a finished duel to anyone with the link, from either seat or both, keeping questions private', async () => {
     const url = (from: string) => `${h.baseUrl}/api/duels/${duel.id}/replay?from=${from}`;
     const replay = async (who: Browser, from: string) => (await who.json<Replay>(url(from))).body;
     const raw = await guest.fetch(url('1'), { headers: { 'accept-encoding': 'gzip' } });
@@ -264,10 +291,11 @@ describe('a challenge link played by a guest', () => {
     expect(asked(await replay(guest, 'both'))).toBe(false);
     expect(asked(await replay(guest, '0'))).toBe(false);
     expect(asked(await replay(admin, '1'))).toBe(true);
+    expect(asked(await replay(new Browser(), 'both'))).toBe(false);
     await h.db.delete(matchEvents).where(and(eq(matchEvents.matchId, duel.id), eq(matchEvents.seq, seq)));
 
     expect((await guest.json(url('2'))).status).toBe(400);
-    expect((await new Browser().json(url('0'))).status).toBe(403);
+    expect((await replay(new Browser(), 'both')).steps.at(-1)!.view.result).toEqual({ winner: 1, reason: 'surrender' });
     const ongoing = await challenge(admin);
     expect((await admin.json(`${h.baseUrl}/api/duels/${ongoing.id}/replay`)).status).toBe(404);
   });

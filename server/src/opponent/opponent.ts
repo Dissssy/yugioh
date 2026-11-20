@@ -83,7 +83,7 @@ export class Opponents {
       },
     });
     this.playing.set(key, opponent);
-    const unwatch = await this.duels.watch(id, seat, (update) => opponent.update(update));
+    const unwatch = await this.duels.watch(id, seat, seat, (update) => opponent.update(update));
   }
 }
 

@@ -91,7 +91,7 @@ describe('playing against Claude', () => {
     h.setModel(randomModel(seeded(3)));
     const created = await admin.json<DuelSummary>(`${h.baseUrl}/api/admin/duels/ai`, { method: 'POST', body });
     expect(created.status).toBe(201);
-    expect(created.body).toMatchObject({ status: 'active', yourSeat: 0, decks: [decks[0]!.name, decks[1]!.name] });
+    expect(created.body).toMatchObject({ status: 'active', yourSeat: 0, players: [{ deck: decks[0]!.name }, { name: 'Claude', deck: decks[1]!.name }] });
 
     // Claude picks rock-paper-scissors as soon as the duel loads, with no model call.
     const stream = new Stream(await admin.fetch(`${h.baseUrl}/api/duels/${created.body.id}/stream`));
@@ -113,12 +113,12 @@ describe('playing against Claude', () => {
 
     const ids: string[] = [];
     for (const [a, b] of [[0, 1], [1, 0], [1, 1]] as const) {
-      const id = (await duels.create(owner!.id, 'ai:a', decks[a]!.id))!;
-      await duels.join(id, decks[b]!.id, 'A', async () => ({ key: 'ai:b', name: 'B' }));
+      const id = (await duels.create(owner!.id, 'ai:a', 'A', decks[a]!.id))!;
+      await duels.join(id, decks[b]!.id, async () => ({ key: 'ai:b', name: 'B' }));
       ids.push(id);
       // Loading the duel starts both AI seats.
       const updates: DuelUpdate[] = [];
-      await duels.watch(id, 0, (u) => updates.push(u));
+      await duels.watch(id, 0, 0, (u) => updates.push(u));
     }
     for (const id of ids) expect(await finished(id, 60_000)).toBe(true);
 

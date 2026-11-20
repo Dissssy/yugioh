@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { EffectSheet } from '@yugioh/engine';
-import type { UserSettings } from '@yugioh/shared';
+import type { DuelOutcome, UserSettings } from '@yugioh/shared';
 import { integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
@@ -85,6 +85,11 @@ export const matches = pgTable('matches', {
   finishedAt: timestamp('finished_at', { withTimezone: true }),
   seat0: text('seat0').notNull(),
   seat1: text('seat1'),
+  /** The players' names as the duel shows them, kept from when they took their seats. */
+  name0: text('name0').notNull(),
+  name1: text('name1'),
+  /** How the duel ended, once it has. */
+  result: jsonb('result').$type<DuelOutcome>(),
   deck0: integer('deck0')
     .notNull()
     .references(() => decks.id),
