@@ -1,22 +1,23 @@
 {
   "code": 84206435,
+  "textHash": "ef42588afbcfb2c3ee705e71998cabdf07b2778f801f7ca45adcebcf9d33a351",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "activation",
-      "when": null,
       "speed": 1,
-      "effect": "Add 1 \"Ice Barrier\" monster from your Deck to your hand.",
-      "script": null,
-      "status": "unverified",
-      "window": "Your Main Phase",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Add 1 \"Ice Barrier\" monster from your Deck to your hand.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "ef42588afbcfb2c3ee705e71998cabdf07b2778f801f7ca45adcebcf9d33a351",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

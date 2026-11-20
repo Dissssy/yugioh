@@ -35,13 +35,13 @@
       "effect": "Send it to the Graveyard.",
       "targets": null,
       "when": {
+        "event": "end_phase",
         "self": false,
         "filter": null,
         "how": [],
         "from": "field",
         "canMiss": false,
-        "by": null,
-        "event": "end_phase"
+        "by": null
       },
       "script": {
         "conditions": [
@@ -72,5 +72,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

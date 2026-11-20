@@ -1,50 +1,51 @@
 {
   "code": 18319762,
+  "textHash": "486e80ebb4abbcedc58b84344aabc98b4afbc3d6a32d569c374648e47320d337",
   "model": "claude-opus-5-5",
   "effects": [
     {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
       "opt": "none",
-      "cost": "",
-      "kind": "continuous",
-      "when": null,
-      "speed": 1,
-      "effect": "Your opponent cannot Tribute Summon.",
-      "script": null,
-      "status": "unverified",
       "window": "While this card is face-up on the field and you control another \"Ice Barrier\" monster",
-      "targets": null,
-      "mandatory": false,
-      "continuous": null
-    },
-    {
-      "opt": "hard",
-      "cost": "Discard 1 card",
-      "kind": "ignition",
-      "when": null,
-      "speed": 1,
-      "effect": "Special Summon 1 \"Ice Barrier\" Tuner from your Deck, also you cannot Special Summon monsters for the rest of this turn, except WATER monsters.",
-      "script": null,
-      "status": "unverified",
-      "window": "Your Main Phase, while this card is face-up on the field",
-      "targets": null,
-      "mandatory": false,
-      "continuous": null
-    },
-    {
-      "opt": "hard",
       "cost": "",
-      "kind": "continuous",
-      "when": null,
-      "speed": 1,
-      "effect": "You can banish this card from your GY instead of 1 of those cards.",
-      "script": null,
-      "status": "unverified",
-      "window": "While this card is in your GY, when you would discard, or send a card(s) from your hand to the GY, to activate an \"Ice Barrier\" monster's effect",
+      "effect": "Your opponent cannot Tribute Summon.",
       "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "ignition",
+      "speed": 1,
       "mandatory": false,
-      "continuous": null
+      "opt": "hard",
+      "window": "Your Main Phase, while this card is face-up on the field",
+      "cost": "Discard 1 card",
+      "effect": "Special Summon 1 \"Ice Barrier\" Tuner from your Deck, also you cannot Special Summon monsters for the rest of this turn, except WATER monsters.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "hard",
+      "window": "While this card is in your GY, when you would discard, or send a card(s) from your hand to the GY, to activate an \"Ice Barrier\" monster's effect",
+      "cost": "",
+      "effect": "You can banish this card from your GY instead of 1 of those cards.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "486e80ebb4abbcedc58b84344aabc98b4afbc3d6a32d569c374648e47320d337",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

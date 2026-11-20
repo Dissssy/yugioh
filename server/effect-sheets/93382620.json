@@ -1,59 +1,87 @@
 {
   "code": 93382620,
+  "textHash": "bf44d3b104a9d174e91ea15c74b50caa4718e4b22be1f22d8868f2baac2637a7",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "Discard your entire hand (min.1)",
       "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "opt": "none",
+      "window": "When a monster(s) is destroyed by battle and sent to your GY",
+      "cost": "Discard your entire hand (min.1)",
+      "effect": "Target 1 of those monsters; Special Summon it, and if you do, it gains 800 ATK.",
+      "targets": "1 of those monsters (destroyed by battle and sent to your GY)",
       "when": {
-        "by": null,
-        "how": [],
-        "from": "field",
-        "self": false,
         "event": "destroyed_by_battle",
+        "self": false,
         "filter": {
-          "atk": null,
-          "def": null,
           "side": "you",
+          "place": "graveyard",
           "kinds": [
             "monster"
           ],
-          "level": null,
-          "place": "graveyard",
-          "races": [],
           "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
           "faceUp": null,
           "position": null,
-          "attributes": []
+          "level": null,
+          "atk": null,
+          "def": null
         },
-        "canMiss": false
+        "how": [],
+        "from": "field",
+        "canMiss": false,
+        "by": null
       },
-      "speed": 2,
-      "effect": "Target 1 of those monsters; Special Summon it, and if you do, it gains 800 ATK.",
       "script": {
+        "conditions": [],
         "cost": [
           {
             "do": "move",
-            "to": "graveyard",
             "cards": {
               "from": "all",
               "filter": {
-                "atk": null,
-                "def": null,
                 "side": "you",
-                "kinds": [],
-                "level": null,
                 "place": "hand",
-                "races": [],
+                "kinds": [],
                 "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
                 "faceUp": null,
                 "position": null,
-                "attributes": []
+                "level": null,
+                "atk": null,
+                "def": null
               }
-            }
+            },
+            "to": "graveyard"
           }
         ],
+        "targets": {
+          "filter": {
+            "side": "you",
+            "place": "graveyard",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": true
+        },
         "options": [
           {
             "label": "",
@@ -67,48 +95,24 @@
               },
               {
                 "do": "modify_stats",
-                "atk": 800,
-                "def": 0,
                 "cards": {
                   "from": "targets"
                 },
-                "until": "while_on_field",
+                "atk": 800,
+                "def": 0,
+                "levelDelta": 0,
                 "levelSet": null,
-                "levelDelta": 0
+                "until": "while_on_field"
               }
             ]
           }
         ],
-        "targets": {
-          "max": 1,
-          "min": 1,
-          "event": true,
-          "filter": {
-            "atk": null,
-            "def": null,
-            "side": "you",
-            "kinds": [
-              "monster"
-            ],
-            "level": null,
-            "place": "graveyard",
-            "races": [],
-            "types": [],
-            "faceUp": null,
-            "position": null,
-            "attributes": []
-          }
-        },
-        "unapplied": null,
-        "conditions": []
+        "unapplied": null
       },
-      "status": "unverified",
-      "window": "When a monster(s) is destroyed by battle and sent to your GY",
-      "targets": "1 of those monsters (destroyed by battle and sent to your GY)",
-      "mandatory": false,
-      "continuous": null
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "bf44d3b104a9d174e91ea15c74b50caa4718e4b22be1f22d8868f2baac2637a7",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

@@ -3,7 +3,7 @@
 
 import { cardOf } from './rules.ts';
 import { levelNow, statsOf } from './continuous.ts';
-import { levelOf, locate, monsterZonesFor, summonMatches, summonName } from './state.ts';
+import { levelOf, locate, monsterZonesFor, other, summonMatches, summonName } from './state.ts';
 import type { CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
@@ -28,7 +28,7 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   if (filter.faceUp !== null && (!field || field.faceUp !== filter.faceUp)) return false;
   if (filter.position !== null && (at.zone !== 'monsters' || field!.position !== filter.position)) return false;
   if (field && !field.faceUp) {
-    const identity = filter.types.length + filter.races.length + filter.attributes.length > 0 || filter.level || filter.atk || filter.def;
+    const identity = filter.types.length + filter.races.length + filter.attributes.length > 0 || filter.named !== null || filter.level || filter.atk || filter.def;
     if (identity) return false;
     if (filter.kinds.length === 0) return true;
     return at.zone === 'monsters' ? filter.kinds.includes('monster') : filter.kinds.includes('spell') && filter.kinds.includes('trap');
@@ -38,6 +38,7 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   const words = card.type.toLowerCase().split(/\s+/);
   if (!filter.types.every((t) => words.includes(t.toLowerCase()))) return false;
   if (filter.races.length && !filter.races.some((r) => r.toLowerCase() === card.race.toLowerCase())) return false;
+  if (filter.named !== null && !card.name.toLowerCase().includes(filter.named.toLowerCase())) return false;
   if (filter.attributes.length && !filter.attributes.some((a) => a.toUpperCase() === card.attribute)) return false;
   // Current stats on the field, printed ones elsewhere. ATK and DEF are only worked out when the filter asks, since an
   // effect that counts monsters by Level (Tenshin) changes ATK itself.
@@ -46,6 +47,11 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   if (!filter.atk && !filter.def) return true;
   const stats = monster ? statsOf(state, id) : { atk: card.atk, def: card.def };
   return inRange(stats.atk, filter.atk) && inRange(stats.def, filter.def);
+}
+
+/** Whether an effect stopped `seat` Special Summoning this card this turn (Silent Angler's "you cannot Special Summon monsters from your hand"). */
+export function specialSummonForbidden(state: DuelState, seat: Seat, id: string): boolean {
+  return state.forbidden.some((f) => f.player === seat && f.what === 'special_summon' && f.turn === state.turn && (f.filter === null || fits(state, id, f.filter, seat)));
 }
 
 /** Every card that fits, except `except` (the card being activated). */
@@ -63,12 +69,13 @@ export function chooseFrom(state: DuelState, selection: Extract<Selection, { fro
   return all.filter((id) => value(id) === best);
 }
 
-/** "face-up Warrior monster your opponent controls". */
-export function describeFilter(f: CardFilter): string {
+/** "face-up Warrior monster your opponent controls"; with `they`, as said of a player ("monster in their hand"). */
+export function describeFilter(f: CardFilter, they = false): string {
   const words: string[] = [];
   if (f.faceUp !== null) words.push(f.faceUp ? 'face-up' : 'face-down');
   if (f.position) words.push(`${f.position === 'attack' ? 'Attack' : 'Defense'} Position`);
   if (f.attributes.length) words.push(f.attributes.join(' or '));
+  if (f.named !== null) words.push(`"${f.named}"`);
   if (f.races.length) words.push(f.races.join(' or '));
   words.push(...f.types);
   const kinds = [...f.kinds].sort();
@@ -82,8 +89,9 @@ export function describeFilter(f: CardFilter): string {
   if (f.place === 'any') return words.join(' ');
   const pile = { hand: 'hand', deck: 'Deck', graveyard: 'GY', banished: 'banished cards' }[f.place as 'hand'];
   const field = { field: 'on the field', monsters: 'in a Monster Zone', spellTraps: 'in a Spell & Trap Zone' }[f.place as 'field'];
-  if (field) words.push(f.side === 'you' ? 'you control' : f.side === 'opponent' ? 'your opponent controls' : field);
-  else words.push(f.side === 'you' ? `in your ${pile}` : f.side === 'opponent' ? `in your opponent's ${pile}` : `in either player's ${pile}`);
+  const [you, your] = they ? ['they control', 'their'] : ['you control', 'your'];
+  if (field) words.push(f.side === 'you' ? you : f.side === 'opponent' ? `${your} opponent controls` : field);
+  else words.push(f.side === 'you' ? `in ${your} ${pile}` : f.side === 'opponent' ? `in ${your} opponent's ${pile}` : `in either player's ${pile}`);
   return words.join(' ');
 }
 
@@ -97,6 +105,7 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string): st
   if (!('cards' in step)) return null;
   const sel = step.cards;
   if (step.do === 'special_summon' && freeMonsterZones(state, seat) === 0) return 'You have no free Monster Zone to Special Summon into.';
+  if (step.do === 'special_summon' && sel.from === 'self' && specialSummonForbidden(state, seat, card)) return "An effect stops you Special Summoning it this turn.";
   if (step.do === 'remove_counters' && selected(state, sel, seat, card).every((id) => (onFieldCard(state, id)?.counters[step.counter] ?? 0) < step.count)) {
     return `There aren't ${step.count} ${step.counter === 'spell' ? 'Spell Counter' : 'counter'}${step.count === 1 ? '' : 's'} to remove.`;
   }
@@ -185,6 +194,10 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
       const n = materialsOf(state, card).length;
       if ((c.min === null || n >= c.min) && (c.max === null || n <= c.max)) return null;
       return c.max === 0 ? 'It needs this card to have no Xyz Material.' : `It needs this card to have ${c.min ?? 0}${c.max === null ? ' or more' : ` to ${c.max}`} Xyz Materials.`;
+    }
+    case 'outnumbered': {
+      const count = (p: Seat) => [...state.players[p].monsters, ...state.players[p].spellTraps].filter((c) => c !== null).length;
+      return count(other(seat)) - count(seat) >= c.by ? null : `It needs your opponent to control at least ${c.by} more cards than you.`;
     }
     case 'summoned_this_turn': {
       const at = locate(state, card);

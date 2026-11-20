@@ -1,60 +1,104 @@
 {
   "code": 13959634,
+  "textHash": "025bb3d851a4f0f08843c15e6ba6ef727733fbc85a36a3f01ee11db9b6ed80ae",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "condition",
-      "when": null,
       "speed": 1,
-      "effect": "Cannot be Normal Summoned/Set. Must be Special Summoned (from your hand) by having exactly 5 WATER monsters in your GY.",
-      "script": null,
-      "status": "unverified",
-      "window": "Summoning condition: cannot be Normal Summoned/Set; Special Summoned from your hand while you have exactly 5 WATER monsters in your GY",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "While this card is in your hand, during your Main Phase, if you have exactly 5 WATER monsters in your GY",
+      "cost": "",
+      "effect": "Cannot be Normal Summoned/Set. Must be Special Summoned (from your hand) by having exactly 5 WATER monsters in your GY.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "graveyard",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [
+                "WATER"
+              ],
+              "named": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 5,
+            "max": 5
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "self"
+                },
+                "position": "choice"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "hard",
-      "cost": "",
       "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "hard",
+      "window": "If this card is Special Summoned",
+      "cost": "",
+      "effect": "Discard 2 random cards from your opponent's hand (or their entire hand, if less than 2).",
+      "targets": null,
       "when": {
-        "by": null,
+        "event": "summoned",
+        "self": true,
+        "filter": null,
         "how": [
           "special"
         ],
         "from": "field",
-        "self": true,
-        "event": "summoned",
-        "filter": null,
-        "canMiss": false
+        "canMiss": false,
+        "by": null
       },
-      "speed": 1,
-      "effect": "Discard 2 random cards from your opponent's hand (or their entire hand, if less than 2).",
       "script": null,
-      "status": "unverified",
-      "window": "If this card is Special Summoned",
-      "targets": null,
-      "mandatory": true,
-      "continuous": null
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "none",
-      "cost": "",
       "kind": "continuous",
-      "when": null,
       "speed": 1,
-      "effect": "If this face-up card leaves the field, skip the Battle Phase of your next turn.",
-      "script": null,
-      "status": "unverified",
-      "window": "If this face-up card leaves the field (a leaves-the-field event, which code does not track)",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "If this face-up card leaves the field (a leaves-the-field event, which code does not track)",
+      "cost": "",
+      "effect": "If this face-up card leaves the field, skip the Battle Phase of your next turn.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "025bb3d851a4f0f08843c15e6ba6ef727733fbc85a36a3f01ee11db9b6ed80ae",
-  "materials": null
+  "materials": null,
+  "normalSummon": false
 }

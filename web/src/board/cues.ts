@@ -31,6 +31,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   judged: 300,
   appealed: 300,
   effectActivated: 600,
+  procedureUsed: 0,
   targeted: 400,
   effectChosen: 0,
   moved: 450,

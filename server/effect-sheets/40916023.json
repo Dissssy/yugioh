@@ -1,50 +1,85 @@
 {
   "code": 40916023,
+  "textHash": "f2e5fde66659c88f24fcab40041825df977b6f8204a8a5150a1fdce4c43a568b",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "condition",
-      "when": null,
       "speed": 1,
-      "effect": "This card cannot be Normal Summoned or Set.",
-      "script": null,
-      "status": "unverified",
-      "window": "Always; applies to how this card can be Summoned",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
-    },
-    {
       "opt": "none",
+      "window": "While this card is in your hand, during your Main Phase",
       "cost": "removing from play 1 WATER monster in your Graveyard",
-      "kind": "condition",
-      "when": null,
-      "speed": 1,
-      "effect": "This card can only be Special Summoned by removing from play 1 WATER monster in your Graveyard.",
-      "script": null,
-      "status": "unverified",
-      "window": "When you could Special Summon this card from your hand, if you have a WATER monster in your Graveyard",
+      "effect": "This card cannot be Normal Summoned or Set. This card can only be Special Summoned by removing from play 1 WATER monster in your Graveyard.",
       "targets": null,
-      "mandatory": false,
-      "continuous": null
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "place": "graveyard",
+                "kinds": [
+                  "monster"
+                ],
+                "types": [],
+                "races": [],
+                "attributes": [
+                  "WATER"
+                ],
+                "named": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null
+            },
+            "to": "banished"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "self"
+                },
+                "position": "choice"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "soft",
-      "cost": "",
       "kind": "quick",
-      "when": null,
       "speed": 2,
-      "effect": "Change the battle position of 1 of your opponent's face-up Monster Cards. Once changed, the monster must remain in this position for the rest of the turn.",
-      "script": null,
-      "status": "unverified",
-      "window": "During each of your opponent's Standby Phases, while this card is face-up on the field (once per such Standby Phase), if your opponent controls a face-up monster",
-      "targets": "1 of your opponent's face-up Monster Cards",
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "During each of your opponent's Standby Phases",
+      "cost": "",
+      "effect": "Change the battle position of 1 of your opponent's face-up Monster Cards. Once changed, the monster must remain in this position for the rest of the turn.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "f2e5fde66659c88f24fcab40041825df977b6f8204a8a5150a1fdce4c43a568b",
-  "materials": null
+  "materials": null,
+  "normalSummon": false
 }

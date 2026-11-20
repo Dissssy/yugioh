@@ -1,22 +1,23 @@
 {
   "code": 73048641,
+  "textHash": "28daa9a65803e3723e8b9362ffe4348de6b33de6d6a5a77061d66d2c991d76e2",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "activation",
-      "when": null,
       "speed": 2,
-      "effect": "Target 1 face-up monster on the field; it cannot be destroyed by battle this turn, also its ATK is halved until the end of this turn.",
-      "script": null,
-      "status": "unverified",
-      "window": "Quick-Play Spell: any time you could activate a Quick-Play Spell (from the hand during your turn, or Set and activated on either player's turn)",
-      "targets": "1 face-up monster on the field",
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "Quick-Play Spell: any time you could activate a Quick-Play Spell (from the hand during your turn, or Set and activated on either player's turn)",
+      "cost": "",
+      "effect": "Target 1 face-up monster on the field; it cannot be destroyed by battle this turn, also its ATK is halved until the end of this turn.",
+      "targets": "1 face-up monster on the field",
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "28daa9a65803e3723e8b9362ffe4348de6b33de6d6a5a77061d66d2c991d76e2",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

@@ -1,22 +1,23 @@
 {
   "code": 81275309,
+  "textHash": "9d09f99bbf1b062966ed6a8b2f49ec3721b5531b09016f8e8a190e035790a1cd",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "continuous",
-      "when": null,
       "speed": 1,
-      "effect": "When an effect resolves that was activated by an Effect Monster that was on your opponent's side of the field, they must discard 1 card or the effect is negated (their choice).",
-      "script": null,
-      "status": "unverified",
-      "window": "While this card is face-up on the field, whenever an effect activated by an Effect Monster that was on your opponent's side of the field resolves",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "While this card is face-up on the field, whenever an effect activated by an Effect Monster that was on your opponent's side of the field resolves",
+      "cost": "",
+      "effect": "When an effect resolves that was activated by an Effect Monster that was on your opponent's side of the field, they must discard 1 card or the effect is negated (their choice).",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "9d09f99bbf1b062966ed6a8b2f49ec3721b5531b09016f8e8a190e035790a1cd",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

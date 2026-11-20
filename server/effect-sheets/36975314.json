@@ -1,54 +1,55 @@
 {
   "code": 36975314,
+  "textHash": "cabca68fa24490509fa0ce24decfa0f6d6b12e6f1b23b32a491688385f792fca",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "activation",
-      "when": null,
       "speed": 2,
-      "effect": "Take control of that monster.",
-      "script": null,
-      "status": "unverified",
+      "mandatory": false,
+      "opt": "none",
       "window": "Set Trap that can be activated on either player's turn, while your opponent controls a face-up monster",
+      "cost": "",
+      "effect": "Take control of that monster.",
       "targets": "1 face-up monster your opponent controls",
-      "mandatory": false,
-      "continuous": null
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "none",
-      "cost": "",
       "kind": "continuous",
-      "when": null,
       "speed": 1,
-      "effect": "While you control that monster, it cannot attack or activate effects.",
-      "script": null,
-      "status": "unverified",
+      "mandatory": false,
+      "opt": "none",
       "window": "While this card is face-up on the field and you control that monster",
+      "cost": "",
+      "effect": "While you control that monster, it cannot attack or activate effects.",
       "targets": null,
-      "mandatory": false,
-      "continuous": null
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "none",
-      "cost": "",
       "kind": "continuous",
-      "when": null,
       "speed": 1,
-      "effect": "When that monster leaves the field, destroy this card.",
-      "script": null,
-      "status": "unverified",
-      "window": "When that monster leaves the field",
-      "targets": null,
       "mandatory": false,
+      "opt": "none",
+      "window": "When that monster leaves the field",
+      "cost": "",
+      "effect": "When that monster leaves the field, destroy this card.",
+      "targets": null,
+      "when": null,
+      "script": null,
       "continuous": {
         "apply": "tie",
-        "defenseBreaks": false,
-        "destroyLinked": false
-      }
+        "destroyLinked": false,
+        "defenseBreaks": false
+      },
+      "status": "unverified"
     }
   ],
-  "textHash": "cabca68fa24490509fa0ce24decfa0f6d6b12e6f1b23b32a491688385f792fca",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

@@ -10,6 +10,8 @@ import { and, desc, eq, or } from 'drizzle-orm';
 import {
   cardOf,
   decide,
+  isProcedure,
+  procedureDone,
   scriptOf,
   entryFor,
   evolve,
@@ -305,7 +307,8 @@ export class Duels {
         if (blocked) return answer(blocked);
         answer({ ok: true });
         const [intentEvent, ...activation] = decision.events;
-        await this.activate(duel, [intentEvent!], activation);
+        if (isProcedure(duel.state, intent.card, intent.effect)) await this.useProcedure(duel, intentEvent!, activation[0]!);
+        else await this.activate(duel, [intentEvent!], activation);
         await this.advance(duel);
       }).catch(() => answer({ ok: false, status: 500, error: 'Something went wrong.' }));
     });
@@ -330,6 +333,22 @@ export class Duels {
     await this.runJudge(duel, 'activation', scratch, link, overturned?.summary ?? null, ({ record, events: costs }) => {
       const judged: DuelEvent = { type: 'judged', record };
       return record.legal ? [...before, judged, ...activation, ...costs] : [...before, judged];
+    });
+  }
+
+  /**
+   * Runs a Summoning procedure's script (its cost, then the Summon) and commits it if it worked, with the checkpoint
+   * for the Summon. It never goes on the chain.
+   */
+  private async useProcedure(duel: LiveDuel, intent: DuelEvent, used: DuelEvent) {
+    if (used.type !== 'procedureUsed') throw new Error('Expected a procedureUsed event');
+    const link: ChainLink = { player: used.player, card: used.card, effect: used.effect, targets: [], choice: null, cause: null, negated: false, setAgain: false };
+    const overturned = duel.state.rulings.find((r) => r.legal && r.player === link.player && r.card === link.card && r.effect === link.effect);
+    await this.runJudge(duel, 'activation', evolve(duel.state, used), link, overturned?.summary ?? null, ({ record, events }) => {
+      const judged: DuelEvent = { type: 'judged', record };
+      if (!record.legal) return [intent, judged];
+      const done = [judged, used, ...events];
+      return [intent, ...done, procedureDone(done.reduce(evolve, duel.state), used.card)];
     });
   }
 

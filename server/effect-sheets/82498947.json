@@ -1,22 +1,23 @@
 {
   "code": 82498947,
+  "textHash": "3dd33ba819d8b85570ec6452852e97c39085a1d1b1211ff14ad5c91429769a0a",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "continuous",
-      "when": null,
       "speed": 1,
-      "effect": "Monsters your opponent controls cannot declare an attack if their ATK is greater than or equal to this card's DEF.",
-      "script": null,
-      "status": "unverified",
-      "window": "While this card is face-up on the field and you control another face-up \"Ice Barrier\" monster",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "While this card is face-up on the field and you control another face-up \"Ice Barrier\" monster",
+      "cost": "",
+      "effect": "Monsters your opponent controls cannot declare an attack if their ATK is greater than or equal to this card's DEF.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "3dd33ba819d8b85570ec6452852e97c39085a1d1b1211ff14ad5c91429769a0a",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

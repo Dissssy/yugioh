@@ -1,22 +1,23 @@
 {
   "code": 54652250,
+  "textHash": "bdfc27220b8ce4528d2423a1361ce0967cc5a5d8c1ead2a26bf8176be95390eb",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "flip",
-      "when": null,
       "speed": 1,
-      "effect": "Destroy the targeted monster.",
-      "script": null,
-      "status": "unverified",
-      "window": "When this card is flipped face-up",
-      "targets": "1 monster on the field",
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "When this card is flipped face-up",
+      "cost": "",
+      "effect": "Destroy the targeted monster.",
+      "targets": "1 monster on the field",
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "bdfc27220b8ce4528d2423a1361ce0967cc5a5d8c1ead2a26bf8176be95390eb",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

@@ -13,13 +13,13 @@
       "effect": "Destroy that monster.",
       "targets": null,
       "when": {
+        "event": "damage_step_start",
         "self": true,
         "filter": null,
         "how": [],
         "from": "field",
         "canMiss": false,
-        "by": null,
-        "event": "damage_step_start"
+        "by": null
       },
       "script": {
         "conditions": [],
@@ -40,6 +40,7 @@
                     "types": [],
                     "races": [],
                     "attributes": [],
+                    "named": null,
                     "faceUp": true,
                     "position": "defense",
                     "level": null,
@@ -57,5 +58,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

@@ -1,36 +1,37 @@
 {
   "code": 70703416,
+  "textHash": "abefa1f60cc3c23cb412db012e69bea216989cb4438753222203307f2d7f29f0",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "continuous",
-      "when": null,
       "speed": 1,
-      "effect": "While you control another \"Ice Barrier\" monster, monsters your opponent controls lose 500 ATK/DEF.",
-      "script": null,
-      "status": "unverified",
-      "window": "While this card is face-up on the field and you control another \"Ice Barrier\" monster",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "While this card is face-up on the field and you control another \"Ice Barrier\" monster",
+      "cost": "",
+      "effect": "While you control another \"Ice Barrier\" monster, monsters your opponent controls lose 500 ATK/DEF.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "hard",
-      "cost": "",
       "kind": "ignition",
-      "when": null,
       "speed": 1,
-      "effect": "Send 1 Level 3 or lower \"Ice Barrier\" monster from your Deck to the GY, and if you do, this card's Level becomes the same as that monster's, until the end of this turn.",
-      "script": null,
-      "status": "unverified",
-      "window": "During your Main Phase",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "hard",
+      "window": "During your Main Phase",
+      "cost": "",
+      "effect": "Send 1 Level 3 or lower \"Ice Barrier\" monster from your Deck to the GY, and if you do, this card's Level becomes the same as that monster's, until the end of this turn.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "abefa1f60cc3c23cb412db012e69bea216989cb4438753222203307f2d7f29f0",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

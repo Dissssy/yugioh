@@ -1,22 +1,85 @@
 {
   "code": 88559132,
+  "textHash": "9f41dce5c5556efb208e7c06640198e207f179f612360b9c5d96aeb5f04163b0",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "Tributing 1 Warrior-Type monster",
       "kind": "condition",
-      "when": null,
       "speed": 1,
-      "effect": "You can Special Summon this card (from your hand) by Tributing 1 Warrior-Type monster, and if you do, it gains ATK equal to the Tributed monster's original ATK.",
-      "script": null,
-      "status": "unverified",
-      "window": "While this card is in your hand, when you could Special Summon it (open game state in your Main Phase)",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "Your Main Phase, while this card is in your hand and you control a Warrior-Type monster to Tribute",
+      "cost": "Tributing 1 Warrior-Type monster",
+      "effect": "Special Summon this card (from your hand), and if you do, it gains ATK equal to the Tributed monster's original ATK.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "place": "monsters",
+                "kinds": [
+                  "monster"
+                ],
+                "types": [],
+                "races": [
+                  "Warrior"
+                ],
+                "attributes": [],
+                "named": null,
+                "faceUp": true,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "self"
+                },
+                "position": "choice"
+              },
+              {
+                "do": "gain_stats",
+                "cards": {
+                  "from": "self"
+                },
+                "atk": {
+                  "of": "cost",
+                  "stat": "atk",
+                  "original": true,
+                  "times": 1
+                },
+                "def": null,
+                "until": "while_on_field"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "9f41dce5c5556efb208e7c06640198e207f179f612360b9c5d96aeb5f04163b0",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

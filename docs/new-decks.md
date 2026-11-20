@@ -22,7 +22,7 @@ Of the new cards' 124 effects, Opus scripted 25 and gave 6 continuous effects da
 
 Each step leaves both decks playable, and each new piece of vocabulary goes into the compiler's prompt so Opus can use it, then the affected cards are recompiled (`sheets:compile -- --force "Name"`), with offline eval cases for the new steps.
 
-1. Summoning procedures from the hand, and "cannot be Normal Summoned".
+1. Summoning procedures from the hand, and "cannot be Normal Summoned". Built: a `condition` effect with a script is a procedure (docs/effects.md), with new vocabulary for it (`outnumbered`, `named` filters, `gain_stats` with a value from the cost, and `forbid` of Special Summons with a filter, which code enforces on effects, procedures and Synchro and Xyz Summons). The seven cards are recompiled, with eval cases. Not yet: a procedure whose cost frees the last Monster Zone (Turret Warrior with five monsters out) isn't offered; Prior's ban applies only after its Summon, not to Special Summons made earlier that turn; and a monster that must first be Special Summoned by its procedure can still be revived without it.
 2. Taking control, Tokens, and random cards from a hand: the ops that whole effects need.
 3. The continuous vocabulary: attack, position and activation locks, then battle changes and protection.
 4. The rest: banish-when-leaves, the Deck top, skipping the Battle Phase, name changes, the Synchro details.

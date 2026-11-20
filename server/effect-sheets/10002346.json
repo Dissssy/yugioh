@@ -40,6 +40,7 @@
           "types": [],
           "races": [],
           "attributes": [],
+          "named": null,
           "faceUp": true,
           "position": null,
           "level": null,
@@ -60,5 +61,6 @@
     "summon": "xyz",
     "level": 2,
     "count": 2
-  }
+  },
+  "normalSummon": true
 }

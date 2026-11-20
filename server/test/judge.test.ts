@@ -32,6 +32,7 @@ const sheets: Record<number, EffectSheet> = {
     textHash: '',
     model: 'test',
     materials: null,
+    normalSummon: true,
     effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, continuous: null, status: 'unverified' }],
   },
 };
@@ -268,6 +269,7 @@ const anyCard = (side: CardFilter['side'], place: CardFilter['place'], kinds: Ca
   types: [],
   races: [],
   attributes: [],
+  named: null,
   faceUp: null,
   position: null,
   level: null,

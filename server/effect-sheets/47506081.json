@@ -33,7 +33,6 @@
           }
         ],
         "targets": null,
-        "unapplied": null,
         "options": [
           {
             "label": "",
@@ -46,7 +45,8 @@
               }
             ]
           }
-        ]
+        ],
+        "unapplied": null
       },
       "continuous": null,
       "status": "unverified"
@@ -56,5 +56,6 @@
     "summon": "xyz",
     "level": 3,
     "count": 2
-  }
+  },
+  "normalSummon": true
 }

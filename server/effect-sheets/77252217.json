@@ -1,22 +1,23 @@
 {
   "code": 77252217,
+  "textHash": "0aad595a3e7bfc70452ef0cd40c6e7676dc3445f6c0818b09298c0dd24f5e2f5",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "trigger",
-      "when": null,
       "speed": 1,
-      "effect": "Your opponent draws 1 card.",
-      "script": null,
-      "status": "unverified",
-      "window": "At the end of the Damage Step, if this card attacked or was attacked (this event is not in the engine's event list, so this effect never fires)",
-      "targets": null,
       "mandatory": true,
-      "continuous": null
+      "opt": "none",
+      "window": "At the end of the Damage Step, if this card attacked or was attacked (this event is not in the engine's event list, so this effect never fires)",
+      "cost": "",
+      "effect": "Your opponent draws 1 card.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "0aad595a3e7bfc70452ef0cd40c6e7676dc3445f6c0818b09298c0dd24f5e2f5",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

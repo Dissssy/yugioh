@@ -1,58 +1,53 @@
 {
   "code": 54059040,
+  "textHash": "cbab136647a79e28f98dc91a4bee479dc007f03a5ae680646f3ea708e3efff9a",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "activation",
-      "when": null,
       "speed": 2,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Can be activated on either player's turn once Set.",
+      "cost": "",
       "effect": "Activate this card; it does nothing by itself and remains on the field so its effect can apply.",
+      "targets": null,
+      "when": null,
       "script": {
+        "conditions": [],
         "cost": [],
+        "targets": null,
         "options": [
           {
             "label": "",
             "steps": []
           }
         ],
-        "targets": null,
-        "unapplied": null,
-        "conditions": []
+        "unapplied": null
       },
-      "status": "unverified",
-      "window": "Can be activated on either player's turn once Set.",
-      "targets": null,
-      "mandatory": false,
-      "continuous": null
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "none",
-      "cost": "",
       "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "opt": "none",
+      "window": "While this card is face-up on the field, if a non-WATER monster(s) is Normal or Special Summoned while you control a WATER monster.",
+      "cost": "",
+      "effect": "Change that Summoned monster to Defense Position.",
+      "targets": null,
       "when": {
-        "by": null,
-        "how": [
-          "normal",
-          "special"
-        ],
-        "from": "field",
-        "self": false,
         "event": "summoned",
+        "self": false,
         "filter": {
-          "atk": null,
-          "def": null,
           "side": "either",
+          "place": "monsters",
           "kinds": [
             "monster"
           ],
-          "level": null,
-          "place": "monsters",
-          "races": [],
           "types": [],
-          "faceUp": null,
-          "position": null,
+          "races": [],
           "attributes": [
             "LIGHT",
             "DARK",
@@ -60,20 +55,27 @@
             "FIRE",
             "WIND",
             "DIVINE"
-          ]
+          ],
+          "named": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
         },
-        "canMiss": false
+        "how": [
+          "normal",
+          "special"
+        ],
+        "from": "field",
+        "canMiss": false,
+        "by": null
       },
-      "speed": 1,
-      "effect": "Change that Summoned monster to Defense Position.",
       "script": null,
-      "status": "unverified",
-      "window": "While this card is face-up on the field, if a non-WATER monster(s) is Normal or Special Summoned while you control a WATER monster.",
-      "targets": null,
-      "mandatory": true,
-      "continuous": null
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "cbab136647a79e28f98dc91a4bee479dc007f03a5ae680646f3ea708e3efff9a",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

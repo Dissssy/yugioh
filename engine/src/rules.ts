@@ -1,7 +1,7 @@
 // The game rules as code: what a player may do now, and the events an intent produces.
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
-import { scriptOf, scriptProblem } from './script.ts';
+import { scriptOf, scriptProblem, specialSummonForbidden } from './script.ts';
 import { continuousOnField, levelNow, replacement, restricted, statsOf } from './continuous.ts';
 import { evolve, locate, monsterZoneFree, monsterZonesFor, onField, other } from './state.ts';
 import {
@@ -184,7 +184,7 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
           // A tribute leaves its zone free for the monster it makes way for; a Main Deck monster never goes to an Extra Monster Zone.
           const zones = [...Array(MONSTER_ZONES).keys()].filter((i) => monsterZoneFree(state, seat, i) || (tributes > 0 && tributeFrom.includes(p.monsters[i]?.id ?? '')));
           const fits = tributes > 0 ? monsters.length >= tributes && zones.length > 0 : zones.length > 0;
-          if (!normalSummonUsed(state) && !card.extraDeck && fits) {
+          if (!normalSummonUsed(state) && !card.extraDeck && canNormalSummon(state, card) && fits) {
             actions.push({ type: 'normalSummon', card: id, tributes, tributeFrom, zones });
             actions.push({ type: 'setMonster', card: id, tributes, tributeFrom, zones });
           }
@@ -226,7 +226,7 @@ type ExtraSummon = Extract<LegalAction, { type: 'extraSummon' }>;
 function extraSummonAction(state: DuelState, seat: Seat, id: string): ExtraSummon | null {
   const card = cardOf(state, id);
   const materials = state.sheets[card.code]?.materials;
-  if (!materials) return null;
+  if (!materials || specialSummonForbidden(state, seat, id)) return null;
   const sets = materials.summon === 'xyz' ? xyzMaterials(state, seat, materials) : card.level === null ? [] : synchroMaterials(state, seat, materials, card.level);
   const options = sets.flatMap((set) => {
     const zones = zonesAfterLeaving(state, seat, set);
@@ -234,6 +234,9 @@ function extraSummonAction(state: DuelState, seat: Seat, id: string): ExtraSummo
   });
   return options.length > 0 ? { type: 'extraSummon', card: id, how: materials.summon, options } : null;
 }
+
+/** Whether a monster's sheet allows it to be Normal Summoned or Set ("Cannot be Normal Summoned/Set"). */
+const canNormalSummon = (state: DuelState, card: CardData) => state.sheets[card.code]?.normalSummon !== false;
 
 /** Every set of `count` face-up monsters the player controls whose current Level is the Xyz Monster's. */
 function xyzMaterials(state: DuelState, seat: Seat, materials: Extract<Materials, { summon: 'xyz' }>): string[][] {
@@ -347,7 +350,7 @@ function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
     const no = (reason: string): EffectCheck => ({ effect: index, reason });
     if (effect.kind === 'trigger') return no(`A trigger effect: it comes up by itself (${effect.window || 'when its event happens'}).`);
     if (effect.kind === 'continuous') return no('Always on while the card is face-up on the field; it is never activated.');
-    if (effect.kind === 'condition') return no('A summoning condition, not an effect you activate.');
+    if (effect.kind === 'condition') return procedureCheck(state, seat, id, index, timing);
     if (effect.kind === 'flip') return no('A Flip effect: it happens when the card is flipped face-up.');
     // Where the card is and its state come first: they are the reasons a player can do least about.
     const set = at.zone === 'spellTraps' ? p.spellTraps[at.index]! : null;
@@ -398,6 +401,35 @@ function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
     const zones = card.kind !== 'monster' && at.zone === 'hand' ? freeZones(p.spellTraps) : null;
     return { effect: index, candidate: { ...activateAction(state, id, index, zones), cause } };
   });
+}
+
+/**
+ * A Summoning procedure from the hand (a `condition` effect with a script): its controller's open Main Phase, like an
+ * ignition effect. Its script's conditions and cost are checked after, like an activation's.
+ */
+function procedureCheck(state: DuelState, seat: Seat, id: string, index: number, timing: string | null): EffectCheck {
+  const no = (reason: string): EffectCheck => ({ effect: index, reason });
+  const effect = state.sheets[cardOf(state, id).code]!.effects[index]!;
+  if (!scriptOf(state, id, index)) return no('A summoning condition, not an effect you activate.');
+  if (locate(state, id)?.zone !== 'hand') return no('A Summoning procedure: it Special Summons this card from your hand.');
+  if (timing) return no(timing);
+  if (state.step.at !== 'open' || !isMainPhase(state)) return no('Only in your own Main Phase, with no chain going.');
+  if (!onceOk(state, id, cardOf(state, id).code, index, effect.opt)) return no('Once per turn: it was already used this turn.');
+  const ruling = ruledIllegal(state, seat, id, index);
+  if (ruling) return no(`The judge refused it on this board: ${ruling.summary}`);
+  return { effect: index, candidate: { ...activateAction(state, id, index, null), cause: null } };
+}
+
+/** Whether effect `effect` of the card is a Summoning procedure (see `procedureCheck`). */
+export const isProcedure = (state: DuelState, card: string, effect: number) => state.sheets[cardOf(state, card).code]?.effects[effect]?.kind === 'condition';
+
+/**
+ * The checkpoint after a Summoning procedure: triggers and responses to the Summon it made, or just a return to the
+ * open game if it made none.
+ */
+export function procedureDone(state: DuelState, card: string): DuelEvent {
+  const summoned = state.happened.findLast((h) => h.event === 'summoned' && h.card === card) ?? null;
+  return { type: 'checkpoint', cause: summoned, then: { do: 'open' } };
 }
 
 /** The effects of one card the player may try to activate in the open game or the response window now. */
@@ -565,6 +597,7 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
       check(p.hand.includes(intent.card), 'That card is not in your hand.');
       const card = cardOf(state, intent.card);
       check(card.kind === 'monster' && !card.extraDeck, 'Only Main Deck monsters can be Normal Summoned or Set.');
+      check(canNormalSummon(state, card), `${card.name} cannot be Normal Summoned or Set.`);
       const needed = tributesFor(card);
       const tributes = new Set(intent.tributes);
       check(tributes.size === intent.tributes.length, 'Each tribute must be a different monster.');
@@ -799,6 +832,7 @@ function activate(run: Run, seat: Seat, intent: Extract<Intent, { type: 'activat
   check(options.length > 0, "That effect can't be activated now.");
   const problem = scriptProblem(state, seat, intent.card, intent.effect, options[0]!.cause);
   check(!problem, problem!);
+  if (isProcedure(state, intent.card, intent.effect)) return run.emit({ type: 'procedureUsed', player: seat, card: intent.card, effect: intent.effect });
   const fromHand = options.find((a) => a.zones !== null);
   if (fromHand) check(intent.zone !== null && fromHand.zones!.includes(intent.zone), 'Choose an empty Spell & Trap Zone.');
   run.emit({ type: 'effectActivated', player: seat, card: intent.card, effect: intent.effect, zone: fromHand ? intent.zone : null, cause: options[0]!.cause });

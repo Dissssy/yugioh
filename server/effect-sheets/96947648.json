@@ -1,65 +1,67 @@
 {
   "code": 96947648,
+  "textHash": "14acc282ef4b4a3baf5e8dd524267bfe81293b0fcd18ae9c13efb99470c3fb30",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "activation",
-      "when": null,
       "speed": 1,
+      "mandatory": false,
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
       "effect": "Add those targets to your hand.",
+      "targets": "2 WATER monsters with 1500 or less ATK in your Graveyard",
+      "when": null,
       "script": {
+        "conditions": [],
         "cost": [],
+        "targets": {
+          "filter": {
+            "side": "you",
+            "place": "graveyard",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [
+              "WATER"
+            ],
+            "named": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": {
+              "min": null,
+              "max": 1500
+            },
+            "def": null
+          },
+          "min": 2,
+          "max": 2,
+          "event": false
+        },
         "options": [
           {
             "label": "",
             "steps": [
               {
                 "do": "move",
-                "to": "hand",
                 "cards": {
                   "from": "targets"
-                }
+                },
+                "to": "hand"
               }
             ]
           }
         ],
-        "targets": {
-          "max": 2,
-          "min": 2,
-          "event": false,
-          "filter": {
-            "atk": {
-              "max": 1500,
-              "min": null
-            },
-            "def": null,
-            "side": "you",
-            "kinds": [
-              "monster"
-            ],
-            "level": null,
-            "place": "graveyard",
-            "races": [],
-            "types": [],
-            "faceUp": null,
-            "position": null,
-            "attributes": [
-              "WATER"
-            ]
-          }
-        },
-        "unapplied": null,
-        "conditions": []
+        "unapplied": null
       },
-      "status": "unverified",
-      "window": "Your Main Phase",
-      "targets": "2 WATER monsters with 1500 or less ATK in your Graveyard",
-      "mandatory": false,
-      "continuous": null
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "14acc282ef4b4a3baf5e8dd524267bfe81293b0fcd18ae9c13efb99470c3fb30",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

@@ -19,32 +19,18 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { DESTINATIONS, FORBIDDEN, RESTRICTIONS, UNTIL, type CardData, type CardFilter, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
+import { DESTINATIONS, FORBIDDEN, RESTRICTIONS, UNTIL, type CardData, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
 import { cards, decks, effectSheets, sheetReports, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
 import { strictSchema } from './judge/tools.ts';
+import { cardFilter } from './judge/cardFilter.ts';
 
 export const SHEET_DIR = fileURLToPath(new URL('../effect-sheets', import.meta.url));
 export const COMPILE_MODEL = 'claude-opus-5-5';
 
 export const textHash = (text: string) => createHash('sha256').update(text).digest('hex');
 
-const range = z.object({ min: z.number().int().nullable(), max: z.number().int().nullable() }).nullable();
-
-const cardFilter = z.object({
-  side: z.enum(['you', 'opponent', 'either']),
-  place: z.enum(['field', 'monsters', 'spellTraps', 'hand', 'deck', 'graveyard', 'banished', 'any']),
-  kinds: z.array(z.enum(['monster', 'spell', 'trap'])),
-  types: z.array(z.string()),
-  races: z.array(z.string()),
-  attributes: z.array(z.string()),
-  faceUp: z.boolean().nullable(),
-  position: z.enum(['attack', 'defense']).nullable(),
-  level: range,
-  atk: range,
-  def: range,
-}) satisfies z.ZodType<CardFilter>;
 
 const selection = z.union([
   z.object({ from: z.literal('self') }),
@@ -61,7 +47,7 @@ const selection = z.union([
 ]) satisfies z.ZodType<Selection>;
 
 const player = z.enum(['you', 'opponent']);
-const statValue = z.object({ of: z.enum(['self', 'targets']), stat: z.enum(['atk', 'def']), original: z.boolean(), times: z.number() }) satisfies z.ZodType<StatValue>;
+const statValue = z.object({ of: z.enum(['self', 'targets', 'cost']), stat: z.enum(['atk', 'def']), original: z.boolean(), times: z.number() }) satisfies z.ZodType<StatValue>;
 const summonKind = z.enum(['normal', 'flip', 'special', 'synchro', 'xyz']);
 const phase = z.enum(['draw', 'standby', 'main1', 'battle', 'main2', 'end']);
 const step = z.union([
@@ -78,12 +64,13 @@ const step = z.union([
     until: z.enum(UNTIL),
   }),
   z.object({ do: z.literal('set_stats'), cards: selection, atk: statValue.nullable(), def: statValue.nullable(), until: z.enum(UNTIL) }),
+  z.object({ do: z.literal('gain_stats'), cards: selection, atk: statValue.nullable(), def: statValue.nullable(), until: z.enum(UNTIL) }),
   z.object({ do: z.literal('change_lp'), player, amount: z.number().int(), kind: z.enum(['cost', 'damage', 'gain']) }),
   z.object({ do: z.literal('draw'), player, count: z.number().int() }),
   z.object({ do: z.literal('extra_normal_summon') }),
   z.object({ do: z.literal('negate_attack') }),
   z.object({ do: z.literal('detach'), cards: selection, count: z.number().int() }),
-  z.object({ do: z.literal('forbid'), player, what: z.enum(FORBIDDEN) }),
+  z.object({ do: z.literal('forbid'), player, what: z.enum(FORBIDDEN), filter: cardFilter.nullable() }),
   z.object({ do: z.literal('link'), cards: selection }),
   z.object({ do: z.literal('negate_activation'), destroy: z.boolean() }),
   z.object({ do: z.literal('negate_effects'), cards: selection }),
@@ -100,6 +87,7 @@ const condition = z.union([
       z.object({ if: z.literal('phase'), phases: z.array(phase) }),
       z.object({ if: z.literal('summoned_this_turn'), how: z.array(summonKind) }),
       z.object({ if: z.literal('materials'), min: z.number().int().nullable(), max: z.number().int().nullable() }),
+      z.object({ if: z.literal('outnumbered'), by: z.number().int().min(1) }),
 ]) satisfies z.ZodType<Condition>;
 
 const script = z.object({
@@ -165,6 +153,7 @@ const sheetEffect = z.object({
 const compiled = z.object({
   effects: z.array(sheetEffect.omit({ speed: true, status: true }).extend({ when: z.string().nullable(), script: z.string().nullable(), continuous: z.string().nullable() })),
   materials: z.string().nullable(),
+  normalSummon: z.boolean(),
 });
 
 /** An effect's spell speed follows from its kind and the card's type, so code sets it rather than the model. */
@@ -181,6 +170,7 @@ export const sheetSchema = z.object({
   model: z.string(),
   effects: z.array(sheetEffect),
   materials: materials.nullable(),
+  normalSummon: z.boolean(),
 }) satisfies z.ZodType<EffectSheet>;
 
 /** Sheets for the given cards, keyed by passcode. A card without a current sheet acts as if it had no effects. */
@@ -288,7 +278,8 @@ export async function resetSheets(db: Db): Promise<void> {
 /** Writes every sheet in the database to `dir`, one file per card. */
 export async function exportSheetFiles(db: Db, dir = SHEET_DIR): Promise<number> {
   const rows = await db.select().from(effectSheets);
-  for (const { sheet } of rows) await writeFile(sheetPath(sheet.code, dir), `${JSON.stringify(sheet, null, 2)}\n`);
+  // Parsed, so the keys come out in the schema's order rather than the database's.
+  for (const { sheet } of rows) await writeFile(sheetPath(sheet.code, dir), `${JSON.stringify(sheetSchema.parse(sheet), null, 2)}\n`);
   return rows.length;
 }
 
@@ -304,18 +295,23 @@ List the card's effects in the order they appear in the text. For each:
 - targets: what it targets, as worded, or null if it doesn't target.
 - when: a JSON string naming the event the effect needs, as data code checks (see "When" below), or null. Every trigger has one: it is what makes the trigger fire ("When this card is Normal Summoned", "If this card is destroyed by battle"). A Spell/Trap or quick effect that is activated in response to an event has one too ("When an opponent's monster declares an attack", "When your opponent Normal Summons a monster"). Effects that need no event have null.
 - continuous: for a "continuous" effect, a JSON string with what it does as data code applies at all times (see "Continuous effects" below), or null when it doesn't fit that vocabulary exactly (a judge can't apply an always-on effect, so it then does nothing until someone writes it). null for every other kind.
-- script: a JSON string holding the effect as structured data that code runs exactly, with no judge. Write one only when the whole effect, its activation conditions, cost and targets fit the vocabulary below exactly; otherwise null, and a judge applies the text. A script that is almost right is worse than none: code trusts it completely. Only "activation", "ignition", "quick" and "trigger" effects get scripts; others null.
+- script: a JSON string holding the effect as structured data that code runs exactly, with no judge. Write one only when the whole effect, its activation conditions, cost and targets fit the vocabulary below exactly; otherwise null, and a judge applies the text. A script that is almost right is worse than none: code trusts it completely. Only "activation", "ignition", "quick" and "trigger" effects get scripts, and "condition" effects that are Summoning procedures from the hand (see "Summoning procedures" below); others null.
+normalSummon: false when the text says the card "cannot be Normal Summoned/Set" (in any wording), else true.
 materials: a JSON string with an Extra Deck monster's materials as data code checks, else null. A Synchro Monster: {"summon": "synchro", "tuner": null, "nonTuners": {"min": 1, "max": null}} for "1 Tuner + 1 or more non-Tuner monsters"; "tuner" is the Tuner's name when the text names one ("Junk Synchron" + ...), and nonTuners gives how many ("1 or more" is min 1, max null; "2 non-Tuner monsters" is min 2, max 2). An Xyz Monster: {"summon": "xyz", "level": 4, "count": 2} for "2 Level 4 monsters". Normal Monsters (flavour text) have no effects: return an empty list.
 
 # Scripts
 
 "You" is the player activating the effect. Code already handles phases, once-per-turn clauses, spell speed and the event in "when", so a script says only what the card itself adds.
 
-- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n, "max": n | null} needs at least min and at most max cards that fit ("While there are 5 or more monsters in your GY": min 5, max null; "If you control a Synchro Monster": min 1; "while you have 1 or less cards in your hand": min 0, max 1). {"if": "turn", "whose": "you" | "opponent"} for "during your turn" ("during your Battle Phase" is this plus a phase condition). {"if": "position", "position": "attack" | "defense"} for "while this card is in face-up Defense Position". {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon). {"if": "materials", "min": n | null, "max": n | null} needs this Xyz Monster to have that many Xyz Materials ("while this card has no Xyz Material": min null, max 0).
+- conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n, "max": n | null} needs at least min and at most max cards that fit ("While there are 5 or more monsters in your GY": min 5, max null; "If you control a Synchro Monster": min 1; "while you have 1 or less cards in your hand": min 0, max 1). {"if": "turn", "whose": "you" | "opponent"} for "during your turn" ("during your Battle Phase" is this plus a phase condition). {"if": "position", "position": "attack" | "defense"} for "while this card is in face-up Defense Position". {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon). {"if": "materials", "min": n | null, "max": n | null} needs this Xyz Monster to have that many Xyz Materials ("while this card has no Xyz Material": min null, max 0). {"if": "outnumbered", "by": n} for "If your opponent controls n or more cards than you do" (cards on the field).
 - cost: steps paid on activation, in order ("Discard 1 card" is a move to graveyard of 1 card chosen from your hand; "Pay 500 LP" is change_lp kind cost; "Tribute this card" is a move of self to graveyard).
 - targets: {"filter", "min", "max", "event"} for "target 1 ..." ("up to 3" is min 1 max 3), or null. The player picks them on activation, after paying the cost; resolution steps reach them with {"from": "targets"}, and a target that no longer fits the filter isn't affected. event true for "target that monster", where the target is the card the "when" event happened to (Trap Hole); else false.
 - options: what the effect does. One option (label "") unless the text says "activate 1 of these effects", then one per bullet with the bullet's wording as label; the player picks one on activation.
 - unapplied: a part of the text no step can express, typically a lingering restriction ("You cannot conduct your Battle Phase this turn", "your opponent cannot declare an attack this turn"), in the card's words; the effect resolves without it and says so. Use it only for such a side clause. If the main thing the effect does can't be expressed, the script is null.
+
+# Summoning procedures
+
+"You can Special Summon this card (from your hand) by ...", "If you control ..., you can Special Summon this card (from your hand)", "Must be Special Summoned (from your hand) by ...": a "condition" effect whose script code runs as a Summoning procedure. It is used in its controller's Main Phase while the card is in the hand, and doesn't start a chain or use the once-per-turn of other effects. conditions: what must hold ("If you control a WATER monster": a count condition; "by having exactly 5 WATER monsters in your GY": count min 5, max 5). cost: what the Summon is made "by" ("by sending 1 monster from your hand to the GY": a move to graveyard of 1 monster chosen from your hand; "by Tributing 1 Warrior monster": a move to graveyard of 1 face-up Warrior monster you control; "by banishing 1 WATER monster from your GY": a move to banished). targets null. options: one option whose first step is {"do": "special_summon", "cards": {"from": "self"}, "position": "choice"}, followed by what else the text says comes with it ("and if you do, it gains ATK equal to the Tributed monster's original ATK": gain_stats with {"of": "cost", ...}; "but you cannot Special Summon monsters from your hand for the rest of this turn": forbid special_summon). "Cannot be Normal Summoned/Set" alone is a condition effect with no script (and normalSummon false); when it shares a sentence with the procedure, one condition effect has both. A procedure from anywhere but the hand, or one this vocabulary can't express, has no script.
 
 # Continuous effects
 
@@ -333,7 +329,8 @@ Steps (each "cards" is a selection):
 - {"do": "move", "cards", "to"}: to "hand", "graveyard", "banished", "deck_top", "deck_bottom" or "deck_shuffled". Add to hand, send, discard, banish, return to the Deck.
 - {"do": "special_summon", "cards", "position"}: "attack", "defense", or "choice" when the text names no position (the player picks).
 - {"do": "modify_stats", "cards", "atk", "def", "levelDelta", "levelSet", "until"}: ATK/DEF deltas, Level delta, or levelSet to make it that Level (else null). until: "end_of_turn" (also "until the End Phase"), "end_of_battle_phase", "next_standby_phase" ("until your next Standby Phase") or "while_on_field" (no end given).
-- {"do": "set_stats", "cards", "atk", "def", "until"}: ATK and/or DEF "become" a value (null leaves that stat alone). Each value is {"of": "self" | "targets", "stat": "atk" | "def", "original": bool, "times": n}: a stat read when the effect resolves from this card or its first target, the printed ("original") or current value, multiplied by times. "Make its ATK become double its original ATK": {"of": "self", "stat": "atk", "original": true, "times": 2}. "This card's ATK/DEF become equal to that monster's original ATK/DEF": atk {"of": "targets", "stat": "atk", "original": true, "times": 1}, def likewise.
+- {"do": "set_stats", "cards", "atk", "def", "until"}: ATK and/or DEF "become" a value (null leaves that stat alone). Each value is {"of": "self" | "targets" | "cost", "stat": "atk" | "def", "original": bool, "times": n}: a stat read when the effect resolves from this card, its first target or the first card paid as its cost, the printed ("original") or current value, multiplied by times. "Make its ATK become double its original ATK": {"of": "self", "stat": "atk", "original": true, "times": 2}. "This card's ATK/DEF become equal to that monster's original ATK/DEF": atk {"of": "targets", "stat": "atk", "original": true, "times": 1}, def likewise.
+- {"do": "gain_stats", "cards", "atk", "def", "until"}: ATK and/or DEF gain a value read when the step resolves (each a value as in set_stats, or null). "It gains ATK equal to the Tributed monster's original ATK" (in a procedure whose cost Tributed it): atk {"of": "cost", "stat": "atk", "original": true, "times": 1}, def null, until "while_on_field".
 - {"do": "change_lp", "player", "amount", "kind"}: kind "cost", "damage" or "gain"; amount positive.
 - {"do": "draw", "player", "count"}.
 - {"do": "extra_normal_summon"}: you may conduct one more Normal Summon/Set this turn.
@@ -344,7 +341,7 @@ Steps (each "cards" is a selection):
 - {"do": "add_counters", "cards", "counter", "count", "max"}: "place 1 Spell Counter on it (max. 1)": counter "spell", max 1 (null for no limit).
 - {"do": "remove_counters", "cards", "counter", "count"}: "remove 1 Spell Counter from this card", usually in cost.
 - {"do": "link", "cards"}: equip this card to the monster the selection picks ("Equip this card to 1 face-up monster": targets that monster, then link {"from": "targets"}), or tie a Continuous Trap to its target or to the monster it Special Summoned (special_summon {"from": "targets"}, then link {"from": "targets"}). An Equip Spell or a Continuous Trap that works through its monster goes to the GY if it resolves without being linked.
-- {"do": "forbid", "player", "what"}: for the rest of this turn that player can't "declare_attack" ("your opponent cannot declare an attack this turn") or can't conduct their "battle_phase" ("you cannot conduct your Battle Phase the turn you activate this card"; pair it with the before_battle_phase condition). Such a restriction is a step, not unapplied.
+- {"do": "forbid", "player", "what", "filter"}: for the rest of this turn that player can't "declare_attack" ("your opponent cannot declare an attack this turn"), can't conduct their "battle_phase" ("you cannot conduct your Battle Phase the turn you activate this card"; pair it with the before_battle_phase condition), or can't "special_summon" the monsters that fit filter ("you cannot Special Summon monsters from your hand for the rest of this turn": side "you", place "hand", kinds ["monster"]; "You cannot Special Summon any Level 5 or higher monsters the turn you use this effect": place "any", level min 5; null for any monster). filter is null for the other two. Such a restriction is a step, not unapplied.
 - {"do": "detach", "cards", "count"}: detach count Xyz Materials from an Xyz Monster the selection picks. "Detach 1 Xyz Material from this card" (usually a cost): cards {"from": "self"}, count 1. "Detach 1 Xyz Material from a monster you control": a choose selection of face-up Xyz monsters you control.
 
 Selections:
@@ -354,13 +351,14 @@ Selections:
 - {"from": "battling", "filter"}: the monster battling this card, if it fits ("if this card attacks a face-up Defense Position monster: destroy that monster" is a destroy step on {"from": "battling"} with faceUp true, position "defense"; the effect doesn't fire without one).
 - {"from": "all", "filter"}: every card that fits ("destroy all face-up monsters your opponent controls"); the activation needs at least one.
 
-Filters ({"side", "place", "kinds", "types", "races", "attributes", "faceUp", "position", "level", "atk", "def"}; empty lists and nulls don't restrict):
+Filters ({"side", "place", "kinds", "types", "races", "attributes", "named", "faceUp", "position", "level", "atk", "def"}; empty lists and nulls don't restrict):
 - side: "you", "opponent" or "either": who controls a card on the field, or whose hand, Deck, GY or banished cards it is in.
 - place: "field", "monsters", "spellTraps", "hand", "deck", "graveyard", "banished", or "any" (wherever it is: "When a monster effect is activated" matches one activated from the hand or GY too).
 - kinds: any of "monster", "spell", "trap". "Spell/Trap" is ["spell", "trap"]; "card" is [].
 - types: words that must all appear in the card's type line, such as "Synchro", "Xyz", "Tuner", "Normal" (a "non-Effect Monster" is ["Normal"]), "Effect".
 - races: any of these monster types ("Warrior", "Spellcaster") or Spell/Trap properties ("Quick-Play", "Continuous").
 - attributes: any of "LIGHT", "DARK", "EARTH", "WATER", "FIRE", "WIND", "DIVINE".
+- named: text the card's name must contain, for an archetype or a named card: "Ice Barrier" for an "Ice Barrier" monster, "Synchron" for a "Synchron" monster; else null.
 - faceUp: true for "face-up", false for "face-down", else null. A face-down card never fits a filter on its type, race, attribute or stats, and fits kinds ["spell", "trap"] only as a pair.
 - position: "attack" or "defense", or null.
 - level, atk, def: {"min", "max"} with nulls for open ends. Xyz and Link Monsters have no Level, so a filter for cards whose Level an effect changes needs level {"min": 1, "max": null}. "Level 2 or lower" is {"min": null, "max": 2}; "1500 or less ATK" is {"min": null, "max": 1500}. A filter can't test original ATK.
@@ -464,7 +462,7 @@ export async function compileSheets(db: Db, options: { force?: boolean; names?: 
       const checked = script.safeParse(parseJson(e.script));
       const problem = !checked.success
         ? z.prettifyError(checked.error)
-        : !['activation', 'ignition', 'quick', 'trigger'].includes(e.kind)
+        : !['activation', 'ignition', 'quick', 'trigger', 'condition'].includes(e.kind)
           ? `a ${e.kind} effect can't have a script`
           : null;
       if (problem) log(`${row.name}: effect ${i}'s script is invalid, so the judge will apply it (${problem})`);
@@ -472,7 +470,14 @@ export async function compileSheets(db: Db, options: { force?: boolean; names?: 
     });
     const materialsChecked = parsed.data.materials === null ? null : materials.safeParse(parseJson(parsed.data.materials));
     if (materialsChecked && !materialsChecked.success) log(`${row.name}: its materials are invalid, so it can't be Summoned (${z.prettifyError(materialsChecked.error)})`);
-    const sheet: EffectSheet = { code: row.id, textHash: row.textHash, model: COMPILE_MODEL, effects, materials: materialsChecked?.success ? materialsChecked.data : null };
+    const sheet: EffectSheet = {
+      code: row.id,
+      textHash: row.textHash,
+      model: COMPILE_MODEL,
+      effects,
+      materials: materialsChecked?.success ? materialsChecked.data : null,
+      normalSummon: parsed.data.normalSummon,
+    };
     await saveSheet(db, sheet, 'compiled');
     log(`${row.name}: written`);
   }

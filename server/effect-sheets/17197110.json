@@ -1,36 +1,37 @@
 {
   "code": 17197110,
+  "textHash": "62d9bab2d5a5a8e2850f8ac6567f5572a33513b6022d15f9caac4e85d69f3302",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "hard",
-      "cost": "Tribute any number of \"Ice Barrier\" monsters",
       "kind": "activation",
-      "when": null,
       "speed": 1,
-      "effect": "Special Summon from your Deck that many Level 4 or lower \"Ice Barrier\" monsters with different names from each other.",
-      "script": null,
-      "status": "unverified",
-      "window": "Your Main Phase",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "hard",
+      "window": "Your Main Phase",
+      "cost": "Tribute any number of \"Ice Barrier\" monsters",
+      "effect": "Special Summon from your Deck that many Level 4 or lower \"Ice Barrier\" monsters with different names from each other.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "hard",
-      "cost": "banish this card from your GY",
       "kind": "ignition",
-      "when": null,
       "speed": 1,
-      "effect": "Add the targeted \"Ice Barrier\" monster to your hand.",
-      "script": null,
-      "status": "unverified",
-      "window": "During your Main Phase, while this card is in your GY, except the turn this card was sent to the GY",
-      "targets": "1 of your \"Ice Barrier\" monsters that is banished or in your GY",
       "mandatory": false,
-      "continuous": null
+      "opt": "hard",
+      "window": "During your Main Phase, while this card is in your GY, except the turn this card was sent to the GY",
+      "cost": "banish this card from your GY",
+      "effect": "Add the targeted \"Ice Barrier\" monster to your hand.",
+      "targets": "1 of your \"Ice Barrier\" monsters that is banished or in your GY",
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "62d9bab2d5a5a8e2850f8ac6567f5572a33513b6022d15f9caac4e85d69f3302",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

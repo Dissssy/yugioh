@@ -35,5 +35,6 @@
       "min": 1,
       "max": null
     }
-  }
+  },
+  "normalSummon": true
 }

@@ -48,6 +48,7 @@
           "types": [],
           "races": [],
           "attributes": [],
+          "named": null,
           "faceUp": true,
           "position": null,
           "level": null,
@@ -75,5 +76,6 @@
       "status": "unverified"
     }
   ],
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

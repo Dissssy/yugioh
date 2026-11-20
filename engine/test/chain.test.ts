@@ -66,6 +66,7 @@ const filter = (f: Partial<CardFilter>): CardFilter => ({
   types: [],
   races: [],
   attributes: [],
+  named: null,
   faceUp: null,
   position: null,
   level: null,
@@ -89,7 +90,7 @@ const effect = (e: Partial<SheetEffect> & Pick<SheetEffect, 'kind'>): SheetEffec
   status: 'unverified',
   ...e,
 });
-const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null });
+const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null, normalSummon: true });
 
 const sheets: Record<number, EffectSheet> = {
   3: sheet(

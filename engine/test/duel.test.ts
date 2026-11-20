@@ -28,6 +28,7 @@ import {
   cardsFitting,
   monsterZoneFree,
   monsterZonesFor,
+  procedureDone,
 } from '../src/index.ts';
 
 const monster = (code: number, name: string, level: number, atk: number, def: number): CardData => ({
@@ -75,6 +76,9 @@ const cards: Record<number, CardData> = {
   28: { ...monster(28, 'Zubaba Knight', 3, 1600, 900), type: 'Effect Monster' },
   29: { ...monster(29, 'Majestic Mech - Senku', 4, 2400, 1500), type: 'Effect Monster' },
   30: { ...monster(30, 'Frequency Magician', 4, 1500, 800), type: 'Effect Monster' },
+  31: { ...monster(31, 'Silent Angler', 4, 800, 1400), type: 'Effect Monster', attribute: 'WATER', race: 'Fish' },
+  32: { ...monster(32, 'Moulinglacia the Elemental Lord', 8, 2800, 2000), type: 'Effect Monster', attribute: 'WATER', race: 'Sea Serpent' },
+  33: { ...monster(33, 'Medium of the Ice Barrier', 7, 2400, 1800), type: 'Effect Monster', attribute: 'WATER', race: 'Spellcaster' },
 };
 
 function spell(code: number, name: string): CardData {
@@ -96,12 +100,14 @@ const effect = (kind: SheetEffect['kind'], opt: SheetEffect['opt'] = 'none'): Sh
   status: 'unverified',
 });
 /** Face-up monsters on the field that fit, for continuous effects. */
-const filter = (f: Partial<CardFilter>): CardFilter => ({ side: 'either', place: 'monsters', kinds: [], types: [], races: [], attributes: [], faceUp: true, position: null, level: null, atk: null, def: null, ...f });
+const filter = (f: Partial<CardFilter>): CardFilter => ({ side: 'either', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, faceUp: true, position: null, level: null, atk: null, def: null, ...f });
 const aura = (c: Partial<Extract<Continuous, { apply: 'stats' }>>): Continuous => ({ apply: 'stats', to: 'self', atk: 0, def: 0, per: null, levelDelta: 0, levelSet: null, while: [], ...c });
 const restrict = (c: Partial<Extract<Continuous, { apply: 'restrict' }>>): Continuous => ({ apply: 'restrict', to: 'self', others: false, cannot: [], by: null, while: [], ...c });
-const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null });
+const sheet = (code: number, ...effects: SheetEffect[]): EffectSheet => ({ code, textHash: '', model: 'test', effects, materials: null, normalSummon: true });
 const detachSelf = { do: 'detach', cards: { from: 'self' }, count: 1 } as const;
 const scripted = (script: Partial<Script>): Pick<SheetEffect, 'script'> => ({ script: { conditions: [], cost: [], targets: null, options: [], unapplied: null, ...script } });
+/** Silent Angler's "you cannot Special Summon monsters from your hand". */
+const fromHand = filter({ side: 'you', place: 'hand', kinds: ['monster'], faceUp: null });
 const sheets: Record<number, EffectSheet> = {
   8: sheet(8, effect('activation')),
   9: sheet(9, effect('activation')),
@@ -149,6 +155,17 @@ const sheets: Record<number, EffectSheet> = {
     when: { event: 'destroyed_by_effect', self: true, filter: filter({ side: 'you', faceUp: true }), how: [], from: 'graveyard', canMiss: false, by: 'opponent' },
     ...scripted({ options: [{ label: '', steps: [{ do: 'draw', player: 'you', count: 1 }] }] }),
   }),
+  31: sheet(31, {
+    ...effect('condition'),
+    ...scripted({
+      conditions: [{ if: 'count', filter: filter({ side: 'you', attributes: ['WATER'] }), min: 1, max: null }],
+      options: [
+        { label: '', steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice' }, { do: 'forbid', player: 'you', what: 'special_summon', filter: fromHand }] },
+      ],
+    }),
+  }),
+  32: { ...sheet(32, effect('condition')), normalSummon: false },
+  33: sheet(33, { ...effect('condition'), ...scripted({ conditions: [{ if: 'outnumbered', by: 4 }], options: [{ label: '', steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice' }] }] }) }),
   21: {
     ...sheet(
       21,
@@ -406,7 +423,7 @@ describe('Extra Monster Zones', () => {
     const t = withJunkWarrior([4, 1, 1, 1, 1, 1, ...filler(34)], filler(40, 2), 3);
     const destroy = applyOp(t.state, { op: 'destroy', cards: ['ax0'] }, { player: 1, stage: 'resolution', random: () => 0 });
     expect(destroy.ok && replay([...t.events, ...destroy.events]).players[0].graveyard).toEqual(['ax0']);
-    const anyMonster = { side: 'opponent', place: 'monsters', kinds: [], types: [], races: [], attributes: [], faceUp: true, position: null, level: null, atk: { min: 2000, max: null }, def: null } as const;
+    const anyMonster = { side: 'opponent', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, faceUp: true, position: null, level: null, atk: { min: 2000, max: null }, def: null } as const;
     expect(cardsFitting(t.state, { ...anyMonster, kinds: [], types: [], races: [], attributes: [] }, 1, '')).toEqual(['ax0']);
     t.play(0, { type: 'setMonster', card: 'a1', tributes: [], zone: 4 });
     t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [t.state.players[1].hand[0]!] });
@@ -516,7 +533,7 @@ describe('Xyz Summons', () => {
     expect(t.state.players[0].graveyard).toEqual([]);
     expect(viewFor(t.state, 1).players[0].monsters[5]!.materials).toMatchObject([{ id: 'a0' }, { id: 'a1' }]);
     // An Xyz Monster has no Level, so it is never an Xyz Material itself, and a material is not on the field.
-    expect(cardsFitting(t.state, { side: 'you', place: 'field', kinds: [], types: [], races: [], attributes: [], faceUp: null, position: null, level: null, atk: null, def: null }, 0, '')).toEqual(['ax2']);
+    expect(cardsFitting(t.state, { side: 'you', place: 'field', kinds: [], types: [], races: [], attributes: [], named: null, faceUp: null, position: null, level: null, atk: null, def: null }, 0, '')).toEqual(['ax2']);
     op(t, { op: 'destroy', cards: ['ax2'] });
     expect(t.state.players[0].graveyard).toEqual(['a0', 'a1', 'ax2']);
   });
@@ -637,15 +654,62 @@ describe('restrictions', () => {
 
   it('stop a player declaring attacks or entering the Battle Phase for the rest of the turn only', () => {
     const t = board([], [3]);
-    const r = applyOp(t.state, { op: 'forbid', player: 1, what: 'declare_attack' }, { player: 0, stage: 'resolution', random: () => 0 });
+    const r = applyOp(t.state, { op: 'forbid', player: 1, what: 'declare_attack', filter: null }, { player: 0, stage: 'resolution', random: () => 0 });
     t.push(...(r.ok ? r.events : []));
     expect(attacks(t)).toEqual([]);
     end(t, 1);
-    const b = applyOp(t.state, { op: 'forbid', player: 0, what: 'battle_phase' }, { player: 0, stage: 'resolution', random: () => 0 });
+    const b = applyOp(t.state, { op: 'forbid', player: 0, what: 'battle_phase', filter: null }, { player: 0, stage: 'resolution', random: () => 0 });
     t.push(...(b.ok ? b.events : []));
     expect(t.refuse(0, { type: 'enterBattle' })).toMatch(/can't conduct/);
     end(t, 0).play(1, { type: 'enterBattle' });
     expect(attacks(t)).toHaveLength(1);
+  });
+});
+
+describe('summoning procedures', () => {
+  const procedures = (t: Table) => legalActions(t.state, 0).filter((a) => a.type === 'activate');
+  const op = (t: Table, o: Op) => {
+    const r = applyOp(t.state, o, { player: 0, stage: 'activation', random: () => 0 });
+    if (!r.ok) throw new Error(r.error);
+    return t.push(...r.events);
+  };
+
+  it('Special Summon from the hand without a chain once their condition holds, and their bans last the turn', () => {
+    const t = new Table(stacked([31, 31, 32, 13, 14, ...filler(35)], filler(40, 2)));
+    expect(procedures(t)).toEqual([]);
+    expect(viewFor(t.state, 0).blocked.find((b) => b.card === 'a0')?.reason).toMatch(/WATER/);
+    t.push({ type: 'specialSummoned', player: 0, card: 'a1', zone: 0, position: 'attack' });
+    expect(procedures(t)).toMatchObject([{ card: 'a0', effect: 0, zones: null }]);
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: null });
+    expect(t.state.chain).toEqual([]);
+    expect(t.state.step.at).toBe('open');
+    // The server pays the cost and makes the Summon from the script, then the checkpoint follows.
+    op(t, { op: 'special_summon', card: 'a0', controller: 0, position: 'defense', zone: 1 });
+    op(t, { op: 'forbid', player: 0, what: 'special_summon', filter: fromHand });
+    t.push(procedureDone(t.state, 'a0'));
+    expect(t.state.players[0].monsters[1]).toMatchObject({ id: 'a0', position: 'defense', summoned: { how: 'special', turn: 1 } });
+    expect(applyOp(t.state, { op: 'special_summon', card: 'a3', controller: 0, position: 'attack', zone: 2 }, { player: 0, stage: 'resolution', random: () => 0 })).toMatchObject({ ok: false, error: /stops/ });
+    expect(logFor(t.events, 1).map((e) => e.text)).toContain("Yusei can't Special Summon a monster in their hand this turn");
+    // The Normal Summon is still there, but not for a monster that can't be Normal Summoned.
+    expect(legalActions(t.state, 0).filter((a) => a.type === 'normalSummon').map((a) => 'card' in a && a.card)).toEqual(['a3', 'a4']);
+    expect(t.refuse(0, { type: 'normalSummon', card: 'a2', tributes: ['a0', 'a1'], zone: 0 })).toMatch(/cannot be Normal Summoned/);
+  });
+
+  it('can ban Special Summons of high-Level monsters, Synchro Summons included', () => {
+    const t = new Table(stacked([13, 14, ...filler(38)], filler(40, 2)));
+    t.push({ type: 'specialSummoned', player: 0, card: 'a0', zone: 0, position: 'attack' }, { type: 'specialSummoned', player: 0, card: 'a1', zone: 1, position: 'attack' });
+    expect(legalActions(t.state, 0).some((a) => a.type === 'extraSummon' && a.card === 'ax0')).toBe(true);
+    op(t, { op: 'forbid', player: 0, what: 'special_summon', filter: filter({ place: 'any', side: 'you', faceUp: null, level: { min: 5, max: null } }) });
+    expect(legalActions(t.state, 0).some((a) => a.type === 'extraSummon')).toBe(false);
+  });
+
+  it('count the cards each player controls for "4 or more cards than you"', () => {
+    const t = new Table(stacked([33, ...filler(39)], filler(40, 2)));
+    const foe = (i: number) => t.push({ type: 'specialSummoned', player: 1, card: `b${i}`, zone: i, position: 'attack' });
+    [0, 1, 2].forEach(foe);
+    expect(scriptProblem(t.state, 0, 'a0', 0, null)).toMatch(/4 more cards/);
+    foe(3);
+    expect(scriptProblem(t.state, 0, 'a0', 0, null)).toBeNull();
   });
 });
 

@@ -1,22 +1,23 @@
 {
   "code": 43262273,
+  "textHash": "8a420ad0cc28ba76401c797c313dd7ef3779cbe6439b6de62dc3dbf8e8d01569",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "Pay 2000 Life Points",
       "kind": "activation",
-      "when": null,
       "speed": 2,
-      "effect": "Reveal all cards in your hand. Look at your opponent's hand and select 1 card. Remove that card from play until your opponent's next End Phase.",
-      "script": null,
-      "status": "unverified",
-      "window": "Set Normal Trap; can be activated on either player's turn",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "Set Normal Trap; can be activated on either player's turn",
+      "cost": "Pay 2000 Life Points",
+      "effect": "Reveal all cards in your hand. Look at your opponent's hand and select 1 card. Remove that card from play until your opponent's next End Phase.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "8a420ad0cc28ba76401c797c313dd7ef3779cbe6439b6de62dc3dbf8e8d01569",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

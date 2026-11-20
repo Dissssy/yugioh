@@ -24,7 +24,10 @@ export interface CardData {
 export interface SheetEffect {
   /**
    * `activation`: activating the Spell/Trap card itself. `ignition`, `trigger`, `quick`, `flip`: monster effects.
-   * `continuous`: always on, never activated. `condition`: a summoning condition or procedure.
+   * `continuous`: always on, never activated. `condition`: a summoning condition or procedure; one whose `script` is
+   * set is a procedure from the hand ("You can Special Summon this card (from your hand) by ..."): used in its
+   * controller's open Main Phase like an ignition effect, but it doesn't start a chain, its cost is paid and its steps
+   * (the Special Summon of this card first) are done at once.
    */
   kind: 'activation' | 'ignition' | 'trigger' | 'quick' | 'continuous' | 'flip' | 'condition';
   speed: 1 | 2 | 3;
@@ -145,7 +148,9 @@ export type Condition =
   /** This card was Summoned this turn, in one of these ways (empty for any). */
   | { if: 'summoned_this_turn'; how: SummonKind[] }
   /** This card has between `min` and `max` Xyz Materials (null: no bound); "while it has no material" is max 0. */
-  | { if: 'materials'; min: number | null; max: number | null };
+  | { if: 'materials'; min: number | null; max: number | null }
+  /** The opponent controls at least `by` more cards than this player ("If your opponent controls 4 or more cards than you do"). */
+  | { if: 'outnumbered'; by: number };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
 /** Kinds of counters. The starter decks only use Spell Counters. */
@@ -159,6 +164,8 @@ export type Step =
   | { do: 'modify_stats'; cards: Selection; atk: number; def: number; levelDelta: number; levelSet: number | null; until: Until }
   /** ATK and/or DEF "become" a value (null leaves that stat alone). Gains and losses still apply on top. */
   | { do: 'set_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
+  /** ATK and/or DEF gain a value read when the step resolves ("it gains ATK equal to the Tributed monster's original ATK"). */
+  | { do: 'gain_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
   | { do: 'change_lp'; player: 'you' | 'opponent'; amount: number; kind: 'cost' | 'damage' | 'gain' }
   | { do: 'draw'; player: 'you' | 'opponent'; count: number }
   | { do: 'extra_normal_summon' }
@@ -181,11 +188,14 @@ export type Step =
   | { do: 'add_counters'; cards: Selection; counter: Counter; count: number; max: number | null }
   /** Removes counters from the card selected (a cost: "remove 1 Spell Counter from this card"). */
   | { do: 'remove_counters'; cards: Selection; counter: Counter; count: number }
-  /** For the rest of this turn, that player can't declare attacks, or can't conduct their Battle Phase. */
-  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden };
+  /**
+   * For the rest of this turn, that player can't declare attacks, can't conduct their Battle Phase, or can't Special
+   * Summon the monsters that fit `filter` (null for any monster). `filter` is null for the others.
+   */
+  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null };
 
-export const FORBIDDEN = ['declare_attack', 'battle_phase'] as const;
-/** What a lingering restriction from a resolved effect stops a player doing this turn (Threatening Roar, Reinforce Truth). */
+export const FORBIDDEN = ['declare_attack', 'battle_phase', 'special_summon'] as const;
+/** What a lingering restriction stops a player doing this turn (Threatening Roar, Reinforce Truth, Silent Angler). */
 export type Forbidden = (typeof FORBIDDEN)[number];
 
 /**
@@ -224,11 +234,11 @@ export type Restriction = (typeof RESTRICTIONS)[number];
 export type Affected = 'self' | 'linked' | CardFilter;
 
 /**
- * A stat read from a card when the step resolves: `self` or the first target still there. `original` is the printed
- * value, else the current one. `times` multiplies it ("double its original ATK" is 2).
+ * A stat read from a card when the step resolves: `self`, the first target still there, or the first card paid as the
+ * cost. `original` is the printed value, else the current one. `times` multiplies it ("double its original ATK" is 2).
  */
 export interface StatValue {
-  of: 'self' | 'targets';
+  of: 'self' | 'targets' | 'cost';
   stat: 'atk' | 'def';
   original: boolean;
   times: number;
@@ -258,6 +268,8 @@ export interface CardFilter {
   types: string[];
   /** Any of these monster types ("Warrior") or Spell/Trap properties ("Quick-Play"). */
   races: string[];
+  /** Text the card's name must contain: "Ice Barrier" for an "Ice Barrier" monster; null for any name. */
+  named: string | null;
   attributes: string[];
   faceUp: boolean | null;
   position: Position | null;
@@ -281,6 +293,8 @@ export interface EffectSheet {
   effects: SheetEffect[];
   /** How an Extra Deck monster is Summoned, or null for any other card. */
   materials: Materials | null;
+  /** False for "Cannot be Normal Summoned/Set". */
+  normalSummon: boolean;
 }
 
 export const HANDS = ['rock', 'paper', 'scissors'] as const;
@@ -428,7 +442,7 @@ export interface DuelState {
   normalSummonLimit: number;
   modifiers: Modifier[];
   /** What resolved effects stopped each player doing this turn; they lapse when the turn ends. */
-  forbidden: { player: Seat; what: Forbidden; turn: number }[];
+  forbidden: { player: Seat; what: Forbidden; filter: CardFilter | null; turn: number }[];
   chain: ChainLink[];
   step: DuelStep;
   /** Events since the last triggers were put on the chain, for triggers to watch. */
@@ -533,7 +547,7 @@ export type Op =
   | { op: 'negate_attack' }
   /** Detaches this Xyz Material: it goes to its owner's GY. */
   | { op: 'detach'; card: string }
-  | { op: 'forbid'; player: Seat; what: Forbidden }
+  | { op: 'forbid'; player: Seat; what: Forbidden; filter: CardFilter | null }
   /** Links the card being resolved to this face-up monster (see the `link` step). */
   | { op: 'link'; card: string }
   /** Negates the activation of this card's link on the chain, below the one resolving. */
@@ -717,12 +731,17 @@ export type DuelEvent =
   | { type: 'destroyed'; cards: string[]; by: Seat }
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
-  | { type: 'forbidden'; player: Seat; what: Forbidden }
+  | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null }
   | { type: 'linked'; card: string; to: string }
   | { type: 'activationNegated'; link: number; card: string }
   | { type: 'effectsNegated'; card: string }
   | { type: 'setAgain' }
   | { type: 'countersChanged'; card: string; counter: Counter; delta: number }
+  /**
+   * A player uses a monster's Summoning procedure from the hand (a `condition` effect with a script). It doesn't start
+   * a chain: the cost and the Special Summon follow at once, then a checkpoint.
+   */
+  | { type: 'procedureUsed'; player: Seat; card: string; effect: number }
   /** The attack moves into its Damage Step. */
   | { type: 'damageStepStarted' }
   | { type: 'replacementOffered'; card: string; player: Seat; then: Then }

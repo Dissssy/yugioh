@@ -1,56 +1,58 @@
 {
   "code": 6075533,
+  "textHash": "4a265581587d8d3766a21549a4beb90f5a19bdfc922f0809155f19b0da32b521",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "hard",
-      "cost": "",
       "kind": "activation",
-      "when": null,
       "speed": 2,
-      "effect": "Apply these effects, in sequence, depending on the number of \"Ice Barrier\" Synchro Monsters you control with different names; ● 1+: Banish 1 card your opponent controls. ● 2+: Banish 1 card from your opponent's GY. ● 3+: Banish 1 random card from your opponent's hand.",
-      "script": null,
-      "status": "unverified",
-      "window": "Any time this Set card can be activated (either player's turn), if you control at least 1 \"Ice Barrier\" Synchro Monster",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "hard",
+      "window": "Any time this Set card can be activated (either player's turn), if you control at least 1 \"Ice Barrier\" Synchro Monster",
+      "cost": "",
+      "effect": "Apply these effects, in sequence, depending on the number of \"Ice Barrier\" Synchro Monsters you control with different names; ● 1+: Banish 1 card your opponent controls. ● 2+: Banish 1 card from your opponent's GY. ● 3+: Banish 1 random card from your opponent's hand.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "hard",
-      "cost": "banish this card from your GY",
       "kind": "quick",
+      "speed": 2,
+      "mandatory": false,
+      "opt": "hard",
+      "window": "While this card is in your GY, when your opponent activates a card or effect that targets an \"Ice Barrier\" Synchro Monster(s) you control",
+      "cost": "banish this card from your GY",
+      "effect": "negate that effect.",
+      "targets": null,
       "when": {
-        "by": null,
-        "how": [],
-        "from": "field",
-        "self": false,
         "event": "activated",
+        "self": false,
         "filter": {
-          "atk": null,
-          "def": null,
           "side": "opponent",
-          "kinds": [],
-          "level": null,
           "place": "any",
-          "races": [],
+          "kinds": [],
           "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
           "faceUp": null,
           "position": null,
-          "attributes": []
+          "level": null,
+          "atk": null,
+          "def": null
         },
-        "canMiss": false
+        "how": [],
+        "from": "field",
+        "canMiss": false,
+        "by": null
       },
-      "speed": 2,
-      "effect": "negate that effect.",
       "script": null,
-      "status": "unverified",
-      "window": "While this card is in your GY, when your opponent activates a card or effect that targets an \"Ice Barrier\" Synchro Monster(s) you control",
-      "targets": null,
-      "mandatory": false,
-      "continuous": null
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "4a265581587d8d3766a21549a4beb90f5a19bdfc922f0809155f19b0da32b521",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

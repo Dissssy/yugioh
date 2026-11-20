@@ -5,6 +5,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { DESTINATIONS, FORBIDDEN, UNTIL, type Op } from '@yugioh/engine';
+import { cardFilter } from './cardFilter.ts';
 
 const card = z.string().describe('A card instance ID from the state, such as "k3f9a0b2".');
 const seat = z.union([z.literal(0), z.literal(1)]).describe('Player 0 or player 1.');
@@ -81,8 +82,8 @@ export const opTools = {
   },
   forbid: {
     description:
-      'For the rest of this turn, stop a player declaring attacks ("your opponent cannot declare an attack this turn") or conducting their Battle Phase ("you cannot conduct your Battle Phase this turn").',
-    input: z.object({ player: seat, what: z.enum(FORBIDDEN) }),
+      'For the rest of this turn, stop a player declaring attacks ("your opponent cannot declare an attack this turn"), conducting their Battle Phase ("you cannot conduct your Battle Phase this turn") or Special Summoning ("you cannot Special Summon monsters from your hand for the rest of this turn"). filter: for special_summon, the monsters it stops ("from your hand": place "hand"; "Level 5 or higher monsters": place "any", level min 5; null for any monster); null for the others. side "you" in it is that player.',
+    input: z.object({ player: seat, what: z.enum(FORBIDDEN), filter: cardFilter.nullable() }),
   },
   add_counters: {
     loose: true,

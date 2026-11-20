@@ -1,22 +1,23 @@
 {
   "code": 72892473,
+  "textHash": "d18564f171c8207dcd46563f79c8420a34a5745b09e5c2d23d9b2ca4acefa9a2",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "activation",
-      "when": null,
       "speed": 1,
-      "effect": "Both players discard as many cards as possible from their hands, then each player draws the same number of cards they discarded.",
-      "script": null,
-      "status": "unverified",
-      "window": "During your Main Phase.",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "none",
+      "window": "During your Main Phase.",
+      "cost": "",
+      "effect": "Both players discard as many cards as possible from their hands, then each player draws the same number of cards they discarded.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "d18564f171c8207dcd46563f79c8420a34a5745b09e5c2d23d9b2ca4acefa9a2",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }

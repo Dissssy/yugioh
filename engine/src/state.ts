@@ -377,7 +377,10 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.modifiers.push(event.modifier);
         return;
       case 'forbidden':
-        s.forbidden.push({ player: event.player, what: event.what, turn: s.turn });
+        s.forbidden.push({ player: event.player, what: event.what, filter: event.filter, turn: s.turn });
+        return;
+      case 'procedureUsed':
+        s.usedThisTurn.push({ card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         return;
       case 'linked':
         onField(s, event.card).linked = event.to;

@@ -505,3 +505,67 @@ describe('asking the judge', () => {
     expect(duels.duels.find((d) => d.id === s.duel.id)).toMatchObject({ questions: 2, appeals: 2 });
   });
 });
+
+describe('a Summoning procedure', () => {
+  const ANGLER = 90303176; // Silent Angler: Special Summon from the hand if you control a WATER monster; then no more from the hand.
+  const PRIOR = 50088247; // Prior of the Ice Barrier: Special Summon from the hand if you control a face-up "Ice Barrier" monster.
+  const MEDIUM = 88494899; // Medium of the Ice Barrier: a WATER "Ice Barrier" monster.
+
+  it('Special Summons from the hand without a chain, with its choices asked, and its ban applies', async () => {
+    const admin = await login();
+    const deckList = (await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`)).body;
+    const freezing = deckList.find((d) => d.name.includes('Freezing Chains'))!;
+    const duel = (await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: deckList[0]!.id }) })).body;
+    const guest = new Browser();
+    await guest.json(`${h.baseUrl}/api/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify({ deckId: freezing.id, guestName: 'Kaiba' }) });
+    const [d0, d1] = await Promise.all([deckList[0]!, freezing].map((d) => h.db.query.decks.findFirst({ where: eq(decks.id, d.id) })));
+    const cards = await loadCards(h.db, [...d0!.main, ...d0!.extra, ...d1!.main, ...d1!.extra]);
+    await importSheetFiles(h.db, { force: true });
+    const sheets = await loadSheets(h.db, cards);
+    const [dealt] = startDuel({ players: [{ name: 'Ethan', main: d0!.main, extra: d0!.extra }, { name: 'Kaiba (guest)', main: d1!.main, extra: d1!.extra }], cards, sheets }, seeded(1));
+    const start = dealt as Extract<DuelEvent, { type: 'duelStarted' }>;
+    const id = (code: number) => start.players[1].deck.find((x) => start.instances[x]!.code === code)!;
+    const [angler, prior, medium] = [id(ANGLER), id(PRIOR), id(MEDIUM)];
+    const events: DuelEvent[] = [
+      start,
+      { type: 'drew', player: 1, count: 5 },
+      { type: 'drew', player: 0, count: 5 },
+      { type: 'turnStarted', player: 1, turn: 1 },
+      { type: 'phaseChanged', phase: 'main1' },
+      { type: 'specialSummoned', player: 1, card: medium, zone: 0, position: 'attack' },
+    ];
+    for (const card of [angler, prior]) if (!start.players[1].deck.slice(0, 5).includes(card)) events.push({ type: 'moved', card, owner: 1, from: 'deck', to: 'hand' });
+    await h.db.delete(matchEvents).where(eq(matchEvents.matchId, duel.id));
+    await h.db.insert(matchEvents).values(events.map((event, seq) => ({ matchId: duel.id, seq, event })));
+    h.setModel(async () => {
+      throw new Error('A Summoning procedure must not call the model.');
+    });
+
+    const mine = new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
+    const view = await until(mine, (u) => (u.type === 'sync' ? u.view : undefined));
+    const procedures = (v: typeof view) => v.actions.flatMap((a) => (a.type === 'activate' && a.zones === null ? [a.card] : []));
+    expect(procedures(view).sort()).toEqual([angler, prior].sort());
+    const sent = await guest.json(`${h.baseUrl}/api/duels/${duel.id}/intents`, { method: 'POST', body: JSON.stringify({ type: 'activate', card: angler, effect: 0, zone: null }) });
+    expect(sent.status).toBe(204);
+    // Its position, then its zone: answer each with the first option.
+    let after: DuelUpdate | undefined;
+    while (!after) {
+      const u = await mine.update();
+      const prompt = u.type === 'judging' ? u.judging?.prompt : null;
+      if (prompt) {
+        const pick = prompt.choices[0] ?? (prompt.zones.length ? `zone:${prompt.zones[0]}` : prompt.cards[0]!.pick);
+        await guest.json(`${h.baseUrl}/api/duels/${duel.id}/answer`, { method: 'POST', body: JSON.stringify({ prompt: prompt.id, picks: [pick] }) });
+      }
+      if (u.type === 'steps' && u.steps.at(-1)!.view.players[1].monsters.some((m) => m && 'id' in m.card && m.card.id === angler)) after = u;
+    }
+    if (after.type !== 'steps') throw new Error('expected steps');
+    const last = after.steps.at(-1)!.view;
+    expect(last.chain).toEqual([]);
+    // "You cannot Special Summon monsters from your hand for the rest of this turn": Prior is no longer offered.
+    expect(procedures(last)).toEqual([]);
+    expect(entries(after).map((e) => e.text)).toEqual(
+      expect.arrayContaining(['Silent Angler was Special Summoned by its own procedure. Kaiba (guest) can\'t Special Summon a monster in their hand this turn.']),
+    );
+    mine.close();
+  });
+});

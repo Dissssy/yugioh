@@ -1,50 +1,51 @@
 {
   "code": 44308317,
+  "textHash": "243d491362008228250b371674adea1a3aa81d8afc53686a6344319560e6b944",
   "model": "claude-opus-5-5",
   "effects": [
     {
-      "opt": "none",
-      "cost": "",
       "kind": "continuous",
-      "when": null,
       "speed": 1,
-      "effect": "Defense Position monsters your opponent controls cannot change their battle positions.",
-      "script": null,
-      "status": "unverified",
+      "mandatory": false,
+      "opt": "none",
       "window": "While this card is face-up on the field and you control another \"Ice Barrier\" monster",
-      "targets": null,
-      "mandatory": false,
-      "continuous": null
-    },
-    {
-      "opt": "hard",
       "cost": "",
-      "kind": "ignition",
-      "when": null,
-      "speed": 1,
-      "effect": "Special Summon this card from your hand.",
-      "script": null,
-      "status": "unverified",
-      "window": "Main Phase, while this card is in your hand, if you control an \"Ice Barrier\" monster",
+      "effect": "Defense Position monsters your opponent controls cannot change their battle positions.",
       "targets": null,
-      "mandatory": false,
-      "continuous": null
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     },
     {
-      "opt": "hard",
-      "cost": "banish this card from your GY",
       "kind": "ignition",
-      "when": null,
       "speed": 1,
-      "effect": "Special Summon 1 \"Ice Barrier Token\" (Aqua/WATER/Level 1/ATK 0/DEF 0).",
-      "script": null,
-      "status": "unverified",
-      "window": "Main Phase, while this card is in your GY, if you control an \"Ice Barrier\" monster",
-      "targets": null,
       "mandatory": false,
-      "continuous": null
+      "opt": "hard",
+      "window": "Main Phase, while this card is in your hand, if you control an \"Ice Barrier\" monster",
+      "cost": "",
+      "effect": "Special Summon this card from your hand.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "opt": "hard",
+      "window": "Main Phase, while this card is in your GY, if you control an \"Ice Barrier\" monster",
+      "cost": "banish this card from your GY",
+      "effect": "Special Summon 1 \"Ice Barrier Token\" (Aqua/WATER/Level 1/ATK 0/DEF 0).",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
     }
   ],
-  "textHash": "243d491362008228250b371674adea1a3aa81d8afc53686a6344319560e6b944",
-  "materials": null
+  "materials": null,
+  "normalSummon": true
 }
