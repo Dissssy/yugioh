@@ -68,6 +68,34 @@ export function specialSummonForbidden(state: DuelState, seat: Seat, id: string 
   );
 }
 
+/**
+ * Whether a monster must be Special Summoned a certain way before any other effect may Special Summon it: an Extra
+ * Deck monster (by its Synchro or Xyz Summon), or one that can't be Normal Summoned and has its own Summoning
+ * procedure (Moulinglacia the Elemental Lord, Medium of the Ice Barrier).
+ */
+function mustBeProperlySummoned(state: DuelState, id: string): boolean {
+  const code = state.instances[id]!.code;
+  const sheet = state.sheets[code];
+  return state.cards[code]!.extraDeck || (sheet?.normalSummon === false && sheet.effects.some((e) => e.kind === 'condition' && e.script !== null));
+}
+
+/** Why `seat` can't Special Summon this monster by an effect now, or null if they can. */
+export function specialSummonProblem(state: DuelState, seat: Seat, id: string): string | null {
+  const card = state.cards[state.instances[id]!.code]!;
+  if (specialSummonForbidden(state, seat, id)) return `An effect stops you Special Summoning ${card.name} this turn.`;
+  if (mustBeProperlySummoned(state, id) && !state.properlySummoned.includes(id)) {
+    return `${card.name} must first be ${card.extraDeck ? `${card.type.startsWith('XYZ') ? 'Xyz' : 'Synchro'} Summoned` : 'Special Summoned by its own procedure'} before an effect can Special Summon it.`;
+  }
+  return null;
+}
+
+/** The cards a step may pick from its `choose` selection: for a Special Summon, only the monsters that can be Special Summoned. */
+export function choosableFor(state: DuelState, step: Step, seat: Seat, card: string): string[] {
+  if (!('cards' in step) || step.cards.from !== 'choose') return [];
+  const all = chooseFrom(state, step.cards, seat, card);
+  return step.do === 'special_summon' ? all.filter((id) => !specialSummonProblem(state, seat, id)) : all;
+}
+
 /** Every card that fits, except `except` (the card being activated). */
 export function cardsFitting(state: DuelState, filter: CardFilter, seat: Seat, except: string): string[] {
   return Object.keys(state.instances).filter((id) => id !== except && fits(state, id, filter, seat));
@@ -139,18 +167,26 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, fre
   if (step.do === 'negate_attack') return state.attack ? null : 'No attack is being made.';
   if (step.do === 'negate_activation') return state.chain.length > 0 ? null : 'There is no activation to negate.';
   if (step.do === 'detach') return detachFrom(state, step, seat, card).length > 0 ? null : `No ${step.cards.from === 'self' ? 'this card has' : 'monster here has'} ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`;
+  if (step.do === 'forbid' && step.wholeTurn) {
+    const player = step.player === 'you' ? seat : other(seat);
+    const did = state.didThisTurn.find((d) => d.player === player && d.what === step.what && (!step.filter || (d.card !== null && locate(state, d.card) && fits(state, d.card, step.filter, seat))));
+    if (did) return { declare_attack: 'You already declared an attack this turn.', battle_phase: 'You already conducted your Battle Phase this turn.', special_summon: `You already Special Summoned ${step.filter ? `a ${describeFilter(step.filter, true)}` : 'a monster'} this turn.` }[step.what];
+  }
   if (!('cards' in step)) return null;
   const sel = step.cards;
   if (step.do === 'special_summon' && freeMonsterZones(state, seat) + freed === 0) return 'You have no free Monster Zone to Special Summon into.';
   if (step.do === 'take_control' && freeMonsterZones(state, seat) + freed === 0) return 'You have no free Monster Zone to take control of a monster into.';
-  if (step.do === 'special_summon' && sel.from === 'self' && specialSummonForbidden(state, seat, card)) return "An effect stops you Special Summoning it this turn.";
+  if (step.do === 'special_summon' && sel.from === 'self') {
+    const problem = specialSummonProblem(state, seat, card);
+    if (problem) return problem;
+  }
   if (step.do === 'remove_counters' && selected(state, sel, seat, card).every((id) => (onFieldCard(state, id)?.counters[step.counter] ?? 0) < step.count)) {
     return `There aren't ${step.count} ${step.counter === 'spell' ? 'Spell Counter' : 'counter'}${step.count === 1 ? '' : 's'} to remove.`;
   }
   if (sel.from === 'battling' && battling(state, sel.filter, seat, card).length === 0) return `This card isn't battling a ${describeFilter(sel.filter)}.`;
   if (sel.from === 'all' && cardsFitting(state, sel.filter, seat, card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
   if (sel.from === 'random' && cardsFitting(state, sel.filter, seat, card).length < sel.min) return `There is no ${describeFilter(sel.filter)}.`;
-  if (sel.from === 'choose' && chooseFrom(state, sel, seat, card).length < sel.min) {
+  if (sel.from === 'choose' && choosableFor(state, step, seat, card).length < sel.min) {
     return sel.min === 1 ? `There is no ${describeFilter(sel.filter)}.` : `There are fewer than ${sel.min} of: ${describeFilter(sel.filter)}.`;
   }
   return null;
@@ -246,7 +282,8 @@ export function targetMax(state: DuelState, script: Script, card: string): numbe
 /** The cards a script may target: those that fit, and for "target that monster" only the card its event happened to. */
 export function targetable(state: DuelState, script: Script, seat: Seat, card: string, cause: Happening | null): string[] {
   if (!script.targets) return [];
-  const fitting = cardsFitting(state, script.targets.filter, seat, script.targets.others ? card : '');
+  const summoned = script.options.some((o) => o.steps.some((s) => s.do === 'special_summon' && s.cards.from === 'targets'));
+  const fitting = cardsFitting(state, script.targets.filter, seat, script.targets.others ? card : '').filter((id) => !summoned || !specialSummonProblem(state, seat, id));
   return script.targets.event ? fitting.filter((id) => cause && cause.event !== 'phase' && id === cause.card) : fitting;
 }
 
@@ -305,9 +342,12 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
  * before the cost is paid: a card the cost will use can't also be one of its targets. `cause` is the event it is
  * activated for, if any.
  */
-export function scriptProblem(state: DuelState, seat: Seat, card: string, effect: number, cause: Happening | null): string | null {
-  const script = scriptOf(state, card, effect);
+export function scriptProblem(board: DuelState, seat: Seat, card: string, effect: number, cause: Happening | null): string | null {
+  const script = scriptOf(board, card, effect);
   if (!script) return null;
+  // A Summoning procedure is the proper way to Summon its card, so its own Summon is never refused for not being one.
+  const procedure = board.sheets[board.instances[card]!.code]!.effects[effect]!.kind === 'condition';
+  const state = procedure ? { ...board, properlySummoned: [...board.properlySummoned, card] } : board;
   for (const c of script.conditions) {
     const problem = conditionProblem(state, c, seat, card);
     if (problem) return problem;

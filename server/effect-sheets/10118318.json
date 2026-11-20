@@ -64,7 +64,8 @@
                 "do": "forbid",
                 "player": "you",
                 "what": "battle_phase",
-                "filter": null
+                "filter": null,
+                "wholeTurn": true
               }
             ]
           }

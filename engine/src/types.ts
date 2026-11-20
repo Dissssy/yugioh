@@ -232,9 +232,11 @@ export type Step =
   | { do: 'summon_token'; player: 'you' | 'opponent'; token: Token; count: number; position: Position | 'choice' }
   /**
    * For the rest of this turn, that player can't declare attacks, can't conduct their Battle Phase, or can't Special
-   * Summon the monsters that fit `filter` (null for any monster). `filter` is null for the others.
+   * Summon the monsters that fit `filter` (null for any monster). `filter` is null for the others. With `wholeTurn`
+   * ("the turn you activate this card") the ban covers the whole turn, so the effect can't be used once the player
+   * already did that this turn.
    */
-  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null }
+  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null; wholeTurn: boolean }
   /**
    * "During the End Phase of this turn, take `damage` damage if you did not Normal Summon the added monster, or a card
    * with the same name": about the cards the step before it moved (Where Arf Thou?).
@@ -579,6 +581,13 @@ export interface DuelState {
   modifiers: Modifier[];
   /** What resolved effects stopped each player doing this turn; they lapse when the turn ends. */
   forbidden: { player: Seat; what: Forbidden; filter: CardFilter | null; turn: number }[];
+  /** What each player did this turn that a `forbid` can ban: Special Summons (with the monster), Battle Phases and attacks. */
+  didThisTurn: { player: Seat; what: Forbidden; card: string | null }[];
+  /**
+   * Monsters that must be Special Summoned a certain way (by their procedure, or a Synchro or Xyz Summon) and were. Only
+   * these can be Special Summoned by other effects later, until they go back to the hand, Deck or Extra Deck.
+   */
+  properlySummoned: string[];
   /** Damage each player takes in this turn's End Phase unless they Normal Summon a card with one of these names first. */
   pledges: { player: Seat; names: string[]; damage: number }[];
   /**

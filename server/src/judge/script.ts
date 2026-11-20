@@ -10,6 +10,7 @@ import {
   replacement,
   cardOf,
   chooseFrom,
+  specialSummonProblem,
   cardsFitting,
   describeFilter,
   detachFrom,
@@ -105,7 +106,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
   /** Targets an earlier step of this effect Special Summoned or took control of: still its targets ("Special Summon it, and if you do, equip this card to it"). */
   const movedHere = new Set<string>();
   /** The cards a selection picks, asking the player when it is theirs to choose. */
-  const select = async (sel: Selection, verb: string, limit = Infinity): Promise<string[]> => {
+  const select = async (sel: Selection, verb: string, limit = Infinity, keep: (id: string) => boolean = () => true): Promise<string[]> => {
     if (sel.from === 'self') return locate(state, self) ? [self] : [];
     if (sel.from === 'targets') return link.targets.filter((id) => movedHere.has(id) || (script.targets && fits(state, id, script.targets.filter, seat)));
     if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, self);
@@ -117,7 +118,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       transcript.push({ random: picked });
       return picked;
     }
-    const options = chooseFrom(state, sel, seat, self);
+    const options = chooseFrom(state, sel, seat, self).filter(keep);
     const max = Math.min(sel.max, options.length, limit);
     if (max === 0) return [];
     // A tie-break with no tie leaves nothing to choose.
@@ -196,7 +197,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       }
       case 'special_summon': {
         const free = monsterZonesFor(state, seat, false).length;
-        const cards = await select(step.cards, 'Special Summon', free);
+        const cards = await select(step.cards, 'Special Summon', free, (id) => !specialSummonProblem(state, seat, id));
         for (const id of cards.slice(0, free)) {
           const position =
             step.position !== 'choice'

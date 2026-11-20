@@ -152,7 +152,8 @@
                   "level": null,
                   "atk": null,
                   "def": null
-                }
+                },
+                "wholeTurn": false
               }
             ]
           }

@@ -3,7 +3,7 @@
 
 import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
 import { restriction, statsOf } from './continuous.ts';
-import { specialSummonForbidden } from './script.ts';
+import { specialSummonForbidden, specialSummonProblem } from './script.ts';
 import { locate, monsterZonesFor, other } from './state.ts';
 import { type CardData, type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
 
@@ -95,7 +95,8 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(at.zone !== 'monsters', `${card.name} is already on the field.`);
       check(at.zone !== 'spellTraps', `${card.name} is in a Spell & Trap Zone.`);
       check(at.zone !== 'extra', 'Monsters in the Extra Deck are Summoned by their own procedures, not by this op.');
-      check(!specialSummonForbidden(state, ctx.player, op.card), `An effect stops that player Special Summoning ${card.name} this turn.`);
+      const problem = specialSummonProblem(state, ctx.player, op.card);
+      check(!problem, problem ?? '');
       const free = monsterZonesFor(state, op.controller, false);
       check(free.length > 0, 'That player has no empty Main Monster Zone.');
       check(free.includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);

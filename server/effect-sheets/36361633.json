@@ -27,7 +27,8 @@
                 "do": "forbid",
                 "player": "opponent",
                 "what": "declare_attack",
-                "filter": null
+                "filter": null,
+                "wholeTurn": false
               }
             ]
           }
