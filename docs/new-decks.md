@@ -1,0 +1,29 @@
+# New decks: Duelist Toolbox and Freezing Chains
+
+Status, 2026-11-20: both decks are premade decks with compiled sheets (Opus, about $8.90 for 72 sheets). This page lists what their cards need from the engine and the order to build it in. Ethan chose these two decks to widen rulings coverage and test how far the system extends; Kaiba Reloaded and Yugi Reloaded come in a later cycle.
+
+Duelist Toolbox has 38 Main Deck cards (the set printed one copy of each), below the usual 40. Duels don't check deck size, so it plays as it is.
+
+## Where the new cards stand
+
+Of the new cards' 124 effects, Opus scripted 25 and gave 6 continuous effects data. Activated effects without a script go to the judge, as they do today. What doesn't work yet falls into four groups, each a generic mechanic rather than a card:
+
+1. **Summoning procedures from the hand.** A `condition` effect such as "You can Special Summon this card (from your hand) by ..." isn't offered at all, and "Cannot be Normal Summoned/Set" isn't enforced. Cards: Aqua Spirit, Medium, Prior and Silent Angler of the Ice Barrier, Quickdraw Synchron, Turret Warrior, Moulinglacia the Elemental Lord.
+2. **Continuous effects with no data**, which therefore do nothing:
+   - attack locks by a stat or Level (Cryomancer, Defender of the Ice Barrier) and position locks (Speaker for the Ice Barriers);
+   - activation locks (Medium: one Spell/Trap a turn; Warlock; Mind Drain; Spellbreaker; Revealer: no Tribute Summons);
+   - battle changes (Hayabusa Knight's second attack, Twin-Sword Marauder's piercing and second attack, Fortress Warrior's no battle damage and once-per-turn survival, X-Saber Galahad's Damage Step stats);
+   - protection (Dai-sojo, Freezing Chains of the Ice Barrier), Fiendish Chain negating the monster it's tied to;
+   - "can't be Synchro Material" (Fishborg Launcher, Quickdraw Synchron, Ronintoadin) and name changes (Dupe Frog, Ronintoadin).
+3. **New ops** the judge and scripts don't have: take control of a monster (Enemy Controller, Crackdown), Tokens (Speaker), a random card from a hand (Moulinglacia, X-Saber Urbellum, Trishula), looking at and placing the top card of the Deck (Dark Tinker), "banish it when it leaves the field" (Quillbolt Hedgehog, Fishborg Launcher, Zuijin), and skipping a Battle Phase (Moulinglacia).
+4. **Synchro details:** Quickdraw Synchron standing in for a "Synchron" Tuner, Junk Destroyer counting its non-Tuner materials, and Trishula, Zero Dragon's "2 or more non-Tuners".
+
+## Build order
+
+Each step leaves both decks playable, and each new piece of vocabulary goes into the compiler's prompt so Opus can use it, then the affected cards are recompiled (`sheets:compile -- --force "Name"`), with offline eval cases for the new steps.
+
+1. Summoning procedures from the hand, and "cannot be Normal Summoned".
+2. Taking control, Tokens, and random cards from a hand: the ops that whole effects need.
+3. The continuous vocabulary: attack, position and activation locks, then battle changes and protection.
+4. The rest: banish-when-leaves, the Deck top, skipping the Battle Phase, name changes, the Synchro details.
+5. Self-play with the four decks against each other to find what still breaks.
