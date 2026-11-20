@@ -7,13 +7,60 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
-      "window": "Set Trap that can be activated on either player's turn, while your opponent controls a face-up monster",
+      "window": "Activate on either player's turn by targeting 1 face-up monster your opponent controls.",
       "cost": "",
       "effect": "Take control of that monster.",
       "targets": "1 face-up monster your opponent controls",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "monsters",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "take_control",
+                "cards": {
+                  "from": "targets"
+                },
+                "until": null
+              },
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     },
@@ -21,8 +68,9 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
-      "window": "While this card is face-up on the field and you control that monster",
+      "window": "While you control that monster.",
       "cost": "",
       "effect": "While you control that monster, it cannot attack or activate effects.",
       "targets": null,
@@ -35,8 +83,9 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
-      "window": "When that monster leaves the field",
+      "window": "When that monster leaves the field.",
       "cost": "",
       "effect": "When that monster leaves the field, destroy this card.",
       "targets": null,

@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "During your Main Phase.",
       "cost": "",

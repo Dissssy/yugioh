@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Your Main Phase, while you control a Normal Monster and there is a monster in either player's Graveyard",
       "cost": "Send 1 Normal Monster you control to the Graveyard",
@@ -67,6 +68,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "special_summon",
@@ -93,6 +95,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When this card leaves the field",
       "cost": "",

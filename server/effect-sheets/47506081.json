@@ -7,6 +7,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When this card destroys an opponent's monster by battle and sends it to the Graveyard",
       "cost": "detach 1 Xyz Material from this card",
@@ -17,7 +18,6 @@
         "self": true,
         "filter": null,
         "how": [],
-        "from": "field",
         "canMiss": true,
         "by": null
       },
@@ -36,6 +36,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "change_lp",

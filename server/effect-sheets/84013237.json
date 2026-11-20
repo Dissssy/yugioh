@@ -7,6 +7,7 @@
       "kind": "quick",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When a monster declares an attack",
       "cost": "detach 1 material from this card",
@@ -17,7 +18,6 @@
         "self": false,
         "filter": null,
         "how": [],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
@@ -36,6 +36,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "negate_attack"
@@ -52,6 +53,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
+      "from": "field",
       "opt": "none",
       "window": "If this card is targeted for an attack, while it has no material",
       "cost": "",
@@ -62,7 +64,6 @@
         "self": true,
         "filter": null,
         "how": [],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
@@ -79,6 +80,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "destroy",

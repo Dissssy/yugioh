@@ -33,7 +33,7 @@ const sheets: Record<number, EffectSheet> = {
     model: 'test',
     materials: null,
     normalSummon: true,
-    effects: [{ kind: 'activation', speed: 1, mandatory: false, opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, continuous: null, status: 'unverified' }],
+    effects: [{ kind: 'activation', speed: 1, mandatory: false, from: 'field', opt: 'none', window: 'Your Main Phase', cost: 'Discard 1 card', effect: 'Add that target to your hand.', targets: '1 monster in your GY', when: null, script: null, continuous: null, status: 'unverified' }],
   },
 };
 
@@ -281,7 +281,7 @@ const reincarnation: Script = {
   conditions: [],
   cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 1, rank: null }, to: 'graveyard' }],
   targets: { filter: anyCard('you', 'graveyard', ['monster']), min: 1, max: 1, event: false },
-  options: [{ label: '', steps: [{ do: 'move', cards: { from: 'targets' }, to: 'hand' }] }],
+  options: [{ label: '', cost: [], steps: [{ do: 'move', cards: { from: 'targets' }, to: 'hand' }] }],
   unapplied: null,
 };
 const withScript = (state: DuelState): DuelState => ({

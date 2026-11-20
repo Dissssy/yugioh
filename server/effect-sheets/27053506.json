@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Can be activated on either player's turn once Set.",
       "cost": "",

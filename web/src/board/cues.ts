@@ -36,6 +36,8 @@ const baseMs: Record<LogEvent['type'], number> = {
   effectChosen: 0,
   moved: 450,
   specialSummoned: 550,
+  tokenSummoned: 550,
+  controlChanged: 550,
   destroyed: 500,
   lpChanged: 650,
   statsModified: 400,
@@ -181,6 +183,7 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
       }
       return;
     case 'specialSummoned':
+    case 'tokenSummoned':
     case 'extraSummoned': {
       const el = slot(e.player, 'm', e.zone);
       if (!el) return;

@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While there are 5 or more monsters in your Graveyard",
       "cost": "",
@@ -67,6 +68,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "move",

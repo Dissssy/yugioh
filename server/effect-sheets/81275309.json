@@ -7,6 +7,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field, whenever an effect activated by an Effect Monster that was on your opponent's side of the field resolves",
       "cost": "",

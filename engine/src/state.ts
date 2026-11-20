@@ -310,6 +310,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         removeFromPlay(s, event.card);
         const owner = s.players[event.owner];
         const card = s.cards[s.instances[event.card]!.code]!;
+        if (isToken(s, event.card)) return;
         if (card.extraDeck && event.to !== 'graveyard' && event.to !== 'banished') owner.extra.push(event.card);
         else if (event.to === 'hand') owner.hand.push(event.card);
         else if (event.to === 'deck_top') owner.deck.unshift(event.card);
@@ -325,6 +326,18 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         p.deck = [...event.order];
         return;
       }
+      case 'controlChanged': {
+        const card = onField(s, event.card);
+        removeFromPlay(s, event.card, false);
+        s.players[event.to].monsters[event.zone] = { ...card, returnsAtEndPhase: event.until === 'end_phase' };
+        return;
+      }
+      case 'tokenSummoned':
+        s.instances[event.card] = { code: event.token.code, owner: event.player };
+        s.cards[event.token.code] = event.token;
+        s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position };
+        summoned(s, event.card, event.player, 'special', group);
+        return;
       case 'specialSummoned': {
         removeFromPlay(s, event.card);
         s.players[event.player].monsters[event.zone] = { ...fieldCard(event.card, s.turn, true), position: event.position };
@@ -456,6 +469,7 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     linked: null,
     effectsNegated: false,
     counters: {},
+    returnsAtEndPhase: false,
   };
 }
 
@@ -494,15 +508,17 @@ export function onField(state: DuelState, id: string): FieldCard {
 
 /**
  * Takes a card out of wherever it is. A card leaving the field loses its modifiers, and its Xyz Materials go to their
- * owners' GYs.
+ * owners' GYs; with `leaves` false (a change of control) it keeps everything.
  */
-function removeFromPlay(state: DuelState, id: string) {
+function removeFromPlay(state: DuelState, id: string, leaves = true) {
   const at = locate(state, id);
   if (!at) throw new Error(`Unknown card ${id}`);
   const p = state.players[at.seat];
   if (at.zone === 'monsters' || at.zone === 'spellTraps') {
     const card = p[at.zone][at.index]!;
     p[at.zone][at.index] = null;
+    // A change of control moves the card without it leaving the field.
+    if (!leaves) return;
     state.modifiers = state.modifiers.filter((m) => m.card !== id);
     for (const m of card.materials) state.players[state.instances[m]!.owner].graveyard.push(m);
     // Cards linked to a monster go when it goes; a card that takes its monster with it (Birthright) does so.
@@ -524,8 +540,11 @@ function tie(state: DuelState, id: string) {
   return null;
 }
 
-/** Cards always go to their owner's Graveyard. */
+/** Cards always go to their owner's Graveyard. A Token that leaves the field is gone. */
 function sendToGraveyard(state: DuelState, id: string) {
   removeFromPlay(state, id);
-  state.players[state.instances[id]!.owner].graveyard.push(id);
+  if (!isToken(state, id)) state.players[state.instances[id]!.owner].graveyard.push(id);
 }
+
+/** Whether a card is a Token: made on the field by an effect, and gone once it leaves. */
+export const isToken = (state: DuelState, id: string) => state.cards[state.instances[id]!.code]!.type === 'Token';

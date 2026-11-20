@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Any time you could activate a Normal Trap, provided you have not conducted your Battle Phase this turn",
       "cost": "",
@@ -24,6 +25,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "special_summon",

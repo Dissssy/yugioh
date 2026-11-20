@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Your Main Phase",
       "cost": "Detach 1 Xyz Material you control",
@@ -65,6 +66,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "destroy",

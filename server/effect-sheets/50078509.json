@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Set Continuous Trap; can be activated on either player's turn while there is a face-up Effect Monster on the field",
       "cost": "",
@@ -42,6 +43,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "link",
@@ -61,6 +63,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field and the targeted monster is face-up on the field",
       "cost": "",
@@ -75,6 +78,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field and the targeted monster is face-up on the field",
       "cost": "",
@@ -98,6 +102,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When the targeted monster is destroyed",
       "cost": "",

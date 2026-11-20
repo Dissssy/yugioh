@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 3,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When a monster effect is activated",
       "cost": "Discard 1 card",
@@ -32,7 +33,6 @@
           "def": null
         },
         "how": [],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
@@ -68,6 +68,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "negate_activation",

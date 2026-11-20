@@ -33,6 +33,11 @@ export interface SheetEffect {
   speed: 1 | 2 | 3;
   /** For triggers: whether the controller must activate it. */
   mandatory: boolean;
+  /**
+   * For a monster effect, where the card is when it is used: a trigger fires, or an ignition or quick effect is
+   * activated ("You can banish this card from your GY; ..." is "graveyard"). "field" means face-up on the field.
+   */
+  from: 'field' | 'hand' | 'graveyard';
   /** `soft`: once per turn for each copy. `hard`: once per turn for all copies by card name. */
   opt: 'none' | 'soft' | 'hard';
   /** When it can be used, in plain words. */
@@ -103,8 +108,6 @@ export interface When {
   filter: CardFilter | null;
   /** For `summoned`, which Summons count; empty for any. */
   how: SummonKind[];
-  /** For a trigger: where this card must be when the event happens (Ganbara Knight waits in the hand). */
-  from: 'field' | 'hand' | 'graveyard';
   /**
    * An optional "When ...: You can" trigger misses the timing unless its event was the last thing to happen (it
    * happened during the last chain link to resolve). "If ..." triggers and mandatory ones never miss.
@@ -128,8 +131,12 @@ export interface Script {
    * the card the effect's `when` event happened to may be targeted ("Target that monster").
    */
   targets: { filter: CardFilter; min: number; max: number; event: boolean } | null;
-  /** What the effect does. One option, or several when the text says "activate 1 of these effects" (picked on activation by `label`). */
-  options: { label: string; steps: Step[] }[];
+  /**
+   * What the effect does. One option, or several when the text says "activate 1 of these effects" (picked on
+   * activation by `label`). An option's own `cost` is paid after the script's, once it is picked ("Tribute 1 monster,
+   * then target ...").
+   */
+  options: { label: string; cost: Step[]; steps: Step[] }[];
   /** Any part of the text the steps can't express yet (a lingering restriction), said in the summary; else null. */
   unapplied: string | null;
 }
@@ -153,6 +160,16 @@ export type Condition =
   | { if: 'outnumbered'; by: number };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
+/** A Token's printed stats ("Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)). */
+export interface Token {
+  name: string;
+  attribute: string;
+  race: string;
+  level: number;
+  atk: number;
+  def: number;
+}
+
 /** Kinds of counters. The starter decks only use Spell Counters. */
 export type Counter = 'spell';
 
@@ -188,6 +205,12 @@ export type Step =
   | { do: 'add_counters'; cards: Selection; counter: Counter; count: number; max: number | null }
   /** Removes counters from the card selected (a cost: "remove 1 Spell Counter from this card"). */
   | { do: 'remove_counters'; cards: Selection; counter: Counter; count: number }
+  /** The selected monsters' control passes to the activating player, until the End Phase or (null) for good. */
+  | { do: 'take_control'; cards: Selection; until: 'end_phase' | null }
+  /** Changes the battle position of the monsters selected; `switch` turns Attack to Defense and Defense to Attack. A face-down monster turns face-up. */
+  | { do: 'change_position'; cards: Selection; position: Position | 'switch' }
+  /** Special Summons `count` Tokens to that player's field. */
+  | { do: 'summon_token'; player: 'you' | 'opponent'; token: Token; count: number; position: Position | 'choice' }
   /**
    * For the rest of this turn, that player can't declare attacks, can't conduct their Battle Phase, or can't Special
    * Summon the monsters that fit `filter` (null for any monster). `filter` is null for the others.
@@ -254,6 +277,8 @@ export type Selection =
   | { from: 'targets' }
   | { from: 'choose'; filter: CardFilter; min: number; max: number; rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null }
   | { from: 'all'; filter: CardFilter }
+  /** `count` cards that fit, picked at random by code ("discard 2 random cards from your opponent's hand"); fewer if fewer fit. */
+  | { from: 'random'; filter: CardFilter; count: number }
   /** The monster battling this card, if it fits ("At the start of the Damage Step, if this card attacks a face-up Defense Position monster: destroy that monster"). */
   | { from: 'battling'; filter: CardFilter };
 
@@ -410,6 +435,8 @@ export interface FieldCard {
   effectsNegated: boolean;
   /** Counters on it, by kind. */
   counters: Partial<Record<Counter, number>>;
+  /** A monster whose control was taken "until the End Phase": it goes back to its owner when this turn's End Phase starts. */
+  returnsAtEndPhase: boolean;
 }
 
 export type Zones = (FieldCard | null)[];
@@ -548,6 +575,9 @@ export type Op =
   /** Detaches this Xyz Material: it goes to its owner's GY. */
   | { op: 'detach'; card: string }
   | { op: 'forbid'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  /** `controller` takes control of this monster, into `zone` (an empty Main Monster Zone of theirs). */
+  | { op: 'take_control'; card: string; controller: Seat; zone: number; until: 'end_phase' | null }
+  | { op: 'summon_token'; controller: Seat; token: Token; position: Position; zone: number }
   /** Links the card being resolved to this face-up monster (see the `link` step). */
   | { op: 'link'; card: string }
   /** Negates the activation of this card's link on the chain, below the one resolving. */
@@ -732,6 +762,9 @@ export type DuelEvent =
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
   | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  /** `to` now controls the monster, in `zone`. A Token's card data comes with its event, since it isn't in any Deck. */
+  | { type: 'controlChanged'; card: string; to: Seat; zone: number; until: 'end_phase' | null }
+  | { type: 'tokenSummoned'; player: Seat; card: string; token: CardData; zone: number; position: Position }
   | { type: 'linked'; card: string; to: string }
   | { type: 'activationNegated'; link: number; card: string }
   | { type: 'effectsNegated'; card: string }

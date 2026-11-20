@@ -21,6 +21,21 @@ export const opTools = {
     description: 'Special Summon a monster face-up from the hand, Deck, GY or banished. Its controller is asked which empty Main Monster Zone it goes to.',
     input: z.object({ card, controller: seat, position }),
   },
+  take_control: {
+    loose: true,
+    description:
+      'Take control of a monster on the field for `controller` ("take control of that target until the End Phase"). until: "end_phase" when it goes back to its owner as the End Phase starts, null for good. Its new controller is asked which empty Main Monster Zone it goes to.',
+    input: z.object({ card, controller: seat, until: z.literal('end_phase').nullable() }),
+  },
+  summon_token: {
+    description:
+      'Special Summon one Token to a player\'s field, with the stats the text gives ("Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)). One call per Token. Its controller is asked which empty Main Monster Zone it goes to. A Token that leaves the field is gone.',
+    input: z.object({
+      controller: seat,
+      token: z.object({ name: z.string(), attribute: z.string(), race: z.string(), level: z.number().int(), atk: z.number().int(), def: z.number().int() }),
+      position,
+    }),
+  },
   destroy: {
     description: 'Destroy cards on the field; they go to their owners\' GYs.',
     input: z.object({ cards: z.array(card) }),
@@ -127,6 +142,8 @@ export const finish = z.object({
   legal: z.boolean().describe('Checking an activation: whether it is legal, as the summary concludes. Resolving: always true.'),
 });
 
+export const randomCards = z.object({ player: seat, count: z.number().int() });
+
 export type AskPlayer = z.infer<typeof askPlayer>;
 export type Finish = z.infer<typeof finish>;
 
@@ -159,6 +176,11 @@ export const TOOLS: Anthropic.Tool[] = [
     'ask_player',
     'Ask a player to choose, and wait for the answer: costs such as "discard 1 card", targets, searches, or a choice between effects. The answer is the list of picked card IDs or choices.',
     askPlayer,
+  ),
+  tool(
+    'random_cards',
+    'Pick cards from a player\'s hand at random, for "random" in the text ("discard 2 random cards from your opponent\'s hand"). The answer is the picked card IDs (all of the hand if it holds fewer); then apply the effect to them with ops.',
+    randomCards,
   ),
   tool('finish', 'End this judge call. Nothing you did takes effect until you call it; call it last, alone or after the turn\'s other calls succeed.', finish),
 ];

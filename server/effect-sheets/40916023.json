@@ -7,6 +7,7 @@
       "kind": "condition",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is in your hand, during your Main Phase",
       "cost": "removing from play 1 WATER monster in your Graveyard",
@@ -49,6 +50,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "special_summon",
@@ -69,6 +71,7 @@
       "kind": "quick",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "During each of your opponent's Standby Phases",
       "cost": "",

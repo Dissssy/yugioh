@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When your opponent Normal or Flip Summons 1 monster with 1000 or more ATK",
       "cost": "",
@@ -36,7 +37,6 @@
           "normal",
           "flip"
         ],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
@@ -68,6 +68,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "destroy",

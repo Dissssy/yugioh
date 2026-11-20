@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Any time you could activate a Quick-Play Spell",
       "cost": "",
@@ -20,6 +21,7 @@
         "options": [
           {
             "label": "Gain 1200 LP.",
+            "cost": [],
             "steps": [
               {
                 "do": "change_lp",
@@ -31,6 +33,7 @@
           },
           {
             "label": "Inflict 800 damage to your opponent.",
+            "cost": [],
             "steps": [
               {
                 "do": "change_lp",

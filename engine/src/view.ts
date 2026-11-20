@@ -404,6 +404,10 @@ function describe(state: DuelState, event: LogEvent): string | null {
           : `${who(event.player)} can't Special Summon ${event.filter ? `a ${describeFilter(event.filter, true)}` : 'monsters'} this turn`;
     case 'procedureUsed':
       return null;
+    case 'controlChanged':
+      return `${who(event.to)} took control of ${name(event.card)}${event.until === 'end_phase' ? ' until the End Phase' : ''}`;
+    case 'tokenSummoned':
+      return `${who(event.player)} Special Summoned ${event.token.name} in ${event.position} position`;
     case 'chatted':
       return `${who(event.player)}: ${event.text}`;
     case 'asked':

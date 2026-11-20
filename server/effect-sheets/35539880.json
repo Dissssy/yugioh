@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Any time you could activate a Continuous Trap",
       "cost": "",
@@ -42,6 +43,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "special_summon",
@@ -68,6 +70,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When this card leaves the field",
       "cost": "",
@@ -86,6 +89,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When the monster Special Summoned by this card leaves the field",
       "cost": "",

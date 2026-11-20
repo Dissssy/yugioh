@@ -793,6 +793,62 @@ export const CASES: EvalCase[] = [
     activate: 'Moulinglacia the Elemental Lord',
     legal: false,
   },
+  {
+    name: 'moulinglacia discards 2 random cards from the opponent\'s hand once Summoned',
+    board: [
+      { hand: ['Moulinglacia the Elemental Lord'], gy: ['Silent Angler', 'Aqua Spirit', 'Prior of the Ice Barrier', 'Medium of the Ice Barrier', 'Dupe Frog'] },
+      { hand: ['Axe Raider', 'Dark Blade', 'Twister'] },
+    ],
+    activate: 'Moulinglacia the Elemental Lord',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Moulinglacia the Elemental Lord', '0:monsters'), b.state.players[1].hand.length === 1 && b.state.players[1].graveyard.length === 2 ? null : 'not 2 cards discarded'),
+  },
+  // Control, Tokens, and effects used from the hand or GY.
+  {
+    name: 'crackdown takes control of a face-up monster for good',
+    board: [{ set: ['Crackdown'] }, { monsters: ['Axe Raider'] }],
+    activate: 'Crackdown',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Axe Raider', '0:monsters'), expectAt(b, 'Crackdown', '0:spellTraps'), b.monster('Axe Raider')?.returnsAtEndPhase === false ? null : 'it would go back'),
+  },
+  {
+    name: 'enemy controller tributes a monster to take control until the end phase',
+    board: [{ hand: ['Enemy Controller'], monsters: ['Sonic Chick'] }, { monsters: ['Dark Blade'] }],
+    activate: 'Enemy Controller',
+    picks: [['take control'], ['Sonic Chick'], ['Dark Blade']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dark Blade', '0:monsters'), expectAt(b, 'Sonic Chick', '0:gy'), b.monster('Dark Blade')?.returnsAtEndPhase ? null : 'it would not go back'),
+  },
+  {
+    name: 'enemy controller changes a battle position without a tribute',
+    board: [{ hand: ['Enemy Controller'] }, { monsters: ['Dark Blade'] }],
+    activate: 'Enemy Controller',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dark Blade', '1:monsters'), b.monster('Dark Blade')?.position === 'defense' ? null : 'still in Attack Position'),
+  },
+  {
+    name: 'speaker for the ice barriers makes an ice barrier token from the gy',
+    board: [{ gy: ['Speaker for the Ice Barriers'], monsters: ['Medium of the Ice Barrier'] }, {}],
+    activate: 'Speaker for the Ice Barriers',
+    effect: 2,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Ice Barrier Token', '0:monsters'), expectAt(b, 'Speaker for the Ice Barriers', '0:banished')),
+  },
+  {
+    name: 'speaker for the ice barriers special summons itself from the hand',
+    board: [{ hand: ['Speaker for the Ice Barriers'], monsters: ['Medium of the Ice Barrier'] }, {}],
+    activate: 'Speaker for the Ice Barriers',
+    effect: 1,
+    legal: true,
+    check: (b) => expectAt(b, 'Speaker for the Ice Barriers', '0:monsters'),
+  },
+  {
+    name: 'speaker for the ice barriers needs an ice barrier monster',
+    board: [{ hand: ['Speaker for the Ice Barriers'], monsters: ['Axe Raider'] }, {}],
+    activate: 'Speaker for the Ice Barriers',
+    effect: 1,
+    legal: false,
+  },
 ];
 
 /** Builds a case's board: every listed card is put in place from its owner's Deck. */

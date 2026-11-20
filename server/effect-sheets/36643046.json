@@ -7,6 +7,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When this card is Normal Summoned",
       "cost": "",
@@ -19,7 +20,6 @@
         "how": [
           "normal"
         ],
-        "from": "field",
         "canMiss": true,
         "by": null
       },

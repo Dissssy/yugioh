@@ -7,6 +7,7 @@
       "kind": "ignition",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "soft",
       "window": "Your Main Phase, if you control another face-up \"Ice Barrier\" monster",
       "cost": "reveal any number of \"Ice Barrier\" monsters in your hand",

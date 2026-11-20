@@ -7,6 +7,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
+      "from": "field",
       "opt": "none",
       "window": "When this card is Normal or Flip Summoned",
       "cost": "",
@@ -20,7 +21,6 @@
           "normal",
           "flip"
         ],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
@@ -32,6 +32,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field",
       "cost": "",

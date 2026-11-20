@@ -7,6 +7,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
+      "from": "field",
       "opt": "none",
       "window": "When this card inflicts Battle Damage to your opponent while they have 4 or more cards in their hand",
       "cost": "",
@@ -17,11 +18,65 @@
         "self": true,
         "filter": null,
         "how": [],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "opponent",
+              "place": "hand",
+              "kinds": [],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 4,
+            "max": null
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "random",
+                  "filter": {
+                    "side": "opponent",
+                    "place": "hand",
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  },
+                  "count": 1
+                },
+                "to": "deck_top"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

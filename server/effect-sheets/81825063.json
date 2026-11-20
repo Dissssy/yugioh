@@ -7,6 +7,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is face-up on the field",
       "cost": "",
@@ -21,13 +22,75 @@
       "kind": "ignition",
       "speed": 1,
       "mandatory": false,
+      "from": "hand",
       "opt": "hard",
       "window": "Your Main Phase, while this card is in your hand, if your opponent controls a monster and you control an \"Ice Barrier\" monster",
       "cost": "",
       "effect": "Special Summon this card from your hand.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "opponent",
+              "place": "monsters",
+              "kinds": [],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 1,
+            "max": null
+          },
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "monsters",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Ice Barrier",
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 1,
+            "max": null
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "self"
+                },
+                "position": "choice"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     },
@@ -35,6 +98,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "hard",
       "window": "If this card is Normal or Special Summoned",
       "cost": "",
@@ -48,11 +112,50 @@
           "normal",
           "special"
         ],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "place": "deck",
+                    "kinds": [
+                      "spell",
+                      "trap"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Ice Barrier",
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null
+                },
+                "to": "hand"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "During your Main Phase, while you have 3 \"Ice Barrier\" monsters with different names in your hand to reveal",
       "cost": "Reveal 3 \"Ice Barrier\" monsters with different names in your hand",

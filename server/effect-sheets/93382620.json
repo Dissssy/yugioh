@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 2,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "When a monster(s) is destroyed by battle and sent to your GY",
       "cost": "Discard your entire hand (min.1)",
@@ -32,7 +33,6 @@
           "def": null
         },
         "how": [],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
@@ -85,6 +85,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "special_summon",

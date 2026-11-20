@@ -7,6 +7,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "soft",
       "window": "During your End Phase, while this card is face-up on the field",
       "cost": "",
@@ -17,7 +18,6 @@
         "self": false,
         "filter": null,
         "how": [],
-        "from": "field",
         "canMiss": false,
         "by": null
       },

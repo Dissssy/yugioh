@@ -5,7 +5,7 @@ import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
 import { statsOf } from './continuous.ts';
 import { specialSummonForbidden } from './script.ts';
 import { locate, monsterZonesFor, other } from './state.ts';
-import { type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
+import { type CardData, type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
 
 export type OpResult = { ok: true; events: DuelEvent[] } | { ok: false; error: string };
 
@@ -74,6 +74,29 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(free.includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
       run.emit({ type: 'specialSummoned', player: op.controller, card: op.card, zone: op.zone, position: op.position });
       if (at.zone === 'deck') shuffle(run, at.seat, ctx, null);
+      return;
+    }
+    case 'take_control': {
+      const { at, card } = onField(state, op.card);
+      check(at.zone === 'monsters', 'Only monsters can change control.');
+      check(at.seat !== op.controller, 'That player already controls it.');
+      check(op.until === null || op.until === 'end_phase', 'until is "end_phase" or null.');
+      check(monsterZonesFor(state, op.controller, false).includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
+      run.emit({ type: 'controlChanged', card: card.id, to: op.controller, zone: op.zone, until: op.until });
+      return;
+    }
+    case 'summon_token': {
+      const t = op.token;
+      check(t.name.trim() !== '' && /token/i.test(t.name), 'A Token is named "... Token".');
+      check([t.level, t.atk, t.def].every((n) => Number.isInteger(n) && n >= 0) && t.level >= 1 && t.level <= 12, 'A Token has a Level from 1 to 12 and whole ATK and DEF, 0 or more.');
+      check(!specialSummonForbidden(state, ctx.player, null), 'An effect stops that player Special Summoning this turn.');
+      check(monsterZonesFor(state, op.controller, false).includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
+      // Tokens with the same printed stats share their card data (a code below 0); each Token is a new instance.
+      const data: Omit<CardData, 'code'> = { name: t.name, type: 'Token', kind: 'monster', extraDeck: false, text: '', level: t.level, atk: t.atk, def: t.def, attribute: t.attribute.toUpperCase(), race: t.race };
+      const same = Object.values(state.cards).find(({ code: _, ...c }) => JSON.stringify(c) === JSON.stringify(data));
+      const token: CardData = { code: same?.code ?? Math.min(0, ...Object.keys(state.cards).map(Number)) - 1, ...data };
+      const id = `token${Object.keys(state.instances).filter((i) => i.startsWith('token')).length + 1}`;
+      run.emit({ type: 'tokenSummoned', player: op.controller, card: id, token, zone: op.zone, position: op.position });
       return;
     }
     case 'destroy': {

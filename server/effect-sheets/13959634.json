@@ -7,6 +7,7 @@
       "kind": "condition",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is in your hand, during your Main Phase, if you have exactly 5 WATER monsters in your GY",
       "cost": "",
@@ -44,6 +45,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "special_summon",
@@ -64,8 +66,9 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
+      "from": "field",
       "opt": "hard",
-      "window": "If this card is Special Summoned",
+      "window": "When this card is Special Summoned",
       "cost": "",
       "effect": "Discard 2 random cards from your opponent's hand (or their entire hand, if less than 2).",
       "targets": null,
@@ -76,11 +79,45 @@
         "how": [
           "special"
         ],
-        "from": "field",
         "canMiss": false,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "random",
+                  "filter": {
+                    "side": "opponent",
+                    "place": "hand",
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  },
+                  "count": 2
+                },
+                "to": "graveyard"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     },
@@ -88,10 +125,11 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
-      "window": "If this face-up card leaves the field (a leaves-the-field event, which code does not track)",
+      "window": "If this face-up card leaves the field (an event code doesn't track)",
       "cost": "",
-      "effect": "If this face-up card leaves the field, skip the Battle Phase of your next turn.",
+      "effect": "Skip the Battle Phase of your next turn.",
       "targets": null,
       "when": null,
       "script": null,

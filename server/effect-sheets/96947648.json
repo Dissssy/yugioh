@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Your Main Phase",
       "cost": "",
@@ -45,6 +46,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "move",

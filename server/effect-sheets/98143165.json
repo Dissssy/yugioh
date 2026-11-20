@@ -7,6 +7,7 @@
       "kind": "activation",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "Your Main Phase, targeting 1 face-up monster on the field to equip this card to",
       "cost": "",
@@ -38,6 +39,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "link",
@@ -57,6 +59,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
+      "from": "field",
       "opt": "none",
       "window": "While this card is equipped to a monster",
       "cost": "",

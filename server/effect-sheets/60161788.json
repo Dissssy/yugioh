@@ -7,6 +7,7 @@
       "kind": "trigger",
       "speed": 1,
       "mandatory": true,
+      "from": "graveyard",
       "opt": "none",
       "window": "When this card is destroyed by battle and sent to the Graveyard",
       "cost": "",
@@ -17,7 +18,6 @@
         "self": true,
         "filter": null,
         "how": [],
-        "from": "graveyard",
         "canMiss": false,
         "by": null
       },
@@ -28,6 +28,7 @@
         "options": [
           {
             "label": "",
+            "cost": [],
             "steps": [
               {
                 "do": "draw",
