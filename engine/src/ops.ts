@@ -67,9 +67,10 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(at.zone !== 'monsters', `${card.name} is already on the field.`);
       check(at.zone !== 'spellTraps', `${card.name} is in a Spell & Trap Zone.`);
       check(at.zone !== 'extra', 'Monsters in the Extra Deck are Summoned by their own procedures, not by this op.');
-      const zone = monsterZonesFor(state, op.controller, false)[0];
-      check(zone !== undefined, 'That player has no empty Main Monster Zone.');
-      run.emit({ type: 'specialSummoned', player: op.controller, card: op.card, zone, position: op.position });
+      const free = monsterZonesFor(state, op.controller, false);
+      check(free.length > 0, 'That player has no empty Main Monster Zone.');
+      check(free.includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
+      run.emit({ type: 'specialSummoned', player: op.controller, card: op.card, zone: op.zone, position: op.position });
       if (at.zone === 'deck') shuffle(run, at.seat, ctx, null);
       return;
     }
