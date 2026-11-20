@@ -25,13 +25,15 @@ const me = (b: Browser) => b.json<Me>(`${h.baseUrl}/api/me`).then((r) => r.body)
 const guestCount = async () => (await h.db.select().from(guests)).length;
 
 describe('card data', () => {
-  it('imports cards, builds both starter decks from their sets and downloads their images', async () => {
+  it('imports cards, builds the premade decks from their sets and downloads their images', async () => {
     await syncCards(h.db, { imageDir: h.imageDir, api: h.ygoprodeck, imageGapMs: 0 });
     const admin = await login({ sub: 'admin', email: ADMIN_EMAIL, email_verified: true });
     const { body: decks } = await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`);
     expect(decks.map((d) => [d.name, d.mainCount, d.extraCount])).toEqual([
       ["Yu-Gi-Oh! 5D's Starter Deck (2008)", 40, 3],
       ['Starter Deck: Dawn of the Xyz', 40, 3],
+      ['Starter Deck: Duelist Toolbox', 38, 4],
+      ['Structure Deck: Freezing Chains', 41, 5],
     ]);
     const { body: xyz } = await admin.json<DeckDetail>(`${h.baseUrl}/api/decks/${decks[1]!.id}`);
     expect(xyz.main[0]!.name).toBe('Spirit of the Harp');

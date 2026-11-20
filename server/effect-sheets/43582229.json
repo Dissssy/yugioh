@@ -1,0 +1,36 @@
+{
+  "code": 43582229,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "hard",
+      "cost": "",
+      "kind": "activation",
+      "when": null,
+      "speed": 1,
+      "effect": "When this card is activated: You can target 1 Level 4 or lower \"Ice Barrier\" monster in your GY; Special Summon it.",
+      "script": null,
+      "status": "unverified",
+      "window": "Main Phase of your turn, when you could activate a Spell Card; you can only activate 1 \"Freezing Chains of the Ice Barrier\" per turn",
+      "targets": "1 Level 4 or lower \"Ice Barrier\" monster in your GY (optional)",
+      "mandatory": false,
+      "continuous": null
+    },
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "continuous",
+      "when": null,
+      "speed": 1,
+      "effect": "While you control 3 or more \"Ice Barrier\" monsters, \"Ice Barrier\" monsters you control are unaffected by the activated effects of your opponent's monsters that were Special Summoned from the Extra Deck.",
+      "script": null,
+      "status": "unverified",
+      "window": "While this card is face-up on the field and you control 3 or more \"Ice Barrier\" monsters",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "234887f03b179a4c6bcd1d47522c4859c4ee82a43922e2321514aabb869f226c",
+  "materials": null
+}

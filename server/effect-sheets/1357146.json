@@ -1,0 +1,50 @@
+{
+  "code": 1357146,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "continuous",
+      "when": null,
+      "speed": 1,
+      "effect": "Cannot be used as a Synchro Material.",
+      "script": null,
+      "status": "unverified",
+      "window": "Always",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    },
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "continuous",
+      "when": null,
+      "speed": 1,
+      "effect": "This card's name becomes \"Des Frog\" while it is on the field.",
+      "script": null,
+      "status": "unverified",
+      "window": "While this card is on the field",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    },
+    {
+      "opt": "none",
+      "cost": "Banish 1 \"Frog\" monster from your Graveyard",
+      "kind": "ignition",
+      "when": null,
+      "speed": 1,
+      "effect": "Special Summon this card.",
+      "script": null,
+      "status": "unverified",
+      "window": "Your Main Phase, if this card is in your Graveyard",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "77bb028919906dc8d3d8a925767dbf851c03467079a78695f8c705c257928cd6",
+  "materials": null
+}

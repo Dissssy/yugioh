@@ -1,0 +1,22 @@
+{
+  "code": 76614003,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "trigger",
+      "when": null,
+      "speed": 1,
+      "effect": "Look at the top card of your Deck. Return that card to either the top or the bottom of the Deck.",
+      "script": null,
+      "status": "unverified",
+      "window": "When this card you control is sent to the Graveyard (this event isn't in the engine's event list, so the trigger never fires)",
+      "targets": null,
+      "mandatory": true,
+      "continuous": null
+    }
+  ],
+  "textHash": "1f374cdd81f6265b1445a1867df6a1f9165e06e53aa6e52c75d55c78d6796cdb",
+  "materials": null
+}

@@ -1,0 +1,22 @@
+{
+  "code": 9056100,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "soft",
+      "cost": "",
+      "kind": "continuous",
+      "when": null,
+      "speed": 1,
+      "effect": "You can Normal Summon 1 \"Ice Barrier\" monster in addition to your Normal Summon or Set. This effect can only be used once per turn.",
+      "script": null,
+      "status": "unverified",
+      "window": "During your Main Phase, while this card is face-up on the field",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "48efafad9a8e630844e1196ae36012b24c94d1d556dcb9bf6e523952d649386f",
+  "materials": null
+}

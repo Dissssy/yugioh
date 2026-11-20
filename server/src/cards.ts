@@ -22,6 +22,8 @@ export const YGOPRODECK_API = 'https://db.ygoprodeck.com/api/v7';
 export const PREMADE_DECKS = [
   { slug: '5ds-2008', name: "Yu-Gi-Oh! 5D's Starter Deck (2008)", set: "Starter Deck: Yu-Gi-Oh! 5D's" },
   { slug: 'dawn-of-the-xyz', name: 'Starter Deck: Dawn of the Xyz', set: 'Starter Deck: Dawn of the Xyz' },
+  { slug: 'duelist-toolbox', name: 'Starter Deck: Duelist Toolbox', set: 'Starter Deck: Duelist Toolbox' },
+  { slug: 'freezing-chains', name: 'Structure Deck: Freezing Chains', set: 'Structure Deck: Freezing Chains' },
 ] as const;
 
 const apiCard = z.looseObject({
@@ -65,11 +67,12 @@ export async function syncCards(db: Db, options: SyncOptions) {
     const all = z.object({ data: z.array(apiCard) }).parse(await getJson(`${api}/cardinfo.php`)).data;
     await db.transaction(async (tx) => {
       await upsertCards(tx, all);
-      await buildPremadeDecks(tx, all);
       await tx.insert(cardImports).values({ databaseVersion: version, cardCount: all.length });
     });
     log(`Imported ${all.length} cards.`);
   }
+  // From our copy every time, so a deck added to PREMADE_DECKS appears without waiting for a new YGOPRODeck version.
+  await buildPremadeDecks(db);
   await downloadDeckImages(db, options.imageDir, options.imageGapMs ?? 100, log);
   // A new database starts with the effect sheets kept in the repository.
   const imported = await importSheetFiles(db);
@@ -130,9 +133,14 @@ async function upsertCards(db: Tx, all: ApiCard[]) {
 const isExtraDeck = (frameType: string) => /^(fusion|synchro|xyz|link)/.test(frameType);
 
 /** One copy of a card per printing in the set, in set-number order. */
-async function buildPremadeDecks(db: Tx, all: ApiCard[]) {
+async function buildPremadeDecks(db: Db) {
   for (const deck of PREMADE_DECKS) {
-    const printings = all
+    const rows = await db
+      .select({ raw: cards.raw })
+      .from(cards)
+      .where(sql`${cards.raw}->'card_sets' @> ${JSON.stringify([{ set_name: deck.set }])}::jsonb`);
+    const printings = rows
+      .map((r) => r.raw as ApiCard)
       .flatMap((c) => (c.card_sets ?? []).filter((s) => s.set_name === deck.set).map((s) => ({ code: s.set_code, card: c })))
       .sort((a, b) => a.code.localeCompare(b.code));
     if (printings.length === 0) throw new Error(`No cards found for set "${deck.set}"`);

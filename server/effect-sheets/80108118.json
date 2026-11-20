@@ -1,0 +1,37 @@
+{
+  "code": 80108118,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "trigger",
+      "when": {
+        "by": null,
+        "how": [],
+        "from": "field",
+        "self": true,
+        "event": "battle_damage",
+        "filter": null,
+        "canMiss": false
+      },
+      "speed": 1,
+      "effect": "Place 1 random card from their hand on top of their Deck.",
+      "script": null,
+      "status": "unverified",
+      "window": "When this card inflicts Battle Damage to your opponent while they have 4 or more cards in their hand",
+      "targets": null,
+      "mandatory": true,
+      "continuous": null
+    }
+  ],
+  "textHash": "c34911982be49aa3a80ebbc5d8e17b6bc75ede09b5113bdad4ecf16cf2d35efb",
+  "materials": {
+    "tuner": null,
+    "summon": "synchro",
+    "nonTuners": {
+      "max": null,
+      "min": 1
+    }
+  }
+}

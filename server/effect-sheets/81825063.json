@@ -1,0 +1,61 @@
+{
+  "code": 81825063,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "continuous",
+      "when": null,
+      "speed": 1,
+      "effect": "Spells and Traps sent from the field to your opponent's GY are banished instead.",
+      "script": null,
+      "status": "unverified",
+      "window": "While this card is face-up on the field",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    },
+    {
+      "opt": "hard",
+      "cost": "",
+      "kind": "ignition",
+      "when": null,
+      "speed": 1,
+      "effect": "Special Summon this card from your hand.",
+      "script": null,
+      "status": "unverified",
+      "window": "Your Main Phase, while this card is in your hand, if your opponent controls a monster and you control an \"Ice Barrier\" monster",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    },
+    {
+      "opt": "hard",
+      "cost": "",
+      "kind": "trigger",
+      "when": {
+        "by": null,
+        "how": [
+          "normal",
+          "special"
+        ],
+        "from": "field",
+        "self": true,
+        "event": "summoned",
+        "filter": null,
+        "canMiss": false
+      },
+      "speed": 1,
+      "effect": "Add 1 \"Ice Barrier\" Spell/Trap from your Deck to your hand.",
+      "script": null,
+      "status": "unverified",
+      "window": "If this card is Normal or Special Summoned",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "a6506bae9a90b306706f2abc1db8f0949a416d7f7c238cfc9ab5e68b0769686b",
+  "materials": null
+}

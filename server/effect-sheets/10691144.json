@@ -1,0 +1,22 @@
+{
+  "code": 10691144,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "activation",
+      "when": null,
+      "speed": 2,
+      "effect": "During this turn, each time a card(s) is removed from play from your hand, your side of the field, and/or your Graveyard by the effect of an opponent's Effect Monster: ● If a card in your hand is removed from play, remove from play up to 2 random cards in your opponent's hand. ● If a card you control is removed from play, remove from play up to 2 cards your opponent controls. ● If a card in your Graveyard is removed from play, remove from play up to 2 cards in your opponent's Graveyard.",
+      "script": null,
+      "status": "unverified",
+      "window": "Whenever a Quick-Play Spell can be activated; its effect lasts for the rest of this turn.",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "fbc0461ada895583740b39288661bf25414e27eed3d1b3c773f3855b73e1f962",
+  "materials": null
+}

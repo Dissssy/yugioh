@@ -1,0 +1,29 @@
+{
+  "code": 50321796,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "hard",
+      "cost": "discard any number of cards to the GY",
+      "kind": "ignition",
+      "when": null,
+      "speed": 1,
+      "effect": "Return the targeted cards your opponent controls to the hand.",
+      "script": null,
+      "status": "unverified",
+      "window": "Main Phase, while this card is face-up on the field",
+      "targets": "the same number of cards your opponent controls as cards discarded",
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "86326bf59791729857a6710e6ced34fb4d9058986eedb2f220f0520301075fbf",
+  "materials": {
+    "tuner": null,
+    "summon": "synchro",
+    "nonTuners": {
+      "max": null,
+      "min": 1
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "code": 68937720,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "Activate this card by paying 1000 LP.",
+      "kind": "activation",
+      "when": null,
+      "speed": 2,
+      "effect": "Activates this Continuous Trap; the activation itself does nothing further (its ongoing effect applies while it is face-up on the field).",
+      "script": {
+        "cost": [
+          {
+            "do": "change_lp",
+            "kind": "cost",
+            "amount": 1000,
+            "player": "you"
+          }
+        ],
+        "options": [
+          {
+            "label": "",
+            "steps": []
+          }
+        ],
+        "targets": null,
+        "unapplied": null,
+        "conditions": []
+      },
+      "status": "unverified",
+      "window": "Any time a Set Trap can be activated (either player's turn).",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    },
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "continuous",
+      "when": null,
+      "speed": 1,
+      "effect": "Effects of monsters in the hand cannot be activated.",
+      "script": null,
+      "status": "unverified",
+      "window": "While this card is face-up on the field.",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "9f46753c2bd74662fcaf7c98bc4fad157249919e3524176d354c0463158dac51",
+  "materials": null
+}

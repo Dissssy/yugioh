@@ -1,0 +1,22 @@
+{
+  "code": 42703248,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "activation",
+      "when": null,
+      "speed": 1,
+      "effect": "Return all Spell and Trap Cards on the field to the hand.",
+      "script": null,
+      "status": "unverified",
+      "window": "Main Phase of your turn",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "f019183bede287e0c2597dd460eb62e7c58927cfa13a24ba942a0820f1a85b61",
+  "materials": null
+}

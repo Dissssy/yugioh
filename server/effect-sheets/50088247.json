@@ -1,0 +1,36 @@
+{
+  "code": 50088247,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "condition",
+      "when": null,
+      "speed": 1,
+      "effect": "If you control a face-up \"Ice Barrier\" monster, you can Special Summon this card (from your hand). You cannot Special Summon any Level 5 or higher monsters the turn you use this effect.",
+      "script": null,
+      "status": "unverified",
+      "window": "While this card is in your hand, if you control a face-up \"Ice Barrier\" monster",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    },
+    {
+      "opt": "none",
+      "cost": "Tribute this card",
+      "kind": "ignition",
+      "when": null,
+      "speed": 1,
+      "effect": "Special Summon that target.",
+      "script": null,
+      "status": "unverified",
+      "window": "Your Main Phase, while this card is face-up on the field",
+      "targets": "1 \"Ice Barrier\" monster in your Graveyard, except \"Prior of the Ice Barrier\"",
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "3141acbcfee92f2d45cd4255146da95695af2c904e16307c72946ea370a47dc6",
+  "materials": null
+}

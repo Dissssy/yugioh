@@ -1,0 +1,69 @@
+{
+  "code": 23924608,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "activation",
+      "when": null,
+      "speed": 2,
+      "effect": "Destroy up to 2 targeted Spells/Traps on the field. You cannot conduct your Battle Phase the turn you activate this card.",
+      "script": {
+        "cost": [],
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              },
+              {
+                "do": "forbid",
+                "what": "battle_phase",
+                "player": "you"
+              }
+            ]
+          }
+        ],
+        "targets": {
+          "max": 2,
+          "min": 1,
+          "event": false,
+          "filter": {
+            "atk": null,
+            "def": null,
+            "side": "either",
+            "kinds": [
+              "spell",
+              "trap"
+            ],
+            "level": null,
+            "place": "field",
+            "races": [],
+            "types": [],
+            "faceUp": null,
+            "position": null,
+            "attributes": []
+          }
+        },
+        "unapplied": null,
+        "conditions": [
+          {
+            "if": "before_battle_phase"
+          }
+        ]
+      },
+      "status": "unverified",
+      "window": "Set Normal Trap; can be activated on either player's turn, but only if you have not conducted your Battle Phase this turn",
+      "targets": "up to 2 Spells/Traps on the field",
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "577934f77d37a732ba101c4afd098ddb8e950f9249d3dec3a392cb9603d2d811",
+  "materials": null
+}

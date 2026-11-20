@@ -1,0 +1,22 @@
+{
+  "code": 50032342,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "soft",
+      "cost": "send 1 \"Ice Barrier\" monster from your hand to the Graveyard",
+      "kind": "ignition",
+      "when": null,
+      "speed": 1,
+      "effect": "Draw 1 card.",
+      "script": null,
+      "status": "unverified",
+      "window": "Your Main Phase, while this card is face-up on the field",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "52f72b132cca3623c63f23685c5a053e89033b8e99941c63b30aca8046dceb31",
+  "materials": null
+}

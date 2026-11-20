@@ -1,0 +1,36 @@
+{
+  "code": 66853752,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "hard",
+      "cost": "",
+      "kind": "ignition",
+      "when": null,
+      "speed": 1,
+      "effect": "Special Summon this card from your Graveyard. If you do, banish it when it leaves the field.",
+      "script": null,
+      "status": "unverified",
+      "window": "Your Main Phase, while this card is in your Graveyard, if you have a monster(s) in your Graveyard other than \"Fishborg Launcher\", and all of them are WATER",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    },
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "continuous",
+      "when": null,
+      "speed": 1,
+      "effect": "This card cannot be used as a Synchro Material Monster, except for the Synchro Summon of a WATER monster.",
+      "script": null,
+      "status": "unverified",
+      "window": "Whenever this card would be used as Synchro Material",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "2d69a19e8701e29487e90a70594bfefe081a1355ad9bac0ade059981f8efa1ba",
+  "materials": null
+}

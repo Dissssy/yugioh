@@ -1,0 +1,36 @@
+{
+  "code": 43256007,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "hard",
+      "cost": "Tribute this card",
+      "kind": "ignition",
+      "when": null,
+      "speed": 1,
+      "effect": "Special Summon 1 Level 5 or higher \"Ice Barrier\" monster from your hand.",
+      "script": null,
+      "status": "unverified",
+      "window": "Your Main Phase, while this card is on the field",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    },
+    {
+      "opt": "hard",
+      "cost": "",
+      "kind": "ignition",
+      "when": null,
+      "speed": 1,
+      "effect": "Reduce its Level by exactly 2, and if you do, Special Summon this card, but banish it when it leaves the field.",
+      "script": null,
+      "status": "unverified",
+      "window": "Your Main Phase, while this card is in your GY, except the turn it was sent there",
+      "targets": "1 Level 3 or higher WATER monster you control",
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "b4d65f2ba8f8d1b76e1b7c656eb6521edfdf2287b60deaff02ef94d7dab20883",
+  "materials": null
+}

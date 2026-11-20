@@ -1,0 +1,22 @@
+{
+  "code": 98045062,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "Second effect only: Tribute 1 monster",
+      "kind": "activation",
+      "when": null,
+      "speed": 2,
+      "effect": "Activate 1 of these effects. ● Target 1 face-up monster your opponent controls; change that target's battle position. ● Tribute 1 monster, then target 1 face-up monster your opponent controls; take control of that target until the End Phase.",
+      "script": null,
+      "status": "unverified",
+      "window": "Whenever a Quick-Play Spell can be activated (from the hand during your turn, or Set on either player's turn after the turn it was Set)",
+      "targets": "1 face-up monster your opponent controls",
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "4284e95b90a6d24240e2a9a718270c42cfec956a04d36a665d46b0c7e54e6e4e",
+  "materials": null
+}

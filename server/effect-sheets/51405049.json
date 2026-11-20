@@ -1,0 +1,86 @@
+{
+  "code": 51405049,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "activation",
+      "when": null,
+      "speed": 1,
+      "effect": "Add 1 Level 1 monster from your Deck to your hand. During the End Phase of this turn, take 2000 damage if you did not Normal Summon the added monster, or a card with the same name, after activating this card.",
+      "script": {
+        "cost": [],
+        "options": [
+          {
+            "label": "",
+            "steps": [
+              {
+                "do": "move",
+                "to": "hand",
+                "cards": {
+                  "max": 1,
+                  "min": 1,
+                  "from": "choose",
+                  "rank": null,
+                  "filter": {
+                    "atk": null,
+                    "def": null,
+                    "side": "you",
+                    "kinds": [
+                      "monster"
+                    ],
+                    "level": {
+                      "max": 1,
+                      "min": 1
+                    },
+                    "place": "deck",
+                    "races": [],
+                    "types": [],
+                    "faceUp": null,
+                    "position": null,
+                    "attributes": []
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "targets": null,
+        "unapplied": "During the End Phase of this turn, take 2000 damage if you did not Normal Summon the added monster, or a card with the same name, after activating this card.",
+        "conditions": [
+          {
+            "if": "count",
+            "max": null,
+            "min": 1,
+            "filter": {
+              "atk": null,
+              "def": null,
+              "side": "you",
+              "kinds": [
+                "monster"
+              ],
+              "level": {
+                "max": 1,
+                "min": 1
+              },
+              "place": "monsters",
+              "races": [],
+              "types": [],
+              "faceUp": true,
+              "position": null,
+              "attributes": []
+            }
+          }
+        ]
+      },
+      "status": "unverified",
+      "window": "Your Main Phase, if you control a face-up Level 1 monster",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "2bd59e9b39363d9332a21017f2420ab19ddf8022d923231002c23ea275ccea1a",
+  "materials": null
+}

@@ -1,0 +1,22 @@
+{
+  "code": 21015833,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "",
+      "kind": "continuous",
+      "when": null,
+      "speed": 1,
+      "effect": "This card can make a second attack during each Battle Phase.",
+      "script": null,
+      "status": "unverified",
+      "window": "While this card is face-up on the field, during each Battle Phase",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "eb07b9c4f849086a06a3296aa8e370417da3c70e8ed70e0b8e9a87a210eb3725",
+  "materials": null
+}

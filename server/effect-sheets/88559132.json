@@ -1,0 +1,22 @@
+{
+  "code": 88559132,
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "opt": "none",
+      "cost": "Tributing 1 Warrior-Type monster",
+      "kind": "condition",
+      "when": null,
+      "speed": 1,
+      "effect": "You can Special Summon this card (from your hand) by Tributing 1 Warrior-Type monster, and if you do, it gains ATK equal to the Tributed monster's original ATK.",
+      "script": null,
+      "status": "unverified",
+      "window": "While this card is in your hand, when you could Special Summon it (open game state in your Main Phase)",
+      "targets": null,
+      "mandatory": false,
+      "continuous": null
+    }
+  ],
+  "textHash": "9f41dce5c5556efb208e7c06640198e207f179f612360b9c5d96aeb5f04163b0",
+  "materials": null
+}
