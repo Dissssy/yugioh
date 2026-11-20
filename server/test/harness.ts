@@ -51,8 +51,8 @@ export async function startHarness(): Promise<Harness> {
   const baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
   let model: ModelCall = () => Promise.reject(new Error('No model set for this test'));
   const call = (params: Anthropic.MessageCreateParamsNonStreaming) => model(params);
-  const ai = { judge: call, appeal: call, judgeCalls: 300, appeals: 10, opponent: { call, model: 'claude-haiku-5-5', calls: 400, paceMs: 0 } };
-  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10, AI_OPPONENT_MODEL: 'claude-haiku-5-5', AI_CALLS_PER_DUEL: 400, RESPONSE_FLOOR_MS: 0, RESET_SHEETS: false }, db, ai, seeded(1)));
+  const ai = { judge: call, appeal: call, judgeCalls: 300, appeals: 10, questions: 20, opponent: { call, model: 'claude-haiku-5-5', calls: 400, paceMs: 0 } };
+  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10, QUESTIONS_PER_DUEL: 20, AI_OPPONENT_MODEL: 'claude-haiku-5-5', AI_CALLS_PER_DUEL: 400, RESPONSE_FLOOR_MS: 0, RESET_SHEETS: false }, db, ai, seeded(1)));
 
   return {
     db,

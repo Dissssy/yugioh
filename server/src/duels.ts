@@ -38,6 +38,7 @@ import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
 import { decks, matchEvents, matches, sheetReports, users } from './db/schema.ts';
 import { appeal } from './judge/appeal.ts';
+import { askJudge, escalate } from './judge/ask.ts';
 import type { JudgeOutcome, ModelCall, Question } from './judge/judge.ts';
 import { calledModel, NO_JUDGE, rule, SCRIPT } from './judge/script.ts';
 import { flagScripts, loadSheets } from './sheets.ts';
@@ -61,6 +62,10 @@ interface LiveDuel {
   judging: Judging | null;
   /** Contests being reviewed, as `seq:seat`, so the same one isn't sent twice. */
   appealing: Set<string>;
+  /** Seats whose question to the judge is being answered: one at a time each. */
+  asking: Set<Seat>;
+  /** Questions (their `asked` seq) being escalated. */
+  escalating: Set<number>;
   /** A pass the server will make for a player with nothing to activate, once the response floor has passed. */
   autoPass: ReturnType<typeof setTimeout> | null;
 }
@@ -80,8 +85,10 @@ export interface Ai {
   appeal: ModelCall | null;
   /** Judge calls allowed per duel (an activation and its resolution are two). */
   judgeCalls: number;
-  /** Contests allowed per duel, for both players together. */
+  /** Contests allowed per duel, for both players together. Escalated questions count too. */
   appeals: number;
+  /** Questions to the judge each player may ask per duel (docs/ask-the-judge.md). */
+  questions: number;
   /** The AI opponent's model, or null when the server has no API key (docs/ai-opponent.md). */
   opponent: OpponentModel | null;
 }
@@ -224,6 +231,8 @@ export class Duels {
           writes: Promise.resolve(),
           judging: null,
           appealing: new Set(),
+          asking: new Set(),
+          escalating: new Set(),
           autoPass: null,
         };
         // Sheets that changed while the duel wasn't loaded (a report, a fix) apply from here on.
@@ -423,6 +432,18 @@ export class Duels {
     const seat = await this.seatOf(id, seatKey);
     if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
     if (!this.ai.appeal) return { ok: false, status: 503, error: "Appeals need an Anthropic API key, and this server has none." };
+    return this.startContest(duel, seat, seq, note, false);
+  }
+
+  /** Appeals used or under way: contests, and escalated questions that didn't become a contest (which counts itself). */
+  private appealsUsed(duel: LiveDuel): number {
+    const used = duel.events.filter((e) => e.type === 'appealed' || (e.type === 'escalated' && e.record.outcome !== 'ruling_wrong')).length;
+    return used + duel.appealing.size + duel.escalating.size;
+  }
+
+  /** `escalated`: a contest an escalated question started, whose escalation already counted against the appeals. */
+  private startContest(duel: LiveDuel, seat: Seat, seq: number, note: string, escalated: boolean): ActResult {
+    const appealModel = this.ai.appeal!;
     const event = duel.events[seq];
     const seen = event?.type === 'judged' && logFor(duel.events.slice(0, seq + 1), seat).at(-1)?.seq === seq;
     if (!seen) return { ok: false, status: 404, error: 'There is no such ruling.' };
@@ -432,21 +453,85 @@ export class Duels {
     if (duel.appealing.has(key) || appeals.some((e) => e.appeal.judged === seq && e.appeal.by === seat)) {
       return { ok: false, status: 409, error: 'You already contested this ruling.' };
     }
-    if (appeals.length + duel.appealing.size >= this.ai.appeals) return { ok: false, status: 429, error: 'This duel has used all its appeals.' };
+    if (!escalated && this.appealsUsed(duel) >= this.ai.appeals) return { ok: false, status: 429, error: 'This duel has used all its appeals.' };
     duel.appealing.add(key);
     const input = { before: replay(duel.events.slice(0, seq)), now: duel.state, record: event.record, judged: seq, by: seat, note };
-    void appeal(input, this.ai.appeal)
+    void appeal(input, appealModel)
       .then(async (record) => {
         await this.enqueue(duel, () => this.commit(duel, [{ type: 'appealed', appeal: record }, ...this.rollbackOffer(duel, seq, record)]));
         // An overturned scripted ruling means the script is wrong: the judge takes the card over until it is fixed.
         if (record.verdict === 'overturned' && event.record.model === SCRIPT) {
           const code = cardOf(duel.state, event.record.card).code;
-          await this.db.insert(sheetReports).values({ code, matchId: id, seq, reporter: 'appeal', note: record.ruling });
+          await this.db.insert(sheetReports).values({ code, matchId: duel.id, seq, reporter: 'appeal', note: record.ruling });
           await this.sheetChanged(code, await flagScripts(this.db, code, `appeal overturned a scripted ruling: ${record.ruling}`));
         }
       })
       .catch((error: unknown) => console.error(`Appeal in duel ${duel.id} failed:`, error))
       .finally(() => duel.appealing.delete(key));
+    return { ok: true };
+  }
+
+  /**
+   * A player's question to the judge, answered from what their seat can see (docs/ask-the-judge.md). Answers once the
+   * question is accepted; the answer arrives in that player's log only. The duel never waits for it.
+   */
+  async ask(id: string, seatKey: string, question: string, card: number | null): Promise<ActResult> {
+    const duel = await this.load(id);
+    const seat = await this.seatOf(id, seatKey);
+    if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
+    if (!this.ai.judge) return { ok: false, status: 503, error: 'Questions need an Anthropic API key, and this server has none.' };
+    const state = duel.state;
+    if (duel.asking.has(seat)) return { ok: false, status: 409, error: 'Your last question is still being answered.' };
+    // A question the judge failed to answer doesn't count.
+    const asked = duel.events.filter((e) => e.type === 'asked' && e.record.player === seat && !e.record.error).length;
+    if (asked >= this.ai.questions) return { ok: false, status: 429, error: `You can ask the judge up to ${this.ai.questions} questions per duel.` };
+    const view = viewFor(state, seat);
+    // The cards this player may know: their own Deck and Extra Deck, and every card they can see now.
+    const codes = new Set([...view.deckList, ...Object.entries(state.instances).flatMap(([i, c]) => (visibleTo(state, i, seat) ? [c.code] : []))]);
+    if (card !== null && !codes.has(card)) return { ok: false, status: 404, error: "There's no such card." };
+    const cards = [...codes].map((code) => ({ card: state.cards[code]!, sheet: state.sheets[code] ?? null }));
+    const input = { view, log: logFor(duel.events, seat), cards, question, card, state };
+    duel.asking.add(seat);
+    void askJudge(input, this.ai.judge)
+      .then((record) => this.commit(duel, [{ type: 'asked', record }]))
+      .catch((error: unknown) => console.error(`Question in duel ${duel.id} failed:`, error))
+      .finally(() => duel.asking.delete(seat));
+    return { ok: true };
+  }
+
+  /**
+   * Escalates a player's question to the appeal model, which sees the whole board. Its finding joins the asker's log;
+   * a wrong ruling is contested for them, a wrong card is reported (its scripts set aside, as a player's report does),
+   * and a wrong rule in code is reported for the admin. It uses one of the duel's appeals.
+   */
+  async escalate(id: string, seatKey: string, seq: number, note: string): Promise<ActResult> {
+    const duel = await this.load(id);
+    const seat = await this.seatOf(id, seatKey);
+    if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
+    if (!this.ai.appeal) return { ok: false, status: 503, error: 'Escalating needs an Anthropic API key, and this server has none.' };
+    const event = duel.events[seq];
+    if (event?.type !== 'asked' || event.record.player !== seat) return { ok: false, status: 404, error: 'There is no such question.' };
+    if (duel.escalating.has(seq) || duel.events.some((e) => e.type === 'escalated' && e.record.asked === seq)) {
+      return { ok: false, status: 409, error: 'You already escalated this question.' };
+    }
+    if (this.appealsUsed(duel) >= this.ai.appeals) return { ok: false, status: 429, error: 'This duel has used all its appeals.' };
+    duel.escalating.add(seq);
+    const input = { state: duel.state, events: duel.events, view: viewFor(duel.state, seat), asked: event.record, seq, note };
+    void escalate(input, this.ai.appeal)
+      .then(async (record) => {
+        await this.commit(duel, [{ type: 'escalated', record }]);
+        if (record.outcome === 'ruling_wrong') {
+          const started = this.startContest(duel, seat, record.judged!, `Escalated question: ${record.ruling}`, true);
+          if (!started.ok) console.log(`Duel ${duel.id}: an escalation found ruling #${record.judged} wrong, but it can't be contested: ${started.error}`);
+        } else if (record.outcome === 'card_wrong') {
+          await this.db.insert(sheetReports).values({ code: record.code!, matchId: duel.id, seq: duel.events.length, reporter: 'escalation', note: record.ruling });
+          await this.sheetChanged(record.code!, await flagScripts(this.db, record.code!, `escalated question found the card wrong: ${record.ruling}`));
+        } else if (record.outcome === 'engine_wrong') {
+          await this.db.insert(sheetReports).values({ code: null, matchId: duel.id, seq: duel.events.length, reporter: 'escalation', note: record.ruling });
+        }
+      })
+      .catch((error: unknown) => console.error(`Escalation in duel ${duel.id} failed:`, error))
+      .finally(() => duel.escalating.delete(seq));
     return { ok: true };
   }
 

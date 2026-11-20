@@ -1,6 +1,6 @@
 # Ask the judge
 
-Status, 2026-11-19: plan, not built. Part of the order in [next-steps.md](next-steps.md).
+Status, 2026-11-20: all three steps built. Notes marked **Built** say where the code differs from the plan. Part of the order in [next-steps.md](next-steps.md).
 
 During a duel a player asks a rules question in plain words about the board in front of them: "Can Trap Hole answer that Synchro Summon?", "Why can't I attack with Junk Warrior?", "Does Swords of Revealing Light stop my own attacks?" They get an answer in a few seconds. When they think the answer shows the game is wrong, one click escalates it to the appeal model, which can contest a ruling through the existing flow or set a card's script aside the way a report does.
 
@@ -32,10 +32,12 @@ When a player opens the menu of a card with effects that aren't offered right no
 - **Judge-only effects** (no script) have only the generic checks. If those pass, the reason is "The judge decides when you try", and the effect is offered anyway.
 - **Hidden information:** reasons only describe the asker's own cards and public facts. A test runs `hiddenNameIn` over every reason the offline duels produce.
 - **API:** the reasons ride on the view: `PlayerView.blocked: { card, effect, reason }[]` for the player's visible cards with effects, so no extra request is needed and the menu shows them at once.
+- **Built:** `checkEffects` in `engine/src/rules.ts` runs the checks once per effect and gives either the activation code may offer or the reason it can't; `legalActions` takes the activations and `blockedEffects` the reasons (then `scriptProblem` for scripted effects that pass), so the two can't drift. Where the card is comes first (a Trap Set this turn, an effect of a face-down monster), then the timing, spell speed, once per turn, a standing refusal, the phase and last the `when` moment. `blockedAttacks` covers attacks in the Battle Phase. `Blocked` also carries the effect's wording, so a card with several effects says which. Trigger, continuous, Flip and summoning-condition effects get a line saying how they work (they are never activated by hand). The menu opens on any of your cards with something to say, and each reason sits in a "Why can't I activate this?" item that unfolds in place.
 
 ### 2. Ask a question (Haiku)
 
 - **Where:** the chat box in the sidebar gets a switch, **Chat / Ask the judge**. Pinned card details get **Ask about this card**, which switches the box to Ask and names the card. The answer appears in the asker's log as a private entry, styled apart and marked "Only you see this", with **Escalate** under it.
+- **Built:** `card` is the card's code, not an instance ID (pinned card details know the card, not which copy), and must be a card the asker can see or one in their own Deck or Extra Deck. While the answer is on its way the box says "The judge is answering…".
 - **API:** `POST /api/duels/:id/ask { text, card? }` answers 202, and the answer arrives on the asker's stream as a log entry. 409 while that player's previous question is still being answered (one at a time each), 429 when their questions are used up, 503 without an API key. Guests can ask like accounts.
 - **The prompt**, in cache order:
   1. *System (cached, the same for every question):* what the judge's helper is for, the judge's rules reference (`RULES` from `prompt.ts`, so both agree), what this site doesn't support yet (Fusion, Link, Pendulum, per-card default responses), and the answer format.
@@ -72,8 +74,9 @@ It answers with one of four outcomes:
 | `engine_wrong` | A rule in code is wrong (phases, chains, battle, summoning) | Stored for the admin as a report with no card. Nothing in the duel changes. |
 
 - **Cost and limits:** an escalation is one of the duel's 10 appeals (`APPEALS_PER_DUEL`). A contest it starts doesn't count again. Each player may escalate each answer once.
-- **Reports with no card:** `sheet_reports` becomes `reports`, with a nullable `code` and a `kind` (`card` or `engine`), so engine problems show up in the admin Rulings section next to card ones. The database is pre-launch, so this is a schema change with no migration of old rows.
+- **Reports with no card:** `sheet_reports.code` becomes nullable; a report with no card is about a rule in code. **Built:** the admin Rulings section lists them under "Rules in code", and `GET /api/admin/rulings` answers `{ cards, engine }`. Reports from an escalation have the reporter `escalation`.
 - **Record:** an `escalated` event (seat, the `asked` seq, outcome, explanation, ruling, model, usage), shown only to the asker, like `asked`. A contest it starts is an ordinary `appealed` entry.
+- **Built:** `POST /api/duels/:id/escalate { seq, note }` (202; 404 for a question that isn't the caller's, 409 when already escalated, 429 when the appeals are used up). `server/src/judge/ask.ts` holds both calls. The escalation's answer is checked by code: a `ruling_wrong` must name a ruling in the asker's log and a `card_wrong` a card in the duel, and its explanation must name no card the asker can't see. A failed check goes back to the model once; a target still wrong after that is kept as an `engine_wrong` for the admin, and a leak gets a plain explanation instead. Appeals used = contests + escalations that didn't start a contest. The admin's duel list gains a Questions column; escalations count as appeals.
 
 ## Tests and evals
 

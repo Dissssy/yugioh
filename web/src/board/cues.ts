@@ -53,6 +53,8 @@ const baseMs: Record<LogEvent['type'], number> = {
   rolledBack: 600,
   linkResolved: 200,
   chatted: 0,
+  asked: 0,
+  escalated: 0,
 };
 
 /** Phases nobody acts in pass almost instantly. */

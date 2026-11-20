@@ -36,6 +36,8 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
 
 const answerBody = z.object({ prompt: z.string(), picks: z.array(z.string()).max(60) });
 const chatBody = z.object({ text: z.string().trim().min(1).max(300) });
+const askBody = z.object({ text: z.string().trim().min(1).max(500), card: z.number().int().nullable().default(null) });
+const escalateBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
 const contestBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
 const reportBody = z.object({ code: z.number().int(), note: z.string().trim().min(1).max(1000) });
 
@@ -199,6 +201,32 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     const row = await duels.find(req.params.id);
     if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
     const result = await duels.contest(row.id, p.key, body.data.seq, body.data.note);
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.status(202).end();
+  });
+
+  // A question to the judge (docs/ask-the-judge.md). The answer arrives later in the asker's log only.
+  router.post('/duels/:id/ask', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const body = askBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    const row = await duels.find(req.params.id);
+    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    const result = await duels.ask(row.id, p.key, body.data.text, body.data.card);
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.status(202).end();
+  });
+
+  // Escalates the question at log entry `seq` to the appeal model. Its finding arrives later in the asker's log.
+  router.post('/duels/:id/escalate', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const body = escalateBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    const row = await duels.find(req.params.id);
+    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    const result = await duels.escalate(row.id, p.key, body.data.seq, body.data.note);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(202).end();
   });

@@ -1,7 +1,7 @@
 // What each player is allowed to see. Hidden cards are sent without an ID or card data, so nothing leaks to the browser.
 
 import { waitingFor } from './chain.ts';
-import { legalActions, normalSummonUsed } from './rules.ts';
+import { blockedAttacks, blockedEffects, legalActions, normalSummonUsed } from './rules.ts';
 import { statsOf } from './continuous.ts';
 import { evolve, locate, replay } from './state.ts';
 import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, LogEntry, LogEvent, Phase, Place, PlayerView, Seat, StartView } from './types.ts';
@@ -9,6 +9,7 @@ import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, Lo
 export function viewFor(state: DuelState, seat: Seat): PlayerView {
   const shown = (id: string): CardView => ({ id, card: state.cards[state.instances[id]!.code]! });
   const hidden: CardView = { hidden: true };
+  const actions = legalActions(state, seat);
   const field = (owner: Seat, monsters: boolean) => (c: FieldCard | null): FieldCardView | null =>
     c && {
       card: c.faceUp || owner === seat ? shown(c.id) : hidden,
@@ -49,7 +50,8 @@ export function viewFor(state: DuelState, seat: Seat): PlayerView {
     waiting: waitingFor(state, seat),
     start: startFor(state, seat),
     rollback: state.rollback && { explanation: state.rollback.explanation, accepted: state.rollback.accepted },
-    actions: legalActions(state, seat),
+    actions,
+    blocked: [...blockedEffects(state, seat, actions), ...blockedAttacks(state, seat)],
   };
 }
 
@@ -145,6 +147,16 @@ function reviewText(state: DuelState, event: DuelEvent): string {
       const note = a.note ? ` with the note "${a.note}"` : '';
       return `Appeal (${a.model}) by ${who(a.by)} of ruling #${a.judged}${note}: ${a.verdict}. ${a.explanation} | Correct ruling: ${a.ruling}`;
     }
+    case 'asked': {
+      const a = event.record;
+      const about = [a.card !== null && `about ${state.cards[a.card]?.name ?? a.card}`, a.ruling !== null && `about ruling #${a.ruling}`].filter(Boolean).join(', ');
+      return `Question (${a.model}) by ${who(a.player)}${about ? ` ${about}` : ''}: "${a.question}" | ${a.verdict}: ${a.answer}${a.error ? ` | Error: ${a.error}` : ''}`;
+    }
+    case 'escalated': {
+      const e = event.record;
+      const target = e.judged !== null ? ` (ruling #${e.judged})` : e.code !== null ? ` (${state.cards[e.code]?.name ?? e.code})` : '';
+      return `Escalation (${e.model}) by ${who(e.player)} of question #${e.asked}${e.note ? ` with the note "${e.note}"` : ''}: ${e.outcome}${target}. ${e.explanation} | Ruling: ${e.ruling}`;
+    }
     case 'aiDecided': {
       const a = event.record;
       const picked = a.picks.map((i) => `${i + 1}. ${a.options[i]}`).join('; ') || 'nothing';
@@ -197,6 +209,13 @@ function visibleEvent(state: DuelState, event: DuelEvent, seat: Seat): LogEvent 
     case 'attackEnded':
     case 'aiDecided':
       return null;
+    case 'asked': {
+      const r = event.record;
+      if (r.player !== seat) return null;
+      return { type: 'asked', player: r.player, question: r.question, card: r.card, answer: r.answer, verdict: r.verdict, failed: r.error !== null };
+    }
+    case 'escalated':
+      return event.record.player === seat ? { type: 'escalated', asked: event.record.asked, outcome: event.record.outcome, explanation: event.record.explanation } : null;
     case 'moved': {
       // A card moving between places this player can't see (Deck to hand, say) stays anonymous.
       const seen = event.owner === seat || PUBLIC.includes(event.from) || visibleTo(state, event.card, seat);
@@ -352,6 +371,10 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return event.what === 'battle_phase' ? `${who(event.player)} can't conduct their Battle Phase this turn` : `${who(event.player)} can't declare an attack this turn`;
     case 'chatted':
       return `${who(event.player)}: ${event.text}`;
+    case 'asked':
+      return `You asked the judge: "${event.question}" ${event.answer}`;
+    case 'escalated':
+      return `The appeal looked at your question: ${event.explanation}`;
     case 'flippedByAttack':
     case 'linkResolved':
       return null;

@@ -5,7 +5,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
-import { isAdmin, type AdminDuels, type Me, type RulingCard, type UserSettings } from '@yugioh/shared';
+import { isAdmin, type AdminDuels, type Me, type Rulings, type UserSettings } from '@yugioh/shared';
 import { findUserBySub, listUsers, setRole, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import { duelCosts } from './costs.ts';
@@ -15,7 +15,7 @@ import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
 import { matchReport, reportText } from './matchReport.ts';
 import { Opponents } from './opponent/opponent.ts';
-import { editSheet, resolveReport, rulingCards } from './rulings.ts';
+import { editSheet, resolveReport, rulings } from './rulings.ts';
 import { username } from './usernames.ts';
 import { userKey, viewerOf, type Viewer } from './viewer.ts';
 
@@ -174,7 +174,7 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
 
   app.get('/api/admin/duels', requireAdmin, async (_req, res) => {
     const { total, byDuel } = await duelCosts(db);
-    const none = { judgeCalls: 0, appeals: 0, aiCalls: 0, cost: 0 };
+    const none = { judgeCalls: 0, appeals: 0, aiCalls: 0, questions: 0, cost: 0 };
     const list = await Promise.all((await duels.recent()).map(async (row) => ({ ...(await duels.summarize(row, null, false)), ...(byDuel.get(row.id) ?? none) })));
     res.json({ totalCost: total, duels: list } satisfies AdminDuels);
   });
@@ -189,7 +189,7 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
 
   // Rulings: reported cards and set-aside scripts, the admin's sheet edits, and closing reports.
   app.get('/api/admin/rulings', requireAdmin, async (_req, res) => {
-    res.json((await rulingCards(db)) satisfies RulingCard[]);
+    res.json((await rulings(db)) satisfies Rulings);
   });
 
   const sheetBody = z.object({ sheet: z.unknown(), note: z.string().trim().min(1).max(1000) });

@@ -47,6 +47,8 @@ An always-on effect can't be a judge call, so a `continuous` sheet entry carries
 
 ## Reports: when a script is wrong
 
+Before reporting, a player can ask: the card menu says why code doesn't offer an effect, and the judge answers rules questions privately, with an escalation to the appeal model that can report the card itself. See [ask-the-judge.md](ask-the-judge.md).
+
 A player who thinks a card is ruled wrongly pins the card's details (right-click or Shift) and uses **Report a ruling problem**, saying what the game did and what it should have done (`POST /api/duels/:id/report`; up to 5 per player per duel, only for cards they can see). An appeal that overturns a scripted ruling does the same on its own, with the appeal's `ruling` as the note. Either way, at once and in every duel:
 
 - the report is stored in `sheet_reports` with the duel and its event count, so the board it was made on can be replayed from the log;

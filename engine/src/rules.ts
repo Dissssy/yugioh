@@ -10,6 +10,7 @@ import {
   MONSTER_ZONES,
   OPENING_HAND,
   SPELL_TRAP_ZONES,
+  type Blocked,
   type CardData,
   type DuelEvent,
   type EffectSheet,
@@ -310,16 +311,31 @@ export function activateAction(state: DuelState, card: string, effect: number, z
   return { type: 'activate', card, effect, zones, text: state.sheets[cardOf(state, card).code]!.effects[effect]!.effect };
 }
 
-/** The effects of one card the player may try to activate in the open game or the response window now. */
-function candidates(state: DuelState, seat: Seat, id: string): Candidate[] {
+/** One effect of a card: the activation the timing allows now, or why it doesn't. */
+type EffectCheck = { effect: number; candidate: Candidate } | { effect: number; reason: string };
+
+/** Why no effect can be activated now, whatever the card, or null when some may be. */
+function timingProblem(state: DuelState, seat: Seat): string | null {
   const step = state.step;
-  const window = step.at === 'respond' ? step : null;
-  if (!window && !(step.at === 'open' && state.turnPlayer === seat)) return [];
+  if (step.at === 'respond') return step.priority === seat ? null : 'Wait until you have priority in this response window.';
+  if (step.at === 'open') return state.turnPlayer === seat ? null : "On your opponent's turn you can only respond when a response window gives you priority.";
+  return 'Not now: the duel is resolving something first.';
+}
+
+/**
+ * Each effect of one card, checked against what code knows for every card: the timing (the open game or a response
+ * window, and the spell speed a window allows), the phase, where the card is, a free zone, once-per-turn use, a
+ * standing ruling and the event the effect needs. A passing effect becomes a candidate; its script is checked after.
+ */
+function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
   const at = locate(state, id);
   if (!at || at.seat !== seat || state.instances[id]!.owner !== seat) return [];
   const card = cardOf(state, id);
   const sheet = state.sheets[card.code];
   if (!sheet) return [];
+  const timing = timingProblem(state, seat);
+  const step = state.step;
+  const window = step.at === 'respond' ? step : null;
   const yourTurn = state.turnPlayer === seat;
   const main = yourTurn && isMainPhase(state);
   /** In the open game, fast effects work in your Main and Battle Phases; a window allows them in any phase. */
@@ -327,35 +343,109 @@ function candidates(state: DuelState, seat: Seat, id: string): Candidate[] {
   // In a chain, a response must be at least as fast as the link it answers, and never Spell Speed 1.
   const minSpeed = window ? Math.max(2, ...state.chain.map((l) => speedOf(state, l))) : 1;
   const p = state.players[seat];
-  const result: Candidate[] = [];
-  sheet.effects.forEach((effect, index) => {
-    if (effect.speed < minSpeed) return;
-    if (!onceOk(state, id, card.code, index, effect.opt)) return;
-    if (ruledIllegal(state, seat, id, index)) return;
+  return sheet.effects.map((effect, index): EffectCheck => {
+    const no = (reason: string): EffectCheck => ({ effect: index, reason });
+    if (effect.kind === 'trigger') return no(`A trigger effect: it comes up by itself (${effect.window || 'when its event happens'}).`);
+    if (effect.kind === 'continuous') return no('Always on while the card is face-up on the field; it is never activated.');
+    if (effect.kind === 'condition') return no('A summoning condition, not an effect you activate.');
+    if (effect.kind === 'flip') return no('A Flip effect: it happens when the card is flipped face-up.');
+    // Where the card is and its state come first: they are the reasons a player can do least about.
+    const set = at.zone === 'spellTraps' ? p.spellTraps[at.index]! : null;
+    const m = at.zone === 'monsters' ? p.monsters[at.index]! : null;
+    const quick = card.kind === 'spell' && card.race === 'Quick-Play';
+    if (card.kind === 'spell' && effect.kind === 'activation') {
+      if (!ACTIVATABLE_SPELLS.includes(card.race)) return no(`${card.race} Spells can't be activated on this site yet.`);
+      if (at.zone !== 'hand' && !set) return no('Only from your hand or a Spell & Trap Zone.');
+      if (set?.faceUp) return no('It is already face-up.');
+      if (quick && set && set.placedTurn === state.turn) return no("A Quick-Play Spell Set this turn can't be activated until a later turn.");
+      if (at.zone === 'hand' && freeZones(p.spellTraps).length === 0) return no('Your Spell & Trap Zones are full.');
+    } else if (card.kind === 'trap' && effect.kind === 'activation') {
+      if (!ACTIVATABLE_TRAPS.includes(card.race)) return no(`${card.race} Traps can't be activated on this site yet.`);
+      if (!set) return no('A Trap must be Set first, and activated on a later turn.');
+      if (set.faceUp) return no('It is already face-up.');
+      if (set.placedTurn === state.turn) return no("A Trap can't be activated the turn it was Set.");
+    } else if (card.kind === 'monster' && (effect.kind === 'ignition' || effect.kind === 'quick')) {
+      if (!m?.faceUp) return no('Only while it is face-up on the field.');
+      if (m.effectsNegated) return no('Its effects are negated.');
+    } else {
+      return no('This effect is not activated.');
+    }
+    if (timing) return no(timing);
+    if (effect.speed < minSpeed) {
+      return no(minSpeed === 3 ? 'Only a Counter Trap can respond to a Counter Trap.' : `A Spell Speed ${effect.speed} effect can't be activated in response to Spell Speed ${minSpeed}.`);
+    }
+    if (!onceOk(state, id, card.code, index, effect.opt)) return no('Once per turn: it was already used this turn.');
+    const ruling = ruledIllegal(state, seat, id, index);
+    if (ruling) return no(`The judge refused it on this board: ${ruling.summary}`);
+    // The phase each kind needs.
+    if (card.kind === 'spell') {
+      if (!(quick ? fast : main && !window)) {
+        return no(quick ? 'A Quick-Play Spell can be activated in your Main or Battle Phase, or in response.' : 'Only in your own Main Phase, with no chain going.');
+      }
+      if (at.zone === 'hand' && !yourTurn) return no('A Quick-Play Spell can be activated from the hand only on your own turn.');
+    } else if (card.kind === 'trap' || effect.kind === 'quick') {
+      if (!fast) return no('Only in your Main or Battle Phase, or in response.');
+    } else {
+      // An ignition effect needs your open Main Phase, unless its script names other phases (Speed Warrior).
+      const phased = scriptOf(state, id, index)?.conditions.some((c) => c.if === 'phase');
+      if (window) return no("An ignition effect can't be activated in response.");
+      if (!(yourTurn && (main || phased))) return no('Only in your own Main Phase.');
+    }
     // An effect that answers an event can only be activated in the window that event opened; one that answers an
     // activation, in the window the last link on the chain opened.
     const cause = effect.when?.event === 'activated' ? lastActivation(state) : effect.when ? (window?.cause ?? null) : null;
-    if (effect.when && (!cause || !whenMatches(state, effect.when, cause, id, seat))) return;
-    const push = (zones: number[] | null) => result.push({ ...activateAction(state, id, index, zones), cause });
-    if (card.kind === 'spell' && effect.kind === 'activation' && ACTIVATABLE_SPELLS.includes(card.race)) {
-      const quick = card.race === 'Quick-Play';
-      if (!(quick ? fast : main && !window)) return;
-      // A Quick-Play Spell can be activated from the hand only on your own turn, and not the turn it was Set.
-      if (at.zone === 'hand' && yourTurn && freeZones(p.spellTraps).length > 0) push(freeZones(p.spellTraps));
-      const set = at.zone === 'spellTraps' ? p.spellTraps[at.index]! : null;
-      if (set && !set.faceUp && !(quick && set.placedTurn === state.turn)) push(null);
-    } else if (card.kind === 'trap' && effect.kind === 'activation' && ACTIVATABLE_TRAPS.includes(card.race)) {
-      const set = at.zone === 'spellTraps' ? p.spellTraps[at.index]! : null;
-      if (fast && set && !set.faceUp && set.placedTurn !== state.turn) push(null);
-    } else if (card.kind === 'monster' && (effect.kind === 'ignition' || effect.kind === 'quick')) {
-      const m = at.zone === 'monsters' ? p.monsters[at.index]! : null;
-      if (!m?.faceUp || m.effectsNegated) return;
-      // An ignition effect needs your open Main Phase, unless its script names other phases (Speed Warrior).
-      const phased = scriptOf(state, id, index)?.conditions.some((c) => c.if === 'phase');
-      if (effect.kind === 'ignition' ? !window && yourTurn && (main || phased) : fast) push(null);
-    }
+    if (effect.when && (!cause || !whenMatches(state, effect.when, cause, id, seat))) return no(`Only at its moment: ${effect.window || 'when the event it answers happens'}.`);
+    const zones = card.kind !== 'monster' && at.zone === 'hand' ? freeZones(p.spellTraps) : null;
+    return { effect: index, candidate: { ...activateAction(state, id, index, zones), cause } };
   });
-  return result;
+}
+
+/** The effects of one card the player may try to activate in the open game or the response window now. */
+function candidates(state: DuelState, seat: Seat, id: string): Candidate[] {
+  return checkEffects(state, seat, id).flatMap((c) => ('candidate' in c ? [c.candidate] : []));
+}
+
+/**
+ * Why each effect of the player's cards (hand and field) can't be activated now, for "Why can't I?". An effect that
+ * `actions` (the player's legal actions now) offers isn't listed, nor is one waiting as an optional trigger. Reasons only use what the player can see.
+ */
+export function blockedEffects(state: DuelState, seat: Seat, actions: LegalAction[]): Blocked[] {
+  if (state.result || state.step.at === 'rps' || state.step.at === 'order') return [];
+  const offered = actions.flatMap((a) => (a.type === 'activate' ? [`${a.card}:${a.effect}`] : []));
+  const p = state.players[seat];
+  const ids = [...p.hand, ...p.monsters.flatMap((m) => (m ? [m.id] : [])), ...p.spellTraps.flatMap((c) => (c ? [c.id] : []))];
+  return ids.flatMap((id) =>
+    checkEffects(state, seat, id).flatMap((c): Blocked[] => {
+      if (offered.includes(`${id}:${c.effect}`)) return [];
+      const text = state.sheets[cardOf(state, id).code]!.effects[c.effect]!.effect;
+      if ('reason' in c) return [{ card: id, effect: c.effect, text, reason: c.reason }];
+      const problem = scriptProblem(state, seat, id, c.effect, c.candidate.cause);
+      return problem ? [{ card: id, effect: c.effect, text, reason: problem }] : [];
+    }),
+  );
+}
+
+/** Why each of the player's monsters can't attack now, in their Battle Phase, for "Why can't I?". */
+export function blockedAttacks(state: DuelState, seat: Seat): Blocked[] {
+  if (state.result || state.step.at !== 'open' || state.turnPlayer !== seat || state.phase !== 'battle') return [];
+  const targets = attackTargets(state, seat);
+  const direct = state.players[other(seat)].monsters.every((m) => m === null);
+  return ownMonsters(state, seat).flatMap((m): Blocked[] => {
+    const reason = !m.faceUp
+      ? 'A face-down monster can\'t attack.'
+      : m.position !== 'attack'
+        ? 'Only a monster in Attack Position can attack.'
+        : m.attackedTurn === state.turn
+          ? 'It already attacked this turn.'
+          : forbidden(state, seat, 'declare_attack')
+            ? "An effect stopped you declaring attacks this turn."
+            : restricted(state, m.id, 'attack')
+              ? "A card's effect stops it attacking."
+              : !direct && targets.length === 0
+                ? "None of your opponent's monsters can be attacked."
+                : null;
+    return reason ? [{ card: m.id, effect: null, text: null, reason }] : [];
+  });
 }
 
 /** The activation a response window answers: the chain's last link, while players may respond to it. */

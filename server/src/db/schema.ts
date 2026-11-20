@@ -130,19 +130,18 @@ export const sheetRevisions = pgTable('sheet_revisions', {
 });
 
 /**
- * A player's report that a card is ruled wrongly, or an appeal that overturned a scripted ruling. `seq` is how many
- * events the duel had, so the board it was made on can be replayed. Open until the admin resolves it.
+ * A player's report that a card is ruled wrongly, an appeal that overturned a scripted ruling, or an escalated
+ * question that found a card or a rule in code wrong. `code` is null for a rule in code. `seq` is how many events the
+ * duel had, so the board it was made on can be replayed. Open until the admin resolves it.
  */
 export const sheetReports = pgTable('sheet_reports', {
   id: serial('id').primaryKey(),
-  code: integer('code')
-    .notNull()
-    .references(() => cards.id, { onDelete: 'cascade' }),
+  code: integer('code').references(() => cards.id, { onDelete: 'cascade' }),
   matchId: text('match_id')
     .notNull()
     .references(() => matches.id, { onDelete: 'cascade' }),
   seq: integer('seq').notNull(),
-  /** The reporting seat key, or "appeal". */
+  /** The reporting seat key, "appeal" or "escalation". */
   reporter: text('reporter').notNull(),
   note: text('note').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

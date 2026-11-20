@@ -3,7 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startDuel, type DuelEvent, type DuelUpdate, type LogEntry } from '@yugioh/engine';
-import type { AdminDuels, DeckSummary, DuelSummary, RulingCard } from '@yugioh/shared';
+import type { AdminDuels, DeckSummary, DuelSummary, Rulings } from '@yugioh/shared';
 import { loadCards, syncCards } from '../src/cards.ts';
 import { decks, matchEvents } from '../src/db/schema.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
@@ -333,7 +333,7 @@ describe('a scripted card effect', () => {
 
     // The admin sees the report, restores the script, and closes the report.
     expect((await s.guest.json(`${h.baseUrl}/api/admin/rulings`)).status).toBe(403);
-    const { body: cards } = await s.admin.json<RulingCard[]>(`${h.baseUrl}/api/admin/rulings`);
+    const { body: { cards } } = await s.admin.json<Rulings>(`${h.baseUrl}/api/admin/rulings`);
     expect(cards).toHaveLength(1);
     const card = cards[0]!;
     expect(card).toMatchObject({ code: RETURNING, name: 'The Warrior Returning Alive', reports: [{ from: 'player', note: 'It should see the Warrior I discarded.' }] });
@@ -347,7 +347,7 @@ describe('a scripted card effect', () => {
     expect((await sheetOf(h.db, RETURNING))!.model).toBe('admin');
 
     expect((await s.admin.json(`${h.baseUrl}/api/admin/reports/${card.reports[0]!.id}/resolve`, { method: 'POST' })).status).toBe(204);
-    expect((await s.admin.json<RulingCard[]>(`${h.baseUrl}/api/admin/rulings`)).body).toEqual([]);
+    expect((await s.admin.json<Rulings>(`${h.baseUrl}/api/admin/rulings`)).body).toEqual({ cards: [], engine: [] });
     mine.close();
   });
 
@@ -364,7 +364,7 @@ describe('a scripted card effect', () => {
     await until(mine, (u) => entries(u).find((e) => e.event.type === 'appealed'));
     await until(mine, (u) => (u.type === 'sync' ? u : undefined));
     expect((await sheetOf(h.db, POISON))!.effects.every((e) => !e.script || e.status === 'flagged')).toBe(true);
-    const { body: cards } = await s.admin.json<RulingCard[]>(`${h.baseUrl}/api/admin/rulings`);
+    const { body: { cards } } = await s.admin.json<Rulings>(`${h.baseUrl}/api/admin/rulings`);
     expect(cards).toMatchObject([{ code: POISON, reports: [{ from: 'appeal', note: 'The damage goes to the opponent.' }] }]);
     mine.close();
   });
@@ -425,5 +425,83 @@ describe('a rewind after an overturned ruling', () => {
     // The undone ruling can't be contested any more.
     expect((await fresh.admin.json(`${url}/contest`, { method: 'POST', body: JSON.stringify({ seq: ruled.seq, note: 'again' }) })).status).toBe(409);
     mine.close();
+  });
+});
+
+describe('asking the judge', () => {
+  let s: Setup;
+  let url: string;
+  let mine: Stream;
+  /** What each model call was sent, by model. */
+  const sent: Record<string, Anthropic.MessageCreateParamsNonStreaming[]> = {};
+  const json = (model: string, body: unknown) => message(model, [{ type: 'text', text: JSON.stringify(body) }], 'end_turn');
+  let escalation: unknown = null;
+
+  beforeAll(async () => {
+    s = await setUp(true);
+    url = `${h.baseUrl}/api/duels/${s.duel.id}`;
+    mine = new Stream(await s.guest.fetch(`${url}/stream`));
+    h.setModel(async (params) => {
+      (sent[params.model] ??= []).push(params);
+      if (params.model === 'claude-haiku-5-5') return json(params.model, { answer: 'It needs a Warrior in your GY to target, and yours is empty.', verdict: 'game_seems_wrong', ruling: null });
+      return json(params.model, escalation);
+    });
+  });
+  afterAll(() => mine.close());
+
+  it("says why an effect isn't offered", async () => {
+    const view = await until(mine, (u) => (u.type === 'sync' ? u.view : undefined));
+    expect(view.actions.some((a) => a.type === 'activate' && a.card === s.returning)).toBe(false);
+    expect(view.blocked.find((b) => b.card === s.returning)?.reason).toMatch(/target/);
+  });
+
+  it("answers a question in the asker's log only, from what the asker can see", async () => {
+    expect((await s.guest.json(`${url}/ask`, { method: 'POST', body: JSON.stringify({ text: 'Why can I not activate this?', card: 1 }) })).status).toBe(404);
+    const asked = await s.guest.json(`${url}/ask`, { method: 'POST', body: JSON.stringify({ text: 'Why can I not activate this?', card: RETURNING }) });
+    expect(asked.status).toBe(202);
+    const entry = await until(mine, (u) => entries(u).find((e) => e.event.type === 'asked'));
+    expect(entry.event).toMatchObject({ type: 'asked', question: 'Why can I not activate this?', card: RETURNING, verdict: 'game_seems_wrong', failed: false });
+    // The prompt holds code's reason, and the opponent's hand only as a count.
+    const prompt = JSON.stringify(sent['claude-haiku-5-5']![0]!.messages);
+    expect(prompt).toContain("Code's reason");
+    expect(prompt).toContain('The Warrior Returning Alive');
+    expect(prompt).toContain("5 cards you can't see");
+    // The opponent never sees it.
+    const theirs = new Stream(await s.admin.fetch(`${url}/stream`));
+    const log = await until(theirs, (u) => (u.type === 'sync' ? u.log : undefined));
+    theirs.close();
+    expect(log.some((e) => e.event.type === 'asked')).toBe(false);
+  });
+
+  it('escalates a question that finds a card wrong: its scripts are set aside and the admin sees the report', async () => {
+    const log = await (async () => {
+      const again = new Stream(await s.guest.fetch(`${url}/stream`));
+      const l = await until(again, (u) => (u.type === 'sync' ? u.log : undefined));
+      again.close();
+      return l;
+    })();
+    const question = log.find((e) => e.event.type === 'asked')!;
+    escalation = { outcome: 'card_wrong', explanation: 'The script is wrong.', ruling: 'It should be allowed.', judged: null, card: s.returning };
+    expect((await s.guest.json(`${url}/escalate`, { method: 'POST', body: JSON.stringify({ seq: question.seq, note: 'I think so.' }) })).status).toBe(202);
+    expect((await s.admin.json(`${url}/escalate`, { method: 'POST', body: JSON.stringify({ seq: question.seq, note: '' }) })).status).toBe(404);
+    const found = await until(mine, (u) => entries(u).find((e) => e.event.type === 'escalated'));
+    expect(found.event).toMatchObject({ type: 'escalated', asked: question.seq, outcome: 'card_wrong', explanation: 'The script is wrong.' });
+    expect((await s.guest.json(`${url}/escalate`, { method: 'POST', body: JSON.stringify({ seq: question.seq, note: '' }) })).status).toBe(409);
+    await until(mine, (u) => (u.type === 'sync' ? u : undefined));
+    expect((await sheetOf(h.db, RETURNING))!.effects.every((e) => !e.script || e.status === 'flagged')).toBe(true);
+    const { body } = await s.admin.json<Rulings>(`${h.baseUrl}/api/admin/rulings`);
+    expect(body.cards.find((c) => c.code === RETURNING)?.reports).toMatchObject([{ from: 'escalation', note: 'It should be allowed.' }]);
+  });
+
+  it('reports a rule in code for the admin, changing nothing in the duel', async () => {
+    expect((await s.guest.json(`${url}/ask`, { method: 'POST', body: JSON.stringify({ text: 'Can I skip my Draw Phase?', card: null }) })).status).toBe(202);
+    const second = await until(mine, (u) => entries(u).find((e) => e.event.type === 'asked'));
+    escalation = { outcome: 'engine_wrong', explanation: 'A rule in code is wrong.', ruling: 'Phases are wrong.', judged: null, card: null };
+    expect((await s.guest.json(`${url}/escalate`, { method: 'POST', body: JSON.stringify({ seq: second.seq, note: '' }) })).status).toBe(202);
+    await until(mine, (u) => entries(u).find((e) => e.event.type === 'escalated'));
+    await expect.poll(async () => (await s.admin.json<Rulings>(`${h.baseUrl}/api/admin/rulings`)).body.engine).toMatchObject([{ from: 'escalation', note: 'Phases are wrong.' }]);
+    // The admin's costs count the questions, and the escalations as appeals.
+    const duels = (await s.admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`)).body;
+    expect(duels.duels.find((d) => d.id === s.duel.id)).toMatchObject({ questions: 2, appeals: 2 });
   });
 });

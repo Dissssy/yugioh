@@ -1,6 +1,6 @@
 # Next steps after the starter decks
 
-Written 2026-11-19, while both starter decks are being playtested. Everything in [roadmap.md](roadmap.md) is built, and nothing here is built yet. The AI opponent's deck plans (step 3 of [ai-opponent.md](ai-opponent.md)) wait on playtest results and aren't covered here.
+Written 2026-11-19, while both starter decks are being playtested. Everything in [roadmap.md](roadmap.md) is built. Ask the judge (items 1 and 3 below) was built 2026-11-20; the rest isn't built yet. The AI opponent's deck plans (step 3 of [ai-opponent.md](ai-opponent.md)) wait on playtest results and aren't covered here.
 
 The three features coming next have their own plans:
 
@@ -118,7 +118,7 @@ The full tables with the other options are in each plan.
 
 | Feature | Question | Recommendation |
 | --- | --- | --- |
-| Ask the judge | Who sees questions | Only the asker |
+| Ask the judge | Who sees questions | Only the asker (Ethan chose this, 2026-11-20) |
 | Ask the judge | Questions per duel | 20 per player, separate from judge calls |
 | Ask the judge | When Escalate is offered | On every answer |
 | Ask the judge | An escalation finds a card wrong | Flag its scripts at once, like a report |

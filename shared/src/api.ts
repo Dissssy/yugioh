@@ -75,6 +75,8 @@ export interface DuelCost {
   appeals: number;
   /** The AI opponent's model calls (docs/ai-opponent.md). */
   aiCalls: number;
+  /** Players' questions to the judge; escalations count as appeals (docs/ask-the-judge.md). */
+  questions: number;
   /** Estimated from the tokens used and Anthropic's list prices, in US dollars. */
   cost: number;
 }
@@ -91,9 +93,15 @@ export interface SheetReport {
   matchId: string;
   /** How many events the duel had when the report was made. */
   seq: number;
-  from: 'player' | 'appeal';
+  from: 'player' | 'appeal' | 'escalation';
   note: string;
   createdAt: string;
+}
+
+/** What the admin's Rulings section lists: cards to look at, and open reports of a rule in code being wrong. */
+export interface Rulings {
+  cards: RulingCard[];
+  engine: SheetReport[];
 }
 
 /** A card whose rulings need the admin: it has open reports, or scripts set aside for the judge. */

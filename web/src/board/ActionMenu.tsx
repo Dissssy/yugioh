@@ -1,14 +1,19 @@
 import { autoUpdate, flip, FloatingPortal, offset, shift, useFloating } from '@floating-ui/react';
 import { useEffect } from 'react';
 
-/** What you can do with the card you clicked, in a small menu right next to it. */
+/**
+ * What you can do with the card you clicked, in a small menu right next to it. `notes` are what you can't do now,
+ * each opening code's reason ("Why can't I?").
+ */
 export function ActionMenu({
   anchor,
   items,
+  notes = [],
   onClose,
 }: {
   anchor: HTMLElement;
   items: { label: string; run: () => void }[];
+  notes?: { label: string; reason: string }[];
   onClose: () => void;
 }) {
   const { refs, floatingStyles } = useFloating({
@@ -39,6 +44,12 @@ export function ActionMenu({
           <button key={item.label} role="menuitem" onClick={item.run} autoFocus={i === 0}>
             {item.label}
           </button>
+        ))}
+        {notes.map((note, i) => (
+          <details key={i} className="why-not">
+            <summary autoFocus={items.length === 0 && i === 0}>{note.label}</summary>
+            <p>{note.reason}</p>
+          </details>
         ))}
       </div>
     </FloatingPortal>

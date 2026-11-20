@@ -18,6 +18,8 @@ const env = z.object({
   JUDGE_CALLS_PER_DUEL: z.coerce.number().int().positive().default(300),
   /** Contests per duel, both players together. */
   APPEALS_PER_DUEL: z.coerce.number().int().nonnegative().default(10),
+  /** Questions to the judge per player per duel (docs/ask-the-judge.md). */
+  QUESTIONS_PER_DUEL: z.coerce.number().int().nonnegative().default(20),
   /** The model the AI opponent plays with (docs/ai-opponent.md). It must have a price in judge/pricing.ts. */
   AI_OPPONENT_MODEL: z.string().min(1).default('claude-haiku-5-5'),
   /** Model calls the AI opponent may make per duel; at the limit it surrenders. */
