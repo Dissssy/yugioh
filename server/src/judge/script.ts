@@ -370,6 +370,12 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         const what = { battle_phase: 'conduct their Battle Phase', declare_attack: 'declare an attack', special_summon: `Special Summon ${step.filter ? `a ${describeFilter(step.filter, true)}` : 'monsters'}` }[step.what];
         return `${state.players[player].name} can't ${what} this turn.`;
       }
+      case 'lock': {
+        apply({ op: 'lock', player: step.player, filter: step.filter, until: step.until, while_face_up: step.whileFaceUp });
+        const who = step.player === 'both' ? 'Neither player can' : `${state.players[step.player === 'you' ? seat : seat === 0 ? 1 : 0]!.name} can't`;
+        const what = step.filter ? `${describeFilter(step.filter)}s` : 'cards';
+        return `${who} activate ${what} until the End Phase${step.until === 'your_next_end_phase' ? ` of ${state.players[seat]!.name}'s next turn` : ''}.`;
+      }
       case 'pledge_normal_summon': {
         if (!moved.length) return null;
         apply({ op: 'pledge_normal_summon', player: seat, cards: moved, damage: step.damage });

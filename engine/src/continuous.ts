@@ -135,9 +135,16 @@ export const piercing = (state: DuelState, id: string) => battleOn(state, id).so
 /** Whether its controller takes no battle damage from attacks involving this monster (Fortress Warrior). */
 export const shieldsBattleDamage = (state: DuelState, id: string) => battleOn(state, id).some((b) => b.noDamageToYou);
 
-/** The locks in force on a player. */
+/** The locks in force on a player: from continuous effects, and those effects left behind that still hold. */
 function locksOn(state: DuelState, seat: Seat): InForce<Lock>[] {
-  return inForce(state).filter(
+  const lingering = state.lingering.flatMap((l): InForce<Lock>[] => {
+    const at = locate(state, l.source);
+    const faceUp = (at?.zone === 'monsters' || at?.zone === 'spellTraps') && state.players[at.seat][at.zone][at.index]!.faceUp;
+    const over = state.turn > l.untilTurn || (state.turn === l.untilTurn && state.phase === 'end');
+    if (over || (l.whileFaceUp && !faceUp)) return [];
+    return [{ source: l.source, seat: l.seat, index: -1, effect: { apply: 'lock', player: l.player, cannot: 'activate', filter: l.filter, perTurn: null, setFirst: false, while: [] } }];
+  });
+  return [...inForce(state), ...lingering].filter(
     (f): f is InForce<Lock> => f.effect.apply === 'lock' && (f.effect.player === 'both' || (f.effect.player === 'you') === (f.seat === seat)),
   );
 }

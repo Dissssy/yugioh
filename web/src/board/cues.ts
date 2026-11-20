@@ -55,6 +55,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   replacementChosen: 300,
   taxDemanded: 0,
   pledged: 0,
+  locked: 0,
   taxAnswered: 300,
   rollbackOffered: 0,
   rollbackAnswered: 0,

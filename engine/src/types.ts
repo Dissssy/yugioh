@@ -239,7 +239,15 @@ export type Step =
    * "During the End Phase of this turn, take `damage` damage if you did not Normal Summon the added monster, or a card
    * with the same name": about the cards the step before it moved (Where Arf Thou?).
    */
-  | { do: 'pledge_normal_summon'; damage: number };
+  | { do: 'pledge_normal_summon'; damage: number }
+  /**
+   * A lock an effect leaves behind: `player` can't activate cards that fit `filter`, until the End Phase of this turn or
+   * of your next turn, and with `whileFaceUp` only as long as this card stays face-up on the field (Spellbreaker).
+   */
+  | { do: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; whileFaceUp: boolean };
+
+export const LOCK_UNTIL = ['this_end_phase', 'your_next_end_phase'] as const;
+export type LockUntil = (typeof LOCK_UNTIL)[number];
 
 export const FORBIDDEN = ['declare_attack', 'battle_phase', 'special_summon'] as const;
 /** What a lingering restriction stops a player doing this turn (Threatening Roar, Reinforce Truth, Silent Angler). */
@@ -569,6 +577,11 @@ export interface DuelState {
   forbidden: { player: Seat; what: Forbidden; filter: CardFilter | null; turn: number }[];
   /** Damage each player takes in this turn's End Phase unless they Normal Summon a card with one of these names first. */
   pledges: { player: Seat; names: string[]; damage: number }[];
+  /**
+   * Locks effects left behind (Spellbreaker): `seat` controls `source`; the lock holds until the End Phase of turn
+   * `untilTurn` starts, and with `whileFaceUp` only while `source` stays face-up on the field.
+   */
+  lingering: { source: string; seat: Seat; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; untilTurn: number; whileFaceUp: boolean }[];
   chain: ChainLink[];
   step: DuelStep;
   /** Events since the last triggers were put on the chain, for triggers to watch. */
@@ -681,6 +694,8 @@ export type Op =
   | { op: 'forbid'; player: Seat; what: Forbidden; filter: CardFilter | null }
   /** `player` takes `damage` in this turn's End Phase unless they Normal Summon a card with the name of one of `cards`. */
   | { op: 'pledge_normal_summon'; player: Seat; cards: string[]; damage: number }
+  /** See the `lock` step; `player` is relative to the effect's controller. */
+  | { op: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; while_face_up: boolean }
   /** `controller` takes control of this monster, into `zone` (an empty Main Monster Zone of theirs). */
   | { op: 'take_control'; card: string; controller: Seat; zone: number; until: 'end_phase' | null }
   | { op: 'summon_token'; controller: Seat; token: Token; position: Position; zone: number }
@@ -873,6 +888,7 @@ export type DuelEvent =
   | { type: 'statsModified'; modifier: Modifier }
   | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null }
   | { type: 'pledged'; player: Seat; names: string[]; damage: number }
+  | { type: 'locked'; source: string; seat: Seat; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; untilTurn: number; whileFaceUp: boolean }
   /** `to` now controls the monster, in `zone`. A Token's card data comes with its event, since it isn't in any Deck. */
   | { type: 'controlChanged'; card: string; to: Seat; zone: number; until: 'end_phase' | null }
   | { type: 'tokenSummoned'; player: Seat; card: string; token: CardData; zone: number; position: Position }

@@ -74,6 +74,7 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     modifiers: [],
     forbidden: [],
     pledges: [],
+    lingering: [],
     chain: [],
     step: { at: 'rps', picks: [null, null], last: null },
     happened: [],
@@ -197,6 +198,7 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         // Bans for this turn and later ones ("skip the Battle Phase of your next turn") stay.
         s.forbidden = s.forbidden.filter((f) => f.turn >= event.turn);
         s.pledges = [];
+        s.lingering = s.lingering.filter((l) => l.untilTurn >= event.turn);
         return;
       case 'phaseChanged':
         s.phase = event.phase;
@@ -426,6 +428,11 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'statsModified':
         s.modifiers.push(event.modifier);
         return;
+      case 'locked': {
+        const { type: _, ...lock } = event;
+        s.lingering.push(lock);
+        return;
+      }
       case 'pledged':
         s.pledges.push({ player: event.player, names: event.names, damage: event.damage });
         return;

@@ -19,7 +19,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { DESTINATIONS, FORBIDDEN, RESTRICTIONS, UNTIL, type CardData, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
+import { DESTINATIONS, FORBIDDEN, LOCK_UNTIL, RESTRICTIONS, UNTIL, type CardData, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
 import { cards, decks, effectSheets, sheetReports, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
@@ -83,6 +83,7 @@ const step = z.union([
   }),
   z.object({ do: z.literal('forbid'), player, what: z.enum(FORBIDDEN), filter: cardFilter.nullable() }),
   z.object({ do: z.literal('pledge_normal_summon'), damage: z.number().int().min(1) }),
+  z.object({ do: z.literal('lock'), player: z.enum(['you', 'opponent', 'both']), filter: cardFilter.nullable(), until: z.enum(LOCK_UNTIL), whileFaceUp: z.boolean() }),
   z.object({ do: z.literal('link'), cards: selection }),
   z.object({ do: z.literal('negate_activation'), destroy: z.boolean() }),
   z.object({ do: z.literal('negate_effects'), cards: selection }),
@@ -404,6 +405,7 @@ Steps (each "cards" is a selection):
 - {"do": "summon_token", "player", "token", "count", "position"}: Special Summon count Tokens to that player's field. token {"name", "attribute", "race", "level", "atk", "def"} from the text: "1 "Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)" is {"name": "Ice Barrier Token", "attribute": "WATER", "race": "Aqua", "level": 1, "atk": 0, "def": 0}.
 - {"do": "forbid", "player", "what", "filter"}: for the rest of this turn that player can't "declare_attack" ("your opponent cannot declare an attack this turn"), can't conduct their "battle_phase" ("you cannot conduct your Battle Phase the turn you activate this card"; pair it with the before_battle_phase condition), or can't "special_summon" the monsters that fit filter ("you cannot Special Summon monsters from your hand for the rest of this turn": side "you", place "hand", kinds ["monster"]; "You cannot Special Summon any Level 5 or higher monsters the turn you use this effect": place "any", level min 5; null for any monster; "except WATER monsters": attributes lists every other Attribute, DARK, DIVINE, EARTH, FIRE, LIGHT and WIND). filter is null for the other two. Such a restriction is a step, not unapplied.
 - {"do": "pledge_normal_summon", "damage"}: "During the End Phase of this turn, take 2000 damage if you did not Normal Summon the added monster, or a card with the same name": about the cards the step before it moved (put it right after that move).
+- {"do": "lock", "player", "filter", "until", "whileFaceUp"}: a lock the effect leaves behind: player ("you", "opponent" or "both") can't activate cards that fit filter until "this_end_phase" or "your_next_end_phase" (the End Phase of this card's controller's next turn), and with whileFaceUp only while this card stays face-up on the field ("Spell Cards cannot be activated until the End Phase of your next turn, as long as this card remains face-up on the field": both, kinds ["spell"], place "any", your_next_end_phase, whileFaceUp true).
 - {"do": "detach", "cards", "count"}: detach count Xyz Materials from an Xyz Monster the selection picks. "Detach 1 Xyz Material from this card" (usually a cost): cards {"from": "self"}, count 1. "Detach 1 Xyz Material from a monster you control": a choose selection of face-up Xyz monsters you control.
 
 Selections:

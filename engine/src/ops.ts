@@ -244,6 +244,11 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'setAgain' });
       return;
     }
+    case 'lock': {
+      const untilTurn = op.until === 'this_end_phase' ? state.turn : state.turnPlayer === ctx.player ? state.turn + 2 : state.turn + 1;
+      run.emit({ type: 'locked', source: ctx.source, seat: ctx.player, player: op.player, filter: op.filter, untilTurn, whileFaceUp: op.while_face_up });
+      return;
+    }
     case 'pledge_normal_summon':
       check(op.cards.length > 0 && op.damage > 0, 'Name the cards the pledge is about, and a positive damage.');
       run.emit({ type: 'pledged', player: op.player, names: [...new Set(op.cards.map((id) => cardOf(state, id).name))], damage: op.damage });

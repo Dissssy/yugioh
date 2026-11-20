@@ -8,6 +8,7 @@ import {
   replay,
   statsOf,
   targetMax,
+  applyOp,
   viewFor,
   type CardData,
   type CardFilter,
@@ -235,6 +236,7 @@ function stacked(deck0: number[], deck1: number[]): DuelEvent[] {
   ];
 }
 
+const ctx0 = (source: string) => ({ player: 0 as Seat, source, stage: 'resolution' as const, random: () => 0 });
 const pad = (codes: number[]) => [...codes, ...Array<number>(40 - codes.length).fill(2)];
 
 /** Plays a duel the way the server does: after each move, code-only steps run and players with nothing to activate pass. */
@@ -613,6 +615,25 @@ describe('leaving the field', () => {
     expect(legalActions(t.state, 0).some((a) => a.type === 'enterBattle')).toBe(false);
     t.endTurn(0).play(1, { type: 'endTurn', discard: t.state.players[1].hand.slice(6) });
     expect(legalActions(t.state, 0).some((a) => a.type === 'enterBattle')).toBe(true);
+  });
+});
+
+describe('locks an effect leaves behind', () => {
+  it("hold until the End Phase of its controller's next turn, while the card stays face-up (Spellbreaker)", () => {
+    const spells = (t: Table, seat: Seat) => legalActions(t.state, seat).flatMap((a) => (a.type === 'activate' ? [a.card] : []));
+    const t = new Table(stacked(pad([2, 10, 2, 2, 2, 2]), pad([10, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    const locked = applyOp(t.state, { op: 'lock', player: 'both', filter: filter({ place: 'any', kinds: ['spell'] }), until: 'your_next_end_phase', while_face_up: true }, ctx0('a0'));
+    if (!locked.ok) throw new Error(locked.error);
+    t.push(...locked.events);
+    expect(spells(t, 0)).toEqual([]);
+    t.endTurn(0);
+    expect(spells(t, 1)).toEqual([]);
+    t.endTurn(1);
+    expect(spells(t, 0)).toEqual([]);
+    // It ends once the card leaves the field.
+    t.push({ type: 'destroyed', cards: ['a0'], by: 1 });
+    expect(spells(t, 0)).toEqual(['a1']);
   });
 });
 
