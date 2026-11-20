@@ -10,6 +10,15 @@ const ZOOM_GAP = 16;
 /** How long a touch rests on a card before its details pin open, and how far it may wander before it's a drag instead. */
 const LONG_PRESS_MS = 450;
 const LONG_PRESS_SLOP_PX = 10;
+/** How long Shift is held alone before it zooms, so Shift+Tab doesn't flash a zoom. */
+const SHIFT_ALONE_MS = 150;
+
+/** The card element a focused element shows: itself, or a card inside it (a pile's top card). */
+const focusedCard = (): HTMLElement | null => {
+  const el = document.activeElement;
+  if (!(el instanceof HTMLElement) || el === document.body) return null;
+  return el.closest<HTMLElement>('[data-zoom]') ?? el.querySelector<HTMLElement>('[data-zoom]');
+};
 
 interface Hover {
   card: CardData;
@@ -17,12 +26,25 @@ interface Hover {
   pinned: boolean;
 }
 
-type Bind = (card: CardData | null) => {
+/** A monster's ATK and DEF on the field now, which effects may have changed from the printed ones. */
+export interface Stats {
+  atk: number;
+  def: number;
+}
+
+type Bind = (card: CardData | null, stats?: Stats | null) => {
   onPointerEnter?: (e: PointerEvent<HTMLElement>) => void;
   onPointerLeave?: () => void;
   onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
   /** Marks the element as showing this card (its passcode), for zooming in on whatever is under the pointer. */
   'data-zoom'?: number;
+  /** Its ATK and DEF now, as `atk/def`, read when its details show so they are always current. */
+  'data-stats'?: string;
+};
+
+const statsOf = (el: HTMLElement): Stats | null => {
+  const [atk, def] = el.dataset.stats?.split('/').map(Number) ?? [];
+  return atk === undefined || def === undefined ? null : { atk, def };
 };
 
 const TooltipContext = createContext<Bind>(() => ({}));
@@ -37,6 +59,7 @@ export const useCardHover = () => useContext(TooltipContext);
  *
  * Holding Shift zooms instead: the card under the pointer is shown as large as fits beside it, with its text,
  * until Shift is released. Zoom is asked for on purpose, so it works while suppressed too, aiming an attack included.
+ * When the keyboard was used last, Shift zooms the focused card instead, and I pins its details (docs/keyboard.md).
  */
 export function CardTooltipProvider({
   suppressed,
@@ -62,12 +85,13 @@ export function CardTooltipProvider({
   });
 
   const bind = useCallback<Bind>(
-    (card) => {
+    (card, stats) => {
       if (!card) return {};
       known.current.set(card.code, card);
-      if (suppressed) return { 'data-zoom': card.code };
+      const marks = { 'data-zoom': card.code, 'data-stats': stats ? `${stats.atk}/${stats.def}` : undefined };
+      if (suppressed) return marks;
       return {
-        'data-zoom': card.code,
+        ...marks,
         onPointerEnter: (e) => {
           // Touch has no hover; a long press pins the details instead.
           if (e.pointerType !== 'mouse') return;
@@ -101,28 +125,46 @@ export function CardTooltipProvider({
      * The card under the pointer, found from where the pointer is rather than from enter and leave events, which some
      * browsers don't send while a button is held (aiming an attack).
      */
+    /** Whether the keyboard was used since the pointer last moved. */
+    let keyboard = false;
+    let shiftTimer: ReturnType<typeof setTimeout> | undefined;
     const zoomAtPointer = () => {
       const at = pointer.current;
-      const el = at && document.elementsFromPoint(at.x, at.y).map((e) => e.closest<HTMLElement>('[data-zoom]')).find((e) => e);
+      const el = keyboard
+        ? focusedCard()
+        : at && document.elementsFromPoint(at.x, at.y).map((e) => e.closest<HTMLElement>('[data-zoom]')).find((e) => e);
       const card = el && known.current.get(Number(el.dataset.zoom));
       setZoom((z) => (card && el ? (z?.el === el && z.card === card ? z : { card, el }) : null));
     };
     const onKey = (e: KeyboardEvent) => {
+      const inText = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       if (e.key === 'Escape') setHover(null);
+      // Shift with another key (Shift+Tab) isn't a zoom.
+      if (e.key !== 'Shift') clearTimeout(shiftTimer);
+      if (e.key !== 'Shift' && e.key !== 'Escape') keyboard = true;
       // Shift while typing (capitals in the chat or a search box) is not a request to zoom.
-      if (e.key === 'Shift' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
-        zoomHeld.current = true;
-        zoomAtPointer();
+      if (e.key === 'Shift' && !e.repeat && !inText) {
+        shiftTimer = setTimeout(() => {
+          zoomHeld.current = true;
+          zoomAtPointer();
+        }, SHIFT_ALONE_MS);
+      }
+      if (e.key.toLowerCase() === 'i' && !inText && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target instanceof HTMLSelectElement)) {
+        const el = focusedCard();
+        const card = el && known.current.get(Number(el.dataset.zoom));
+        if (el && card) setHover({ card, el, pinned: true });
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key !== 'Shift') return;
+      clearTimeout(shiftTimer);
       zoomHeld.current = false;
       setZoom(null);
     };
     const onMove = (e: globalThis.PointerEvent) => {
       onPressMove(e);
       pointer.current = { x: e.clientX, y: e.clientY };
+      keyboard = false;
       if (zoomHeld.current) zoomAtPointer();
     };
     // Leaving the window while holding Shift gives no keyup.
@@ -167,6 +209,8 @@ export function CardTooltipProvider({
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKeyUp);
+    const onFocus = () => keyboard && zoomHeld.current && zoomAtPointer();
+    window.addEventListener('focusin', onFocus);
     window.addEventListener('blur', onBlur);
     window.addEventListener('pointerdown', onDown);
     window.addEventListener('pointermove', onMove);
@@ -179,8 +223,10 @@ export function CardTooltipProvider({
       window.removeEventListener('click', swallowClick, true);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
+      clearTimeout(shiftTimer);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('focusin', onFocus);
       window.removeEventListener('blur', onBlur);
       window.removeEventListener('pointerdown', onDown);
       window.removeEventListener('pointermove', onMove);
@@ -199,7 +245,7 @@ export function CardTooltipProvider({
             className={`card-tooltip${hover.pinned ? ' pinned' : ''}`}
             role="tooltip"
           >
-            <CardDetail card={hover.card} />
+            <CardDetail card={hover.card} stats={statsOf(hover.el)} />
             {hover.pinned && pinnedFooter?.(hover.card)}
           </div>
         </FloatingPortal>
@@ -223,7 +269,7 @@ function CardZoom({ card, el }: { card: CardData; el: HTMLElement }) {
   return (
     <FloatingPortal>
       <div className="card-zoom" style={style as CSSProperties} role="tooltip">
-        <CardDetail card={card} />
+        <CardDetail card={card} stats={statsOf(el)} />
       </div>
     </FloatingPortal>
   );

@@ -93,8 +93,11 @@ export function DuelLog({ log, onHighlight, contest, escalate }: { log: LogEntry
                             ? 'question'
                             : undefined
                   }
+                  tabIndex={-1}
                   onPointerEnter={() => onHighlight(cardsOf(e.event))}
                   onPointerLeave={() => onHighlight([])}
+                  onFocus={(ev) => ev.target === ev.currentTarget && onHighlight(cardsOf(e.event))}
+                  onBlur={() => onHighlight([])}
                 >
                   {e.event.type === 'judged' && 'Judge: '}
                   {e.event.type === 'asked' ? (
@@ -169,8 +172,6 @@ export function DuelLog({ log, onHighlight, contest, escalate }: { log: LogEntry
 /** A question to the judge in the making: what it's about, if a card was picked from its details. */
 export interface Asking {
   about: CardData | null;
-  /** Changes when the box should take focus (a card's "Ask the judge" was pressed). */
-  focus: number;
 }
 
 /**
@@ -184,6 +185,7 @@ export function ChatInput({
   answering,
   asking,
   onAsking,
+  focus,
 }: {
   send: (text: string) => Promise<unknown>;
   ask: (text: string, card: number | null) => Promise<unknown>;
@@ -193,15 +195,18 @@ export function ChatInput({
   /** Null in chat mode. */
   asking: Asking | null;
   onAsking: (asking: Asking | null) => void;
+  /** Changes when the box should take focus (T or Q, or a card's "Ask the judge"). */
+  focus: number;
 }) {
   const [text, setText] = useState('');
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (asking?.focus) input.current?.focus();
-  }, [asking?.focus]);
+    if (focus) input.current?.focus();
+  }, [focus]);
   return (
     <form
       className="chat-input"
+      data-area="chat"
       onSubmit={(e) => {
         e.preventDefault();
         if (!text.trim()) return;
@@ -213,11 +218,11 @@ export function ChatInput({
         <button type="button" className={asking ? 'quiet' : 'on'} aria-pressed={!asking} onClick={() => onAsking(null)}>
           Chat
         </button>
-        <button type="button" className={asking ? 'on' : 'quiet'} aria-pressed={!!asking} onClick={() => asking || onAsking({ about: null, focus: 0 })}>
+        <button type="button" className={asking ? 'on' : 'quiet'} aria-pressed={!!asking} onClick={() => asking || onAsking({ about: null })}>
           Ask the judge
         </button>
         {asking?.about && (
-          <button type="button" className="quiet about" title="Not about this card" onClick={() => onAsking({ about: null, focus: asking.focus })}>
+          <button type="button" className="quiet about" title="Not about this card" onClick={() => onAsking({ about: null })}>
             About {asking.about.name} ×
           </button>
         )}

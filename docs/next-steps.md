@@ -1,11 +1,11 @@
 # Next steps after the starter decks
 
-Written 2026-11-19, while both starter decks are being playtested. Everything in [roadmap.md](roadmap.md) is built. Ask the judge (items 1 and 3 below) and replays (item 4) were built 2026-11-20; the rest isn't built yet. The AI opponent's deck plans (step 3 of [ai-opponent.md](ai-opponent.md)) wait on playtest results and aren't covered here.
+Written 2026-11-19, while both starter decks are being playtested. Everything in [roadmap.md](roadmap.md) is built. Ask the judge (items 1 and 3 below), replays (item 4) and keyboard controls (item 6) were built 2026-11-20; the rest isn't built yet. The AI opponent's deck plans (step 3 of [ai-opponent.md](ai-opponent.md)) wait on playtest results and aren't covered here.
 
 The three features coming next have their own plans:
 
 - [ask-the-judge.md](ask-the-judge.md): players ask rules questions during a duel, and can escalate an answer into a contest or a report.
-- [keyboard.md](keyboard.md): a whole duel without a mouse.
+- [keyboard.md](keyboard.md): a whole duel without a mouse (built).
 - [rulings-history.md](rulings-history.md): history and diffs of effect sheets, a git mirror on the server, eval cases as data, and an Opus job that proposes sheet fixes.
 
 The rest are lighter sketches below: replays, custom playmats, challenger-chosen deck lists, draft mode, and a headless mode with a public API. Each gets a full plan when it comes up.
@@ -19,7 +19,7 @@ Each item leaves the site working and is useful alone.
 3. **Escalating a question** (step 3 of ask-the-judge.md). Builds on 1 and on the existing contest and report flows.
 4. **Replays** (below, built). Small, since the event log already holds everything, and it makes playtests easier to review.
 5. **Eval cases as data, then the tuning job** (steps 3 and 4 of rulings-history.md). Better after some weeks of play, when there is evidence to tune from.
-6. **Keyboard controls** ([keyboard.md](keyboard.md)), once the board layout settles after playtest fixes.
+6. **Keyboard controls** ([keyboard.md](keyboard.md), built).
 7. **Custom playmats**, after the layout settles too.
 8. **Challenger-chosen deck lists**, step 1 with premade decks; step 2 needs the deck builder.
 9. **Headless mode and public API.**

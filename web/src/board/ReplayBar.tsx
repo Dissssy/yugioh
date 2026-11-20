@@ -12,7 +12,7 @@ export function ReplayBar({ controls: c, names }: { controls: ReplayControls; na
   const last = c.count - 1;
   const turn = c.turnStarts.filter((i) => i <= c.at).length;
   return (
-    <div className="replay-bar">
+    <div className="replay-bar" data-area="chat">
       <div className="replay-from" role="radiogroup" aria-label="Watch from">
         <span className="muted small">Watch from</span>
         {views.map(([from, label]) => (

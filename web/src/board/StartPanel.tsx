@@ -26,7 +26,7 @@ export function StartPanel({ start, view, can, send }: { start: StartView; view:
   if (start.at === 'order') {
     const won = start.chooser === me;
     return (
-      <div className="table-overlay start-panel" role="dialog" aria-label="Who goes first">
+      <div className="table-overlay start-panel" data-area="strip" role="dialog" aria-label="Who goes first">
         {thrown(start.hands)}
         <strong>{won ? 'You win!' : `${foeName} wins`}</strong>
         {won ? (
@@ -48,7 +48,7 @@ export function StartPanel({ start, view, can, send }: { start: StartView; view:
   }
 
   return (
-    <div className="table-overlay start-panel" role="dialog" aria-label="Rock, paper, scissors">
+    <div className="table-overlay start-panel" data-area="strip" role="dialog" aria-label="Rock, paper, scissors">
       <strong>Rock, paper, scissors</strong>
       <span className="muted">The winner chooses to go first or second.</span>
       {start.last && (
