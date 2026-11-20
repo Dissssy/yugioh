@@ -1,6 +1,6 @@
 # Next steps after the starter decks
 
-Written 2026-11-19, while both starter decks are being playtested. Everything in [roadmap.md](roadmap.md) is built. Ask the judge (items 1 and 3 below) was built 2026-11-20; the rest isn't built yet. The AI opponent's deck plans (step 3 of [ai-opponent.md](ai-opponent.md)) wait on playtest results and aren't covered here.
+Written 2026-11-19, while both starter decks are being playtested. Everything in [roadmap.md](roadmap.md) is built. Ask the judge (items 1 and 3 below) and replays (item 4) were built 2026-11-20; the rest isn't built yet. The AI opponent's deck plans (step 3 of [ai-opponent.md](ai-opponent.md)) wait on playtest results and aren't covered here.
 
 The three features coming next have their own plans:
 
@@ -17,7 +17,7 @@ Each item leaves the site working and is useful alone.
 1. **"Why can't I?" and Ask the judge** (steps 1 and 2 of [ask-the-judge.md](ask-the-judge.md)). Most useful while playtests are running: it answers "nothing happened" confusions without an appeal, and "Why can't I?" costs nothing per use.
 2. **Rulings history and the git mirror** (steps 1 and 2 of [rulings-history.md](rulings-history.md)). Small, and it keeps playtest fixes from being lost to resets.
 3. **Escalating a question** (step 3 of ask-the-judge.md). Builds on 1 and on the existing contest and report flows.
-4. **Replays** (below). Small, since the event log already holds everything, and it makes playtests easier to review.
+4. **Replays** (below, built). Small, since the event log already holds everything, and it makes playtests easier to review.
 5. **Eval cases as data, then the tuning job** (steps 3 and 4 of rulings-history.md). Better after some weeks of play, when there is evidence to tune from.
 6. **Keyboard controls** ([keyboard.md](keyboard.md)), once the board layout settles after playtest fixes.
 7. **Custom playmats**, after the layout settles too.
@@ -44,17 +44,13 @@ Two items below need custom decks, and the deck builder (architecture layer 8: s
 
 ## Replays
 
-The event log already holds every duel, and `viewFor` gives any seat's view after any event, so a replay is the board fed past views.
+**Built 2026-11-20.** The event log already holds every duel, so a replay is the board fed past views.
 
-- **Page:** `/duel/:id/replay`, for a finished duel. Step back and forward by event or by turn, or play at a chosen speed. It is the same `Board` in read-only mode, fed the same `steps` the live stream sends, so every animation already works. Rewinds after overturned appeals show as they happened.
-- **Server:** `GET /api/duels/:id/replay?seat=0` returns the whole duel as steps for that seat: the log and the view after each visible event. The server builds it from the log, so hidden cards stay hidden exactly as they did live. A long duel is a few hundred steps, around a megabyte before gzip.
-- **During a duel:** clicking an old log entry shows the board as it was then, in an overlay (duel-ui.md step 7). Same endpoint, cut off at that entry, for the asking seat only.
-- **Admins** get the same page with every card face up (a view that hides nothing), which is easier to read than the Full log.
-
-| Question | Recommendation | Other options |
-| --- | --- | --- |
-| Who can watch a finished duel | Its two players and admins | Anyone with the link |
-| What players see | Their own seat's view, hidden cards stay hidden | Everything face up once the duel is over |
+- **Page:** `/duel/:id/replay`, for a finished duel; finished duels in the home list and the admin's duel list link to it, and so does the result at the end of a duel. It is the same `Board` with `replay` set: no chat, contest, escalate, surrender or card menus, and the phase dial shows the phases without Next and End. The log builds up as the replay moves on.
+- **Controls** (`ReplayBar` in the sidebar, `useReplay` for the state): **Watch from** either player or **Both** (every card face up, seat 0 at the bottom), a seek bar marked at each turn's start, previous and next turn, step back and forward, play and pause, and a speed of 0.5x to 4x. Stepping forward or playing animates each step as the live board does, held for its usual time divided by the speed; seeking and stepping back show a step at rest. Switching the viewpoint keeps the place in the duel. Steps are the events, as detailed as the log already is; the replay doesn't keep the live timing.
+- **Server:** `GET /api/duels/:id/replay?from=0|1|both` returns `Replay { from, steps }`, where each step is a `SeatStep` (a log entry and the view after it, the same shape the live stream sends). The engine's `replaySteps(events, from, questionsOf)` builds them from the stored log; `viewFor` and `entryFor` take a `reveal` flag for Both. Views offer no actions. The response is gzipped by hand (a long duel is around a megabyte of JSON before gzip).
+- **Who:** the duel's two players and admins, from any viewpoint (Ethan, 2026-11-20). Questions to the judge stay private to the player who asked: a player's replays show only their own questions, whatever the viewpoint; an admin's show everyone's. 404 until the duel has finished.
+- **Not built:** clicking an old log entry during a duel to see the board as it was then (duel-ui.md step 7). `replaySteps` cut off at that entry, for the asking seat only, would serve it.
 
 ## Custom playmats
 
@@ -135,7 +131,7 @@ The full tables with the other options are in each plan.
 | Rulings history | Rulings for judge-only effects | A `rulings` list on the sheet effect |
 | Rulings history | `RESET_SHEETS` off | At launch |
 | Replays | Who can watch | The two players and admins |
-| Replays | What players see | Their own seat's view |
+| Replays | What players see | Either seat or both, chosen while watching (Ethan chose this, 2026-11-20) |
 | Playmats | Whose mat is shown | Each player's under their own half |
 | Challenger decks | The opponent sees an offered custom deck | Its name only |
 | Draft | First format | Sealed |

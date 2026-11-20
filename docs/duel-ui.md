@@ -172,7 +172,7 @@ The log moves to the sidebar and becomes structured, not a list of strings.
 
 **Engine change this needs:** log entries become objects instead of strings: an id, the acting player, a kind, the visible card ids involved, the nested results, and, for judge decisions, the decision id and whether it can be contested. The hidden-information rule stays the same: entries are rendered per player by `viewFor`.
 
-Later (build step 7): clicking an old entry shows the board as it was then (read-only), since the event log makes that a replay. Full replays build on the same thing.
+Later (build step 7): clicking an old entry shows the board as it was then (read-only), since the event log makes that a replay. Full replays of finished duels are built ([next-steps.md](next-steps.md#replays)); this overlay would reuse `replaySteps`.
 
 ## Phones and tablets
 
@@ -233,7 +233,7 @@ PC first (see Decisions). Each step ends with a board two people can play on, an
 6. **Lingering effects and rollback (with engine layers 5 and 6).** Modified ATK/DEF on cards, restriction and counter badges, the details in tooltips, the rollback consent dialog with board preview.
 7. **Polish.** Sound effects once there are assets, visual styling, clicking old log entries to view past boards.
 8. **Phones.** The portrait layout and touch drag described under "Phones and tablets".
-9. **Later ideas.** Full replays, custom playmats.
+9. **Later ideas.** Custom playmats. (Full replays are built: [next-steps.md](next-steps.md#replays).)
 
 ## Decisions
 

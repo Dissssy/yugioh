@@ -850,10 +850,16 @@ export interface LogEntry {
  * What the server pushes to a player. `sync` is the whole picture, sent on connect. `steps` follows each change,
  * with the board after every event so the client can animate them one by one.
  */
+/** One event as a seat sees it: its log entry, and the board after it. */
+export interface SeatStep {
+  /** Null for a step nobody sees in the log that still changes the board (a pass). */
+  entry: LogEntry | null;
+  view: PlayerView;
+}
+
 export type DuelUpdate =
   | { type: 'sync'; view: PlayerView; log: LogEntry[]; judging: JudgingView | null }
-  /** `entry` is null for a step nobody sees in the log that still changes the board (a pass). */
-  | { type: 'steps'; steps: { entry: LogEntry | null; view: PlayerView }[] }
+  | { type: 'steps'; steps: SeatStep[] }
   /** The judge started, asked a player something, got an answer, or finished (null). */
   | { type: 'judging'; judging: JudgingView | null };
 

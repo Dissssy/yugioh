@@ -23,7 +23,9 @@ import { PileViewer } from './PileViewer.tsx';
 import { ReportRuling } from './ReportRuling.tsx';
 import { StartPanel } from './StartPanel.tsx';
 import { systemReducesMotion, useDuelSettings } from './settings.ts';
+import { ReplayBar } from './ReplayBar.tsx';
 import { useDuel } from './useDuel.ts';
+import { useReplay } from './useReplay.ts';
 
 type Summon = Extract<LegalAction, { type: 'normalSummon' | 'setMonster' }>;
 type Activate = Extract<LegalAction, { type: 'activate' }>;
@@ -66,13 +68,17 @@ const idle: Mode = { kind: 'idle' };
 /** How long to wait for card images before showing the board anyway. */
 const PRELOAD_TIMEOUT_MS = 4000;
 
-export function Board({ duelId }: { duelId: string }) {
+/** A duel: the live one this player sits in, or with `replay` a finished one played back, where nothing can be done. */
+export function Board({ duelId, replay = false }: { duelId: string; replay?: boolean }) {
   const [settings, updateSettings] = useDuelSettings();
   const hasAccount = useMe().data?.kind === 'user';
   const { opponentCards } = useSettings();
   const reduceMotion = settings.reduceMotion || systemReducesMotion();
   const pace = useCallback((event: Parameters<typeof cueMs>[0], waiting: number) => cueMs(event, waiting, settings, reduceMotion), [settings, reduceMotion]);
-  const { shown, connected, judging } = useDuel(duelId, pace);
+  const live = useDuel(replay ? null : duelId, pace);
+  const played = useReplay(replay ? duelId : null, pace);
+  const { shown, connected, judging } = replay ? { shown: played.shown, connected: true, judging: null } : live;
+  const controls = played.controls;
   const [mode, setMode] = useReducer((_: Mode, next: Mode) => next, idle);
   /** The open pile viewer, by `pileKey`. */
   const [pile, setPile] = useState<string | null>(null);
@@ -131,7 +137,7 @@ export function Board({ duelId }: { duelId: string }) {
   const cue = shown?.cue ?? null;
   useLayoutEffect(() => {
     if (!cue || !shown || !table || reduceMotion) return;
-    playCue(table, cue, shown.prev, shown.view, cueMs(cue.event, 0, settings, reduceMotion));
+    playCue(table, cue, shown.prev, shown.view, cueMs(cue.event, 0, settings, reduceMotion) / (controls?.speed ?? 1));
     // Only a new step should play anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.seq]);
@@ -192,7 +198,8 @@ export function Board({ duelId }: { duelId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptId]);
 
-  if (!shown) return <div className="duel-loading">{connected ? 'Loading the duel…' : 'Connecting…'}</div>;
+  if (played.error) return <div className="duel-loading">{errorText(played.error)}</div>;
+  if (!shown) return <div className="duel-loading">{replay ? 'Loading the replay…' : connected ? 'Loading the duel…' : 'Connecting…'}</div>;
 
   const { view, log } = shown;
   const me = view.you;
@@ -631,10 +638,10 @@ export function Board({ duelId }: { duelId: string }) {
   const enterBattle = has('enterBattle');
   const enterMain2 = has('enterMain2');
   const endTurn = has('endTurn');
-  const canSurrender = !view.result;
+  const canSurrender = !replay && !view.result;
   const result = view.result;
   const resultText = log.findLast((e) => e.event.type === 'duelEnded')?.text;
-  const turnLabel = <TurnLabel turn={view.turn} label={view.start ? 'Deciding who goes first' : yourTurn ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`} />;
+  const turnLabel = <TurnLabel turn={view.turn} label={view.start ? 'Deciding who goes first' : yourTurn && !replay ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`} />;
   const nextStep = choosing ? undefined : nextPhase(actions);
   const canEnd = yourTurn && !choosing && view.chain.length === 0 && nextPhase(view.actions) !== undefined;
   const dial = (
@@ -648,6 +655,7 @@ export function Board({ duelId }: { duelId: string }) {
       next={nextStep && !ending ? () => start(nextStep) : null}
       end={ending ? () => setEnding(false) : canEnd ? () => setEnding(true) : null}
       ending={ending}
+      readOnly={replay}
     />
   );
   const stripPrompt = prompt || choiceBar || judgeNote || rollbackNote || replaceNote || respondNote || null;
@@ -658,7 +666,7 @@ export function Board({ duelId }: { duelId: string }) {
         <ChoiceProvider value={choice}>
           <CardTooltipProvider
             suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}
-            pinnedFooter={(card) => (
+            pinnedFooter={replay ? undefined : (card) => (
               <>
                 <button className="quiet report-ruling" onClick={() => setAsking((a) => ({ about: card, focus: (a?.focus ?? 0) + 1 }))}>
                   Ask the judge about this card
@@ -675,7 +683,7 @@ export function Board({ duelId }: { duelId: string }) {
                   <>
                     <div className="hand-row foe-row">
                       <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={!view.start && view.turnPlayer === foe} target={lpTarget()} />
-                      <FoeHand seat={foe} count={view.players[foe].hand.length} />
+                      <FoeHand seat={foe} cards={view.players[foe].hand} />
                     </div>
                     <Field {...foeField} />
                     <PhaseStrip
@@ -710,7 +718,7 @@ export function Board({ duelId }: { duelId: string }) {
                       exit={{ opacity: 0, x: '30%' }}
                       transition={{ duration: 0.3, ease: 'easeOut' }}
                     >
-                      {cue.event.player === me ? 'Your turn' : `${view.players[cue.event.player].name}'s turn`}
+                      {cue.event.player === me && !replay ? 'Your turn' : `${view.players[cue.event.player].name}'s turn`}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -719,13 +727,18 @@ export function Board({ duelId }: { duelId: string }) {
                   <StartPanel start={view.start} view={view} can={has(view.start.at === 'rps' ? 'rps' : 'chooseOrder') !== undefined} send={(intent) => send.mutate(intent)} />
                 )}
 
-                {result && cue === null && (
+                {result && cue === null && !replay && (
                   <motion.div className="result-overlay" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
                     <strong>{result.winner === null ? 'Draw' : result.winner === me ? 'Victory' : 'Defeat'}</strong>
                     {resultText && <span>{resultText}</span>}
-                    <Link className="button" to="/">
-                      Back to duels
-                    </Link>
+                    <span className="row">
+                      <Link className="button" to={`/duel/${duelId}/replay`}>
+                        Watch the replay
+                      </Link>
+                      <Link className="button" to="/">
+                        Back to duels
+                      </Link>
+                    </span>
                   </motion.div>
                 )}
               </div>
@@ -782,15 +795,19 @@ export function Board({ duelId }: { duelId: string }) {
                 {chat.isError && <p className="error">{errorText(chat.error)}</p>}
                 {ask.isError && <p className="error">{errorText(ask.error)}</p>}
                 {escalateQuestion.isError && <p className="error">{errorText(escalateQuestion.error)}</p>}
-                <DuelLog log={log} onHighlight={setHighlight} contest={contest} escalate={escalate} />
-                <ChatInput
-                  send={chat.mutateAsync}
-                  ask={(text, card) => ask.mutateAsync({ text, card })}
-                  sending={chat.isPending || ask.isPending}
-                  answering={awaiting !== null && answers <= awaiting}
-                  asking={asking}
-                  onAsking={setAsking}
-                />
+                <DuelLog log={log} onHighlight={setHighlight} contest={replay ? never : contest} escalate={replay ? never : escalate} />
+                {controls ? (
+                  <ReplayBar controls={controls} names={[view.players[0].name, view.players[1].name]} />
+                ) : (
+                  <ChatInput
+                    send={chat.mutateAsync}
+                    ask={(text, card) => ask.mutateAsync({ text, card })}
+                    sending={chat.isPending || ask.isPending}
+                    answering={awaiting !== null && answers <= awaiting}
+                    asking={asking}
+                    onAsking={setAsking}
+                  />
+                )}
               </aside>
 
               {mode.kind === 'menu' && (
@@ -890,6 +907,9 @@ function actionLabel(a: LegalAction, view: PlayerView): string {
       return a.type;
   }
 }
+
+/** Nothing in a replay can be contested or escalated. */
+const never = { can: () => false, send: () => undefined };
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 const plural = (n: number, word: string) => `${n} more ${word}${n === 1 ? '' : 's'}`;

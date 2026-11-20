@@ -358,6 +358,14 @@ button.phase.go { border: 0; background: none; color: var(--fg); text-decoration
 .duel-log li.question q { font-style: italic; }
 .duel-log li.question button { justify-self: start; }
 .chat-input input { flex: 1; min-width: 0; font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); }
+.replay-bar { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+.replay-from { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.replay-from button { padding: 2px 10px; }
+.replay-seek { display: flex; flex-direction: column; gap: 2px; }
+.replay-seek input { width: 100%; }
+.replay-buttons { flex-wrap: nowrap; gap: 6px; }
+.replay-buttons .primary { flex: 1; }
+.replay-buttons select { font: inherit; }
 .contest { display: grid; gap: 4px; margin: 4px 0; }
 .contest textarea { font: inherit; padding: 4px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); resize: vertical; }
 .duel-log li button { font-size: 0.85em; padding: 1px 8px; margin-left: 6px; }

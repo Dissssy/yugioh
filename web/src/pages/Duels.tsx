@@ -26,7 +26,7 @@ export function Duels() {
         <ul className="duel-list">
           {sorted.map((d) => (
             <li key={d.id}>
-              <Link to={`/duel/${d.id}`} className="duel-row">
+              <Link to={d.status === 'finished' ? `/duel/${d.id}/replay` : `/duel/${d.id}`} className="duel-row">
                 <span className="duel-title">
                   <strong>{d.decks[0]}</strong>
                   <span className="vs">vs</span>

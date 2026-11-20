@@ -31,6 +31,7 @@ export function PhaseDial({
   next,
   end,
   ending,
+  readOnly = false,
 }: {
   phase: Phase;
   /** Phases you may move to now, and what moving there does. */
@@ -38,6 +39,8 @@ export function PhaseDial({
   next: (() => void) | null;
   end: (() => void) | null;
   ending: boolean;
+  /** A replay: the phases only, without Next and End. */
+  readOnly?: boolean;
 }) {
   const strip = useRef<HTMLOListElement>(null);
   useLayoutEffect(() => {
@@ -68,19 +71,21 @@ export function PhaseDial({
           })}
         </ol>
       </div>
-      <div className="dial-buttons">
-        <button onClick={next ?? undefined} disabled={!next} title="Go to the next phase">
-          Next
-        </button>
-        <button
-          className={ending ? 'primary' : undefined}
-          onClick={end ?? undefined}
-          disabled={!end}
-          title={ending ? 'Stop ending the turn' : 'Go through the rest of the phases, one at a time, and end the turn'}
-        >
-          {ending ? 'Stop' : 'End'}
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="dial-buttons">
+          <button onClick={next ?? undefined} disabled={!next} title="Go to the next phase">
+            Next
+          </button>
+          <button
+            className={ending ? 'primary' : undefined}
+            onClick={end ?? undefined}
+            disabled={!end}
+            title={ending ? 'Stop ending the turn' : 'Go through the rest of the phases, one at a time, and end the turn'}
+          >
+            {ending ? 'Stop' : 'End'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

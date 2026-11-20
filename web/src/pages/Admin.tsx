@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EffectSheet } from '@yugioh/engine';
 import { isAdmin, type AccountStatus, type AdminDuels, type AdminUser, type Me, type Role, type RulingCard, type Rulings } from '@yugioh/shared';
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { api, errorText } from '../api.ts';
 import { formatDate } from './Home.tsx';
 import { Loading, Notice } from './Notice.tsx';
@@ -66,6 +67,7 @@ function RecentDuels() {
                 <td>{duel.aiCalls}</td>
                 <td><strong>{usd(duel.cost)}</strong></td>
                 <td className="cell-actions">
+                  {duel.status === 'finished' && <Link to={`/duel/${duel.id}/replay`}>Replay</Link>}{' '}
                   <a href={`/api/admin/duels/${duel.id}/report`} target="_blank" rel="noreferrer">Full log</a>{' '}
                   <a href={`/api/admin/duels/${duel.id}/report?format=json`} target="_blank" rel="noreferrer">JSON</a>
                 </td>

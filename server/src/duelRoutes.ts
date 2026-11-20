@@ -1,11 +1,12 @@
 // HTTP API for decks and duels. Players send intents with POST and receive their view and its changes as Server-Sent Events.
 // A challenge link is also the way in for people without an account: joining it signed out creates a guest.
 
+import { gzipSync } from 'node:zlib';
 import { Router, type Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { HANDS, type Intent } from '@yugioh/engine';
-import type { DeckDetail, DeckSummary } from '@yugioh/shared';
+import { isAdmin, type DeckDetail, type DeckSummary } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db } from './db/client.ts';
 import { decks } from './db/schema.ts';
@@ -42,6 +43,7 @@ const contestBody = z.object({ seq: z.number().int().min(0), note: z.string().ma
 const reportBody = z.object({ code: z.number().int(), note: z.string().trim().min(1).max(1000) });
 
 const deckChoice = z.object({ deckId: z.number().int() });
+const replayFrom = z.enum(['0', '1', 'both']).transform((v) => (v === 'both' ? v : (Number(v) as 0 | 1)));
 /** Signed-out visitors also give the name they play under as a guest. */
 const joinBody = deckChoice.extend({ guestName: z.string().trim().min(1).max(30).optional() });
 
@@ -165,6 +167,25 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
       clearInterval(keepalive);
       stop();
     });
+  });
+
+  // A finished duel to watch again, by its players and admins, from either seat or with every card face up
+  // (`?from=0|1|both`). Questions to the judge stay private to the player who asked; admins see them all.
+  router.get('/duels/:id/replay', async (req, res) => {
+    const viewer = viewerOf(res);
+    const from = replayFrom.safeParse(req.query.from ?? '0');
+    if (!from.success) return void res.status(400).json({ error: 'bad_request' });
+    const row = await duels.find(req.params.id);
+    if (!row || row.status !== 'finished') return void res.status(404).json({ error: 'not_finished' });
+    const admin = viewer.kind === 'user' && isAdmin(viewer.user.role);
+    const key = playerKey(viewer);
+    const seat = key === null ? null : await duels.seatOf(row.id, key);
+    if (!admin && seat === null) return void res.status(403).json({ error: 'not_a_player' });
+    // A few hundred steps that each carry the whole board: about a megabyte as JSON, a tenth of that compressed.
+    const body = JSON.stringify(await duels.replay(row.id, from.data, admin ? 'both' : seat!));
+    res.type('json');
+    if (!req.acceptsEncodings('gzip')) return void res.send(body);
+    res.set({ 'content-encoding': 'gzip', vary: 'accept-encoding' }).send(gzipSync(body));
   });
 
   router.post('/duels/:id/intents', async (req, res) => {

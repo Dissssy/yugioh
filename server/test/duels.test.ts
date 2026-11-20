@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DuelUpdate, Intent } from '@yugioh/engine';
-import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelSummary, Me } from '@yugioh/shared';
+import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelSummary, Me, Replay } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { and, eq } from 'drizzle-orm';
 import { guests, matchEvents } from '../src/db/schema.ts';
@@ -227,6 +227,49 @@ describe('a challenge link played by a guest', () => {
     expect(body.events.at(-1)!.event.type).toBe('chatted');
     const { body: list } = await admin.json<AdminDuels>(`${h.baseUrl}/api/admin/duels`);
     expect(list.duels.find((d) => d.id === duel.id)).toMatchObject({ judgeCalls: 0, appeals: 0, aiCalls: 0, cost: 0 });
+  });
+
+  it('replays a finished duel to its players and admins, from either seat or both, keeping questions private', async () => {
+    const url = (from: string) => `${h.baseUrl}/api/duels/${duel.id}/replay?from=${from}`;
+    const replay = async (who: Browser, from: string) => (await who.json<Replay>(url(from))).body;
+    const raw = await guest.fetch(url('1'), { headers: { 'accept-encoding': 'gzip' } });
+    expect(raw.headers.get('content-encoding')).toBe('gzip');
+
+    const own = await replay(guest, '1');
+    expect(own.from).toBe(1);
+    expect(own.steps[0]!.entry).toBeNull();
+    expect(own.steps.every((s) => s.view.you === 1 && s.view.actions.length === 0 && s.view.blocked.length === 0)).toBe(true);
+    const end = own.steps.at(-1)!.view;
+    expect(end.result).toEqual({ winner: 1, reason: 'surrender' });
+    expect(end.players[1].hand.every((c) => 'id' in c)).toBe(true);
+    expect(end.players[0].hand.every((c) => 'hidden' in c)).toBe(true);
+    // The steps are the live log, entry for entry.
+    const live = new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
+    const sync = await live.update();
+    live.close();
+    if (sync.type !== 'sync') throw new Error('expected sync');
+    expect(own.steps.slice(1).map((s) => s.entry)).toEqual(sync.log);
+
+    const theirs = await replay(guest, '0');
+    expect(theirs.steps.at(-1)!.view.players[1].hand.every((c) => 'hidden' in c)).toBe(true);
+    const both = await replay(guest, 'both');
+    expect(both.steps.at(-1)!.view.players.every((p) => p.hand.every((c) => 'id' in c))).toBe(true);
+    expect(both.steps.some((s) => s.entry?.event.type === 'monsterSet' && s.entry.event.card !== null)).toBe(true);
+
+    // A question the admin's seat asked shows in their replays and an admin's, never in the guest's.
+    const seq = (await h.db.select().from(matchEvents).where(eq(matchEvents.matchId, duel.id))).length;
+    const record = { player: 0, question: 'Can I respond?', card: null, answer: 'No.', verdict: 'explained', about: null, model: 'm', usage: [], error: null };
+    await h.db.insert(matchEvents).values({ matchId: duel.id, seq, event: { type: 'asked', record } });
+    const asked = (r: Replay) => r.steps.some((s) => s.entry?.event.type === 'asked');
+    expect(asked(await replay(guest, 'both'))).toBe(false);
+    expect(asked(await replay(guest, '0'))).toBe(false);
+    expect(asked(await replay(admin, '1'))).toBe(true);
+    await h.db.delete(matchEvents).where(and(eq(matchEvents.matchId, duel.id), eq(matchEvents.seq, seq)));
+
+    expect((await guest.json(url('2'))).status).toBe(400);
+    expect((await new Browser().json(url('0'))).status).toBe(403);
+    const ongoing = await challenge(admin);
+    expect((await admin.json(`${h.baseUrl}/api/duels/${ongoing.id}/replay`)).status).toBe(404);
   });
 
   it("tells the admin why the duel list failed, so the page shows the reason instead of hiding the list", async () => {

@@ -1,4 +1,4 @@
-import type { CardData, EffectSheet } from '@yugioh/engine';
+import type { CardData, EffectSheet, SeatStep } from '@yugioh/engine';
 import type { UserSettings } from './settings.ts';
 
 // JSON shapes exchanged between the web client and the server.
@@ -59,6 +59,13 @@ export interface DuelSummary {
   decks: [string, string | null];
   yourSeat: 0 | 1 | null;
   canJoin: boolean;
+}
+
+/** A finished duel to watch again (docs/next-steps.md, Replays). */
+export interface Replay {
+  /** The seat at the bottom of the board, or `both` for every card face up. */
+  from: 0 | 1 | 'both';
+  steps: SeatStep[];
 }
 
 export interface DeckDetail {
