@@ -1,0 +1,1 @@
+ALTER TABLE "sheet_reports" ALTER COLUMN "code" DROP NOT NULL;

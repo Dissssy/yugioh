@@ -21,7 +21,7 @@ export interface Move {
 }
 
 /** Card names by instance ID, for every card the seat can see. */
-function namesIn(view: PlayerView): Map<string, string> {
+export function namesIn(view: PlayerView): Map<string, string> {
   const names = new Map<string, string>();
   const add = (c: CardView | null | undefined) => {
     if (c && 'id' in c) names.set(c.id, c.card.name);

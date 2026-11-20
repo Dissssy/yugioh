@@ -309,6 +309,9 @@ button.phase.go { border: 0; background: none; color: var(--fg); text-decoration
 }
 .action-menu button { text-align: left; border-color: var(--line); }
 .action-menu button:hover, .action-menu button:focus-visible { border-color: var(--accent); }
+.why-not { max-width: 260px; font-size: 0.85em; color: var(--muted); }
+.why-not summary { cursor: pointer; padding: 2px 4px; }
+.why-not p { margin: 4px 4px 2px; color: var(--fg); }
 .sheet-backdrop { position: fixed; inset: 0; z-index: 30; background: rgb(0 0 0 / 0.45); }
 .sheet { position: absolute; top: 50%; left: 50%; translate: -50% -50%; width: min(1100px, 88vw); max-height: 86vh; overflow: auto; padding: 16px; border-radius: 12px; background: var(--bg); box-sizing: border-box; }
 .sheet h3 { margin: 0; }
@@ -347,7 +350,13 @@ button.phase.go { border: 0; background: none; color: var(--fg); text-decoration
 .duel-log li.ruling.refused { border-left-color: var(--danger); }
 .duel-log li.appeal { color: var(--fg); font-style: italic; }
 .duel-log li.chat { color: var(--fg); border-left: 3px solid var(--line); }
-.chat-input { display: flex; gap: 6px; padding-top: 6px; }
+.chat-input { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; }
+.chat-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; flex-basis: 100%; }
+.chat-mode button { padding: 1px 8px; font-size: 0.85em; }
+.chat-mode button.on { border-color: var(--accent); }
+.duel-log li.question { color: var(--fg); border-left: 3px solid var(--accent); display: grid; gap: 2px; }
+.duel-log li.question q { font-style: italic; }
+.duel-log li.question button { justify-self: start; }
 .chat-input input { flex: 1; min-width: 0; font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); }
 .contest { display: grid; gap: 4px; margin: 4px 0; }
 .contest textarea { font: inherit; padding: 4px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); resize: vertical; }

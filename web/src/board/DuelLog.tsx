@@ -1,4 +1,4 @@
-import type { LogEntry, LogEvent } from '@yugioh/engine';
+import type { CardData, LogEntry, LogEvent } from '@yugioh/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /** How close to its end the log counts as following along. */
@@ -7,7 +7,7 @@ const END_SLOP_PX = 24;
 /** Card IDs an event names, for highlighting them on the board. */
 export function cardsOf(event: LogEvent): string[] {
   const ids: (string | null)[] = [];
-  if ('card' in event) ids.push(event.card);
+  if ('card' in event && event.type !== 'asked') ids.push(event.card);
   if ('cards' in event) ids.push(...event.cards);
   if (event.type === 'attackDeclared') ids.push(event.attacker, event.target);
   return ids.filter((id): id is string => id !== null);
@@ -19,12 +19,26 @@ export interface Contest {
   send(seq: number, note: string): void;
 }
 
+/** Escalating a question to the judge to the appeal: whether this player still may, and sending it. */
+export interface Escalate {
+  can(seq: number): boolean;
+  send(seq: number, note: string): void;
+}
+
+const OUTCOMES = {
+  game_right: 'The game is right',
+  ruling_wrong: 'The ruling was wrong, so it is being contested for you',
+  card_wrong: "The card's script was wrong: the judge rules on it from now on",
+  engine_wrong: "A rule in the game's code is wrong; it's been reported",
+} as const;
+
 /**
  * The duel log, grouped by turn. The current turn is open; earlier turns fold away. Hovering an entry highlights
  * the cards it names. The judge's rulings stand out and can be contested; an appeal's verdict follows them.
  */
-export function DuelLog({ log, onHighlight, contest }: { log: LogEntry[]; onHighlight: (ids: string[]) => void; contest: Contest }) {
+export function DuelLog({ log, onHighlight, contest, escalate }: { log: LogEntry[]; onHighlight: (ids: string[]) => void; contest: Contest; escalate: Escalate }) {
   const [contesting, setContesting] = useState<number | null>(null);
+  const [escalating, setEscalating] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const turns = new Map<number, LogEntry[]>();
   for (const entry of log) {
@@ -69,13 +83,57 @@ export function DuelLog({ log, onHighlight, contest }: { log: LogEntry[]; onHigh
                 <li
                   key={e.seq}
                   className={
-                    e.event.type === 'judged' ? `ruling${e.event.legal ? '' : ' refused'}` : e.event.type === 'appealed' ? 'appeal' : e.event.type === 'chatted' ? 'chat' : undefined
+                    e.event.type === 'judged'
+                      ? `ruling${e.event.legal ? '' : ' refused'}`
+                      : e.event.type === 'appealed' || e.event.type === 'escalated'
+                        ? 'appeal'
+                        : e.event.type === 'chatted'
+                          ? 'chat'
+                          : e.event.type === 'asked'
+                            ? 'question'
+                            : undefined
                   }
                   onPointerEnter={() => onHighlight(cardsOf(e.event))}
                   onPointerLeave={() => onHighlight([])}
                 >
                   {e.event.type === 'judged' && 'Judge: '}
-                  {e.text}
+                  {e.event.type === 'asked' ? (
+                    <>
+                      <span className="muted small">Your question (only you see this)</span>
+                      <q>{e.event.question}</q>
+                      <span>Judge: {e.event.answer}</span>
+                    </>
+                  ) : e.event.type === 'escalated' ? (
+                    <>
+                      <strong>{OUTCOMES[e.event.outcome]}.</strong> {e.event.explanation}
+                    </>
+                  ) : (
+                    e.text
+                  )}
+                  {e.event.type === 'asked' && !e.event.failed && escalate.can(e.seq) && escalating !== e.seq && (
+                    <button className={e.event.verdict === 'explained' ? 'quiet' : undefined} onClick={() => (setEscalating(e.seq), setNote(''))}>
+                      Escalate
+                    </button>
+                  )}
+                  {escalating === e.seq && (
+                    <form
+                      className="contest"
+                      onSubmit={(ev) => {
+                        ev.preventDefault();
+                        escalate.send(e.seq, note.trim());
+                        setEscalating(null);
+                      }}
+                    >
+                      <textarea rows={2} maxLength={500} placeholder="Why do you think the game is wrong? (optional)" value={note} onChange={(ev) => setNote(ev.target.value)} autoFocus />
+                      <span className="muted small">The appeal sees the whole board and uses one of the duel's appeals.</span>
+                      <span className="row">
+                        <button type="submit">Send to appeal</button>
+                        <button type="button" className="quiet" onClick={() => setEscalating(null)}>
+                          Cancel
+                        </button>
+                      </span>
+                    </form>
+                  )}
                   {e.event.type === 'judged' && contest.can(e.seq) && contesting !== e.seq && (
                     <button className="quiet" onClick={() => (setContesting(e.seq), setNote(''))}>
                       Contest
@@ -108,20 +166,73 @@ export function DuelLog({ log, onHighlight, contest }: { log: LogEntry[]; onHigh
   );
 }
 
-/** A line to send to the duel's chat, which both players read in the duel log. */
-export function ChatInput({ send, sending }: { send: (text: string) => Promise<unknown>; sending: boolean }) {
+/** A question to the judge in the making: what it's about, if a card was picked from its details. */
+export interface Asking {
+  about: CardData | null;
+  /** Changes when the box should take focus (a card's "Ask the judge" was pressed). */
+  focus: number;
+}
+
+/**
+ * A line for the duel's chat, which both players read in the duel log, or a question to the judge, which only this
+ * player sees (docs/ask-the-judge.md).
+ */
+export function ChatInput({
+  send,
+  ask,
+  sending,
+  answering,
+  asking,
+  onAsking,
+}: {
+  send: (text: string) => Promise<unknown>;
+  ask: (text: string, card: number | null) => Promise<unknown>;
+  sending: boolean;
+  /** A question was sent and its answer hasn't arrived yet. */
+  answering: boolean;
+  /** Null in chat mode. */
+  asking: Asking | null;
+  onAsking: (asking: Asking | null) => void;
+}) {
   const [text, setText] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (asking?.focus) input.current?.focus();
+  }, [asking?.focus]);
   return (
     <form
       className="chat-input"
       onSubmit={(e) => {
         e.preventDefault();
-        if (text.trim()) void send(text.trim()).then(() => setText(''), () => {});
+        if (!text.trim()) return;
+        const sent = asking ? ask(text.trim(), asking.about?.code ?? null) : send(text.trim());
+        void sent.then(() => setText(''), () => {});
       }}
     >
-      <input aria-label="Chat message" placeholder="Say something…" maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
-      <button type="submit" disabled={sending || !text.trim()}>
-        Send
+      <span className="chat-mode" role="group" aria-label="Send to">
+        <button type="button" className={asking ? 'quiet' : 'on'} aria-pressed={!asking} onClick={() => onAsking(null)}>
+          Chat
+        </button>
+        <button type="button" className={asking ? 'on' : 'quiet'} aria-pressed={!!asking} onClick={() => asking || onAsking({ about: null, focus: 0 })}>
+          Ask the judge
+        </button>
+        {asking?.about && (
+          <button type="button" className="quiet about" title="Not about this card" onClick={() => onAsking({ about: null, focus: asking.focus })}>
+            About {asking.about.name} ×
+          </button>
+        )}
+        {answering && <span className="muted small">The judge is answering…</span>}
+      </span>
+      <input
+        ref={input}
+        aria-label={asking ? 'Question for the judge' : 'Chat message'}
+        placeholder={asking ? 'Ask a rules question…' : 'Say something…'}
+        maxLength={asking ? 500 : 300}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <button type="submit" disabled={sending || answering || !text.trim()}>
+        {asking ? 'Ask' : 'Send'}
       </button>
     </form>
   );

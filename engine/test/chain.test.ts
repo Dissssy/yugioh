@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  blockedAttacks,
+  blockedEffects,
   decide,
   legalActions,
   nextStep,
@@ -281,6 +283,57 @@ describe('responding to a summon', () => {
     const t = setup(2);
     expect(t.activations(1)).toEqual([]);
     expect(decide(t.state, 1, { type: 'activate', card: 'b0', effect: 0, zone: null })).toMatchObject({ ok: false });
+  });
+});
+
+describe("why can't I?", () => {
+  const reasons = (t: Table, seat: Seat, card: string) => viewFor(t.state, seat).blocked.filter((b) => b.card === card).map((b) => b.reason);
+
+  it("says why a Set Trap can't be activated, and stops saying it once the Trap is offered", () => {
+    const t = new Table(stacked(pad([2, 2, 2, 2, 2, 1]), pad([3, 2, 2, 2, 2, 2])));
+    t.endTurn(0);
+    t.play(1, { type: 'setSpellTrap', card: 'b0', zone: 0 });
+    expect(reasons(t, 1, 'b0')).toEqual(["A Trap can't be activated the turn it was Set."]);
+    t.endTurn(1);
+    expect(reasons(t, 1, 'b0')).toEqual(["On your opponent's turn you can only respond when a response window gives you priority."]);
+    t.play(0, { type: 'normalSummon', card: 'a5', tributes: [], zone: 0 });
+    expect(t.activations(1)).toEqual(['b0']);
+    expect(reasons(t, 1, 'b0')).toEqual([]);
+    // The opponent's view never carries the Set card's reasons.
+    expect(viewFor(t.state, 0).blocked.some((b) => b.card === 'b0')).toBe(false);
+  });
+
+  it('names the moment a Trap waits for when the window is the wrong one', () => {
+    const t = new Table(stacked(pad([2, 2, 2, 2, 2, 2]), pad([3, 2, 2, 2, 2, 2])));
+    t.endTurn(0);
+    t.play(1, { type: 'setSpellTrap', card: 'b0', zone: 0 }).endTurn(1);
+    t.play(0, { type: 'normalSummon', card: 'a5', tributes: [], zone: 0 });
+    // Weak Knight has 900 ATK, so Trap Hole's window never opens for seat 1 (it passes by itself); in seat 0's open game it is the timing.
+    expect(t.state.step).toEqual({ at: 'open' });
+    expect(reasons(t, 1, 'b0')[0]).toMatch(/your opponent's turn/);
+  });
+
+  it("gives a scripted effect's own reason, and once per turn", () => {
+    const t = new Table(stacked(pad([7, 2, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    expect(reasons(t, 0, 'a0')).toEqual(['It can only be activated during the Battle Phase.']);
+  });
+
+  it("says why a monster can't attack", () => {
+    const t = new Table(stacked(pad([1, 11, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'setMonster', card: 'a1', tributes: [], zone: 1 }).endTurn(0).endTurn(1);
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).play(0, { type: 'enterBattle' });
+    expect(blockedAttacks(t.state, 0)).toEqual([{ card: 'a1', effect: null, text: null, reason: "A face-down monster can't attack." }]);
+    t.play(0, { type: 'attack', attacker: 'a0', target: 'direct' });
+    expect(blockedAttacks(t.state, 0).find((b) => b.card === 'a0')?.reason).toBe('It already attacked this turn.');
+  });
+
+  it('never lists an effect that is offered', () => {
+    const t = new Table(stacked(pad([9, 10, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    const actions = legalActions(t.state, 0);
+    const offered = actions.flatMap((a) => (a.type === 'activate' ? [a.card] : []));
+    expect(offered.sort()).toEqual(['a0', 'a1']);
+    expect(blockedEffects(t.state, 0, actions)).toEqual([]);
   });
 });
 

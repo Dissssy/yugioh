@@ -2,29 +2,40 @@
 
 import { eq, inArray, isNull } from 'drizzle-orm';
 import type { EffectSheet } from '@yugioh/engine';
-import type { RulingCard } from '@yugioh/shared';
+import type { Rulings, SheetReport } from '@yugioh/shared';
 import type { Db } from './db/client.ts';
 import { cards, effectSheets, sheetReports } from './db/schema.ts';
 import { saveSheet, sheetSchema, textHash } from './sheets.ts';
 
-/** Cards with open reports or with scripts set aside, those with reports first. */
-export async function rulingCards(db: Db): Promise<RulingCard[]> {
+type ReportRow = typeof sheetReports.$inferSelect;
+
+const reportOf = (r: ReportRow): SheetReport => ({
+  id: r.id,
+  matchId: r.matchId,
+  seq: r.seq,
+  from: r.reporter === 'appeal' || r.reporter === 'escalation' ? r.reporter : 'player',
+  note: r.note,
+  createdAt: r.createdAt.toISOString(),
+});
+
+/** Cards with open reports or with scripts set aside (those with reports first), and open reports of a rule in code. */
+export async function rulings(db: Db): Promise<Rulings> {
   const reports = await db.select().from(sheetReports).where(isNull(sheetReports.resolvedAt)).orderBy(sheetReports.createdAt);
+  const engine = reports.filter((r) => r.code === null).map(reportOf);
   const sheets = new Map((await db.select().from(effectSheets)).map((r) => [r.code, r.sheet]));
   const flagged = [...sheets.values()].filter((s) => s.effects.some((e) => e.status === 'flagged')).map((s) => s.code);
-  const codes = [...new Set([...reports.map((r) => r.code), ...flagged])];
-  if (!codes.length) return [];
+  const codes = [...new Set([...reports.flatMap((r) => (r.code === null ? [] : [r.code])), ...flagged])];
+  if (!codes.length) return { cards: [], engine };
   const rows = await db.select({ id: cards.id, name: cards.name, text: cards.text }).from(cards).where(inArray(cards.id, codes));
   const byCode = new Map(rows.map((r) => [r.id, r]));
-  return codes.map((code) => ({
+  const list = codes.map((code) => ({
     code,
     name: byCode.get(code)!.name,
     text: byCode.get(code)!.text,
     sheet: sheets.get(code) ?? null,
-    reports: reports
-      .filter((r) => r.code === code)
-      .map((r) => ({ id: r.id, matchId: r.matchId, seq: r.seq, from: r.reporter === 'appeal' ? 'appeal' : 'player', note: r.note, createdAt: r.createdAt.toISOString() })),
+    reports: reports.filter((r) => r.code === code).map(reportOf),
   }));
+  return { cards: list, engine };
 }
 
 /**

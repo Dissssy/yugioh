@@ -225,6 +225,7 @@ Each layer ends with something two people can play in a browser, and each adds o
    - Playable when: both starter decks play out their normal lines without manual fixes.
    - Triggers, SEGOC and "becomes" stat changes built 2026-11-19 with layer 4. Code detects triggers from the `when` in each sheet, not the judge. Continuous effects and lingering restrictions are next.
 6. **Rollback and rulings memory.** Overturn plus two-player rollback consent, hidden-info check on explanations, candidate/verified rulings, retrieval into prompts, admin review page, every verified ruling added to the eval suite.
+   - Rollback built 2026-11-19 (step 7 of [roadmap.md](roadmap.md)). The rulings memory isn't built; [rulings-history.md](rulings-history.md) proposes keeping rulings in the effect sheets instead.
 7. **Remaining Extra Deck mechanics.** Fusion, Link (and the Extra Monster Zone rules that come with it) and Pendulum, each added when a premade deck needs it.
 8. **Product.** Custom banlists, deck builder with banlist validation and `.ydk` import, more premade decks, match history. Widening the card pool happens here, gated by eval results per archetype. Accounts, Auth0 login, admin approval and guests are being built separately and ahead of the engine, since they don't depend on it.
 
@@ -265,4 +266,4 @@ Decided 2026-11-18.
 
 ## Deferred: draft mode
 
-Requested by several players, mechanics undecided, not scheduled until well after layer 7. A draft series would be run like a campaign or tournament, and players build decks only from the cards they drafted. It sits entirely outside the engine: the deck builder checks a deck against the player's drafted pool the same way it checks a banlist, and the engine still just receives two decklists.
+Requested by several players, mechanics undecided, not scheduled until well after layer 7. A draft series would be run like a campaign or tournament, and players build decks only from the cards they drafted. It sits entirely outside the engine: the deck builder checks a deck against the player's drafted pool the same way it checks a banlist, and the engine still just receives two decklists. A first sketch, with the formats to choose from, is in [next-steps.md](next-steps.md).

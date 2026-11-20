@@ -105,7 +105,7 @@ describe('playing against Claude', () => {
     const errors = vi.spyOn(console, 'error');
     const requests: Anthropic.MessageCreateParamsNonStreaming[] = [];
     const model = randomModel(seeded(5), requests);
-    const ai = { judge: null, appeal: model, judgeCalls: 0, appeals: 10, opponent: { call: model, model: 'claude-haiku-5-5', calls: 60, paceMs: 0 } };
+    const ai = { judge: null, appeal: model, judgeCalls: 0, appeals: 10, questions: 20, opponent: { call: model, model: 'claude-haiku-5-5', calls: 60, paceMs: 0 } };
     const duels = new Duels(h.db, ai, seeded(6), 0);
     const opponents = new Opponents(duels, h.db, ai.opponent, 0, seeded(7));
     duels.onAiSeat = (id, seat) => void opponents.attach(id, seat);

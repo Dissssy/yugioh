@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EffectSheet } from '@yugioh/engine';
-import { isAdmin, type AccountStatus, type AdminDuels, type AdminUser, type Me, type Role, type RulingCard } from '@yugioh/shared';
+import { isAdmin, type AccountStatus, type AdminDuels, type AdminUser, type Me, type Role, type RulingCard, type Rulings } from '@yugioh/shared';
 import { useState } from 'react';
 import { api, errorText } from '../api.ts';
 import { formatDate } from './Home.tsx';
@@ -15,7 +15,7 @@ export function Admin({ me }: { me: Me }) {
   return (
     <>
       <Accounts superAdmin={me.user.role === 'superAdmin'} />
-      <Rulings />
+      <RulingsSection />
       <RecentDuels />
     </>
   );
@@ -47,11 +47,11 @@ function RecentDuels() {
         <h1>Duels</h1>
         <span className="pill">{usd(duels.data.totalCost)} spent on models so far</span>
       </div>
-      <p className="muted">Costs are estimated from the tokens each judge call, appeal and AI opponent call used, at Anthropic's list prices.</p>
+      <p className="muted">Costs are estimated from the tokens each judge call, appeal, question to the judge and AI opponent call used, at Anthropic's list prices.</p>
       <div className="table-scroll">
         <table>
           <thead>
-            <tr><th>Duel</th><th>Created</th><th>Status</th><th>Decks</th><th>Judge calls</th><th>Appeals</th><th>AI calls</th><th>Cost</th><th /></tr>
+            <tr><th>Duel</th><th>Created</th><th>Status</th><th>Decks</th><th>Judge calls</th><th>Appeals</th><th>Questions</th><th>AI calls</th><th>Cost</th><th /></tr>
           </thead>
           <tbody>
             {duels.data.duels.map((duel) => (
@@ -62,6 +62,7 @@ function RecentDuels() {
                 <td className="muted">{duel.createdBy}: {duel.decks[0]} vs {duel.decks[1] ?? '…'}</td>
                 <td>{duel.judgeCalls}</td>
                 <td>{duel.appeals}</td>
+                <td>{duel.questions}</td>
                 <td>{duel.aiCalls}</td>
                 <td><strong>{usd(duel.cost)}</strong></td>
                 <td className="cell-actions">
@@ -81,22 +82,51 @@ function RecentDuels() {
  * Cards whose rulings need a look: players' reports and appeals that overturned a fixed ruling, which set the card's
  * scripts aside for the judge. The admin edits the sheet (restore or verify its scripts, or fix them) and closes the reports.
  */
-function Rulings() {
-  const cards = useQuery({ queryKey: ['admin', 'rulings'], queryFn: () => api<RulingCard[]>('/admin/rulings') });
-  if (cards.isError) return <Failed what="rulings" error={cards.error} />;
-  if (!cards.data) return null;
+function RulingsSection() {
+  const queryClient = useQueryClient();
+  const rulings = useQuery({ queryKey: ['admin', 'rulings'], queryFn: () => api<Rulings>('/admin/rulings') });
+  const resolve = useMutation({
+    mutationFn: (id: number) => api(`/admin/reports/${id}/resolve`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'rulings'] }),
+  });
+  if (rulings.isError) return <Failed what="rulings" error={rulings.error} />;
+  if (!rulings.data) return null;
+  const { cards, engine } = rulings.data;
+  const count = cards.length + engine.length;
   return (
     <section className="box admin">
       <div className="page-head">
         <h1>Rulings</h1>
-        <span className={`pill${cards.data.length ? ' waiting' : ''}`}>{cards.data.length ? `${cards.data.length} cards to look at` : 'Nothing reported'}</span>
+        <span className={`pill${count ? ' waiting' : ''}`}>{count ? `${count} to look at` : 'Nothing reported'}</span>
       </div>
-      {cards.data.map((card) => (
+      {engine.length > 0 && (
+        <div className="ruling">
+          <h2>Rules in code</h2>
+          <p className="muted">Escalated questions where the appeal found a generic rule in code wrong. Nothing changed in the duel.</p>
+          {engine.map((r) => (
+            <div key={r.id} className="ruling-report">
+              <p>
+                <strong>Escalated question</strong>{' '}
+                <span className="muted">
+                  {formatDate(r.createdAt)}, <a href={`/api/admin/duels/${r.matchId}/report`} target="_blank" rel="noreferrer">duel log</a> at event {r.seq}
+                </span>
+              </p>
+              <p>{r.note}</p>
+              <button className="quiet" disabled={resolve.isPending} onClick={() => resolve.mutate(r.id)}>
+                Close report
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {cards.map((card) => (
         <RulingEditor key={`${card.code}:${JSON.stringify(card.sheet)}`} card={card} />
       ))}
     </section>
   );
 }
+
+const REPORT_FROM = { appeal: 'Appeal overturned a fixed ruling', escalation: 'Escalated question found the card wrong', player: 'Player report' };
 
 /** Sets every scripted effect of a sheet to `status`. */
 const withStatus = (sheet: EffectSheet, status: EffectSheet['effects'][number]['status']): EffectSheet => ({
@@ -135,7 +165,7 @@ function RulingEditor({ card }: { card: RulingCard }) {
       {card.reports.map((r) => (
         <div key={r.id} className="ruling-report">
           <p>
-            <strong>{r.from === 'appeal' ? 'Appeal overturned a fixed ruling' : 'Player report'}</strong>{' '}
+            <strong>{REPORT_FROM[r.from]}</strong>{' '}
             <span className="muted">
               {formatDate(r.createdAt)}, <a href={`/api/admin/duels/${r.matchId}/report`} target="_blank" rel="noreferrer">duel log</a> at event {r.seq}
             </span>

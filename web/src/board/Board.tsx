@@ -13,7 +13,7 @@ import { dataOf, idOf, imageUrl, preloadImages } from './Card.tsx';
 import { CardTooltipProvider } from './CardTooltip.tsx';
 import { ChoiceBar, ChoiceProvider, pileKey, useBoardChoice, type PileKind } from './choice.tsx';
 import { cueMs, playCue } from './cues.ts';
-import { ChatInput, DuelLog, type Contest } from './DuelLog.tsx';
+import { ChatInput, DuelLog, type Asking, type Contest, type Escalate } from './DuelLog.tsx';
 import { dropKey, ExtraMonsterZone, Field, type FieldProps, type Row } from './Field.tsx';
 import { FoeHand, OwnHand, type HandDrag } from './Hand.tsx';
 import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
@@ -85,6 +85,12 @@ export function Board({ duelId }: { duelId: string }) {
   const [targetArrows, setTargetArrows] = useState<{ from: Point; to: Point }[]>([]);
   /** Rulings this player has contested here, until the server's appeal entry arrives. */
   const [contested, setContested] = useState<number[]>([]);
+  /** Questions this player has escalated here, until the server's entry arrives. */
+  const [escalated, setEscalated] = useState<number[]>([]);
+  /** Whether the chat box sends to the judge, and about which card. */
+  const [asking, setAsking] = useState<Asking | null>(null);
+  /** How many answers from the judge the log held when this player last asked, until the next one arrives. */
+  const [awaiting, setAwaiting] = useState<number | null>(null);
   /** Set when an aimed attack ends on the attacker, so the click that follows doesn't open its menu. */
   const swallowClick = useRef(false);
   /** A card sent to a zone, kept over it until the step that moves it arrives. */
@@ -104,6 +110,16 @@ export function Board({ duelId }: { duelId: string }) {
   });
   const chat = useMutation({
     mutationFn: (text: string) => api(`/duels/${duelId}/chat`, { method: 'POST', body: JSON.stringify({ text }) }),
+  });
+  const answers = shown?.log.filter((e) => e.event.type === 'asked').length ?? 0;
+  const ask = useMutation({
+    mutationFn: (body: { text: string; card: number | null }) => api(`/duels/${duelId}/ask`, { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => setAwaiting(answers),
+  });
+  const escalateQuestion = useMutation({
+    mutationFn: (body: { seq: number; note: string }) => api(`/duels/${duelId}/escalate`, { method: 'POST', body: JSON.stringify(body) }),
+    onMutate: ({ seq }) => setEscalated((c) => [...c, seq]),
+    onError: (_, { seq }) => setEscalated((c) => c.filter((x) => x !== seq)),
   });
   const contestRuling = useMutation({
     mutationFn: (body: { seq: number; note: string }) => api(`/duels/${duelId}/contest`, { method: 'POST', body: JSON.stringify(body) }),
@@ -186,6 +202,15 @@ export function Board({ duelId }: { duelId: string }) {
   const actions: LegalAction[] = busy ? [] : view.actions;
   const has = <T extends LegalAction['type']>(type: T) => actions.find((a): a is Extract<LegalAction, { type: T }> => a.type === type);
   const actionsFor = (id: string) => actions.filter((a) => ('card' in a && a.card === id) || (a.type === 'attack' && a.attacker === id));
+  /** Why this card's effects and attack that aren't offered now can't be used. */
+  const notesFor = (id: string) => {
+    const blocked = busy ? [] : view.blocked.filter((b) => b.card === id);
+    const effects = blocked.filter((b) => b.effect !== null).length;
+    return blocked.map((b) => ({
+      label: b.effect === null ? "Why can't it attack?" : effects > 1 ? `Why can't I use "${short(b.text ?? '')}"?` : "Why can't I activate this?",
+      reason: b.reason,
+    }));
+  };
   const playable = new Set(actions.flatMap((a) => ('card' in a ? [a.card] : a.type === 'attack' ? [a.attacker] : [])));
   const myHand = view.players[me].hand.map((c) => idOf(c)!);
 
@@ -289,7 +314,7 @@ export function Board({ duelId }: { duelId: string }) {
       return setMode({ ...mode, chosen });
     }
     if (mode.kind === 'menu' && mode.id === id) return setMode(idle);
-    setMode(actionsFor(id).length > 0 ? { kind: 'menu', id, anchor } : idle);
+    setMode(actionsFor(id).length > 0 || notesFor(id).length > 0 ? { kind: 'menu', id, anchor } : idle);
   }
 
   /** Whether a monster can join the materials picked so far: some set of materials holds them all and it. */
@@ -427,6 +452,10 @@ export function Board({ duelId }: { duelId: string }) {
         ? { id: mode.action.card, key: dropKey(me, 'm', mode.zone) }
         : sent && myHand.includes(sent.id) ? sent : null;
 
+  const escalate: Escalate = {
+    can: (seq) => !escalated.includes(seq) && !log.some((e) => e.event.type === 'escalated' && e.event.asked === seq),
+    send: (seq, note) => escalateQuestion.mutate({ seq, note }),
+  };
   const contest: Contest = {
     can: (seq) => !contested.includes(seq) && !log.some((e) => e.event.type === 'appealed' && e.event.judged === seq && e.event.by === me),
     send: (seq, note) => contestRuling.mutate({ seq, note }),
@@ -629,7 +658,14 @@ export function Board({ duelId }: { duelId: string }) {
         <ChoiceProvider value={choice}>
           <CardTooltipProvider
             suppressed={choosing || drag !== null || mode.kind === 'menu' || mode.kind === 'place'}
-            pinnedFooter={(card) => <ReportRuling key={card.code} duelId={duelId} card={card} />}
+            pinnedFooter={(card) => (
+              <>
+                <button className="quiet report-ruling" onClick={() => setAsking((a) => ({ about: card, focus: (a?.focus ?? 0) + 1 }))}>
+                  Ask the judge about this card
+                </button>
+                <ReportRuling key={card.code} duelId={duelId} card={card} />
+              </>
+            )}
           >
             <div className={`duel${look.stacked ? ' stacked' : ''}${look.compact ? ' compact' : ''}${look.tight ? ' tight' : ''}${look.typing ? ' typing' : ''}${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
               <div className="table" ref={setTable}>
@@ -744,8 +780,17 @@ export function Board({ duelId }: { duelId: string }) {
                 {send.isError && <p className="error">{errorText(send.error)}</p>}
                 {contestRuling.isError && <p className="error">{errorText(contestRuling.error)}</p>}
                 {chat.isError && <p className="error">{errorText(chat.error)}</p>}
-                <DuelLog log={log} onHighlight={setHighlight} contest={contest} />
-                <ChatInput send={chat.mutateAsync} sending={chat.isPending} />
+                {ask.isError && <p className="error">{errorText(ask.error)}</p>}
+                {escalateQuestion.isError && <p className="error">{errorText(escalateQuestion.error)}</p>}
+                <DuelLog log={log} onHighlight={setHighlight} contest={contest} escalate={escalate} />
+                <ChatInput
+                  send={chat.mutateAsync}
+                  ask={(text, card) => ask.mutateAsync({ text, card })}
+                  sending={chat.isPending || ask.isPending}
+                  answering={awaiting !== null && answers <= awaiting}
+                  asking={asking}
+                  onAsking={setAsking}
+                />
               </aside>
 
               {mode.kind === 'menu' && (
@@ -762,6 +807,7 @@ export function Board({ duelId }: { duelId: string }) {
                         }))
                       : [{ label: actionLabel(a, view), run: () => start(a) }],
                   )}
+                  notes={notesFor(mode.id)}
                   onClose={() => setMode(idle)}
                 />
               )}
@@ -855,4 +901,9 @@ function nextPhase(actions: LegalAction[]) {
     if (action) return action;
   }
   return undefined;
+}
+
+/** The start of an effect's wording, short enough for a menu item. */
+function short(text: string): string {
+  return text.length > 48 ? `${text.slice(0, 45).trimEnd()}…` : text;
 }

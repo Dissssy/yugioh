@@ -92,6 +92,8 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
       case 'intent':
       case 'chatted':
       case 'aiDecided':
+      case 'asked':
+      case 'escalated':
         return;
       case 'orderChosen':
         // The opening hands are dealt next, then turn 1 starts.

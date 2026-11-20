@@ -622,6 +622,47 @@ export interface AiRecord {
   usage: ModelUsage[];
 }
 
+/**
+ * A player's question to the judge (docs/ask-the-judge.md), answered from what that player can see. Only they see it
+ * in their log; it changes nothing on the board.
+ */
+export interface AskRecord {
+  player: Seat;
+  question: string;
+  /** The card asked about (its code: one the player could see, or in their own Deck), or null. */
+  card: number | null;
+  answer: string;
+  /** `explained`: the game did the right thing. Otherwise the model thinks the game may be wrong, or can't tell. */
+  verdict: 'explained' | 'game_seems_wrong' | 'not_sure';
+  /** The ruling (its `judged` event's seq) the question is about, if any. */
+  ruling: number | null;
+  model: string;
+  /** Set when the call failed; the answer then says the judge couldn't answer. */
+  error: string | null;
+  usage: ModelUsage[];
+}
+
+/**
+ * A question the asker escalated to the appeal model, which sees the whole board. `ruling_wrong` contests the ruling
+ * `judged` for the asker; `card_wrong` reports card `code` (its scripts are set aside); `engine_wrong` is kept for the
+ * admin. Only the asker sees it; a contest it starts is public as usual.
+ */
+export interface EscalationRecord {
+  player: Seat;
+  /** The `asked` event's seq. */
+  asked: number;
+  note: string;
+  outcome: 'game_right' | 'ruling_wrong' | 'card_wrong' | 'engine_wrong';
+  /** For the asker; names no card they can't see. */
+  explanation: string;
+  /** For the people who maintain the game; never shown to players. */
+  ruling: string;
+  judged: number | null;
+  code: number | null;
+  model: string;
+  usage: ModelUsage[];
+}
+
 /** Everything that happens is one of these. The duel's state is the fold of its events. */
 export type DuelEvent =
   | {
@@ -700,7 +741,9 @@ export type DuelEvent =
   | { type: 'duelEnded'; result: DuelResult }
   /** A player's chat message. It changes nothing on the board and never reaches the judge. */
   | { type: 'chatted'; player: Seat; text: string }
-  | { type: 'aiDecided'; record: AiRecord };
+  | { type: 'aiDecided'; record: AiRecord }
+  | { type: 'asked'; record: AskRecord }
+  | { type: 'escalated'; record: EscalationRecord };
 
 export interface StartingPlayer {
   name: string;
@@ -732,6 +775,17 @@ export interface PlayerView {
   /** An offer to rewind to before an overturned ruling: what the appeal said, how many log entries it undoes, who accepted. */
   rollback: { explanation: string; accepted: Seat[] } | null;
   actions: LegalAction[];
+  /** Why the viewer's own effects and attacks that aren't offered now can't be used ("Why can't I?"). */
+  blocked: Blocked[];
+}
+
+/** An effect (`effect` indexes the card's sheet) or, with `effect` null, an attack the player can't make now, and why. */
+export interface Blocked {
+  card: string;
+  effect: number | null;
+  /** The effect's wording, so a card with several effects can say which; null for an attack. */
+  text: string | null;
+  reason: string;
 }
 
 /**
@@ -767,8 +821,14 @@ export type LogEvent =
           | 'passed'
           | 'attackEnded'
           | 'aiDecided'
+          | 'asked'
+          | 'escalated'
       }
     >
+  /** A question to the judge and its answer; only the asker's log has it. */
+  | { type: 'asked'; player: Seat; question: string; card: number | null; answer: string; verdict: AskRecord['verdict']; failed: boolean }
+  /** The appeal model's look at an escalated question; only the asker's log has it. */
+  | { type: 'escalated'; asked: number; outcome: EscalationRecord['outcome']; explanation: string }
   | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number }
   | (Omit<Extract<DuelEvent, { type: 'moved' }>, 'card'> & { card: string | null })
   /** A judge decision. `card` is null when the player can't see it. Contest it by its log entry's `seq`. */
