@@ -24,6 +24,8 @@ import {
   statsOf,
   targetable,
   targetMax,
+  costSubstitute,
+  fromHandToGraveyard,
   visibleTo,
   type DuelEvent,
   type DuelState,
@@ -128,6 +130,8 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
   const paid: string[] = [];
   /** The cards the last move step moved, for a pledge about "the added monster". */
   let moved: string[] = [];
+  /** Whether a `cost_substitute` card already stood in for part of this cost. */
+  let substituted = false;
   /** A stat read when the step resolves: from this card, the first target still on the field (or in a pile, for original stats), or the first card paid as the cost. */
   const valueOf = (v: StatValue): number | null => {
     const id = v.of === 'self' ? self : v.of === 'cost' ? paid[0] : link.targets.find((t) => script.targets && fits(state, t, script.targets.filter, seat));
@@ -169,7 +173,20 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       case 'move': {
         const fromHand = step.cards.from === 'choose' && step.cards.filter.place === 'hand' && step.to === 'graveyard';
         const verb = fromHand ? 'discard' : { hand: 'add to the hand', graveyard: 'send to the GY', banished: 'banish' }[step.to as 'hand'] ?? 'return to the Deck';
-        const cards = await select(step.cards, verb);
+        let sel = step.cards;
+        // A card in the GY may be banished instead of 1 card of a cost from the hand (Revealer of the Ice Barrier).
+        const sub = cost && !substituted && fromHandToGraveyard(step) ? costSubstitute(state, seat, self) : null;
+        if (sub && fromHandToGraveyard(step)) {
+          const short = chooseFrom(state, step.cards, seat, self).length < step.cards.min;
+          const banish = `Banish ${cardOf(state, sub.card).name} from your GY instead of 1 of them`;
+          const [pick] = short ? [banish] : await ask({ prompt: `${name}: pay the cost from your hand, or ${banish.toLowerCase()}?`, cards: [], choices: ['Pay from your hand', banish], min: 1, max: 1 });
+          if (pick === banish) {
+            apply({ op: 'substitute_cost', card: sub.card, effect: sub.effect });
+            substituted = true;
+            sel = { ...step.cards, min: Math.max(0, step.cards.min - 1), max: Math.max(0, step.cards.max - 1) };
+          }
+        }
+        const cards = await select(sel, verb);
         for (const id of cards) apply({ op: 'move', card: id, to: step.to });
         moved = cards;
         if (cost) paid.push(...cards);

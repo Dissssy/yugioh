@@ -9,6 +9,7 @@ import {
   statsOf,
   targetMax,
   applyOp,
+  costSubstitute,
   viewFor,
   type CardData,
   type CardFilter,
@@ -70,6 +71,8 @@ const cards: Record<number, CardData> = {
   27: { ...monster(27, 'Junk Synchron', 1300, 500, 3), type: 'Tuner Effect Monster' },
   28: { ...monster(28, 'Junk Destroyer', 2600, 2500, 8), type: 'Synchro Effect Monster', extraDeck: true },
   29: monster(29, 'Moulinglacia', 2800, 2200),
+  30: monster(30, 'Revealer', 1100, 1500),
+  31: monster(31, 'Ice Caller', 1000, 1000),
 };
 
 const filter = (f: Partial<CardFilter>): CardFilter => ({
@@ -193,6 +196,17 @@ const sheets: Record<number, EffectSheet> = {
   22: sheet(22, effect({ kind: 'continuous', opt: 'soft', continuous: { apply: 'extra_normal_summon', filter: filter({ side: 'you', place: 'hand', named: 'Ice' }), while: [] } })),
   24: sheet(24, effect({ kind: 'continuous', continuous: { apply: 'discard_or_negate', while: [] } })),
   25: sheet(25, effect({ kind: 'continuous', continuous: { apply: 'negate_battled_flips', while: [] } })),
+  30: sheet(30, effect({ kind: 'continuous', from: 'graveyard', opt: 'hard', continuous: { apply: 'cost_substitute', for: filter({ place: 'any', named: 'Ice' }) } })),
+  31: sheet(
+    31,
+    effect({
+      kind: 'ignition',
+      script: script({
+        cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', place: 'hand' }), min: 1, max: 1, rank: null }, to: 'graveyard' }],
+        options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1 }] }],
+      }),
+    }),
+  ),
   29: sheet(29, effect({ kind: 'continuous', continuous: { apply: 'forbid_on_leaving', what: 'battle_phase' } })),
   26: sheet(
     26,
@@ -634,6 +648,24 @@ describe('locks an effect leaves behind', () => {
     // It ends once the card leaves the field.
     t.push({ type: 'destroyed', cards: ['a0'], by: 1 });
     expect(spells(t, 0)).toEqual(['a1']);
+  });
+});
+
+describe('cost substitutes', () => {
+  it('let a card in the GY stand in for a card of the cost from the hand, once (Revealer of the Ice Barrier)', () => {
+    const t = new Table(stacked(pad([31, 30, 2, 2, 2, 2]), pad([2, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    t.push({ type: 'discarded', player: 0, cards: ['a2', 'a3', 'a4'] });
+    // One card in hand pays the cost; with it gone too, only the Revealer in the GY can.
+    expect(t.activations(0)).toEqual(['a0']);
+    t.push({ type: 'discarded', player: 0, cards: ['a1'] });
+    expect(costSubstitute(t.state, 0, 'a0')).toEqual({ card: 'a1', effect: 0 });
+    expect(t.activations(0)).toEqual(['a0']);
+    const used = applyOp(t.state, { op: 'substitute_cost', card: 'a1', effect: 0 }, ctx0('a0'));
+    if (!used.ok) throw new Error(used.error);
+    t.push(...used.events);
+    expect(t.state.players[0].banished).toEqual(['a1']);
+    expect(costSubstitute(t.state, 0, 'a0')).toBeNull();
   });
 });
 

@@ -433,6 +433,9 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         s.lingering.push(lock);
         return;
       }
+      case 'substituted':
+        s.usedThisTurn.push({ player: event.player, card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
+        return;
       case 'pledged':
         s.pledges.push({ player: event.player, names: event.names, damage: event.damage });
         return;

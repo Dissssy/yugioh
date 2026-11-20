@@ -166,7 +166,7 @@
       "kind": "continuous",
       "speed": 1,
       "mandatory": false,
-      "from": "field",
+      "from": "graveyard",
       "opt": "hard",
       "window": "While this card is in your GY, when you would discard, or send a card(s) from your hand to the GY, to activate an \"Ice Barrier\" monster's effect",
       "cost": "",
@@ -174,7 +174,26 @@
       "targets": null,
       "when": null,
       "script": null,
-      "continuous": null,
+      "continuous": {
+        "apply": "cost_substitute",
+        "for": {
+          "side": "either",
+          "place": "any",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": "Ice Barrier",
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        }
+      },
       "status": "unverified"
     }
   ],

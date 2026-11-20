@@ -274,6 +274,9 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  * - `negate_battled_flips`: FLIP effects of monsters this card destroys by battle are negated (Blade Knight).
  * - `discard_or_negate`: when an effect activated by an Effect Monster on the opponent's field resolves, the opponent
  *   discards 1 card or the effect is negated, their choice (General Raiho of the Ice Barrier).
+ * - `cost_substitute`: from its owner's GY, this card can be banished instead of 1 card the owner would discard or send
+ *   from the hand to the GY as the cost of an effect of a card that fits `for` (Revealer of the Ice Barrier). The
+ *   effect's `opt` limits how often.
  * - `forbid_on_leaving`: when this face-up card leaves the field, its controller can't do `what` during their next turn
  *   ("If this face-up card leaves the field, skip the Battle Phase of your next turn": battle_phase; Moulinglacia).
  * - `extra_normal_summon`: its controller can Normal Summon (not Set) 1 monster from the hand that fits `filter` in
@@ -314,6 +317,7 @@ export type Continuous =
   | { apply: 'extra_normal_summon'; filter: CardFilter; while: Condition[] }
   | { apply: 'discard_or_negate'; while: Condition[] }
   | { apply: 'forbid_on_leaving'; what: Forbidden }
+  | { apply: 'cost_substitute'; for: CardFilter }
   /** "This card's name becomes `name` while it is on the field." */
   | { apply: 'name'; name: string }
   /**
@@ -696,6 +700,8 @@ export type Op =
   | { op: 'pledge_normal_summon'; player: Seat; cards: string[]; damage: number }
   /** See the `lock` step; `player` is relative to the effect's controller. */
   | { op: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; while_face_up: boolean }
+  /** Banish `card` from its owner's GY instead of 1 card of the cost, by its `cost_substitute` effect `effect`. */
+  | { op: 'substitute_cost'; card: string; effect: number }
   /** `controller` takes control of this monster, into `zone` (an empty Main Monster Zone of theirs). */
   | { op: 'take_control'; card: string; controller: Seat; zone: number; until: 'end_phase' | null }
   | { op: 'summon_token'; controller: Seat; token: Token; position: Position; zone: number }
@@ -888,6 +894,8 @@ export type DuelEvent =
   | { type: 'statsModified'; modifier: Modifier }
   | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null }
   | { type: 'pledged'; player: Seat; names: string[]; damage: number }
+  /** A `cost_substitute` effect was used (its card is banished by a `moved` event before this). */
+  | { type: 'substituted'; player: Seat; card: string; effect: number }
   | { type: 'locked'; source: string; seat: Seat; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; untilTurn: number; whileFaceUp: boolean }
   /** `to` now controls the monster, in `zone`. A Token's card data comes with its event, since it isn't in any Deck. */
   | { type: 'controlChanged'; card: string; to: Seat; zone: number; until: 'end_phase' | null }

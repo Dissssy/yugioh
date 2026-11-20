@@ -212,6 +212,28 @@ export function feasibleOptions(state: DuelState, script: Script, seat: Seat, ca
   return script.options.flatMap((o, i) => (optionProblem(state, script, o, seat, card) ? [] : [i]));
 }
 
+/** Whether a cost step discards or sends cards from the hand to the GY, which a `cost_substitute` card may stand in for. */
+export function fromHandToGraveyard(step: Step): step is Extract<Step, { do: 'move' }> & { cards: Extract<Selection, { from: 'choose' }> } {
+  return step.do === 'move' && step.to === 'graveyard' && step.cards.from === 'choose' && step.cards.filter.place === 'hand';
+}
+
+/**
+ * A card in the player's GY whose `cost_substitute` effect can stand in for 1 card of a cost paid from the hand for an
+ * effect of `card`, if one can now.
+ */
+export function costSubstitute(state: DuelState, seat: Seat, card: string): { card: string; effect: number } | null {
+  for (const id of state.players[seat].graveyard) {
+    const code = state.instances[id]!.code;
+    const effects = state.sheets[code]?.effects ?? [];
+    for (const [index, e] of effects.entries()) {
+      if (e.kind !== 'continuous' || e.status === 'flagged' || e.continuous?.apply !== 'cost_substitute' || !identityFits(state.cards[state.instances[card]!.code]!, e.continuous.for)) continue;
+      const used = state.usedThisTurn.some((u) => u.effect === index && (e.opt === 'hard' ? u.code === code : u.card === id));
+      if (e.opt === 'none' || !used) return { card: id, effect: index };
+    }
+  }
+  return null;
+}
+
 /** The most cards a script may target: a number, or as many as the non-Tuners used for this card's Synchro Summon. */
 export function targetMax(state: DuelState, script: Script, card: string): number {
   const max = script.targets?.max ?? 0;
@@ -292,7 +314,11 @@ export function scriptProblem(state: DuelState, seat: Seat, card: string, effect
   }
   const costCards = new Set<string>();
   let costCount = 0;
-  for (const step of script.cost) {
+  // A card in the GY may stand in for 1 card of a cost paid from the hand (Revealer of the Ice Barrier).
+  let substitute = costSubstitute(state, seat, card) !== null;
+  for (const original of script.cost) {
+    const step = substitute && fromHandToGraveyard(original) && original.cards.min > 0 ? { ...original, cards: { ...original.cards, min: original.cards.min - 1 } } : original;
+    if (step !== original) substitute = false;
     const problem = stepProblem(state, step, seat, card);
     if (problem) return `The cost can't be paid: ${problem}`;
     // A card the cost uses can't also be a target (an Xyz Monster that only loses a material still can).

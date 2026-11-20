@@ -244,6 +244,13 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'setAgain' });
       return;
     }
+    case 'substitute_cost': {
+      const at = known(state, op.card);
+      check(at.zone === 'graveyard' && at.seat === ctx.player, `${cardOf(state, op.card).name} is not in your GY.`);
+      run.emit({ type: 'moved', card: op.card, owner: at.seat, from: 'graveyard', to: 'banished' });
+      run.emit({ type: 'substituted', player: ctx.player, card: op.card, effect: op.effect });
+      return;
+    }
     case 'lock': {
       const untilTurn = op.until === 'this_end_phase' ? state.turn : state.turnPlayer === ctx.player ? state.turn + 2 : state.turn + 1;
       run.emit({ type: 'locked', source: ctx.source, seat: ctx.player, player: op.player, filter: op.filter, untilTurn, whileFaceUp: op.while_face_up });
