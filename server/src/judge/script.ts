@@ -10,6 +10,7 @@ import {
   replacement,
   cardOf,
   chooseFrom,
+  specialSummonProblem,
   cardsFitting,
   describeFilter,
   detachFrom,
@@ -23,6 +24,9 @@ import {
   scriptOf,
   statsOf,
   targetable,
+  targetMax,
+  costSubstitute,
+  fromHandToGraveyard,
   visibleTo,
   type DuelEvent,
   type DuelState,
@@ -102,7 +106,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
   /** Targets an earlier step of this effect Special Summoned or took control of: still its targets ("Special Summon it, and if you do, equip this card to it"). */
   const movedHere = new Set<string>();
   /** The cards a selection picks, asking the player when it is theirs to choose. */
-  const select = async (sel: Selection, verb: string, limit = Infinity): Promise<string[]> => {
+  const select = async (sel: Selection, verb: string, limit = Infinity, keep: (id: string) => boolean = () => true): Promise<string[]> => {
     if (sel.from === 'self') return locate(state, self) ? [self] : [];
     if (sel.from === 'targets') return link.targets.filter((id) => movedHere.has(id) || (script.targets && fits(state, id, script.targets.filter, seat)));
     if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, self);
@@ -114,7 +118,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       transcript.push({ random: picked });
       return picked;
     }
-    const options = chooseFrom(state, sel, seat, self);
+    const options = chooseFrom(state, sel, seat, self).filter(keep);
     const max = Math.min(sel.max, options.length, limit);
     if (max === 0) return [];
     // A tie-break with no tie leaves nothing to choose.
@@ -125,6 +129,10 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
 
   /** The cards the cost moved, first moved first, for a stat read from the cost. */
   const paid: string[] = [];
+  /** The cards the last move step moved, for a pledge about "the added monster". */
+  let moved: string[] = [];
+  /** Whether a `cost_substitute` card already stood in for part of this cost. */
+  let substituted = false;
   /** A stat read when the step resolves: from this card, the first target still on the field (or in a pile, for original stats), or the first card paid as the cost. */
   const valueOf = (v: StatValue): number | null => {
     const id = v.of === 'self' ? self : v.of === 'cost' ? paid[0] : link.targets.find((t) => script.targets && fits(state, t, script.targets.filter, seat));
@@ -166,8 +174,22 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       case 'move': {
         const fromHand = step.cards.from === 'choose' && step.cards.filter.place === 'hand' && step.to === 'graveyard';
         const verb = fromHand ? 'discard' : { hand: 'add to the hand', graveyard: 'send to the GY', banished: 'banish' }[step.to as 'hand'] ?? 'return to the Deck';
-        const cards = await select(step.cards, verb);
+        let sel = step.cards;
+        // A card in the GY may be banished instead of 1 card of a cost from the hand (Revealer of the Ice Barrier).
+        const sub = cost && !substituted && fromHandToGraveyard(step) ? costSubstitute(state, seat, self) : null;
+        if (sub && fromHandToGraveyard(step)) {
+          const short = chooseFrom(state, step.cards, seat, self).length < step.cards.min;
+          const banish = `Banish ${cardOf(state, sub.card).name} from your GY instead of 1 of them`;
+          const [pick] = short ? [banish] : await ask({ prompt: `${name}: pay the cost from your hand, or ${banish.toLowerCase()}?`, cards: [], choices: ['Pay from your hand', banish], min: 1, max: 1 });
+          if (pick === banish) {
+            apply({ op: 'substitute_cost', card: sub.card, effect: sub.effect });
+            substituted = true;
+            sel = { ...step.cards, min: Math.max(0, step.cards.min - 1), max: Math.max(0, step.cards.max - 1) };
+          }
+        }
+        const cards = await select(sel, verb);
         for (const id of cards) apply({ op: 'move', card: id, to: step.to });
+        moved = cards;
         if (cost) paid.push(...cards);
         if (!cards.length || cost) return null;
         const where = { hand: "to its owner's hand", graveyard: 'to the GY', banished: 'banished' }[step.to as 'hand'] ?? 'to the Deck';
@@ -175,7 +197,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       }
       case 'special_summon': {
         const free = monsterZonesFor(state, seat, false).length;
-        const cards = await select(step.cards, 'Special Summon', free);
+        const cards = await select(step.cards, 'Special Summon', free, (id) => !specialSummonProblem(state, seat, id));
         for (const id of cards.slice(0, free)) {
           const position =
             step.position !== 'choice'
@@ -366,6 +388,17 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         const what = { battle_phase: 'conduct their Battle Phase', declare_attack: 'declare an attack', special_summon: `Special Summon ${step.filter ? `a ${describeFilter(step.filter, true)}` : 'monsters'}` }[step.what];
         return `${state.players[player].name} can't ${what} this turn.`;
       }
+      case 'lock': {
+        apply({ op: 'lock', player: step.player, filter: step.filter, until: step.until, while_face_up: step.whileFaceUp });
+        const who = step.player === 'both' ? 'Neither player can' : `${state.players[step.player === 'you' ? seat : seat === 0 ? 1 : 0]!.name} can't`;
+        const what = step.filter ? `${describeFilter(step.filter)}s` : 'cards';
+        return `${who} activate ${what} until the End Phase${step.until === 'your_next_end_phase' ? ` of ${state.players[seat]!.name}'s next turn` : ''}.`;
+      }
+      case 'pledge_normal_summon': {
+        if (!moved.length) return null;
+        apply({ op: 'pledge_normal_summon', player: seat, cards: moved, damage: step.damage });
+        return `${state.players[seat].name} takes ${step.damage} damage in the End Phase unless they Normal Summon the added monster, or a card with the same name, this turn.`;
+      }
       case 'extra_normal_summon':
         apply({ op: 'extra_normal_summon', player: seat });
         return `${state.players[seat].name} may conduct one more Normal Summon or Set this turn.`;
@@ -402,7 +435,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         const used = new Set(ops.flatMap((o) => ('cards' in o ? o.cards : 'card' in o ? [o.card] : [])));
         // Legality is judged before the cost: only cards that fit then, and weren't used to pay it, can be targeted.
         const options = targetable(before, script, seat, self, link.cause).filter((id) => !used.has(id) && fits(state, id, script.targets!.filter, seat));
-        const max = Math.min(script.targets.max, options.length);
+        const max = Math.min(targetMax(before, script, self), options.length);
         if (options.length < script.targets.min) throw new Refused('No card left to target after the cost.');
         const count = script.targets.min === max ? `${max}` : `${script.targets.min} to ${max}`;
         // "Target that monster" leaves nothing to choose.

@@ -19,7 +19,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { DESTINATIONS, FORBIDDEN, RESTRICTIONS, UNTIL, type CardData, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
+import { DESTINATIONS, FORBIDDEN, LOCK_UNTIL, RESTRICTIONS, UNTIL, type CardData, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
 import { cards, decks, effectSheets, sheetReports, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
@@ -44,7 +44,7 @@ const selection = z.union([
   }),
   z.object({ from: z.literal('all'), filter: cardFilter }),
   z.object({ from: z.literal('battling'), filter: cardFilter }),
-  z.object({ from: z.literal('random'), filter: cardFilter, count: z.number().int().min(1) }),
+  z.object({ from: z.literal('random'), filter: cardFilter, min: z.number().int().min(0), count: z.number().int().min(1) }),
 ]) satisfies z.ZodType<Selection>;
 
 const player = z.enum(['you', 'opponent']);
@@ -81,7 +81,9 @@ const step = z.union([
     count: z.number().int().min(1),
     position: z.enum(['attack', 'defense', 'choice']),
   }),
-  z.object({ do: z.literal('forbid'), player, what: z.enum(FORBIDDEN), filter: cardFilter.nullable() }),
+  z.object({ do: z.literal('forbid'), player, what: z.enum(FORBIDDEN), filter: cardFilter.nullable(), wholeTurn: z.boolean() }),
+  z.object({ do: z.literal('pledge_normal_summon'), damage: z.number().int().min(1) }),
+  z.object({ do: z.literal('lock'), player: z.enum(['you', 'opponent', 'both']), filter: cardFilter.nullable(), until: z.enum(LOCK_UNTIL), whileFaceUp: z.boolean() }),
   z.object({ do: z.literal('link'), cards: selection }),
   z.object({ do: z.literal('negate_activation'), destroy: z.boolean() }),
   z.object({ do: z.literal('negate_effects'), cards: selection }),
@@ -106,7 +108,7 @@ const condition = z.union([
 const script = z.object({
   conditions: z.array(condition),
   cost: z.array(step),
-  targets: z.object({ filter: cardFilter, min: z.number().int(), max: z.number().int(), event: z.boolean() }).nullable(),
+  targets: z.object({ filter: cardFilter, min: z.number().int(), max: z.union([z.number().int(), z.literal('non_tuner_materials')]), others: z.boolean(), event: z.boolean() }).nullable(),
   options: z.array(z.object({ label: z.string(), cost: z.array(step), steps: z.array(step) })),
   unapplied: z.string().nullable(),
 }) satisfies z.ZodType<Script>;
@@ -148,6 +150,8 @@ const continuous = z.union([
   z.object({ apply: z.literal('banish_instead'), filter: cardFilter }),
   z.object({ apply: z.literal('extra_normal_summon'), filter: cardFilter, while: z.array(condition) }),
   z.object({ apply: z.literal('discard_or_negate'), while: z.array(condition) }),
+  z.object({ apply: z.literal('forbid_on_leaving'), what: z.enum(FORBIDDEN) }),
+  z.object({ apply: z.literal('cost_substitute'), for: cardFilter }),
   z.object({ apply: z.literal('name'), name: z.string().min(1) }),
   z.object({ apply: z.literal('synchro_material'), substitutes: z.string().nullable(), never: z.boolean(), onlyFor: cardFilter.nullable(), onlyForTuner: z.string().nullable() }),
   z.object({ apply: z.literal('self_destruct'), opponentTurns: z.number().int().min(1) }),
@@ -345,7 +349,7 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 
 - conditions: what the board must have for the activation, beyond what the cost, targets and steps need. {"if": "count", "filter": ..., "min": n, "max": n | null} needs at least min and at most max cards that fit ("While there are 5 or more monsters in your GY": min 5, max null; "If you control a Synchro Monster": min 1; "while you have 1 or less cards in your hand": min 0, max 1). This card itself is never counted, so "If you control another "Ice Barrier" monster" is min 1, in a script and in a continuous effect's "while" alike. {"if": "turn", "whose": "you" | "opponent"} for "during your turn" ("during your Battle Phase" is this plus a phase condition). {"if": "position", "position": "attack" | "defense"} for "while this card is in face-up Defense Position". {"if": "before_battle_phase"} for "you cannot conduct your Battle Phase the turn you activate this card" (the restriction itself still goes in unapplied). {"if": "phase", "phases": [...]} when the text names the phases it is used in ("during the Battle Phase": ["battle"]); an ignition effect with this condition is used in those phases instead of the Main Phase. {"if": "summoned_this_turn", "how": [...]} for "if this card was Normal Summoned this turn" (how: any of "normal", "flip", "special", "synchro", "xyz"; "special" also covers Synchro and Xyz Summons; [] for any Summon). {"if": "materials", "min": n | null, "max": n | null} needs this Xyz Monster to have that many Xyz Materials ("while this card has no Xyz Material": min null, max 0). {"if": "outnumbered", "by": n} for "If your opponent controls n or more cards than you do" (cards on the field). {"if": "battling", "as": "attacker" | "target", "damageStep": bool} while this card is attacking an opponent's monster ("attacker") or is the attack's target ("target"), only in the Damage Step if damageStep ("during the Damage Step only"). {"if": "last_attack", "on": "attack" | "defense"} if this card's last attack this turn was on a monster in that position.
 - cost: steps paid on activation, in order ("Discard 1 card" is a move to graveyard of 1 card chosen from your hand; "Pay 500 LP" is change_lp kind cost; "Tribute this card" is a move of self to graveyard).
-- targets: {"filter", "min", "max", "event"} for "target 1 ..." ("up to 3" is min 1 max 3), or null. The player picks them on activation, after paying the cost; resolution steps reach them with {"from": "targets"}, and a target that no longer fits the filter isn't affected. event true for "target that monster", where the target is the card the "when" event happened to (Trap Hole); else false.
+- targets: {"filter", "min", "max", "others", "event"} for "target 1 ..." ("up to 3" is min 1 max 3; "up to the number of non-Tuner monsters used for the Synchro Summon of this card" is max "non_tuner_materials"), or null. others true when this card can't target itself: always for a Spell/Trap, and for a monster whose text says "other" or can't reach its own place; false when a monster's target could be itself ("target 1 monster on the field"). The player picks them on activation, after paying the cost; resolution steps reach them with {"from": "targets"}, and a target that no longer fits the filter isn't affected. event true for "target that monster", where the target is the card the "when" event happened to (Trap Hole); else false.
 - options: what the effect does. One option (label "") unless the text says "activate 1 of these effects", then one per bullet with the bullet's wording as label; the player picks one on activation. Each option has its own cost, paid after the script's cost once the option is picked: a cost only one bullet has ("● Tribute 1 monster, then target ...") goes there; else [].
 - unapplied: a part of the text no step can express, typically a lingering restriction ("You cannot conduct your Battle Phase this turn", "your opponent cannot declare an attack this turn"), in the card's words; the effect resolves without it and says so. Use it only for such a side clause. If the main thing the effect does can't be expressed, the script is null.
 
@@ -368,6 +372,8 @@ materials: a JSON string with an Extra Deck monster's materials as data code che
 {"apply": "banish_instead", "filter"}: cards that fit the filter (checked while still on the field) are banished instead of being sent from the field to the GY ("Spells and Traps sent from the field to your opponent's GY are banished instead": kinds ["spell", "trap"], side "opponent", place "field").
 {"apply": "extra_normal_summon", "filter", "while"}: "You can Normal Summon 1 "Ice Barrier" monster in addition to your Normal Summon or Set": once the turn's Normal Summon is used, its controller can still Normal Summon (not Set) a monster from the hand that fits the filter (place "hand", side "you"). The effect's opt says how often ("This effect can only be used once per turn": soft).
 {"apply": "discard_or_negate", "while"}: "When an effect resolves that was activated by an Effect Monster that was on your opponent's side of the field, they must discard 1 card or the effect is negated (their choice)" (General Raiho of the Ice Barrier).
+{"apply": "cost_substitute", "for"}: an effect that works from the GY (from "graveyard"): "If you would discard, or send a card(s) from your hand to the GY, to activate an "Ice Barrier" monster's effect, you can banish this card from your GY instead of 1 of those cards" is for {kinds ["monster"], named "Ice Barrier", place "any"}; opt limits how often.
+{"apply": "forbid_on_leaving", "what"}: "If this face-up card leaves the field, skip the Battle Phase of your next turn" is what "battle_phase": its controller can't do that during their next turn.
 
 {"apply": "name", "name"}: "This card's name becomes "Des Frog" while it is on the field" (name "Des Frog").
 
@@ -399,7 +405,9 @@ Steps (each "cards" is a selection):
 - {"do": "change_position", "cards", "position"}: change the battle position of the monsters selected to "attack" or "defense", or "switch" for "change its battle position". A face-down monster turns face-up.
 - {"do": "take_control", "cards", "until"}: you take control of the monsters selected (usually {"from": "targets"}): until "end_phase" for "until the End Phase", null for good ("take control of that monster"). It needs a free Monster Zone of yours.
 - {"do": "summon_token", "player", "token", "count", "position"}: Special Summon count Tokens to that player's field. token {"name", "attribute", "race", "level", "atk", "def"} from the text: "1 "Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)" is {"name": "Ice Barrier Token", "attribute": "WATER", "race": "Aqua", "level": 1, "atk": 0, "def": 0}.
-- {"do": "forbid", "player", "what", "filter"}: for the rest of this turn that player can't "declare_attack" ("your opponent cannot declare an attack this turn"), can't conduct their "battle_phase" ("you cannot conduct your Battle Phase the turn you activate this card"; pair it with the before_battle_phase condition), or can't "special_summon" the monsters that fit filter ("you cannot Special Summon monsters from your hand for the rest of this turn": side "you", place "hand", kinds ["monster"]; "You cannot Special Summon any Level 5 or higher monsters the turn you use this effect": place "any", level min 5; null for any monster). filter is null for the other two. Such a restriction is a step, not unapplied.
+- {"do": "forbid", "player", "what", "filter", "wholeTurn"}: for the rest of this turn that player can't "declare_attack" ("your opponent cannot declare an attack this turn"), can't conduct their "battle_phase" ("you cannot conduct your Battle Phase the turn you activate this card"; pair it with the before_battle_phase condition), or can't "special_summon" the monsters that fit filter ("you cannot Special Summon monsters from your hand for the rest of this turn": side "you", place "hand", kinds ["monster"]; "You cannot Special Summon any Level 5 or higher monsters the turn you use this effect": place "any", level min 5; null for any monster; "except WATER monsters": attributes lists every other Attribute, DARK, DIVINE, EARTH, FIRE, LIGHT and WIND). filter is null for the other two. wholeTurn is true when the ban covers the whole turn ("the turn you activate this card", "the turn you use this effect"): the effect then can't be used once the player already did that this turn. It is false for "for the rest of this turn" and "this turn" after the effect. Such a restriction is a step, not unapplied.
+- {"do": "pledge_normal_summon", "damage"}: "During the End Phase of this turn, take 2000 damage if you did not Normal Summon the added monster, or a card with the same name": about the cards the step before it moved (put it right after that move).
+- {"do": "lock", "player", "filter", "until", "whileFaceUp"}: a lock the effect leaves behind: player ("you", "opponent" or "both") can't activate cards that fit filter until "this_end_phase" or "your_next_end_phase" (the End Phase of this card's controller's next turn), and with whileFaceUp only while this card stays face-up on the field ("Spell Cards cannot be activated until the End Phase of your next turn, as long as this card remains face-up on the field": both, kinds ["spell"], place "any", your_next_end_phase, whileFaceUp true).
 - {"do": "detach", "cards", "count"}: detach count Xyz Materials from an Xyz Monster the selection picks. "Detach 1 Xyz Material from this card" (usually a cost): cards {"from": "self"}, count 1. "Detach 1 Xyz Material from a monster you control": a choose selection of face-up Xyz monsters you control.
 
 Selections:
@@ -407,7 +415,7 @@ Selections:
 - {"from": "targets"}: the declared targets.
 - {"from": "choose", "filter", "min", "max", "rank"}: the activating player picks min to max cards that fit, when the effect resolves (or when the cost is paid). Use min 0 for "you can". rank {"stat": "atk" | "def" | "level", "order": "lowest" | "highest"} restricts the pick to those tied for that extreme ("the monster with the lowest ATK (your choice, if tied)"), else null. Every choose with min 1 or more must have enough cards that fit for the activation to be legal, which is how "Special Summon 1 ... from your Deck" needs a match in the Deck.
 - {"from": "battling", "filter"}: the monster battling this card, if it fits ("if this card attacks a face-up Defense Position monster: destroy that monster" is a destroy step on {"from": "battling"} with faceUp true, position "defense"; the effect doesn't fire without one).
-- {"from": "random", "filter", "count"}: count cards that fit, picked at random by code, or all of them if fewer fit ("Discard 2 random cards from your opponent's hand (or their entire hand, if less than 2)": filter side "opponent", place "hand", count 2; "place 1 random card from their hand on top of their Deck": a move of count 1 to deck_top). The effect needs at least one.
+- {"from": "random", "filter", "min", "count"}: count cards that fit, picked at random by code, or all of them if fewer fit ("Discard 2 random cards from your opponent's hand (or their entire hand, if less than 2)": filter side "opponent", place "hand", count 2; "place 1 random card from their hand on top of their Deck": a move of count 1 to deck_top). The effect needs at least min to fit: 1 usually, 0 for "up to" ("banish up to 1 card each from your opponent's hand, field, and GY (the card in the hand is chosen at random)": a random move of min 0, count 1, then choose moves of min 0, max 1).
 - {"from": "all", "filter"}: every card that fits ("destroy all face-up monsters your opponent controls"); the activation needs at least one.
 
 Filters ({"side", "place", "kinds", "types", "races", "attributes", "named", "extraDeck", "faceUp", "position", "level", "atk", "def"}; empty lists and nulls don't restrict):
@@ -434,7 +442,7 @@ Filters ({"side", "place", "kinds", "types", "races", "attributes", "named", "ex
 - canMiss: true only for an optional trigger worded "When ...: You can" (it misses the timing unless its event was the last thing to happen); false for "If ..." and for mandatory triggers.
 
 Examples:
-- "Target 1 Warrior-Type monster in your Graveyard; add that target to your hand." conditions [], cost [], targets {"filter": {"side": "you", "place": "graveyard", "kinds": ["monster"], "races": ["Warrior"], ...}, "min": 1, "max": 1, "event": false}, options [{"label": "", "steps": [{"do": "move", "cards": {"from": "targets"}, "to": "hand"}]}].
+- "Target 1 Warrior-Type monster in your Graveyard; add that target to your hand." conditions [], cost [], targets {"filter": {"side": "you", "place": "graveyard", "kinds": ["monster"], "races": ["Warrior"], ...}, "min": 1, "max": 1, "others": true, "event": false}, options [{"label": "", "steps": [{"do": "move", "cards": {"from": "targets"}, "to": "hand"}]}].
 - Magna Drago, "If this card inflicts battle damage to your opponent: It gains 200 ATK.": kind "trigger", mandatory true, when {"event": "battle_damage", "self": true, "filter": null, "how": [], "canMiss": false}, script options [{"label": "", "steps": [{"do": "modify_stats", "cards": {"from": "self"}, "atk": 200, "def": 0, "levelDelta": 0, "levelSet": null, "until": "while_on_field"}]}].
 - "Discard 1 card; destroy all face-up monsters your opponent controls." cost [{"do": "move", "cards": {"from": "choose", "filter": {"side": "you", "place": "hand", "kinds": [], ...}, "min": 1, "max": 1, "rank": null}, "to": "graveyard"}], options [{"label": "", "steps": [{"do": "destroy", "cards": {"from": "all", "filter": {"side": "opponent", "place": "monsters", "faceUp": true, ...}}}]}].
 

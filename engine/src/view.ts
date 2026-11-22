@@ -408,6 +408,12 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return event.materials.length ? `${name(event.card)} detaches ${names(event.materials)} instead of being destroyed` : null;
     case 'linked':
       return `${name(event.card)} ${state.cards[state.instances[event.card]!.code]!.race === 'Equip' ? 'equipped to' : 'tied to'} ${name(event.to)}`;
+    case 'locked':
+      return `${name(event.source)}: ${event.player === 'both' ? 'neither player can' : `${who(event.player === 'you' ? event.seat : event.seat === 0 ? 1 : 0)} can't`} activate ${event.filter ? describeFilter(event.filter) : 'cards'}s until ${event.untilTurn === state.turn ? 'the End Phase' : 'the End Phase of their next turn'}${event.whileFaceUp ? `, while ${name(event.source)} stays face-up` : ''}`;
+    case 'substituted':
+      return `${who(event.player)} banished ${name(event.card)} from the GY instead of 1 card of the cost`;
+    case 'pledged':
+      return `${who(event.player)} takes ${event.damage} damage in the End Phase unless they Normal Summon the added monster, or a card with the same name, this turn`;
     case 'forbidden':
       return event.what === 'battle_phase'
         ? `${who(event.player)} can't conduct their Battle Phase this turn`

@@ -47,6 +47,7 @@
           },
           "min": 2,
           "max": 2,
+          "others": true,
           "event": false
         },
         "options": [

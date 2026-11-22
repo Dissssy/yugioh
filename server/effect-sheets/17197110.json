@@ -22,7 +22,7 @@
       "kind": "ignition",
       "speed": 1,
       "mandatory": false,
-      "from": "field",
+      "from": "graveyard",
       "opt": "hard",
       "window": "During your Main Phase, while this card is in your GY, except the turn this card was sent to the GY",
       "cost": "banish this card from your GY",

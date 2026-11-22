@@ -78,11 +78,15 @@
                   "rank": null
                 },
                 "to": "hand"
+              },
+              {
+                "do": "pledge_normal_summon",
+                "damage": 2000
               }
             ]
           }
         ],
-        "unapplied": "During the End Phase of this turn, take 2000 damage if you did not Normal Summon the added monster, or a card with the same name, after activating this card."
+        "unapplied": null
       },
       "continuous": null,
       "status": "unverified"

@@ -70,6 +70,7 @@
                     "atk": null,
                     "def": null
                   },
+                  "min": 1,
                   "count": 1
                 },
                 "to": "deck_top"

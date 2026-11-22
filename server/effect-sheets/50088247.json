@@ -77,7 +77,8 @@
                   },
                   "atk": null,
                   "def": null
-                }
+                },
+                "wholeTurn": true
               }
             ]
           }

@@ -394,15 +394,16 @@ function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
       if (!set) return no('A Trap must be Set first, and activated on a later turn.');
       if (set.faceUp) return no('It is already face-up.');
       if (set.placedTurn === state.turn) return no("A Trap can't be activated the turn it was Set.");
-    } else if ((card.kind === 'monster' || effect.from === 'graveyard') && (effect.kind === 'ignition' || effect.kind === 'quick')) {
-      // A monster's effect, or any card's effect used from the GY (Terror of Trishula).
+    } else if (effect.kind === 'ignition' || effect.kind === 'quick') {
+      // A monster's effect, a face-up Spell or Trap's effect, or any card's effect used from the hand or GY (Terror of Trishula).
+      const fieldCard = m ?? set;
       if (effect.from !== 'field' && at.zone !== effect.from) return no(`Only while it is in your ${effect.from === 'hand' ? 'hand' : 'GY'}.`);
-      if (effect.from === 'field' && !m?.faceUp) return no('Only while it is face-up on the field.');
-      if (m && negated(state, id)) return no('Its effects are negated.');
+      if (effect.from === 'field' && !fieldCard?.faceUp) return no('Only while it is face-up on the field.');
+      if (fieldCard && negated(state, id)) return no('Its effects are negated.');
     } else {
       return no('This effect is not activated.');
     }
-    const locked = lockProblem(state, seat, id);
+    const locked = lockProblem(state, seat, id, index);
     if (locked) return no(locked);
     if (timing) return no(timing);
     if (effect.speed < minSpeed) {
@@ -888,6 +889,10 @@ function endTurn(run: Run, chosen: string[]) {
   const discard = [...kept, ...hand.filter((id) => !kept.includes(id)).reverse()].slice(0, excess);
   const expiring = selfDestructing(state);
   for (const id of expiring) run.emit({ type: 'destroyed', cards: [id], by: locate(state, id)!.seat });
+  // A pledge not kept: "take 2000 damage if you did not Normal Summon the added monster" (Where Arf Thou?).
+  for (const pl of state.pledges) run.emit({ type: 'lpChanged', player: pl.player, amount: -pl.damage, kind: 'damage' });
+  endIfLpGone(run);
+  if (run.state.result) return;
   if (discard.length > 0) run.emit({ type: 'discarded', player: seat, cards: discard });
   beginTurn(run, other(seat), state.turn + 1);
 }
