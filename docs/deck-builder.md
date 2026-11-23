@@ -27,9 +27,11 @@ The layout follows the screenshot Ethan shared (Master Duel's builder) and today
 | --- | --- | --- |
 | The card you're pointing at (`CardDetail`), with **+1** and **−1** buttons and the reason if you can't add it | The deck's name, then Main, Extra and Side as card grids with their counts. Problems with the deck as a whole are listed here, like "38 of 40 Main Deck cards" | The search bar, filter and sort buttons, then the results as a grid |
 
-- Clicking a result adds it to the Main Deck, or to the Extra Deck if it's a Fusion, Synchro or Xyz Monster.
-  Clicking a card in the deck removes it. You can also drag cards between the grid and each section, including Side.
-  On a phone the columns become tabs and you tap and hold for the details, as on the duel board.
+- Right-clicking a result adds it to the Main Deck, or to the Extra Deck if it's a Fusion, Synchro or Xyz Monster.
+  Right-clicking a card in the deck removes it. A left click shows the card on the left, where **+1** and **−1** also
+  add and remove, including to the Side Deck. You can also drag cards between the search and each section. On a phone
+  the deck and the search are tabs, and a tap adds or removes. Once a card can go in more than one place, the choice
+  will use the same popup as Summon or Set on the board.
 - Shift zooms the card and right-click pins its tooltip, the same as on the board.
 - The deck saves itself as you edit it. The deck list is under **Decks** in the account menu, and **New deck** starts
   an empty one.

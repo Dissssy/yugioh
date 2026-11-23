@@ -13,7 +13,7 @@ import {
   type DeckSummary,
   type Section,
 } from '@yugioh/shared';
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, errorText } from '../api.ts';
 import { CardFace } from '../board/Card.tsx';
@@ -188,19 +188,19 @@ function DeckSection({
         {SECTION_NAME[section]} <span className="count">{cards.length}</span>
       </h2>
       {cards.length === 0 ? (
-        <p className="muted small">{section === 'side' ? 'Drag cards here to keep them on the side.' : 'Click a card in the search to add it.'}</p>
+        <p className="muted small">{section === 'side' ? 'Drag cards here to keep them on the side.' : 'Right-click a card in the search to add it.'}</p>
       ) : (
         <div className="card-grid">
           {cards.map((card, i) => (
             <button
               key={i}
               className="plain"
-              title="Click to remove"
+              title="Right-click to remove"
               draggable
               onDragStart={(e) => startDrag(e, { code: card.code, from: section })}
               onMouseEnter={() => onShow(card)}
               onFocus={() => onShow(card)}
-              onClick={() => onRemove(card.code)}
+              {...clicks(() => onShow(card), () => onRemove(card.code))}
             >
               <CardFace card={card} />
             </button>
@@ -293,8 +293,8 @@ function CardSearch({
             onDragStart={(e) => startDrag(e, { code: card.code, from: null })}
             onMouseEnter={() => onShow(card)}
             onFocus={() => onShow(card)}
-            onClick={() => (blocker ? onShow(card) : onAdd(card))}
-            title={blocker ?? `Add ${card.name}`}
+            {...clicks(() => onShow(card), () => (blocker ? onShow(card) : onAdd(card)))}
+            title={blocker ?? 'Right-click to add'}
           >
             <CardFace card={card} />
             {copiesIn(list, card.code) > 0 && <span className="copies">{copiesIn(list, card.code)}</span>}
@@ -383,6 +383,23 @@ function DeleteDeck({ id }: { id: number }) {
     <button className="quiet" onClick={() => setSure(true)}>Delete</button>
   );
 }
+
+/**
+ * A card's clicks: right-click adds or removes it, a left click shows it. A touch has no right-click, so a tap adds or
+ * removes instead (the card shows on long-press through focus).
+ */
+function clicks(show: () => void, act: () => void) {
+  return {
+    onPointerDown: (e: PointerEvent) => void (lastPointer = e.pointerType),
+    onClick: () => (lastPointer === 'touch' ? act() : show()),
+    onContextMenu: (e: MouseEvent) => {
+      e.preventDefault();
+      if (lastPointer !== 'touch') act();
+    },
+  };
+}
+/** The kind of pointer that last pressed a card. Kept outside React: showing the card re-renders between press and click. */
+let lastPointer = 'mouse';
 
 function startDrag(e: DragEvent, d: Dragged) {
   e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(d));
