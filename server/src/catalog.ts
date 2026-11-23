@@ -3,7 +3,7 @@
 
 import { gzipSync } from 'node:zlib';
 import { desc } from 'drizzle-orm';
-import { deckProblems, type CatalogCard, type DeckList, type RuleCard } from '@yugioh/shared';
+import { deckProblems, type Banlist, type CatalogCard, type DeckList, type RuleCard } from '@yugioh/shared';
 import { poolCardIds, toCardData } from './cards.ts';
 import type { Db } from './db/client.ts';
 import { cardImports, cards } from './db/schema.ts';
@@ -37,10 +37,10 @@ export class Catalog {
     return this.built.data;
   }
 
-  /** What keeps a deck out of a duel, under the basic rules. */
-  async problems(deck: DeckList): Promise<string[]> {
+  /** What keeps a deck out of a duel under the banlist. */
+  async problems(deck: DeckList, banlist: Banlist, premade: boolean): Promise<string[]> {
     const { cards } = await this.get();
-    return deckProblems(deck, (code) => cards.get(code) satisfies RuleCard | undefined);
+    return deckProblems(deck, (code) => cards.get(code) satisfies RuleCard | undefined, banlist, { premade });
   }
 
   private async build(key: string): Promise<CatalogData> {

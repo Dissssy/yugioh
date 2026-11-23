@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { EffectSheet } from '@yugioh/engine';
-import type { DuelOutcome, UserSettings } from '@yugioh/shared';
+import type { Banlist, DuelOutcome, UserSettings } from '@yugioh/shared';
 import { boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
@@ -64,6 +64,20 @@ export const cardImports = pgTable('card_imports', {
 });
 
 /**
+ * A banlist (docs/deck-builder.md, Banlists): copies allowed of each listed card, keyed by passcode. The default lists
+ * have a slug and no owner, and every card import rebuilds them; players' lists have an owner.
+ */
+export const banlists = pgTable('banlists', {
+  id: serial('id').primaryKey(),
+  slug: text('slug').unique(),
+  ownerId: integer('owner_id').references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  limits: jsonb('limits').$type<Record<string, number>>().notNull(),
+  shared: boolean('shared').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * A decklist (docs/deck-builder.md). Premade decks have a slug and no owner; players' decks have an owner and no slug.
  * A deck is saved whether or not it's legal: the rules are checked when it goes into a duel.
  */
@@ -75,6 +89,8 @@ export const decks = pgTable('decks', {
   main: integer('main').array().notNull(),
   extra: integer('extra').array().notNull(),
   side: integer('side').array().notNull().default(sql`'{}'::integer[]`),
+  /** The banlist the deck is built for; its legality on the decks page is under this list. Null is the default list. */
+  banlistId: integer('banlist_id').references(() => banlists.id, { onDelete: 'set null' }),
   /** Anyone with the link may see it and copy it. */
   shared: boolean('shared').notNull().default(false),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -105,6 +121,8 @@ export const matches = pgTable('matches', {
   name1: text('name1'),
   /** How the duel ended, once it has. */
   result: jsonb('result').$type<DuelOutcome>(),
+  /** The banlist both decks must follow, copied when the challenge was made. */
+  banlist: jsonb('banlist').$type<Banlist>().notNull(),
   deck0: jsonb('deck0').$type<DuelDeck>().notNull(),
   deck1: jsonb('deck1').$type<DuelDeck>(),
 });

@@ -4,7 +4,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { reviewLog, type DuelEvent, type DuelUpdate } from '@yugioh/engine';
-import type { AdminDuels, DeckSummary, DuelSummary } from '@yugioh/shared';
+import { NO_BANLIST, type AdminDuels, type DeckSummary, type DuelSummary } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { decks as deckTable, matchEvents, matches, users } from '../src/db/schema.ts';
 import { Duels } from '../src/duels.ts';
@@ -118,7 +118,7 @@ describe('playing against Claude', () => {
 
     const ids: string[] = [];
     for (const [a, b] of [[0, 1], [1, 0], [1, 1]] as const) {
-      const id = await duels.create(owner!.id, 'ai:a', 'A', await duelDeck(decks[a]!.id));
+      const id = await duels.create(owner!.id, 'ai:a', 'A', await duelDeck(decks[a]!.id), NO_BANLIST);
       await duels.join(id, await duelDeck(decks[b]!.id), async () => ({ key: 'ai:b', name: 'B' }));
       ids.push(id);
       // Loading the duel starts both AI seats.

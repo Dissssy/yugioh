@@ -4,6 +4,7 @@ import { AccountMenu, Avatar } from './AccountMenu.tsx';
 import { loginHref, useMe } from './api.ts';
 import { Account } from './pages/Account.tsx';
 import { Admin } from './pages/Admin.tsx';
+import { BanlistPage } from './decks/BanlistPage.tsx';
 import { DecksPage } from './decks/DecksPage.tsx';
 import { DeckPage } from './pages/DeckPage.tsx';
 import { DuelPage, ReplayPage } from './pages/DuelPage.tsx';
@@ -53,6 +54,7 @@ export function App() {
             <Route path="/duel/:id/replay" element={<ReplayPage />} />
             <Route path="/decks" element={<DecksPage me={me.data} />} />
             <Route path="/decks/:id" element={<DeckPage me={me.data} />} />
+            <Route path="/banlists/:id" element={<BanlistPage me={me.data} />} />
             <Route
               path="*"
               element={

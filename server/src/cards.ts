@@ -13,7 +13,7 @@ import { desc, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { CardData } from '@yugioh/engine';
 import type { Db, Tx } from './db/client.ts';
-import { cardImports, cards, decks } from './db/schema.ts';
+import { banlists, cardImports, cards, decks } from './db/schema.ts';
 import { importSheetFiles } from './sheets.ts';
 import { type SimpleCard, simpleSheet } from './simple-sheets.ts';
 
@@ -134,6 +134,7 @@ export async function syncCards(db: Db, options: SyncOptions) {
   }
   // From our copy every time, so a deck added to PREMADE_DECKS appears without waiting for a new YGOPRODeck version.
   await buildPremadeDecks(db);
+  await buildDefaultBanlists(db);
   await downloadPoolImages(db, options.imageDir, options.imageGapMs ?? 100, log);
   // A new database starts with the effect sheets kept in the repository.
   const imported = await importSheetFiles(db);
@@ -211,6 +212,38 @@ async function buildPremadeDecks(db: Db) {
       .insert(decks)
       .values({ slug: deck.slug, name: deck.name, main, extra })
       .onConflictDoUpdate({ target: decks.slug, set: { name: deck.name, main, extra } });
+  }
+}
+
+/**
+ * The default banlists (docs/deck-builder.md, Banlists), rebuilt from YGOPRODeck's `banlist_info` on every import, so
+ * they follow the current lists. The first is preselected for a new challenge or deck.
+ */
+export const DEFAULT_BANLISTS = [
+  { slug: 'tcg', name: 'TCG', field: 'ban_tcg' },
+  { slug: 'ocg', name: 'OCG', field: 'ban_ocg' },
+  { slug: 'goat', name: 'Goat', field: 'ban_goat' },
+  { slug: 'none', name: 'No list', field: null },
+] as const;
+
+const LIMITS: Record<string, number> = { Forbidden: 0, Banned: 0, Limited: 1, 'Semi-Limited': 2 };
+
+async function buildDefaultBanlists(db: Db) {
+  const rows = await db
+    .select({ id: cards.id, info: sql<Record<string, string>>`${cards.raw}->'banlist_info'` })
+    .from(cards)
+    .where(sql`${cards.raw} ? 'banlist_info'`);
+  for (const list of DEFAULT_BANLISTS) {
+    const limits: Record<string, number> = {};
+    if (list.field)
+      for (const row of rows) {
+        const limit = LIMITS[row.info[list.field] ?? ''];
+        if (limit !== undefined) limits[row.id] = limit;
+      }
+    await db
+      .insert(banlists)
+      .values({ slug: list.slug, name: list.name, limits })
+      .onConflictDoUpdate({ target: banlists.slug, set: { name: list.name, limits, updatedAt: sql`now()` } });
   }
 }
 
