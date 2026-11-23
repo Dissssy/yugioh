@@ -41,6 +41,7 @@ export function AccountMenu({ user }: { user: User }) {
               <strong>{user.username}</strong>
               {user.status !== 'approved' && <span className="muted small">{user.status === 'pending' ? 'Waiting for approval' : 'Not approved'}</span>}
             </div>
+            {user.status === 'approved' && <Link role="menuitem" to="/decks" onClick={close}>Your decks</Link>}
             <Link role="menuitem" to="/account" onClick={close}>Account and settings</Link>
             <a role="menuitem" href="/auth/logout">Log out</a>
           </div>

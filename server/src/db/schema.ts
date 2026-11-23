@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { EffectSheet } from '@yugioh/engine';
 import type { DuelOutcome, UserSettings } from '@yugioh/shared';
-import { integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
 export const accountRole = pgEnum('account_role', ['player', 'admin', 'superAdmin']);
@@ -63,14 +63,29 @@ export const cardImports = pgTable('card_imports', {
   importedAt: timestamp('imported_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** A decklist. Premade decks have a slug and no owner. */
+/**
+ * A decklist (docs/deck-builder.md). Premade decks have a slug and no owner; players' decks have an owner and no slug.
+ * A deck is saved whether or not it's legal: the rules are checked when it goes into a duel.
+ */
 export const decks = pgTable('decks', {
   id: serial('id').primaryKey(),
   slug: text('slug').unique(),
+  ownerId: integer('owner_id').references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   main: integer('main').array().notNull(),
   extra: integer('extra').array().notNull(),
+  side: integer('side').array().notNull().default(sql`'{}'::integer[]`),
+  /** Anyone with the link may see it and copy it. */
+  shared: boolean('shared').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** The deck a player brought to a duel, copied when they took their seat, so editing the deck later changes nothing. */
+export interface DuelDeck {
+  name: string;
+  main: number[];
+  extra: number[];
+}
 
 export const matchStatus = pgEnum('match_status', ['waiting', 'active', 'finished']);
 
@@ -90,10 +105,8 @@ export const matches = pgTable('matches', {
   name1: text('name1'),
   /** How the duel ended, once it has. */
   result: jsonb('result').$type<DuelOutcome>(),
-  deck0: integer('deck0')
-    .notNull()
-    .references(() => decks.id),
-  deck1: integer('deck1').references(() => decks.id),
+  deck0: jsonb('deck0').$type<DuelDeck>().notNull(),
+  deck1: jsonb('deck1').$type<DuelDeck>(),
 });
 
 /** The duel's append-only event log. The board is the fold of these events. */

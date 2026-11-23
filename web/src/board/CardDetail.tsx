@@ -1,5 +1,5 @@
 import type { CardData } from '@yugioh/engine';
-import { imageUrl, TokenFace } from './Card.tsx';
+import { CardImage, TokenFace } from './Card.tsx';
 import type { Stats } from './CardTooltip.tsx';
 
 /** The full card: big image, stats and text. `stats` are its ATK and DEF on the field now, shown when an effect changed them. */
@@ -8,7 +8,7 @@ export function CardDetail({ card, stats = null }: { card: CardData; stats?: Sta
   const tone = (now: number, was: number | null) => (was === null || now === was ? undefined : now > was ? 'up' : 'down');
   return (
     <div className="card-detail">
-      {card.type === 'Token' ? <TokenFace card={card} className="token-detail" /> : <img src={imageUrl(card.code, 'full')} alt={card.name} />}
+      {card.type === 'Token' ? <TokenFace card={card} className="token-detail" /> : <CardImage key={card.code} card={card} size="full" className="detail-image" />}
       <div className="card-meta">
         <h3>{card.name}</h3>
         <p className="muted">

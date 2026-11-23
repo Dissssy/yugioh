@@ -64,6 +64,13 @@
       "when": 1795146454276,
       "tag": "0008_duel_cards",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795403120728,
+      "tag": "0009_user_decks",
+      "breakpoints": true
     }
   ]
 }
