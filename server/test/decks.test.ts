@@ -1,6 +1,6 @@
 import { get } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { addBlocker, deckProblems, NO_BANLIST, type BanlistDetail, type BanlistSummary, type CatalogCard, type DeckDetail, type DeckList, type DeckSave, type DeckSummary, type DuelSummary, type RuleCard } from '@yugioh/shared';
+import { addBlocker, deckProblems, NO_BANLIST, parseYdk, toYdk, type BanlistDetail, type BanlistSummary, type CatalogCard, type DeckDetail, type DeckList, type DeckSave, type DeckSummary, type DuelSummary, type RuleCard } from '@yugioh/shared';
 import { eq } from 'drizzle-orm';
 import { syncCards } from '../src/cards.ts';
 import { users } from '../src/db/schema.ts';
@@ -86,11 +86,27 @@ describe('the card catalog', () => {
     const list = (await res.json()) as CatalogCard[];
     expect(list.length).toBeGreaterThan(sample.main.length);
     expect(list.find((c) => c.code === sample.main[0]!.code)?.inPool).toBe(true);
+    expect(list.find((c) => c.code === 6368038)?.altCodes).toEqual([6368039]); // Gaia The Fierce Knight's other artwork
     // fetch() marks conditional requests no-cache, so revalidate the way a browser's cache does.
     const status = await new Promise((resolve) =>
       get(`${h.baseUrl}/api/cards`, { headers: { 'if-none-match': res.headers.get('etag')! } }, (r) => resolve(r.resume().statusCode)),
     );
     expect(status).toBe(304);
+  });
+});
+
+describe('.ydk files', () => {
+  const known: Record<number, boolean> = { 1: false, 2: false, 3: true };
+  const resolve = (code: number) => (code === 9 ? { code: 1, extraDeck: false } : code in known ? { code, extraDeck: known[code]! } : undefined);
+
+  it('round-trips a deck', () => {
+    const deck = { main: [1, 1, 2], extra: [3], side: [2] };
+    expect(parseYdk(toYdk(deck), resolve)).toEqual({ ...deck, unknown: [] });
+  });
+
+  it('reads alternate artworks, sorts Main and Extra Deck cards by kind, and leaves out unknown passcodes', () => {
+    const text = '#created by someone\r\n#main\r\n9\r\n3\r\n77\r\n#extra\r\n2\r\n!side\r\n3\r\n';
+    expect(parseYdk(text, resolve)).toEqual({ main: [1, 2], extra: [3], side: [3], unknown: [77] });
   });
 });
 

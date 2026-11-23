@@ -46,7 +46,11 @@ export class Catalog {
   private async build(key: string): Promise<CatalogData> {
     const [rows, pool] = await Promise.all([this.db.select().from(cards).orderBy(cards.name), poolCardIds(this.db)]);
     const inPool = new Set(pool);
-    const list = rows.map((r): CatalogCard => ({ ...toCardData(r), archetype: r.archetype, inPool: inPool.has(r.id) }));
+    const list = rows.map((r): CatalogCard => {
+      // Alternate artworks have passcodes of their own, which `.ydk` files from other tools may use.
+      const art = ((r.raw as { card_images?: { id: number }[] }).card_images ?? []).map((i) => i.id).filter((id) => id !== r.id);
+      return { ...toCardData(r), archetype: r.archetype, inPool: inPool.has(r.id), ...(art.length > 0 && { altCodes: art }) };
+    });
     const json = JSON.stringify(list);
     return {
       cards: new Map(list.map((c) => [c.code, c])),

@@ -8,6 +8,8 @@ import { api } from '../api.ts';
 export interface Catalog {
   cards: CatalogCard[];
   byCode: Map<number, CatalogCard>;
+  /** A card by its passcode or an alternate artwork's, as `.ydk` files may list it. */
+  resolve(code: number): CatalogCard | undefined;
   /** Passcodes of the best matches first. */
   search(text: string): number[];
 }
@@ -19,9 +21,12 @@ function buildCatalog(cards: CatalogCard[]): Catalog {
     searchOptions: { boost: { name: 4 }, prefix: true, fuzzy: 0.2, combineWith: 'AND' },
   });
   index.addAll(cards);
+  const byCode = new Map(cards.map((c) => [c.code, c]));
+  const byArt = new Map(cards.flatMap((c) => (c.altCodes ?? []).map((a) => [a, c] as const)));
   return {
     cards,
-    byCode: new Map(cards.map((c) => [c.code, c])),
+    byCode,
+    resolve: (code) => byCode.get(code) ?? byArt.get(code),
     search: (text) => index.search(text).map((r) => r.id as number),
   };
 }

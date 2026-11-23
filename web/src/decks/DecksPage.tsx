@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { useBanlists, useDecks } from '../api.ts';
 import { Notice } from '../pages/Notice.tsx';
 import { CopyDeck } from './DeckBuilder.tsx';
+import { ImportYdk } from './ydk.tsx';
 
 /** The viewer's decks, with whether each can go into a duel, and the premade decks to start from. */
 export function DecksPage({ me }: { me: Me }) {
@@ -21,6 +22,7 @@ export function DecksPage({ me }: { me: Me }) {
       <section className="box">
         <div className="row">
           <CopyDeck className="primary" label="New deck" deck={{ name: 'New deck', main: [], extra: [], side: [], shared: false, banlistId: null }} />
+          <ImportYdk />
           <span className="muted small">Decks save as you build them. Only decks that follow the rules can go into a duel.</span>
         </div>
         {decks.isError && <p className="error">Couldn't load your decks.</p>}

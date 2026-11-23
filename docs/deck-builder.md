@@ -1,6 +1,6 @@
 # Deck builder
 
-Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Steps 1 and 2 of the build order are built; the rest isn't yet. This plan replaces the one-line "deck builder" entry in
+Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Steps 1 to 3 of the build order are built; the rest isn't yet. This plan replaces the one-line "deck builder" entry in
 [architecture.md](architecture.md) layer 8 and the "not planned yet" note in [next-steps.md](next-steps.md).
 
 ## What Ethan asked for
@@ -111,8 +111,12 @@ A banlist is a name and a limit per card: 0, 1 or 2. Any card it doesn't list is
 - A deck has an owner (none for a premade deck), a name, Main, Extra and Side lists, and a **shared** switch. A shared
   deck can be seen by anyone with its link, like a replay. Copying it needs an account.
 - **Copy** on any deck you can see (premade, shared, or your own) makes a new deck of yours and opens it.
-- **`.ydk` import and export**, the format most other Yu-Gi-Oh! tools use. Import makes a new deck. Cards that aren't
-  in the pool still come in, and are flagged the same way as in search.
+- **`.ydk` import and export**, the format most other Yu-Gi-Oh! tools use (`shared/src/ydk.ts`). **Import .ydk** on the
+  decks page makes a new deck named after the file and opens it. Cards that aren't in the pool still come in, and are
+  flagged the same way as in search. Passcodes of alternate artworks (the catalog's `altCodes`, from the card's
+  `card_images`) count as the card. Main and Extra Deck cards go where they belong whichever heading listed them.
+  Passcodes no card has are left out, and the page says how many before opening the deck. **Download .ydk** is on
+  every deck page.
 
 ## The pre-duel stage
 
@@ -160,7 +164,7 @@ Each step is a working product on its own.
    legal decks as well as the premade ones.
 2. **Banlists** (built). The `banlists` table, the four defaults from the card import, the banlist editor, and a banlist on
    each challenge that both decks are checked against.
-3. **`.ydk` import and export** in the builder.
+3. **`.ydk` import and export** (built) on the decks page and every deck page.
 4. **The pre-duel stage.** The `preparing` status, the duel's copy of each deck, Side Deck swaps, guests building,
    Ready, and the Premade only switch.
 5. **Search terms** and the help menu.

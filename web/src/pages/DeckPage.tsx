@@ -8,6 +8,7 @@ import { CardFace } from '../board/Card.tsx';
 import { CardDetail } from '../board/CardDetail.tsx';
 import { CopyLink } from '../CopyLink.tsx';
 import { CopyDeck, DeckBuilder } from '../decks/DeckBuilder.tsx';
+import { DownloadYdk } from '../decks/ydk.tsx';
 import { Loading, Notice } from './Notice.tsx';
 
 /** A deck: its owner builds it here; anyone else who may see it can look and copy it. */
@@ -41,6 +42,7 @@ function DeckView({ deck, canCopy }: { deck: DeckDetail; canCopy: boolean }) {
         <div className="row">
           {canCopy && <CopyDeck className="primary" label="Copy to my decks" deck={{ name, main: codes(main), extra: codes(extra), side: codes(side), shared: false, banlistId: null }} />}
           {deck.shared && <CopyLink path={`/decks/${deck.id}`} />}
+          <DownloadYdk name={name} deck={{ main: codes(main), extra: codes(extra), side: codes(side) }} />
         </div>
         <CardGrid title="Main Deck" cards={main} onShow={setHovered} />
         {extra.length > 0 && <CardGrid title="Extra Deck" cards={extra} onShow={setHovered} />}
