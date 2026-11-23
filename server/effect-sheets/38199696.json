@@ -1,0 +1,43 @@
+{
+  "code": 38199696,
+  "textHash": "c5fc1a43a531711f0075d941aaf26df6f4f6b6d85985e0df5902a9002e00d911",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Increase your Life Points by 500 points.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "you",
+                "amount": 500,
+                "kind": "gain"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

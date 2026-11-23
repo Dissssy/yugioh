@@ -1,6 +1,6 @@
 // What the judge reads: a fixed rules reference (cached), then per request the board and the effect at hand.
 
-import { cardOf, describeFilter, levelOf, MONSTER_ZONES, summonName, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Happening, type Seat } from '@yugioh/engine';
+import { cardOf, describeFilter, levelOf, FIELD_ZONE, MONSTER_ZONES, summonName, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Happening, type Seat } from '@yugioh/engine';
 
 export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs every generic rule: turns, phases, summons, battle, damage, LP, zones, once-per-turn counting. Your only job is to apply one card effect at a time exactly as its text says, using tools. Every tool call is checked by code against the board; a refused call comes back as an error that you can correct.
 
@@ -71,7 +71,7 @@ export function describeState(state: DuelState, activating: string | null = null
     const activated = c.placedTurn < state.turn ? `Set on turn ${c.placedTurn}, flipped face-up because it is being activated now` : 'placed from the hand, face-up because it is being activated now';
     const face = c.id === activating && zone === 'spellTraps' ? activated : c.faceUp ? 'face-up' : 'face-down';
     const counters = c.counters.spell ? `, ${c.counters.spell} Spell Counter${c.counters.spell === 1 ? '' : 's'}` : '';
-    if (zone === 'spellTraps') return `[${index}] ${label(c.id)} (${face}${c.linked ? `, linked to ${label(c.linked)}` : ''}${counters})`;
+    if (zone === 'spellTraps') return `[${index}${index === FIELD_ZONE ? ', Field Zone' : ''}] ${label(c.id)} (${face}${c.linked ? `, linked to ${label(c.linked)}` : ''}${counters})`;
     const s = statsOf(state, c.id);
     return `[${index}${index >= MONSTER_ZONES ? ', Extra Monster Zone' : ''}] ${label(c.id)} (${face} ${c.position}, ATK ${s.atk} DEF ${s.def}${s.level !== null ? ` Level ${s.level}` : ''}${c.materials.length ? `, Xyz Materials attached: ${c.materials.map(label).join('; ')}` : ''}${counters})`;
   };

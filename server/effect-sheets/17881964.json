@@ -1,0 +1,14 @@
+{
+  "code": 17881964,
+  "textHash": "f2e3875e15fd12ddf49288261f33dbeda497ae874f897b710c34bea87149f2f7",
+  "model": "claude-opus-5-5",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Firegrass",
+      "Petit Dragon"
+    ]
+  },
+  "normalSummon": true
+}

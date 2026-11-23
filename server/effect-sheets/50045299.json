@@ -1,0 +1,118 @@
+{
+  "code": 50045299,
+  "textHash": "4bff64a44c85994d0d2ec12a5934c3a37e77c82801fcef8abd7ca0d8c958e0cd",
+  "model": "admin",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Either player's turn, once Set (Continuous Trap).",
+      "cost": "",
+      "effect": "Activate this card. The activation does nothing by itself; its effects apply while it remains face-up on the field.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": []
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field.",
+      "cost": "",
+      "effect": "Change all face-up Dragon-Type monsters on the field to Defense Position.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "force_position",
+        "to": {
+          "side": "either",
+          "place": "monsters",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [
+            "Dragon"
+          ],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "position": "defense",
+        "while": []
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field.",
+      "cost": "",
+      "effect": "Face-up Dragon-Type monsters on the field cannot change their battle positions.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": {
+          "side": "either",
+          "place": "monsters",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [
+            "Dragon"
+          ],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "others": false,
+        "cannot": [
+          "change_position"
+        ],
+        "by": null,
+        "compare": null,
+        "once": false,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -30,6 +30,7 @@ import {
   monsterZonesFor,
   procedureDone,
   feasibleOptions,
+  fusionMaterialOptions,
 } from '../src/index.ts';
 
 const monster = (code: number, name: string, level: number, atk: number, def: number): CardData => ({
@@ -102,6 +103,17 @@ const cards: Record<number, CardData> = {
   53: { ...monster(53, 'Turret Warrior', 5, 1200, 2000), type: 'Effect Monster' },
   54: { ...monster(54, 'Prior of the Ice Barrier', 4, 1000, 400), type: 'Effect Monster', attribute: 'WATER' },
   55: { ...monster(55, 'Ice Lord', 8, 2800, 2000), type: 'Effect Monster', attribute: 'WATER' },
+  56: { ...spell(56, 'Sogen'), race: 'Field' },
+  57: { ...spell(57, 'Yami'), race: 'Field' },
+  58: spell(58, 'Polymerization'),
+  59: { ...monster(59, 'Flame Swordsman', 5, 1800, 1600), type: 'Fusion Monster', extraDeck: true },
+  60: { ...monster(60, 'Exodia the Forbidden One', 3, 1000, 1000), type: 'Effect Monster' },
+  61: monster(61, 'Right Leg of the Forbidden One', 1, 200, 300),
+  62: monster(62, 'Left Leg of the Forbidden One', 1, 200, 300),
+  63: monster(63, 'Right Arm of the Forbidden One', 1, 200, 300),
+  64: monster(64, 'Left Arm of the Forbidden One', 1, 200, 300),
+  65: { ...spell(65, 'Dragon Capture Jar'), type: 'Trap Card', kind: 'trap', race: 'Continuous' },
+  66: { ...monster(66, 'Blue-Eyes White Dragon', 8, 3000, 2500), race: 'Dragon' },
 };
 
 function spell(code: number, name: string): CardData {
@@ -276,6 +288,12 @@ const sheets: Record<number, EffectSheet> = {
     }),
     materials: { summon: 'xyz', level: 3, count: 2 },
   },
+  56: sheet(56, effect('activation'), continuous(aura({ to: filter({ races: ['Warrior'] }), atk: 200, def: 200 }))),
+  57: sheet(57, effect('activation')),
+  58: sheet(58, { ...effect('activation'), ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'fusion_summon', from: ['hand', 'field'] }] }] }) }),
+  59: { ...sheet(59), materials: { summon: 'fusion', materials: ['Axe Raider', 'Dark Blade'] } },
+  65: sheet(65, effect('activation'), continuous({ apply: 'force_position', to: filter({ races: ['Dragon'] }), position: 'defense', while: [] })),
+  60: sheet(60, continuous({ apply: 'win_with_hand', names: [60, 61, 62, 63, 64].map((c) => cards[c]!.name) })),
 };
 
 /**
@@ -296,7 +314,7 @@ function stacked(deck0: number[], deck1: number[]): DuelEvent[] {
       sheets,
       instances,
       players: [
-        { name: 'Yusei', deck: ids('a', 0, deck0), extra: ids('ax', 0, [7, 15, 17, 18, 21]) },
+        { name: 'Yusei', deck: ids('a', 0, deck0), extra: ids('ax', 0, [7, 15, 17, 18, 21, 59]) },
         { name: 'Yuma', deck: ids('b', 1, deck1), extra: [] },
       ],
     },
@@ -549,7 +567,7 @@ describe('Synchro Summons', () => {
     t.play(0, { type: 'extraSummon', card: 'ax0', materials: ['a1', 'a0'], zone: 6, position: 'defense' });
     expect(t.state.players[0].graveyard).toEqual(['a1', 'a0']);
     expect(t.state.players[0].monsters[6]).toMatchObject({ id: 'ax0', faceUp: true, position: 'defense', summoned: { how: 'synchro', turn: 3 } });
-    expect(t.state.players[0].extra).toEqual(['ax1', 'ax2', 'ax3', 'ax4']);
+    expect(t.state.players[0].extra).toEqual(['ax1', 'ax2', 'ax3', 'ax4', 'ax5']);
     expect(t.state.normalSummons).toBe(0);
     expect(logFor(t.events, 1).at(-1)?.text).toBe('Yusei Synchro Summoned Junk Warrior in defense position, using Speed Warrior, Junk Synchron');
   });
@@ -1086,6 +1104,17 @@ describe('control and Tokens', () => {
   });
 });
 
+describe('winning hands', () => {
+  it('end the duel when the last piece of Exodia is drawn', () => {
+    const t = new Table(stacked([60, 61, 62, 63, 1, 64, ...filler(34)], filler(40, 2)));
+    t.play(0, { type: 'endTurn', discard: [] });
+    expect(t.state.result).toBeNull();
+    t.play(1, { type: 'endTurn', discard: [] });
+    expect(t.state.result).toEqual({ winner: 0, reason: 'handWin' });
+    expect(logFor(t.events, 1).find((e) => e.event.type === 'duelEnded')!.text).toBe('Yusei won: Yusei held every piece of a winning hand');
+  });
+});
+
 describe('equipped and tied cards', () => {
   /** Yusei's monsters on the field and Spells/Traps in his hand (or Set on turn 1), on his turn 3. */
   function board(monsters: number[], cards: number[], set = false) {
@@ -1106,6 +1135,51 @@ describe('equipped and tied cards', () => {
     for (const o of ops) op(t, o);
     return t.push({ type: 'linkResolved' });
   };
+
+  it('put a Field Spell in the Field Zone, where it stays and applies, and a new one sends the old one to the GY', () => {
+    const t = board([1], [56, 57, 25]);
+    expect(legalActions(t.state, 0)).toContainEqual({ type: 'setSpellTrap', card: 'a0', zones: [5] });
+    expect(legalActions(t.state, 0)).toContainEqual({ type: 'setSpellTrap', card: 'a2', zones: [0, 1, 2, 3, 4] });
+    expect(() => t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 0 })).toThrow();
+    resolve(t, 'a0', 5, []);
+    expect(t.state.players[0].spellTraps[5]).toMatchObject({ id: 'a0', faceUp: true });
+    expect(statsOf(t.state, 'a3')).toMatchObject({ atk: 1900, def: 1350 });
+    resolve(t, 'a1', 5, []);
+    expect(t.state.players[0].spellTraps[5]).toMatchObject({ id: 'a1' });
+    expect(t.state.players[0].graveyard).toEqual(['a0']);
+    expect(statsOf(t.state, 'a3').atk).toBe(1700);
+  });
+
+  it('Fusion Summon a Fusion Monster with materials from the hand and field, which go to the GY', () => {
+    expect(scriptProblem(board([], [58]).state, 0, 'a0', 0, null)).toMatch(/No Fusion Monster/);
+    const t = board([1], [58, 2]);
+    expect(scriptProblem(t.state, 0, 'a0', 0, null)).toBeNull();
+    expect(fusionMaterialOptions(t.state, 0, 'ax5', ['hand', 'field'], [])).toEqual(expect.arrayContaining(['a1', 'a2']));
+    // With an Axe Raider picked, only Dark Blade is left to finish the set.
+    expect(fusionMaterialOptions(t.state, 0, 'ax5', ['hand', 'field'], ['a2'])).toEqual(['a1']);
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 0 });
+    expect(() => op(t, { op: 'fusion_summon', card: 'ax5', materials: ['a2', 'a3'], from: ['hand', 'field'], zone: 0, position: 'attack' })).toThrow(/aren't Fusion Materials/);
+    op(t, { op: 'fusion_summon', card: 'ax5', materials: ['a2', 'a1'], from: ['hand', 'field'], zone: 0, position: 'attack' });
+    expect(t.state.players[0].monsters[0]).toMatchObject({ id: 'ax5', summoned: { how: 'fusion' } });
+    expect(t.state.players[0].graveyard).toEqual(['a2', 'a1']);
+    expect(t.state.properlySummoned).toContain('ax5');
+    expect(logFor(t.events, 1).some((e) => e.text?.startsWith('Yusei Fusion Summoned Flame Swordsman'))).toBe(true);
+  });
+
+  it('keep monsters in a battle position, changing those that arrive in another', () => {
+    const t = board([66, 1], [65], true);
+    resolve(t, 'a0', null, []);
+    expect(t.state.players[0].monsters[0]).toMatchObject({ id: 'a1', position: 'defense' });
+    expect(t.state.players[0].monsters[1]).toMatchObject({ id: 'a2', position: 'attack' });
+    // A Dragon that arrives in Attack Position is changed at once, until the card is gone.
+    t.push({ type: 'moved', card: 'a1', owner: 0, from: 'monsters', to: 'hand' });
+    t.push({ type: 'specialSummoned', player: 0, card: 'a1', zone: 2, position: 'attack' });
+    expect(t.state.players[0].monsters[2]).toMatchObject({ id: 'a1', position: 'defense' });
+    t.push({ type: 'moved', card: 'a0', owner: 0, from: 'spellTraps', to: 'graveyard' });
+    t.push({ type: 'moved', card: 'a1', owner: 0, from: 'monsters', to: 'hand' });
+    t.push({ type: 'specialSummoned', player: 0, card: 'a1', zone: 3, position: 'attack' });
+    expect(t.state.players[0].monsters[3]).toMatchObject({ id: 'a1', position: 'attack' });
+  });
 
   it('apply an Equip Spell to its monster and send it to the GY with the monster', () => {
     const t = board([14], [25, 25]);

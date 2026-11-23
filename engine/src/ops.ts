@@ -4,6 +4,7 @@
 import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
 import { restriction, statsOf } from './continuous.ts';
 import { specialSummonForbidden, specialSummonProblem } from './script.ts';
+import { fusionMaterialsFit, fusionOf, fusionZones } from './fusion.ts';
 import { locate, monsterZonesFor, other } from './state.ts';
 import { type CardData, type DuelEvent, type DuelState, type Op, type Seat } from './types.ts';
 
@@ -236,6 +237,18 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       const target = onField(state, op.card);
       check((target.card.counters[op.counter] ?? 0) >= op.count, `${cardOf(state, op.card).name} doesn't have ${op.count} of those counters.`);
       run.emit({ type: 'countersChanged', card: op.card, counter: op.counter, delta: -op.count });
+      return;
+    }
+    case 'fusion_summon': {
+      check(ctx.stage === 'resolution', 'A Fusion Summon happens as the effect resolves.');
+      check(state.players[ctx.player].extra.includes(op.card) && fusionOf(state, op.card), 'That is not a Fusion Monster in your Extra Deck.');
+      check(!specialSummonForbidden(state, ctx.player, op.card), 'An effect stops you Special Summoning it this turn.');
+      check(fusionMaterialsFit(state, ctx.player, op.card, op.from, op.materials), `Those cards aren't Fusion Materials for ${cardOf(state, op.card).name}.`);
+      check(fusionZones(state, ctx.player, op.materials).includes(op.zone), 'Choose an empty Monster Zone it can go to.');
+      check(op.position === 'attack' || op.position === 'defense', 'Choose Attack or Defense Position.');
+      const fromDeck = op.materials.some((id) => locate(state, id)?.zone === 'deck');
+      run.emit({ type: 'extraSummoned', player: ctx.player, card: op.card, how: 'fusion', materials: op.materials, zone: op.zone, position: op.position });
+      if (fromDeck) shuffle(run, ctx.player, ctx, null);
       return;
     }
     case 'set_again': {

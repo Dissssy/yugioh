@@ -1,0 +1,44 @@
+{
+  "code": 24094653,
+  "textHash": "f2b2f7e1cd55a901aa233ee1a1c406839323d4c2185968b270792700ae6db8b4",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase (Normal Spell).",
+      "cost": "",
+      "effect": "Fusion Summon 1 Fusion Monster from your Extra Deck, using monsters from your hand or field as Fusion Material.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "fusion_summon",
+                "from": [
+                  "hand",
+                  "field"
+                ]
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

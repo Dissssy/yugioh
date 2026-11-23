@@ -1,0 +1,80 @@
+{
+  "code": 50913601,
+  "textHash": "2b74c6195e08fa22e81b906f42418613db449647a9604ecfd104e4335b24adc8",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Activate this Field Spell Card; the activation itself does nothing, its effect applies while it remains face-up on the field.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": []
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "All Dragon, Winged Beast, and Thunder monsters on the field gain 200 ATK/DEF.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": {
+          "side": "either",
+          "place": "monsters",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [
+            "Dragon",
+            "Winged Beast",
+            "Thunder"
+          ],
+          "attributes": [],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "atk": 200,
+        "def": 200,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

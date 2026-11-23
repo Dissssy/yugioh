@@ -70,7 +70,7 @@ function OpenSeat() {
 export function outcomeText(result: DuelOutcome, players: DuelSummary['players'], yourSeat: 0 | 1 | null): string {
   // A duel can end before its first turn, during rock-paper-scissors.
   const on = result.turn === 0 ? 'before the first turn' : `on turn ${result.turn}`;
-  if (result.winner === null) return `Draw: both players' LP hit 0 ${on}`;
+  if (result.winner === null) return `Draw: ${result.reason === 'handWin' ? 'both players held a winning hand' : "both players' LP hit 0"} ${on}`;
   const name = (seat: 0 | 1) => (seat === yourSeat ? 'you' : (players[seat]?.name ?? 'the opponent'));
   const loser = result.winner === 0 ? 1 : 0;
   const head = result.winner === yourSeat ? 'You won' : loser === yourSeat ? 'You lost' : `${name(result.winner)} won`;
@@ -78,6 +78,7 @@ export function outcomeText(result: DuelOutcome, players: DuelSummary['players']
     lp: `${loser === yourSeat ? 'your' : `${name(loser)}'s`} LP hit 0`,
     deckOut: `${name(loser)} couldn't draw`,
     surrender: `${name(loser)} surrendered`,
+    handWin: `${name(result.winner)} held every piece of a winning hand`,
   }[result.reason];
   return `${head}: ${why} ${on}`;
 }

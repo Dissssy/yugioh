@@ -320,7 +320,7 @@ export function checkQuestion(state: DuelState, q: AskPlayer): Question | { erro
 }
 
 /** An op that puts a monster in a Monster Zone of `controller`'s. */
-type ZoneOp = Extract<Op, { zone: number }>;
+type ZoneOp = Extract<Op, { zone: number; controller: Seat }>;
 type Unplaced = ZoneOp extends infer O ? (O extends ZoneOp ? Omit<O, 'zone'> : never) : never;
 
 /**

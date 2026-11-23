@@ -1,0 +1,14 @@
+{
+  "code": 66889139,
+  "textHash": "2103fbec02fa4139e3dbb8102055aba8110032d78b5c28e9863eeecd2ced7e2b",
+  "model": "claude-opus-5-5",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Gaia The Fierce Knight",
+      "Curse of Dragon"
+    ]
+  },
+  "normalSummon": true
+}

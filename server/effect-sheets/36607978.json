@@ -1,0 +1,91 @@
+{
+  "code": 36607978,
+  "textHash": "81b2766f46a937a042a7f9e511dec1e9fb1adcf69ebc76e5d211e8206361fb46",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase, targeting 1 face-up Beast-Warrior-Type monster on the field",
+      "cost": "",
+      "effect": "Equip this card to 1 Beast-Warrior-Type monster.",
+      "targets": "1 face-up Beast-Warrior-Type monster on the field",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "place": "monsters",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [
+              "Beast-Warrior"
+            ],
+            "attributes": [],
+            "named": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is equipped to a monster",
+      "cost": "",
+      "effect": "It gains 300 ATK and DEF.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "linked",
+        "atk": 300,
+        "def": 300,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

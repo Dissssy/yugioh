@@ -1,0 +1,91 @@
+{
+  "code": 39774685,
+  "textHash": "764287e6788a728d1818936cc6de493b024d16fffbb33f95b4188646c604613e",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase, targeting 1 face-up Plant-Type monster on the field",
+      "cost": "",
+      "effect": "Equip this card to 1 face-up Plant-Type monster.",
+      "targets": "1 face-up Plant-Type monster on the field",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "place": "monsters",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [
+              "Plant"
+            ],
+            "attributes": [],
+            "named": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is equipped to a Plant-Type monster",
+      "cost": "",
+      "effect": "A Plant-Type monster equipped with this card increases its ATK and DEF by 300 points.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "linked",
+        "atk": 300,
+        "def": 300,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

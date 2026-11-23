@@ -1,0 +1,58 @@
+{
+  "code": 12580477,
+  "textHash": "ae4a0c7b00af2c789a22715f43f6b9e776bfd3969026f12ca5dc9127df53388d",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Destroy all monsters your opponent controls.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "opponent",
+                    "place": "monsters",
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

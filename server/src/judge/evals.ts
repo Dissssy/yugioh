@@ -17,6 +17,7 @@ import { inArray } from 'drizzle-orm';
 import {
   cardOf,
   decide,
+  FIELD_ZONE,
   evolve,
   isProcedure,
   locate,
@@ -884,6 +885,52 @@ export const CASES: EvalCase[] = [
     legal: true,
     check: (b) => all(expectAt(b, 'Ronintoadin', '0:monsters'), expectAt(b, 'Dupe Frog', '0:banished')),
   },
+  {
+    name: 'polymerization fusion summons with a material from the hand and one from the field',
+    board: [{ set: ['Polymerization'], hand: ['Flame Manipulator'], monsters: ['Masaki the Legendary Swordsman'], extra: ['Flame Swordsman', 'Gaia the Dragon Champion'] }, {}],
+    activate: 'Polymerization',
+    picks: [['Flame Swordsman'], ['Masaki the Legendary Swordsman'], ['Flame Manipulator'], ['Defense Position']],
+    legal: true,
+    check: (b) =>
+      all(
+        expectAt(b, 'Flame Swordsman', '0:monsters'),
+        b.monster('Flame Swordsman')?.position === 'defense' ? null : 'not in Defense Position',
+        expectAt(b, 'Flame Manipulator', '0:gy'),
+        expectAt(b, 'Masaki the Legendary Swordsman', '0:gy'),
+        expectAt(b, 'Gaia the Dragon Champion', '0:extra'),
+      ),
+  },
+  {
+    name: 'polymerization needs the materials of a fusion monster in the extra deck',
+    board: [{ set: ['Polymerization'], hand: ['Flame Manipulator'], extra: ['Flame Swordsman'] }, {}],
+    activate: 'Polymerization',
+    legal: false,
+  },
+  {
+    name: 'sogen goes to the field zone and powers up warriors on both sides',
+    board: [{ set: ['Sogen'], monsters: ['Masaki the Legendary Swordsman'] }, { monsters: ['Celtic Guardian', 'Blue-Eyes White Dragon'] }],
+    activate: 'Sogen',
+    legal: true,
+    check: (b) =>
+      all(
+        b.state.players[0].spellTraps[FIELD_ZONE]?.faceUp ? null : 'Sogen is not face-up in the Field Zone',
+        b.monster('Masaki the Legendary Swordsman')?.atk === 1300 ? null : `Masaki has ATK ${b.monster('Masaki the Legendary Swordsman')?.atk}`,
+        b.monster('Celtic Guardian')?.atk === 1600 ? null : `Celtic Guardian has ATK ${b.monster('Celtic Guardian')?.atk}`,
+        b.monster('Blue-Eyes White Dragon')?.atk === 3000 ? null : 'Blue-Eyes changed',
+      ),
+  },
+  {
+    name: 'dragon capture jar keeps dragons in defense position',
+    board: [{ set: ['Dragon Capture Jar'] }, { monsters: ['Blue-Eyes White Dragon', 'Celtic Guardian'] }],
+    activate: 'Dragon Capture Jar',
+    legal: true,
+    check: (b) =>
+      all(
+        expectAt(b, 'Dragon Capture Jar', '0:spellTraps'),
+        b.monster('Blue-Eyes White Dragon')?.position === 'defense' ? null : 'Blue-Eyes is still in Attack Position',
+        b.monster('Celtic Guardian')?.position === 'attack' ? null : 'Celtic Guardian changed position',
+      ),
+  },
 ];
 
 /** Builds a case's board: every listed card is put in place from its owner's Deck. */
@@ -940,6 +987,8 @@ export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: 
     { type: 'turnStarted', player: 0, turn: 2 },
   ];
   const zones: [number, number][] = [[0, 0], [0, 0]];
+  /** A Field Spell goes in the Field Zone; any other Spell or Trap in the next Spell & Trap Zone. */
+  const spellTrapZone = (id: string, seat: Seat) => (data[instances[id]!.code]!.race === 'Field' ? FIELD_ZONE : zones[seat]![1]++);
   for (const { id, seat, how } of places) {
     const to = how === 'gy' ? 'graveyard' : how === 'banished' ? 'banished' : 'hand';
     events.push({ type: 'moved', card: id, owner: seat, from: 'deck', to });
@@ -948,9 +997,9 @@ export function buildBoard(c: EvalCase, data: Record<number, CardData>, sheets: 
     } else if (how === 'setMonsters') {
       events.push({ type: 'monsterSet', player: seat, card: id, zone: zones[seat]![0]++ });
     } else if (how === 'set') {
-      events.push({ type: 'spellTrapSet', player: seat, card: id, zone: zones[seat]![1]++ });
+      events.push({ type: 'spellTrapSet', player: seat, card: id, zone: spellTrapZone(id, seat) });
     } else if (how === 'faceUp') {
-      events.push({ type: 'effectActivated', player: seat, card: id, effect: 0, zone: zones[seat]![1]++, cause: null }, { type: 'linkResolved' });
+      events.push({ type: 'effectActivated', player: seat, card: id, effect: 0, zone: spellTrapZone(id, seat), cause: null }, { type: 'linkResolved' });
     }
   }
   for (const { id, seat, materials } of xyzs) {

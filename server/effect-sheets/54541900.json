@@ -1,0 +1,14 @@
+{
+  "code": 54541900,
+  "textHash": "9ea3a08e1c7cad82c357d11573547570413e6f875b74bdd614801e4c858af967",
+  "model": "claude-opus-5-5",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "M-Warrior #1",
+      "M-Warrior #2"
+    ]
+  },
+  "normalSummon": true
+}

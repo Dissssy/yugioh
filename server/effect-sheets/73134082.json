@@ -1,0 +1,43 @@
+{
+  "code": 73134082,
+  "textHash": "c5b45cae1db38b245c62a2b4895dcf2f3a271062f4dd58f160f31872ab5917d1",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Inflict 600 points of damage to your opponent's Life Points.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": 600,
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -6,10 +6,11 @@ import { cardsFitting, conditionProblem, fits, identityFits, materialsOf } from 
 import { levelOf, locate } from './state.ts';
 import type { CardFilter, ChainLink, Continuous, DuelState, FieldCard, Restriction, Seat } from './types.ts';
 
-type Applied = Extract<Continuous, { apply: 'stats' | 'restrict' | 'battle' | 'lock' | 'negate_battled_flips' | 'extra_normal_summon' | 'discard_or_negate' }>;
+type Applied = Extract<Continuous, { apply: 'stats' | 'restrict' | 'battle' | 'force_position' | 'lock' | 'negate_battled_flips' | 'extra_normal_summon' | 'discard_or_negate' }>;
 type Stats = Extract<Continuous, { apply: 'stats' }>;
 export type Restrict = Extract<Continuous, { apply: 'restrict' }>;
 type Battle = Extract<Continuous, { apply: 'battle' }>;
+type ForcePosition = Extract<Continuous, { apply: 'force_position' }>;
 type Lock = Extract<Continuous, { apply: 'lock' }>;
 
 /** A continuous effect in force: the card it comes from, that card's controller, the effect's index, and what it does. */
@@ -64,8 +65,20 @@ export function inForce(state: DuelState): InForce[] {
   );
 }
 
+/** The face-up monsters a `force_position` effect in force holds in another position than they are in, with that position. */
+export function positionsToForce(state: DuelState): { card: string; position: 'attack' | 'defense' }[] {
+  const forcing = inForce(state).filter((f): f is InForce<ForcePosition> => f.effect.apply === 'force_position');
+  if (forcing.length === 0) return [];
+  return ([0, 1] as const).flatMap((seat) =>
+    state.players[seat].monsters.flatMap((m) => {
+      const f = m?.faceUp ? forcing.find((f) => affects(state, f, m.id)) : undefined;
+      return m && f && m.position !== f.effect.position ? [{ card: m.id, position: f.effect.position }] : [];
+    }),
+  );
+}
+
 /** Whether an effect in force applies to this card. */
-function affects(state: DuelState, f: InForce<Stats | Restrict | Battle>, id: string): boolean {
+function affects(state: DuelState, f: InForce<Stats | Restrict | Battle | ForcePosition>, id: string): boolean {
   const to = f.effect.to;
   if (to === 'self') return id === f.source;
   if (to === 'linked') {
