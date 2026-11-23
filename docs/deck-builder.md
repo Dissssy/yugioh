@@ -1,6 +1,6 @@
 # Deck builder
 
-Planned 2026-11-23 with Ethan. Nothing here is built yet. This plan replaces the one-line "deck builder" entry in
+Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Nothing here is built yet. This plan replaces the one-line "deck builder" entry in
 [architecture.md](architecture.md) layer 8 and the "not planned yet" note in [next-steps.md](next-steps.md).
 
 ## What Ethan asked for
@@ -120,40 +120,49 @@ references `decks`.
 
 The AI opponent keeps using premade decks.
 
-### Guests
+### The duel's copy of each deck
 
-Guests can't build decks (accounts.md). To keep duels against guests fair, the challenger chooses **Premade decks
-only** or **Any legal deck** when making the challenge. A guest can only accept a premade-only challenge.
+Picking a deck in the pre-duel stage copies it onto the match (`matches.prep0` / `prep1`: name, Main, Extra, Side,
+ready). Everything that happens before the duel starts changes that copy, never the saved deck, and the duel starts
+from it.
 
-### The Side Deck
+- **Side Deck swaps.** Before pressing Ready, a player can swap cards between their Side Deck and their Main or Extra
+  Deck for this duel only. Each swap is one card for one card, so the sizes don't change. The copy is checked with
+  `checkDeck` like any deck.
+- **Guests** build in the same place. A guest has no saved decks, so they start from a premade deck or an empty one, or
+  upload a `.ydk`, and edit the duel's copy with the same builder. **Download .ydk** saves what they built, so their
+  decks live on their own computer and they can upload one next time. Accounts get the same upload and download.
 
-It's built, saved, checked and exported now, but nothing uses it in a duel. When best of 3 comes, siding happens
-between games, in the same place as the pre-duel stage.
+The challenger also picks **Premade decks only** or **Any legal deck** for the challenge. This applies to both
+players, guests and accounts alike.
 
 ## Build order
 
 Each step is a working product on its own.
 
-1. **Decks.** The `decks` table gets an owner, Side Deck and the shared switch. The card catalog API, the builder page
-   with search and reasons, `checkDeck` with the basic rules (no banlist yet), autosave, copy, sharing, and your decks
-   in the account menu. Challenges and joins offer your legal decks as well as the premade ones. Premade-only stays
-   the only option for guests.
+1. **Decks.** The `decks` table gets an owner, a Side Deck and the shared switch. This step adds the card catalog API,
+   the builder page with search and reasons, and `checkDeck` with the basic rules (no banlist yet). Decks save as you
+   go, can be copied and shared, and are listed under your decks in the account menu. Challenges and joins offer your
+   legal decks as well as the premade ones.
 2. **Banlists.** The `banlists` table, the four defaults from the card import, the banlist editor, and a banlist on
    each challenge that both decks are checked against.
-3. **The pre-duel stage.** The `preparing` status, the deck picker and Ready in the duel page, Build one, and the
-   premade-only switch for guests.
-4. **Search terms** and the help menu.
-5. **`.ydk` import and export.**
-6. **Later, not in this plan:** best of 3 with siding, draft mode, and the challenge list and notifications.
+3. **`.ydk` import and export** in the builder.
+4. **The pre-duel stage.** The `preparing` status, the duel's copy of each deck, Side Deck swaps, guests building,
+   Ready, and the Premade only switch.
+5. **Search terms** and the help menu.
+6. **Later, not in this plan:** best of 3 with siding between games, draft mode, and the challenge list and
+   notifications.
 
 ## Decisions
 
-| Question | Recommendation | Other options |
-| --- | --- | --- |
-| Cards from premade decks released after `POOL_YEAR` (like the 5D's and Xyz starters) | Buildable, since they're in the pool and their sheets are written. A copied premade deck stays legal | Only cards from 2002 and earlier: a copy of a later premade deck gets flagged |
-| Draft area | No draft area. Decks save as you go, and only decks legal under the duel's banlist are offered | An explicit draft or finished state on each deck |
-| Fair duels against guests | The challenger picks Premade only or Any legal deck. Guests can only accept Premade only | Guests can also build a deck in the pre-duel stage that only lasts for that duel |
-| The default banlist for a challenge | TCG (current) | No list, or Goat, which is the closest to the 2002 card pool |
-| Side Deck before best of 3 | Build and save it, but don't use it | Let the pre-duel stage swap Side Deck cards in, which doesn't do anything before game 2 |
-| Who sees a shared deck | Anyone with the link, signed in or not. Copying it needs an account | Signed-in players only |
-| Fuzzy search library | MiniSearch | Fuse.js (slower at 14,000 cards) |
+Settled by Ethan on 2026-11-23.
+
+| Question | Decision |
+| --- | --- |
+| Which cards are buildable | Every card in the pool, including premade-deck cards newer than `POOL_YEAR`. The year cap only holds back free cards that may belong to archetypes we don't have yet |
+| Draft area | None. Decks save as you go, and only decks legal under the duel's banlist are offered |
+| Fair duels against guests | Guests build the duel's copy of a deck in the pre-duel stage, the same way accounts do, and keep their decks as `.ydk` files they download and upload |
+| Banlists offered | No list, TCG, OCG and Goat, all selectable on a challenge. TCG is preselected |
+| Side Deck before best of 3 | Built and saved, and usable for one-for-one swaps in the pre-duel stage |
+| Who sees a shared deck | Anyone with the link. Copying it needs an account |
+| Fuzzy search library | MiniSearch |
