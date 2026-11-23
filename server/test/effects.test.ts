@@ -3,7 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startDuel, type DuelEvent, type DuelUpdate, type LogEntry } from '@yugioh/engine';
-import type { AdminDuels, DeckSummary, DuelSummary, Rulings } from '@yugioh/shared';
+import type { AdminDuels, BanlistSummary, DeckSummary, DuelSummary, Rulings } from '@yugioh/shared';
 import { loadCards, syncCards } from '../src/cards.ts';
 import { decks, matchEvents } from '../src/db/schema.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
@@ -515,7 +515,9 @@ describe('a Summoning procedure', () => {
     const admin = await login();
     const deckList = (await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`)).body;
     const freezing = deckList.find((d) => d.name.includes('Freezing Chains'))!;
-    const duel = (await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: deckList[0]!.id }) })).body;
+    // Freezing Chains prints cards the TCG list Forbids, so this duel follows no list.
+    const noList = (await admin.json<BanlistSummary[]>(`${h.baseUrl}/api/banlists`)).body.find((b) => b.slug === 'none')!;
+    const duel = (await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: deckList[0]!.id, banlistId: noList.id }) })).body;
     const guest = new Browser();
     await guest.json(`${h.baseUrl}/api/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify({ deckId: freezing.id, guestName: 'Kaiba' }) });
     const [d0, d1] = await Promise.all([deckList[0]!, freezing].map((d) => h.db.query.decks.findFirst({ where: eq(decks.id, d.id) })));

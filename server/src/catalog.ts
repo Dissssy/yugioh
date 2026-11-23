@@ -38,9 +38,9 @@ export class Catalog {
   }
 
   /** What keeps a deck out of a duel under the banlist. */
-  async problems(deck: DeckList, banlist: Banlist): Promise<string[]> {
+  async problems(deck: DeckList, banlist: Banlist, premade: boolean): Promise<string[]> {
     const { cards } = await this.get();
-    return deckProblems(deck, (code) => cards.get(code) satisfies RuleCard | undefined, banlist);
+    return deckProblems(deck, (code) => cards.get(code) satisfies RuleCard | undefined, banlist, { premade });
   }
 
   private async build(key: string): Promise<CatalogData> {

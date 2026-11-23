@@ -68,10 +68,18 @@ export function addBlocker(deck: DeckList, code: number, card: RuleCard, section
   return null;
 }
 
-/** Everything that keeps the deck out of a duel under the banlist, in plain words. An empty list means it's legal. */
-export function deckProblems(deck: DeckList, cardOf: (code: number) => RuleCard | undefined, banlist: Banlist): string[] {
+/**
+ * Everything that keeps the deck out of a duel under the banlist, in plain words. An empty list means it's legal.
+ * Premade decks skip the section sizes: they are their sets as printed, and some sets aren't 40 cards.
+ */
+export function deckProblems(
+  deck: DeckList,
+  cardOf: (code: number) => RuleCard | undefined,
+  banlist: Banlist,
+  { premade = false }: { premade?: boolean } = {},
+): string[] {
   const problems: string[] = [];
-  for (const section of SECTIONS) {
+  for (const section of premade ? [] : SECTIONS) {
     const { min, max } = SECTION_SIZE[section];
     const n = deck[section].length;
     if (n < min) problems.push(`${SECTION_NAME[section]} has ${n} cards; it needs at least ${min}`);

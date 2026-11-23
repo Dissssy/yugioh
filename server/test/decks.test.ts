@@ -33,9 +33,8 @@ describe('deck rules', () => {
       "Card 4 doesn't exist",
     ]);
     const banlist = { name: 'Test', limits: { 1: 1, 2: 0 } };
-    expect(deckProblems(deck(Array(40).fill(1).map((_, i) => (i < 2 ? 1 : 9)), [2]), (c) => cards[c] ?? { name: 'Other', extraDeck: false, inPool: true }, banlist)).toEqual([
+    expect(deckProblems(deck([1, 1], [2]), of, banlist, { premade: true })).toEqual([
       '2 copies of Monster; Test allows 1',
-      '38 copies of Other; at most 3',
       'Synchro is Forbidden under Test',
     ]);
   });
@@ -172,8 +171,8 @@ describe('banlists', () => {
     const yugiDeck = (await post(yugi, '/decks', save())).body as DeckSummary;
     expect(yugiDeck.problems).toEqual([]);
     const underIt = (await ethan.json<DeckSummary[]>(`${h.baseUrl}/api/decks?banlist=${list.id}`)).body;
-    // Premade decks play as printed under any list.
-    expect(underIt.find((d) => d.id === premade[0]!.id)?.problems).toEqual([]);
+    // Premade decks follow the list too, but not the section sizes.
+    expect(underIt.find((d) => d.id === premade[0]!.id)?.problems).toEqual([`${sample.main[0]!.name} is Forbidden under House rules`]);
 
     const duel = (await post(ethan, '/duels', { deckId: premade[1]!.id, banlistId: list.id })).body as DuelSummary;
     expect(duel.banlist).toBe('House rules');
@@ -184,6 +183,7 @@ describe('banlists', () => {
     // The duel keeps its copy of the list, so deleting the list changes nothing.
     expect((await ethan.fetch(`${h.baseUrl}/api/banlists/${list.id}`, { method: 'DELETE' })).status).toBe(204);
     expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: yugiDeck.id })).status).toBe(400);
-    expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: premade[0]!.id })).status).toBe(200);
+    expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: premade[0]!.id })).status).toBe(400);
+    expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: premade[1]!.id })).status).toBe(200);
   });
 });

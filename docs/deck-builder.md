@@ -77,9 +77,9 @@ joined, so a deck can never get into a duel illegally.
 - At most 3 copies of a card across all three, or fewer if the banlist says so.
 - Every card must be in the pool.
 
-Premade decks aren't checked: they play as printed under any banlist. Some sets aren't 40 cards (Duelist Toolbox has
-38), and some print cards the current lists Forbid (Giant Trunade in Duelist Toolbox; Trishula and two others in
-Freezing Chains under TCG). A copy of one is a player's deck, so it is checked.
+Premade decks follow the banlist like any deck (Ethan, 2026-11-23: the premade decks will grow, and none should bring
+three Pot of Greed). They skip only the section sizes, since some sets aren't 40 cards (Duelist Toolbox has 38). Under
+the current TCG list that leaves out Duelist Toolbox (Giant Trunade) and Freezing Chains (Trishula and two others).
 
 ### Finished decks
 

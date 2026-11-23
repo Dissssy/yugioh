@@ -30,11 +30,10 @@ const listQuery = z.object({ banlist: z.coerce.number().int().optional(), duel: 
 const listOf = (row: DeckRow): DeckList => ({ main: row.main, extra: row.extra, side: row.side });
 
 /**
- * What keeps a deck out of a duel under the banlist. Premade decks have nothing: they play as printed under any list,
- * since some sets aren't 40 cards and some print cards that lists have since Forbidden.
+ * What keeps a deck out of a duel under the banlist. Premade decks follow the banlist like any deck, but skip the
+ * section sizes, since some sets aren't 40 cards.
  */
-const problemsOf = async (catalog: Catalog, row: DeckRow, banlist: Banlist) =>
-  row.slug !== null ? [] : catalog.problems(listOf(row), banlist);
+const problemsOf = (catalog: Catalog, row: DeckRow, banlist: Banlist) => catalog.problems(listOf(row), banlist, row.slug !== null);
 
 /**
  * The deck a player may bring to a duel under its banlist, copied for it: a premade deck, or a deck of their own.
@@ -76,7 +75,7 @@ export function deckRoutes(db: Db, catalog: Catalog) {
     mainCount: row.main.length,
     extraCount: row.extra.length,
     sideCount: row.side.length,
-    problems: row.slug !== null ? [] : await problemsOf(catalog, row, banlist ?? (await banlistOf(row))),
+    problems: await problemsOf(catalog, row, banlist ?? (await banlistOf(row))),
   });
 
   /** Card data never changes between imports, so the browser revalidates it with the ETag and usually gets a 304. */
