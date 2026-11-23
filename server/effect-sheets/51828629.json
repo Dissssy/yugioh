@@ -1,0 +1,14 @@
+{
+  "code": 51828629,
+  "textHash": "b5a62801b212e8469b119b1494336bda1219e0f1777c8ebbad0c43303934eaea",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Guardian of the Labyrinth",
+      "Protector of the Throne"
+    ]
+  },
+  "normalSummon": true
+}

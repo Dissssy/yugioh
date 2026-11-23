@@ -1,0 +1,14 @@
+{
+  "code": 56413937,
+  "textHash": "7602b5a67f571e917165ffc59ed94213f395b91d451738861efa28c5fa5e8910",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Sonic Maid",
+      "Beautiful Headhuntress"
+    ]
+  },
+  "normalSummon": true
+}

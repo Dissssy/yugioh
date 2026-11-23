@@ -15,6 +15,7 @@ import type { CardData } from '@yugioh/engine';
 import type { Db, Tx } from './db/client.ts';
 import { cardImports, cards, decks } from './db/schema.ts';
 import { importSheetFiles } from './sheets.ts';
+import { type SimpleCard, simpleSheet } from './simple-sheets.ts';
 
 export const YGOPRODECK_API = 'https://db.ygoprodeck.com/api/v7';
 
@@ -44,6 +45,15 @@ export interface CardSet {
  */
 export const POOL_THROUGH = 'FMR';
 
+/**
+ * Cards that need no written sheet (Normal Monsters, and cards `simpleSheet` covers) join the pool ahead of their set
+ * once they are printed in a set released in or before this year. It moves up a year at a time.
+ */
+export const POOL_YEAR = 2002;
+
+/** Whether a card needs no written sheet: a Normal Monster, or one whose sheet code writes. */
+export const isFreeCard = (card: SimpleCard) => card.frameType === 'normal' || simpleSheet(card) !== null;
+
 export async function readCardSets(): Promise<CardSet[]> {
   return JSON.parse(await readFile(new URL('../card-sets.json', import.meta.url), 'utf8')) as CardSet[];
 }
@@ -56,15 +66,25 @@ export async function poolSetNames(through = POOL_THROUGH): Promise<string[]> {
   return sets.slice(0, end + 1).flatMap((s) => (s.ygoprodeck ? [s.ygoprodeck] : []));
 }
 
-/** Passcodes of every card in the pool: printed in a pool set, or in a premade deck. */
+/** The YGOPRODeck set names of the sets released in or before the year. */
+export async function setNamesThrough(year = POOL_YEAR): Promise<string[]> {
+  return (await readCardSets()).flatMap((s) => (s.ygoprodeck && Number(s.released.slice(0, 4)) <= year ? [s.ygoprodeck] : []));
+}
+
+const printedIn = (names: string[]) => sql`exists (select 1 from jsonb_array_elements(${cards.raw}->'card_sets') s where s->>'set_name' in ${names})`;
+
+/** Passcodes of every card in the pool: printed in a pool set, a free card printed by POOL_YEAR, or in a premade deck. */
 export async function poolCardIds(db: Db): Promise<number[]> {
-  const names = await poolSetNames();
-  const printed = await db
-    .select({ id: cards.id })
-    .from(cards)
-    .where(sql`exists (select 1 from jsonb_array_elements(${cards.raw}->'card_sets') s where s->>'set_name' in ${names})`);
+  const printed = await db.select({ id: cards.id }).from(cards).where(printedIn(await poolSetNames()));
+  const byYear = await db.select().from(cards).where(printedIn(await setNamesThrough()));
   const premade = await db.select({ main: decks.main, extra: decks.extra }).from(decks).where(sql`${decks.slug} is not null`);
-  return [...new Set([...printed.map((r) => r.id), ...premade.flatMap((d) => [...d.main, ...d.extra])])];
+  return [
+    ...new Set([
+      ...printed.map((r) => r.id),
+      ...byYear.filter(isFreeCard).map((r) => r.id),
+      ...premade.flatMap((d) => [...d.main, ...d.extra]),
+    ]),
+  ];
 }
 
 const apiCard = z.looseObject({

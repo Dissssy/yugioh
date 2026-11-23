@@ -1,0 +1,14 @@
+{
+  "code": 99551425,
+  "textHash": "9ebc85a9e8618356172d317e0eb126c7744f9463f0806ee0522d1f83719e75a3",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Giga-Tech Wolf",
+      "Cannon Soldier"
+    ]
+  },
+  "normalSummon": true
+}

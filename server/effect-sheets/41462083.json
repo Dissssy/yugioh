@@ -1,0 +1,14 @@
+{
+  "code": 41462083,
+  "textHash": "72b2c16d053626274e55cf056126a2277c521184539a3e364f8ff80558879c68",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Time Wizard",
+      "Baby Dragon"
+    ]
+  },
+  "normalSummon": true
+}

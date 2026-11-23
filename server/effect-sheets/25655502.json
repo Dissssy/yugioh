@@ -1,0 +1,14 @@
+{
+  "code": 25655502,
+  "textHash": "3c8cc4e94398c2081ab09d300347440f56ac73a157da942782af87ebc8dc14fc",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Crass Clown",
+      "Dream Clown"
+    ]
+  },
+  "normalSummon": true
+}

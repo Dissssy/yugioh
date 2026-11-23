@@ -1,0 +1,14 @@
+{
+  "code": 95144193,
+  "textHash": "bc61b52d9ed69806417cf035651e15e480d1c7b3e418a37f73b37439c803df55",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Kuwagata α",
+      "Hercules Beetle"
+    ]
+  },
+  "normalSummon": true
+}
