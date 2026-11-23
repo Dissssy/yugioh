@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { api, errorText, loginHref, useDecks } from '../api.ts';
 import { Board } from '../board/Board.tsx';
-import { DeckPicker } from './Duels.tsx';
+import { DeckPicker, firstLegal } from './Duels.tsx';
 import { Loading, Notice } from './Notice.tsx';
 
 export function DuelPage({ me }: { me: Me }) {
@@ -94,7 +94,7 @@ function Join({ duel, me }: { duel: DuelSummary; me: Me }) {
   const queryClient = useQueryClient();
   const [deckId, setDeckId] = useState<number | null>(null);
   const [guestName, setGuestName] = useState('');
-  const chosen = deckId ?? decks.data?.[0]?.id ?? null;
+  const chosen = deckId ?? firstLegal(decks.data);
   const asGuest = me.kind === 'anonymous';
   const join = useMutation({
     mutationFn: (id: number) =>

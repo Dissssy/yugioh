@@ -1,6 +1,6 @@
 # Deck builder
 
-Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Nothing here is built yet. This plan replaces the one-line "deck builder" entry in
+Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Step 1 of the build order is built; the rest isn't yet. This plan replaces the one-line "deck builder" entry in
 [architecture.md](architecture.md) layer 8 and the "not planned yet" note in [next-steps.md](next-steps.md).
 
 ## What Ethan asked for
@@ -54,8 +54,9 @@ frame with its name and type.
 ### Search
 
 - **Runs in the browser.** The page loads one list of every card in our database (about 14,000) with the fields search
-  needs: name, text, type, attribute, race, archetype, ATK, DEF, Level, and whether it's in the pool. It's cached and
-  reloads only when the card import changes. Searching in the browser makes every keystroke instant, and the reasons
+  needs: name, text, type, attribute, race, archetype, ATK, DEF, Level, and whether it's in the pool. It's about 1.3 MB
+  gzipped (`GET /api/cards`, built once per card import in `server/src/catalog.ts`) and the browser revalidates it with
+  its ETag, so it downloads again only when the card import changes. Searching in the browser makes every keystroke instant, and the reasons
   update as you add cards without asking the server.
 - **[MiniSearch](https://github.com/lucaong/minisearch)** does the fuzzy search over names and text, with names
   weighted higher. It's small, has no dependencies, and is fast on this size of list. Fuse.js was the other option, but
@@ -73,6 +74,9 @@ joined, so a deck can never get into a duel illegally.
 - Main Deck 40 to 60, Extra Deck 0 to 15, Side Deck 0 to 15.
 - At most 3 copies of a card across all three, or fewer if the banlist says so.
 - Every card must be in the pool.
+
+Premade decks aren't checked: they are their sets as printed, and some sets aren't 40 cards (Duelist Toolbox has 38).
+A copy of one is a player's deck, so it is checked.
 
 ### Finished decks
 
@@ -140,7 +144,7 @@ players, guests and accounts alike.
 
 Each step is a working product on its own.
 
-1. **Decks.** The `decks` table gets an owner, a Side Deck and the shared switch. This step adds the card catalog API,
+1. **Decks** (built). The `decks` table gets an owner, a Side Deck and the shared switch. This step adds the card catalog API,
    the builder page with search and reasons, and `checkDeck` with the basic rules (no banlist yet). Decks save as you
    go, can be copied and shared, and are listed under your decks in the account menu. Challenges and joins offer your
    legal decks as well as the premade ones.

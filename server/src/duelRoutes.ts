@@ -6,10 +6,10 @@ import { Router, type Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { HANDS, type Intent } from '@yugioh/engine';
-import { isAdmin, type DeckDetail, type DeckSummary } from '@yugioh/shared';
-import { loadCards } from './cards.ts';
+import { isAdmin } from '@yugioh/shared';
+import type { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
-import { decks } from './db/schema.ts';
+import { deckForDuel } from './deckRoutes.ts';
 import type { Duels, SeatClaim } from './duels.ts';
 import { createGuest } from './guests.ts';
 import { displayName, guestKey, guestName, playerKey, viewerOf, type Viewer } from './viewer.ts';
@@ -59,7 +59,7 @@ export interface GuestCookie {
 /** How often an idle event stream sends a comment, so proxies don't close it. */
 const KEEPALIVE_MS = 25_000;
 
-export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
+export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: GuestCookie) {
   const router = Router();
 
   /** Playing needs an approved account or a guest identity. */
@@ -76,25 +76,6 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
   /** Players can take an empty seat, and so can signed-out visitors, who become guests by doing so. */
   const mayJoin = (viewer: Viewer) => viewer.kind === 'anonymous' || playerKey(viewer) !== null;
 
-  // Decks are public: a visitor opening a challenge link picks one before deciding to play as a guest.
-  router.get('/decks', async (_req, res) => {
-    const rows = await db.select().from(decks).orderBy(decks.id);
-    res.json(rows.map((d): DeckSummary => ({ id: d.id, name: d.name, mainCount: d.main.length, extraCount: d.extra.length })));
-  });
-
-  router.get('/decks/:id', async (req, res) => {
-    const deckId = z.coerce.number().int().safeParse(req.params.id);
-    const deck = deckId.success ? await db.query.decks.findFirst({ where: eq(decks.id, deckId.data) }) : undefined;
-    if (!deck) return void res.status(404).json({ error: 'not_found' });
-    const cards = await loadCards(db, [...deck.main, ...deck.extra]);
-    res.json({
-      id: deck.id,
-      name: deck.name,
-      main: deck.main.map((c) => cards[c]!),
-      extra: deck.extra.map((c) => cards[c]!),
-    } satisfies DeckDetail);
-  });
-
   router.get('/duels', async (_req, res) => {
     const p = player(res);
     if (!p) return;
@@ -108,8 +89,10 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     if (p.viewer.kind !== 'user') return void res.status(403).json({ error: 'account_required' });
     const body = deckChoice.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
-    const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), body.data.deckId);
-    if (!duelId) return void res.status(404).json({ error: 'deck_not_found' });
+    const deck = await deckForDuel(db, catalog, body.data.deckId, p.viewer.user.id);
+    if (deck === 'not_found') return void res.status(404).json({ error: 'deck_not_found' });
+    if (deck === 'deck_illegal') return void res.status(400).json({ error: 'deck_illegal' });
+    const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), deck);
     res.status(201).json(await duels.summarize((await duels.find(duelId))!, p.key, false));
   });
 
@@ -142,9 +125,10 @@ export function duelRoutes(db: Db, duels: Duels, guestCookie: GuestCookie) {
     }
     const row = await duels.find(req.params.id);
     if (!row) return void res.status(404).json({ error: 'not_found' });
-    if (!(await db.query.decks.findFirst({ where: eq(decks.id, body.data.deckId) })))
-      return void res.status(404).json({ error: 'deck_not_found' });
-    if (!(await duels.join(row.id, body.data.deckId, claim))) return void res.status(409).json({ error: 'seat_taken' });
+    const deck = await deckForDuel(db, catalog, body.data.deckId, viewer.kind === 'user' ? viewer.user.id : null);
+    if (deck === 'not_found') return void res.status(404).json({ error: 'deck_not_found' });
+    if (deck === 'deck_illegal') return void res.status(400).json({ error: 'deck_illegal' });
+    if (!(await duels.join(row.id, deck, claim))) return void res.status(409).json({ error: 'seat_taken' });
     if (created.guestToken) guestCookie.set(res, created.guestToken);
     const started = (await duels.find(row.id))!;
     res.json(await duels.summarize(started, started.seat1, false));

@@ -283,7 +283,7 @@ button.phase.go { border: 0; background: none; color: var(--fg); text-decoration
 }
 .card-tooltip.pinned { pointer-events: auto; border-color: var(--accent); }
 .card-tooltip .card-detail { display: grid; grid-template-columns: 130px 1fr; gap: 4px 10px; align-items: start; }
-.card-tooltip .card-detail img { max-width: 130px; border-radius: 6px; }
+.card-tooltip .card-detail img.detail-image { max-width: 130px; border-radius: 6px; }
 .card-tooltip .card-meta h3 { margin: 0 0 4px; font-size: 1em; }
 .card-tooltip .card-meta p { margin: 0 0 4px; font-size: 0.85em; }
 .card-tooltip .card-text, .card-tooltip .card-detail > .muted { grid-column: 1 / -1; margin: 4px 0 0; }
@@ -311,7 +311,7 @@ button.phase.go { border: 0; background: none; color: var(--fg); text-decoration
   grid-template-rows: auto 1fr;
   gap: 8px 16px;
 }
-.card-zoom .card-detail img { grid-row: 1 / -1; height: var(--img-h); width: auto; max-width: none; border-radius: 12px; }
+.card-zoom .card-detail img.detail-image { grid-row: 1 / -1; height: var(--img-h); width: auto; max-width: none; border-radius: 12px; }
 .card-zoom .card-meta h3 { margin: 0 0 6px; font-size: 1.3em; }
 .card-zoom .card-meta p { margin: 0 0 6px; }
 .card-zoom .card-text { margin: 0; font-size: 1.05em; line-height: 1.45; }

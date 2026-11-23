@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { reviewLog, type DuelEvent, type DuelUpdate } from '@yugioh/engine';
 import type { AdminDuels, DeckSummary, DuelSummary } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
-import { matchEvents, matches, users } from '../src/db/schema.ts';
+import { decks as deckTable, matchEvents, matches, users } from '../src/db/schema.ts';
 import { Duels } from '../src/duels.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
 import { MISSING_PREFIX, Opponents } from '../src/opponent/opponent.ts';
@@ -14,6 +14,11 @@ import { ADMIN_EMAIL, Browser, seeded, startHarness, Stream, type Harness } from
 
 let h: Harness;
 let decks: DeckSummary[];
+
+const duelDeck = async (id: number) => {
+  const row = (await h.db.query.decks.findFirst({ where: eq(deckTable.id, id) }))!;
+  return { name: row.name, main: row.main, extra: row.extra };
+};
 let admin: Browser;
 beforeAll(async () => {
   h = await startHarness();
@@ -113,8 +118,8 @@ describe('playing against Claude', () => {
 
     const ids: string[] = [];
     for (const [a, b] of [[0, 1], [1, 0], [1, 1]] as const) {
-      const id = (await duels.create(owner!.id, 'ai:a', 'A', decks[a]!.id))!;
-      await duels.join(id, decks[b]!.id, async () => ({ key: 'ai:b', name: 'B' }));
+      const id = await duels.create(owner!.id, 'ai:a', 'A', await duelDeck(decks[a]!.id));
+      await duels.join(id, await duelDeck(decks[b]!.id), async () => ({ key: 'ai:b', name: 'B' }));
       ids.push(id);
       // Loading the duel starts both AI seats.
       const updates: DuelUpdate[] = [];

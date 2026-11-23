@@ -41,7 +41,7 @@ import {
 import type { DuelSummary, Replay } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
-import { decks, matchEvents, matches, sheetReports } from './db/schema.ts';
+import { matchEvents, matches, sheetReports, type DuelDeck } from './db/schema.ts';
 import { appeal } from './judge/appeal.ts';
 import { askJudge, escalate } from './judge/ask.ts';
 import type { JudgeOutcome, ModelCall, Question } from './judge/judge.ts';
@@ -137,18 +137,16 @@ export class Duels {
     this.responseFloorMs = responseFloorMs;
   }
 
-  async create(userId: number, seatKey: string, name: string, deckId: number): Promise<string | null> {
-    if (!(await this.db.query.decks.findFirst({ where: eq(decks.id, deckId) }))) return null;
+  async create(userId: number, seatKey: string, name: string, deck: DuelDeck): Promise<string> {
     const id = randomBytes(12).toString('base64url');
-    await this.db.insert(matches).values({ id, createdBy: userId, seat0: seatKey, name0: name, deck0: deckId });
+    await this.db.insert(matches).values({ id, createdBy: userId, seat0: seatKey, name0: name, deck0: deck });
     return id;
   }
 
   /** A duel against the AI opponent: the player takes seat 0 and the AI seat 1, and it starts at once. */
-  async createAgainstAi(userId: number, seatKey: string, name: string, deckId: number, aiDeckId: number): Promise<string | null> {
-    const id = await this.create(userId, seatKey, name, deckId);
-    if (!id || !(await this.db.query.decks.findFirst({ where: eq(decks.id, aiDeckId) }))) return null;
-    await this.join(id, aiDeckId, async () => ({ key: aiKey('claude'), name: 'Claude' }));
+  async createAgainstAi(userId: number, seatKey: string, name: string, deck: DuelDeck, aiDeck: DuelDeck): Promise<string> {
+    const id = await this.create(userId, seatKey, name, deck);
+    await this.join(id, aiDeck, async () => ({ key: aiKey('claude'), name: 'Claude' }));
     return id;
   }
 
@@ -171,15 +169,14 @@ export class Duels {
   }
 
   async summarize(row: MatchRow, seatKey: string | null, canJoin: boolean): Promise<DuelSummary> {
-    const deckName = async (id: number) => (await this.db.query.decks.findFirst({ where: eq(decks.id, id) }))?.name ?? '';
     return {
       id: row.id,
       status: row.status,
       createdAt: row.createdAt.toISOString(),
       finishedAt: row.finishedAt?.toISOString() ?? null,
       players: [
-        { name: row.name0, deck: await deckName(row.deck0) },
-        row.name1 === null || row.deck1 === null ? null : { name: row.name1, deck: await deckName(row.deck1) },
+        { name: row.name0, deck: row.deck0.name },
+        row.name1 === null || row.deck1 === null ? null : { name: row.name1, deck: row.deck1.name },
       ],
       result: row.result,
       yourSeat: seatKey === null ? null : seatKey === row.seat0 ? 0 : seatKey === row.seat1 ? 1 : null,
@@ -191,7 +188,7 @@ export class Duels {
    * Takes the empty seat and shuffles the Decks; rock-paper-scissors then decides who goes first. Returns false, having changed nothing, if the
    * seat was already taken or the claimant is the challenger.
    */
-  async join(id: string, deckId: number, claim: SeatClaim): Promise<boolean> {
+  async join(id: string, deck: DuelDeck, claim: SeatClaim): Promise<boolean> {
     return this.db.transaction(async (tx) => {
       const [waiting] = await tx
         .select()
@@ -203,14 +200,11 @@ export class Duels {
       if (player.key === waiting.seat0) return false;
       const [row] = await tx
         .update(matches)
-        .set({ seat1: player.key, name1: player.name, deck1: deckId, status: 'active' })
+        .set({ seat1: player.key, name1: player.name, deck1: deck, status: 'active' })
         .where(eq(matches.id, id))
         .returning();
       if (!row) return false;
-      const [deck0, deck1] = await Promise.all(
-        [row.deck0, deckId].map((d) => tx.query.decks.findFirst({ where: eq(decks.id, d) })),
-      );
-      if (!deck0 || !deck1) throw new Error('Deck not found');
+      const [deck0, deck1] = [row.deck0, deck];
       const cards = await loadCards(this.db, [...deck0.main, ...deck0.extra, ...deck1.main, ...deck1.extra]);
       const events = startDuel(
         {

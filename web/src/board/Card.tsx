@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { CardData, CardView } from '@yugioh/engine';
 
 export type ImageSize = 'small' | 'full';
@@ -18,19 +19,31 @@ export function TokenFace({ card, className = 'card' }: { card: CardData; classN
   );
 }
 
+/**
+ * A card drawn as text: a Token, or a card whose image we don't have. Only cards in the pool have downloaded images
+ * (docs/card-pool.md), and the deck builder shows every card.
+ */
+export function TextFace({ card, className = 'card' }: { card: CardData; className?: string }) {
+  return (
+    <div className={`${className} text-face ${card.kind}`} role="img" aria-label={card.name}>
+      <span className="token-name">{card.name}</span>
+      <span className="token-stats">{card.kind === 'monster' ? `${card.atk ?? '?'} / ${card.def ?? '?'}` : `${card.race} ${card.kind}`}</span>
+    </div>
+  );
+}
+
+/** A card's image, drawn as text when the image is missing. */
+export function CardImage({ card, size, className }: { card: CardData; size: ImageSize; className: string }) {
+  const [missing, setMissing] = useState(false);
+  if (card.type === 'Token') return <TokenFace card={card} className={className} />;
+  if (missing) return <TextFace card={card} className={className} />;
+  return <img className={className} src={imageUrl(card.code, size)} alt={card.name} draggable={false} loading="lazy" onError={() => setMissing(true)} />;
+}
+
 /** A card's image, or its back when the viewer can't see it. */
 export function CardFace({ card, faceDown = false, size = 'small' }: { card: CardData | null; faceDown?: boolean; size?: ImageSize }) {
   if (!card) return <div className="card back" aria-label="Face-down card" />;
-  if (card.type === 'Token') return <TokenFace card={card} className={`card${faceDown ? ' set' : ''}`} />;
-  return (
-    <img
-      className={`card${faceDown ? ' set' : ''}`}
-      src={imageUrl(card.code, size)}
-      alt={card.name}
-      draggable={false}
-      loading="lazy"
-    />
-  );
+  return <CardImage card={card} size={size} className={`card${faceDown ? ' set' : ''}`} />;
 }
 
 /** Loads images ahead of time; resolves when all have loaded or failed. */

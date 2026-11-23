@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { DuelStatus, DuelSummary } from '@yugioh/shared';
+import type { DeckSummary, DuelStatus, DuelSummary } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, errorText, useDecks, useDuels } from '../api.ts';
@@ -46,7 +46,7 @@ export function NewChallenge() {
       void navigate(`/duel/${duel.id}`);
     },
   });
-  const chosen = deckId ?? decks.data?.[0]?.id ?? null;
+  const chosen = deckId ?? firstLegal(decks.data);
   return (
     <section className="box">
       <h2>New challenge</h2>
@@ -54,7 +54,9 @@ export function NewChallenge() {
         <p className="muted">Card data hasn't been imported yet, so there are no decks to play with.</p>
       ) : (
         <>
-          <p className="muted small">Pick your deck, then send the challenge link to your opponent.</p>
+          <p className="muted small">
+            Pick your deck, then send the challenge link to your opponent. <Link to="/decks">Build a deck</Link>
+          </p>
           <DeckPicker value={chosen} onChange={setDeckId} />
           <div className="actions">
             <button className="primary" onClick={() => chosen !== null && create.mutate(chosen)} disabled={create.isPending || chosen === null}>
@@ -82,9 +84,10 @@ export function PlayClaude() {
       void navigate(`/duel/${duel.id}`);
     },
   });
-  const first = decks.data?.[0]?.id ?? null;
+  const first = firstLegal(decks.data);
   const mine = deckId ?? first;
-  const claude = aiDeckId ?? first;
+  // Claude plays premade decks only.
+  const claude = aiDeckId ?? firstLegal(decks.data?.filter((d) => d.premade));
   if (!first) return null;
   return (
     <section className="box">
@@ -93,7 +96,7 @@ export function PlayClaude() {
       <h3 className="small">Your deck</h3>
       <DeckPicker name="deck-you" value={mine} onChange={setDeckId} />
       <h3 className="small">Claude's deck</h3>
-      <DeckPicker name="deck-claude" value={claude} onChange={setAiDeckId} />
+      <DeckPicker name="deck-claude" value={claude} onChange={setAiDeckId} premadeOnly />
       <div className="actions">
         <button
           className="primary"
@@ -108,28 +111,49 @@ export function PlayClaude() {
   );
 }
 
-/** The decks as a set of tiles; the chosen one is lit. `name` groups the radio buttons when a page has two pickers. */
-export function DeckPicker({ value, onChange, name = 'deck' }: { value: number | null; onChange: (id: number) => void; name?: string }) {
+export const firstLegal = (decks: DeckSummary[] | undefined) => decks?.find((d) => d.problems.length === 0)?.id ?? null;
+
+/**
+ * The decks as a set of tiles; the chosen one is lit. A deck that breaks the rules can't be picked and says why.
+ * `name` groups the radio buttons when a page has two pickers.
+ */
+export function DeckPicker({
+  value,
+  onChange,
+  name = 'deck',
+  premadeOnly = false,
+}: {
+  value: number | null;
+  onChange: (id: number) => void;
+  name?: string;
+  premadeOnly?: boolean;
+}) {
   const decks = useDecks();
   return (
     <div className="deck-picker" role="radiogroup" aria-label="Deck">
-      {decks.data?.map((d) => (
-        <label key={d.id} className={`deck-choice${d.id === value ? ' chosen' : ''}`}>
-          <input type="radio" name={name} checked={d.id === value} onChange={() => onChange(d.id)} />
-          <span className="deck-stack" aria-hidden>
-            <span className="card back" />
-            <span className="card back" />
-            <span className="card back" />
-          </span>
-          <span className="deck-name">
-            <strong>{d.name}</strong>
-            <span className="muted small">
-              {d.mainCount} cards · {d.extraCount} Extra
-            </span>
-          </span>
-          <Link to={`/decks/${d.id}`} className="small">See cards</Link>
-        </label>
-      ))}
+      {decks.data
+        ?.filter((d) => d.premade || !premadeOnly)
+        .map((d) => {
+          const illegal = d.problems.length > 0;
+          return (
+            <label key={d.id} className={`deck-choice${d.id === value ? ' chosen' : ''}${illegal ? ' illegal' : ''}`}>
+              <input type="radio" name={name} checked={d.id === value} disabled={illegal} onChange={() => onChange(d.id)} />
+              <span className="deck-stack" aria-hidden>
+                <span className="card back" />
+                <span className="card back" />
+                <span className="card back" />
+              </span>
+              <span className="deck-name">
+                <strong>{d.name}</strong>
+                <span className="muted small">
+                  {d.mainCount} cards · {d.extraCount} Extra{d.premade ? '' : ' · yours'}
+                </span>
+                {illegal && <span className="error small">{d.problems[0]}</span>}
+              </span>
+              <Link to={`/decks/${d.id}`} className="small">{d.premade ? 'See cards' : 'Edit'}</Link>
+            </label>
+          );
+        })}
     </div>
   );
 }

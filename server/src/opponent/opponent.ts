@@ -2,12 +2,11 @@
 // (watch, act, answer, chat), so code checks its moves like anyone's, and it only ever reads its own seat's view.
 
 import type Anthropic from '@anthropic-ai/sdk';
-import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { HANDS, type AiRecord, type DuelUpdate, type JudgingView, type LogEntry, type ModelUsage, type PlayerView, type Seat } from '@yugioh/engine';
 import { loadCards } from '../cards.ts';
 import type { Db } from '../db/client.ts';
-import { decks } from '../db/schema.ts';
+import type { DuelDeck } from '../db/schema.ts';
 import type { ActResult, Duels, OpponentModel } from '../duels.ts';
 import { usageOf } from '../judge/pricing.ts';
 import { movesFor, optionsFor, safeMove, type Move } from './moves.ts';
@@ -58,8 +57,7 @@ export class Opponents {
     const row = await this.duels.find(id);
     const seatKey = seat === 0 ? row?.seat0 : row?.seat1;
     if (!row || !seatKey) return;
-    const deckOf = async (deckId: number | null) => {
-      const deck = deckId === null ? undefined : await this.db.query.decks.findFirst({ where: eq(decks.id, deckId) });
+    const deckOf = async (deck: DuelDeck | null) => {
       if (!deck) throw new Error(`Duel ${id} has no deck for a seat`);
       const cards = await loadCards(this.db, [...deck.main, ...deck.extra]);
       return { name: deck.name, main: deck.main.map((c) => cards[c]!), extra: deck.extra.map((c) => cards[c]!) };

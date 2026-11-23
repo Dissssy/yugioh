@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { reviewLog, type DuelEvent } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
 import { costOf } from './judge/pricing.ts';
-import { decks, matchEvents, matches } from './db/schema.ts';
+import { matchEvents, matches } from './db/schema.ts';
 
 export interface MatchReport {
   id: string;
@@ -22,15 +22,13 @@ export async function matchReport(db: Db, id: string): Promise<MatchReport | nul
   const row = await db.query.matches.findFirst({ where: eq(matches.id, id) });
   if (!row) return null;
   const rows = await db.select().from(matchEvents).where(eq(matchEvents.matchId, id)).orderBy(matchEvents.seq);
-  const deckName = async (deck: number | null) =>
-    deck === null ? null : ((await db.query.decks.findFirst({ where: eq(decks.id, deck) }))?.name ?? null);
   return {
     id: row.id,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
     seats: [row.seat0, row.seat1],
-    decks: [await deckName(row.deck0), await deckName(row.deck1)],
+    decks: [row.deck0.name, row.deck1?.name ?? null],
     events: rows.map((r) => ({ seq: r.seq, at: r.createdAt.toISOString(), event: r.event as DuelEvent })),
   };
 }

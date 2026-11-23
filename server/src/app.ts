@@ -9,7 +9,9 @@ import { isAdmin, type AdminDuels, type Me, type Rulings, type UserSettings } fr
 import { findUserBySub, listUsers, setRole, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import { duelCosts } from './costs.ts';
+import { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
+import { deckForDuel, deckRoutes } from './deckRoutes.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
@@ -154,6 +156,7 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
   });
 
   const duels = new Duels(db, ai, random, config.RESPONSE_FLOOR_MS);
+  const catalog = new Catalog(db);
   if (ai.opponent) {
     const opponents = new Opponents(duels, db, ai.opponent, config.RESPONSE_FLOOR_MS, random);
     duels.onAiSeat = (id, seat) => void opponents.attach(id, seat).catch((error: unknown) => console.error(`AI opponent in duel ${id} didn't start:`, error));
@@ -167,8 +170,11 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     if (!ai.opponent) return void res.status(503).json({ error: "Playing against Claude needs an Anthropic API key, and this server has none." });
     const body = aiDuelBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'Pick a deck for each side.' });
-    const id = await duels.createAgainstAi(v.user.id, userKey(v.user.id), v.user.username, body.data.deckId, body.data.aiDeckId);
-    if (!id) return void res.status(404).json({ error: 'deck_not_found' });
+    // Claude plays premade decks only: its deck plans (docs/ai-opponent.md) are written for them.
+    const [deck, aiDeck] = await Promise.all([deckForDuel(db, catalog, body.data.deckId, v.user.id), deckForDuel(db, catalog, body.data.aiDeckId, null)]);
+    if (deck === 'not_found' || aiDeck === 'not_found') return void res.status(404).json({ error: 'deck_not_found' });
+    if (deck === 'deck_illegal' || aiDeck === 'deck_illegal') return void res.status(400).json({ error: 'deck_illegal' });
+    const id = await duels.createAgainstAi(v.user.id, userKey(v.user.id), v.user.username, deck, aiDeck);
     res.status(201).json(await duels.summarize((await duels.find(id))!, userKey(v.user.id), false));
   });
 
@@ -216,7 +222,8 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     res.status(500).json({ error: err.message });
   });
 
-  app.use('/api', duelRoutes(db, duels, guestCookie));
+  app.use('/api', deckRoutes(db, catalog));
+  app.use('/api', duelRoutes(db, catalog, duels, guestCookie));
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'not_found' }));
 
   // Card images, downloaded by the card sync. They never change, so browsers may cache them for long.

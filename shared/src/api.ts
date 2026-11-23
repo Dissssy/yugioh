@@ -36,12 +36,18 @@ export type Me =
   | { kind: 'guest'; guest: { name: string } }
   | { kind: 'user'; user: User; settings: UserSettings };
 
-/** A decklist to pick from. */
+/**
+ * A decklist to pick from: a premade deck, or one of the viewer's own (docs/deck-builder.md). `problems` is what keeps
+ * it out of a duel; premade decks have none.
+ */
 export interface DeckSummary {
   id: number;
   name: string;
+  premade: boolean;
   mainCount: number;
   extraCount: number;
+  sideCount: number;
+  problems: string[];
 }
 
 export type DuelStatus = 'waiting' | 'active' | 'finished';
@@ -80,11 +86,33 @@ export interface Replay {
   steps: SeatStep[];
 }
 
+/** A deck with its cards, for anyone who may see it: its owner, anyone with the link once shared, or anyone for a premade deck. */
 export interface DeckDetail {
   id: number;
   name: string;
+  premade: boolean;
+  /** Whether the viewer owns it and may edit it. */
+  mine: boolean;
+  /** Whether anyone with the link may see it. */
+  shared: boolean;
   main: CardData[];
   extra: CardData[];
+  side: CardData[];
+}
+
+/** What the deck builder saves: the whole deck each time. */
+export interface DeckSave {
+  name: string;
+  main: number[];
+  extra: number[];
+  side: number[];
+  shared: boolean;
+}
+
+/** One card in the deck builder's search: every card in our database, with whether it's in the game yet. */
+export interface CatalogCard extends CardData {
+  archetype: string | null;
+  inPool: boolean;
 }
 
 /** What the judge, appeals and the AI opponent cost in one duel. */
