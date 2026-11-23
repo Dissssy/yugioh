@@ -1,0 +1,43 @@
+{
+  "code": 56260110,
+  "textHash": "3fc4b1a25b22d19b0d5a0409addcfa6d798f6684d99244e8c5934492768d5499",
+  "model": "generated",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Decrease your opponent's Life Points by 300 points.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": 300,
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

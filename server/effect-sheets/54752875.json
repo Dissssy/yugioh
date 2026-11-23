@@ -1,0 +1,14 @@
+{
+  "code": 54752875,
+  "textHash": "b70f243195fdf8a2d6ef8da02aab2424d0f51bbb1bf0a6108014dc8d6071e862",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Thunder Dragon",
+      "Thunder Dragon"
+    ]
+  },
+  "normalSummon": true
+}

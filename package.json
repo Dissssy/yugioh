@@ -17,6 +17,7 @@
     "db:generate": "npm run db:generate -w server",
     "db:migrate": "npm run db:migrate -w server",
     "cards:import": "npm run cards:import -w server --",
+    "sheets:generate": "npm run sheets:generate -w server --",
     "sheets:compile": "npm run sheets:compile -w server --",
     "sheets:import": "npm run sheets:import -w server --",
     "sheets:export": "npm run sheets:export -w server --",

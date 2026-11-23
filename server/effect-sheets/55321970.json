@@ -1,0 +1,91 @@
+{
+  "code": 55321970,
+  "textHash": "b12c7468d231ef215ab59cc2fb4c4cb2baea5635d9aa855f0fea677d8b53c72a",
+  "model": "generated",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "A WIND monster equipped with this card increases its ATK by 400 points and decreases its DEF by 200 points.",
+      "targets": "a face-up monster the card can equip to",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "place": "monsters",
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [
+              "WIND"
+            ],
+            "named": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is equipped to a monster",
+      "cost": "",
+      "effect": "A WIND monster equipped with this card increases its ATK by 400 points and decreases its DEF by 200 points.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "linked",
+        "atk": 400,
+        "def": -200,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

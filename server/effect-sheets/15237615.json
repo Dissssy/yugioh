@@ -1,0 +1,14 @@
+{
+  "code": 15237615,
+  "textHash": "d7180424d607982c38f5734ea52b91f3c03cd661403d1e545eb1ac4f8a136215",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Queen's Double",
+      "Hibikime"
+    ]
+  },
+  "normalSummon": true
+}

@@ -1,0 +1,93 @@
+{
+  "code": 67629977,
+  "textHash": "8b4908e3d201943ebc980aba71f3eba980d7b483ebe38b106ca5b508615b7a79",
+  "model": "generated",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "All LIGHT monsters on the field gain 500 ATK, also all DARK monsters on the field lose 400 ATK.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": {
+          "side": "either",
+          "place": "monsters",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [
+            "LIGHT"
+          ],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "atk": 500,
+        "def": 0,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "All LIGHT monsters on the field gain 500 ATK, also all DARK monsters on the field lose 400 ATK.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": {
+          "side": "either",
+          "place": "monsters",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [
+            "DARK"
+          ],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "atk": -400,
+        "def": 0,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

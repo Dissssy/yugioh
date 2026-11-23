@@ -1,0 +1,78 @@
+{
+  "code": 18161786,
+  "textHash": "9c09ae203118672dbf7e7b302c409cdf134dcd513e9d326113a51b2eb2ec33fd",
+  "model": "generated",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Increase the ATK of all DARK monsters by 500 points and decreases their DEF by 400 points.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": []
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "Increase the ATK of all DARK monsters by 500 points and decreases their DEF by 400 points.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": {
+          "side": "either",
+          "place": "monsters",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [
+            "DARK"
+          ],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "atk": 500,
+        "def": -400,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

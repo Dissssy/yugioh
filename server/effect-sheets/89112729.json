@@ -1,0 +1,14 @@
+{
+  "code": 89112729,
+  "textHash": "f393e74ee1664a1ef18fd118f726a8f25a9845550638987d704b6cfe9cbbbf44",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Blast Juggler",
+      "Two-Headed King Rex"
+    ]
+  },
+  "normalSummon": true
+}

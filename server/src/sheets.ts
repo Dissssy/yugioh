@@ -31,6 +31,7 @@ import { costOf, usageOf } from './judge/pricing.ts';
 import { strictSchema } from './judge/tools.ts';
 import { cardFilter } from './judge/cardFilter.ts';
 import { poolCardIds } from './cards.ts';
+import { simpleSheet } from './simple-sheets.ts';
 
 export const SHEET_DIR = fileURLToPath(new URL('../effect-sheets', import.meta.url));
 export const COMPILE_MODEL = 'claude-opus-5-5';
@@ -496,7 +497,7 @@ async function cardsToCompile(db: Db, force: boolean, names: string[]) {
   const rows = ids.length ? await db.select().from(cards).where(inArray(cards.id, ids)) : [];
   const todo = [];
   for (const row of rows) {
-    if (row.frameType === 'normal') continue;
+    if (row.frameType === 'normal' || simpleSheet(row)) continue;
     if (names.length && !names.includes(row.name)) continue;
     const sheet = await sheetOf(db, row.id);
     if (sheet?.effects.some((e) => e.status === 'verified')) continue;
@@ -624,6 +625,25 @@ The compiler's instructions follow.
   return rows.length;
 }
 
+/**
+ * Writes the sheet file of each pool card whose sheet code writes (`simpleSheet`) and that has no current file yet.
+ * A current file, written by hand or by a model, is kept. Returns how many files it wrote.
+ */
+export async function generateSheetFiles(db: Db, dir = SHEET_DIR): Promise<number> {
+  const ids = await poolCardIds(db);
+  const rows = ids.length ? await db.select().from(cards).where(inArray(cards.id, ids)) : [];
+  let written = 0;
+  for (const row of rows) {
+    const sheet = simpleSheet(row);
+    if (!sheet) continue;
+    const path = sheetPath(row.id, dir);
+    if (existsSync(path) && (JSON.parse(await readFile(path, 'utf8')) as { textHash?: string }).textHash === row.textHash) continue;
+    await writeFile(path, `${JSON.stringify(sheetSchema.parse(sheet), null, 2)}\n`);
+    written++;
+  }
+  return written;
+}
+
 /** Every problem with the pool's sheet files, by card name: a card with an effect and no file, a file that doesn't parse, or `sheetProblems`. */
 export async function checkSheetFiles(db: Db, dir = SHEET_DIR): Promise<Record<string, string[]>> {
   const ids = await poolCardIds(db);
@@ -653,7 +673,8 @@ if (import.meta.main) {
   const db = connect(process.env.DATABASE_URL ?? '');
   const { values, positionals } = parseArgs({ allowPositionals: true, options: { force: { type: 'boolean', default: false } } });
   const [command, ...names] = positionals;
-  if (command === 'compile') await compileSheets(db, { force: values.force, names, log: console.log });
+  if (command === 'generate') console.log(`Wrote ${await generateSheetFiles(db)} sheets that code writes.`);
+  else if (command === 'compile') await compileSheets(db, { force: values.force, names, log: console.log });
   else if (command === 'import') console.log(`Imported ${await importSheetFiles(db, { force: values.force })} sheets.`);
   else if (command === 'export') console.log(`Exported ${await exportSheetFiles(db)} sheets to ${SHEET_DIR}.`);
   else if (command === 'todo' && names[0]) console.log(`${await writeTodo(db, names[0])} cards need a sheet; see ${names[0]}.`);
@@ -663,6 +684,6 @@ if (import.meta.main) {
     console.log(found.length ? `${found.length} cards have problems.` : 'Every pool card has a valid, current sheet.');
     process.exitCode = found.length ? 1 : 0;
   }
-  else console.error('Usage: node src/sheets.ts compile|import|export [--force] [card names] | todo <dir> | check');
+  else console.error('Usage: node src/sheets.ts generate | compile|import|export [--force] [card names] | todo <dir> | check');
   await db.$client.end();
 }

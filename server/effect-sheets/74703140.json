@@ -1,0 +1,14 @@
+{
+  "code": 74703140,
+  "textHash": "e0cd70d054fa187077aa0f6bdb956105b7da1cd00d325f8f406c930f27a0efc7",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Blue-Winged Crown",
+      "Niwatori"
+    ]
+  },
+  "normalSummon": true
+}

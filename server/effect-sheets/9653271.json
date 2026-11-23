@@ -1,0 +1,14 @@
+{
+  "code": 9653271,
+  "textHash": "f1c438a91f5e3e0b9d73fab423b0bbd6505cb9f7e466a4762ac910dc66f380e6",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Ocubeam",
+      "Mega Thunderball"
+    ]
+  },
+  "normalSummon": true
+}

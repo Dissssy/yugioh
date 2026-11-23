@@ -1,0 +1,43 @@
+{
+  "code": 47852924,
+  "textHash": "9d31f13901e9a36dd4d18791b7de1ff7f725a2d8e4ef5b1e84d0cffc3892be9b",
+  "model": "generated",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Increase your Life Points by 800 points.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "you",
+                "amount": 800,
+                "kind": "gain"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

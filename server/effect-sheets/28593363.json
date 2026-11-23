@@ -1,0 +1,14 @@
+{
+  "code": 28593363,
+  "textHash": "5eac046f530f3ae976cd6d9292ccb63287d4eafef13fcbc59a062dfe4f21bab4",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Bottom Dweller",
+      "Tongyo"
+    ]
+  },
+  "normalSummon": true
+}

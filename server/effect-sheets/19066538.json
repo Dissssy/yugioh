@@ -1,0 +1,14 @@
+{
+  "code": 19066538,
+  "textHash": "c6b1f71dce4f43018fcaa8f3aa295870f8f983fdf6e278579fe494d1da13a44f",
+  "model": "generated",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Mystic Lamp",
+      "Hyosube"
+    ]
+  },
+  "normalSummon": true
+}

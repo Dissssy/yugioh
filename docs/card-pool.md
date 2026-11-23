@@ -18,6 +18,18 @@ one is in the pool, along with the premade decks' cards. Pool cards get effect s
 compiles only cards without a current sheet, so a set adds sheets only for the cards that are new to the pool) and
 images. `server/scripts/fixture.ts` rebuilds the tests' card fixture from the same list.
 
+## Free cards and POOL_YEAR
+
+Some cards need no written sheet. Normal Monsters have none, and `server/src/simple-sheets.ts` writes the sheet of a card
+whose whole text is one of a few fixed wordings: an Extra Deck monster that lists only its materials, an Equip or Field
+Spell that only changes ATK/DEF (or gives piercing), a monster that only does either, and a Normal Spell that only
+deals damage, gains LP or draws. That covers 112 cards of the whole list, 37 of them by 2002. A test checks that code
+writes the same sheet as the model or the admin did for every card both have.
+
+These free cards join the pool ahead of their set once they are printed in a set released in or before `POOL_YEAR`
+(2002 for now; it moves up a year at a time). `npm run sheets:generate` writes their files, keeping any current
+sheet written another way, and the compile and the todo list skip them.
+
 ## Writing sheets in a thread
 
 Sheets can be written by Claude in a Claude Code thread instead of the paid compile, so the API budget stays with the

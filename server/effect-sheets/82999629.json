@@ -1,0 +1,78 @@
+{
+  "code": 82999629,
+  "textHash": "68f72c0bffe44a093b671896010e36f9d82b570543af5aff0f78df781e76488f",
+  "model": "generated",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Increase the ATK of all WATER monsters by 500 points and decrease their DEF by 400 points.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": []
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "Increase the ATK of all WATER monsters by 500 points and decrease their DEF by 400 points.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": {
+          "side": "either",
+          "place": "monsters",
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [
+            "WATER"
+          ],
+          "named": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null
+        },
+        "atk": 500,
+        "def": -400,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}
