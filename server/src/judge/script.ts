@@ -17,6 +17,11 @@ import {
   evolve,
   feasibleOptions,
   fits,
+  fusionMaterialOptions,
+  fusionMonsters,
+  fusionOf,
+  fusionZones,
+  zonePick,
   isProcedure,
   locate,
   materialsOf,
@@ -361,6 +366,30 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         });
         for (const id of cards) apply({ op: 'negate_effects', card: id });
         return cards.length ? `${list(cards.map((id) => shown(id, before)))} ${cards.length === 1 ? 'has its' : 'have their'} effects negated.` : null;
+      }
+      case 'fusion_summon': {
+        const monsters = fusionMonsters(state, seat, step.from);
+        if (!monsters.length) return null;
+        const [fusion] = await ask({ prompt: `${name}: choose a Fusion Monster to Fusion Summon.`, cards: monsters, choices: [], min: 1, max: 1 });
+        const fusionName = cardOf(state, fusion!).name;
+        const needed = fusionOf(state, fusion!)!.materials.length;
+        const materials: string[] = [];
+        while (materials.length < needed) {
+          const options = fusionMaterialOptions(state, seat, fusion!, step.from, materials);
+          const [pick] = await ask({ prompt: `${name}: choose Fusion Material ${materials.length + 1} of ${needed} for ${fusionName}.`, cards: options, choices: [], min: 1, max: 1 });
+          materials.push(pick!);
+        }
+        const [position] = await ask({ prompt: `${name}: Fusion Summon ${fusionName} in which position?`, cards: [], choices: ['Attack Position', 'Defense Position'], min: 1, max: 1 });
+        const zones = fusionZones(state, seat, materials);
+        let zone = zones[0];
+        if (zones.length > 1) {
+          const picks = await deps.ask({ player: seat, text: `${fusionName}: choose a Monster Zone for it.`, cards: [], choices: [], zones, min: 1, max: 1 });
+          transcript.push({ question: 'Monster Zone', picks });
+          zone = zones.find((z) => zonePick(z) === picks[0]);
+        }
+        if (zone === undefined) throw new Refused('No Monster Zone was picked.');
+        apply({ op: 'fusion_summon', card: fusion!, materials, from: step.from, zone, position: position === 'Defense Position' ? 'defense' : 'attack' });
+        return `${fusionName} was Fusion Summoned, using ${list(materials.map((id) => shown(id, before)))}.`;
       }
       case 'set_again':
         apply({ op: 'set_again' });

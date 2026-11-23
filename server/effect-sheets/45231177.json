@@ -1,0 +1,14 @@
+{
+  "code": 45231177,
+  "textHash": "10e2318e4b166dea761db051aaff48a022cb79d509be8af18c2c0adbe7086a81",
+  "model": "claude-opus-5-5",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Flame Manipulator",
+      "Masaki the Legendary Swordsman"
+    ]
+  },
+  "normalSummon": true
+}

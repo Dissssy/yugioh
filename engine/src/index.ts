@@ -6,3 +6,4 @@ export { applyOp, type OpContext, type OpResult } from './ops.ts';
 export { entryFor, logFor, replaySteps, reviewLog, viewFor, visibleTo } from './view.ts';
 export { inForce, levelNow, replacement, statsOf, type InForce } from './continuous.ts';
 export { battling, cardsFitting, chooseFrom, conditionProblem, describeFilter, detachFrom, materialsOf, feasibleOptions, fits, scriptOf, scriptProblem, targetable, targetMax, costSubstitute, fromHandToGraveyard, specialSummonProblem } from './script.ts';
+export { fusionMaterialOptions, fusionMonsters, fusionOf, fusionZones } from './fusion.ts';

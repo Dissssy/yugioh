@@ -3,6 +3,7 @@
 
 import { cardOf } from './rules.ts';
 import { levelNow, nameOf, statsOf } from './continuous.ts';
+import { fusionMonsters } from './fusion.ts';
 import { levelOf, locate, monsterZonesFor, other, summonMatches, summonName } from './state.ts';
 import type { CardData, CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
 
@@ -84,7 +85,7 @@ export function specialSummonProblem(state: DuelState, seat: Seat, id: string): 
   const card = state.cards[state.instances[id]!.code]!;
   if (specialSummonForbidden(state, seat, id)) return `An effect stops you Special Summoning ${card.name} this turn.`;
   if (mustBeProperlySummoned(state, id) && !state.properlySummoned.includes(id)) {
-    return `${card.name} must first be ${card.extraDeck ? `${card.type.startsWith('XYZ') ? 'Xyz' : 'Synchro'} Summoned` : 'Special Summoned by its own procedure'} before an effect can Special Summon it.`;
+    return `${card.name} must first be ${card.extraDeck ? `${card.type.startsWith('XYZ') ? 'Xyz' : card.type.startsWith('Fusion') ? 'Fusion' : 'Synchro'} Summoned` : 'Special Summoned by its own procedure'} before an effect can Special Summon it.`;
   }
   return null;
 }
@@ -165,6 +166,7 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, fre
     return specialSummonForbidden(state, seat, null) ? "An effect stops you Special Summoning this turn." : null;
   }
   if (step.do === 'negate_attack') return state.attack ? null : 'No attack is being made.';
+  if (step.do === 'fusion_summon') return fusionMonsters(state, seat, step.from).length > 0 ? null : 'No Fusion Monster in your Extra Deck can be Fusion Summoned with your monsters.';
   if (step.do === 'negate_activation') return state.chain.length > 0 ? null : 'There is no activation to negate.';
   if (step.do === 'detach') return detachFrom(state, step, seat, card).length > 0 ? null : `No ${step.cards.from === 'self' ? 'this card has' : 'monster here has'} ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`;
   if (step.do === 'forbid' && step.wholeTurn) {

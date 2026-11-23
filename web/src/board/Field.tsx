@@ -1,4 +1,4 @@
-import { MONSTER_ZONES, type CardView, type FieldCardView, type PlayerSideView, type Seat } from '@yugioh/engine';
+import { FIELD_ZONE, MONSTER_ZONES, SPELL_TRAP_ZONES, type CardView, type FieldCardView, type PlayerSideView, type Seat } from '@yugioh/engine';
 import { motion } from 'motion/react';
 import { CardFace, dataOf, idOf } from './Card.tsx';
 import { useCardHover } from './CardTooltip.tsx';
@@ -41,9 +41,9 @@ export function Field(props: FieldProps) {
     return mine ? indexed : indexed.reverse();
   };
   const monsters = order(side.monsters.slice(0, MONSTER_ZONES)).map(([z, i]) => <Zone key={`m${i}`} row="m" index={i} card={z} {...props} />);
-  const spellTraps = order(side.spellTraps).map(([z, i]) => <Zone key={`s${i}`} row="s" index={i} card={z} {...props} />);
+  const spellTraps = order(side.spellTraps.slice(0, SPELL_TRAP_ZONES)).map(([z, i]) => <Zone key={`s${i}`} row="s" index={i} card={z} {...props} />);
 
-  const fieldZone = <div className="zone field-zone"><span className="zone-label">Field</span></div>;
+  const fieldZone = <Zone row="s" index={FIELD_ZONE} card={side.spellTraps[FIELD_ZONE] ?? null} {...props} />;
   const choice = useChoice();
   const options = (place: PileKind) => choice?.inPile(pileKey(seat, place)).length ?? 0;
   const gy = (
@@ -131,7 +131,9 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
   const extra = row === 'm' && index >= MONSTER_ZONES;
   const label = extra
     ? `Extra Monster Zone${card ? (mine ? ', yours' : ", your opponent's") : ''}`
-    : `${mine ? 'Your' : "Opponent's"} ${row === 'm' ? 'Monster' : 'Spell & Trap'} Zone ${index + 1}`;
+    : row === 's' && index === FIELD_ZONE
+      ? `${mine ? 'Your' : "Opponent's"} Field Zone`
+      : `${mine ? 'Your' : "Opponent's"} ${row === 'm' ? 'Monster' : 'Spell & Trap'} Zone ${index + 1}`;
   const pick = state
     ? (e: React.SyntheticEvent<HTMLElement>) => {
         e.stopPropagation();
@@ -140,7 +142,7 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
     : undefined;
   return (
     <div
-      className={`zone${extra ? ' extra-zone' : ''}${extra && turned && !mine ? ' turned' : ''}${state ? ` open${mine ? '' : ' foe'}` : ''}${state === 'over' ? ' over' : ''}`}
+      className={`zone${extra ? ' extra-zone' : ''}${row === 's' && index === FIELD_ZONE ? ' field-zone' : ''}${extra && turned && !mine ? ' turned' : ''}${state ? ` open${mine ? '' : ' foe'}` : ''}${state === 'over' ? ' over' : ''}`}
       data-drop={dropKey(seat, row, index)}
       // An empty zone is a place to focus only while a card may go there; a card covers the zone it's in.
       data-nav={pick && !card ? dropKey(seat, row, index) : undefined}
@@ -167,6 +169,7 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
         />
       )}
       {card && <StatsBadge view={card} />}
+      {!card && row === 's' && index === FIELD_ZONE && <span className="zone-label">Field</span>}
     </div>
   );
 }

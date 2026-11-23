@@ -1,0 +1,14 @@
+{
+  "code": 70681994,
+  "textHash": "5daafcaad4bbac9c0133f8051ee930d6e60e77d2373ff42b80b61af81275acd4",
+  "model": "claude-opus-5-5",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Armaill",
+      "One-Eyed Shield Dragon"
+    ]
+  },
+  "normalSummon": true
+}

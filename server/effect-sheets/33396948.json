@@ -1,0 +1,33 @@
+{
+  "code": 33396948,
+  "textHash": "94d5b6b6d414ed0aed55eaf122a79a2a1e939cec9709f6457cb3cb41a6d31007",
+  "model": "claude-opus-5-5",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "hand",
+      "opt": "none",
+      "window": "While this card is in your hand together with the other four Forbidden One pieces",
+      "cost": "",
+      "effect": "If you have \"Right Leg of the Forbidden One\", \"Left Leg of the Forbidden One\", \"Right Arm of the Forbidden One\" and \"Left Arm of the Forbidden One\" in addition to this card in your hand, you win the Duel.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "win_with_hand",
+        "names": [
+          "Exodia the Forbidden One",
+          "Right Leg of the Forbidden One",
+          "Left Leg of the Forbidden One",
+          "Right Arm of the Forbidden One",
+          "Left Arm of the Forbidden One"
+        ]
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

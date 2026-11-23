@@ -69,19 +69,28 @@ export interface SheetEffect {
 }
 
 /**
- * How a monster was Summoned. A Tribute Summon is a Normal Summon. Synchro and Xyz Summons are Special Summons too, so
+ * How a monster was Summoned. A Tribute Summon is a Normal Summon. Fusion, Synchro and Xyz Summons are Special Summons too, so
  * `special` in a `when` or a condition also matches them (see `summonMatches`).
  */
-export type SummonKind = 'normal' | 'flip' | 'special' | 'synchro' | 'xyz';
+export type SummonKind = 'normal' | 'flip' | 'special' | 'fusion' | 'synchro' | 'xyz';
 
 /**
  * How an Extra Deck monster is Summoned, as data code checks. Synchro: exactly one face-up Tuner (`tuner` names the one
  * it needs, or null for any) and `nonTuners` face-up non-Tuner monsters, whose current Levels add up to this card's
  * Level; they go to the GY. Xyz: `count` face-up monsters of current Level `level`, attached to it as materials.
+ * Fusion: one monster for each of `materials`; an effect Fusion Summons it (the `fusion_summon` step).
  */
 export type Materials =
+  | { summon: 'fusion'; materials: FusionMaterial[] }
   | { summon: 'synchro'; tuner: string | null; nonTuners: { min: number; max: number | null } }
   | { summon: 'xyz'; level: number; count: number };
+
+/** One Fusion Material: a card name exactly ("Dark Magician"), or a description ("1 Dragon monster"). */
+export type FusionMaterial = string | CardFilter;
+
+/** Where a `fusion_summon` step takes the materials from. */
+export const FUSION_PLACES = ['hand', 'field', 'deck', 'graveyard'] as const;
+export type FusionPlace = (typeof FUSION_PLACES)[number];
 
 /** The event an effect waits for (see `SheetEffect.when`). */
 export interface When {
@@ -220,6 +229,12 @@ export type Step =
   | { do: 'negate_effects'; cards: Selection }
   /** This card is Set face-down again instead of going to the GY when it resolves (Scrap-Iron Scarecrow). */
   | { do: 'set_again' }
+  /**
+   * Fusion Summons 1 Fusion Monster from the activating player's Extra Deck, with materials from `from` (their hand,
+   * their field, ...), which go to the GY ("Fusion Summon 1 Fusion Monster from your Extra Deck, using monsters from
+   * your hand or field as Fusion Material").
+   */
+  | { do: 'fusion_summon'; from: FusionPlace[] }
   /** Places counters on each card selected, up to `max` on a card (null: no limit). */
   | { do: 'add_counters'; cards: Selection; counter: Counter; count: number; max: number | null }
   /** Removes counters from the card selected (a cost: "remove 1 Spell Counter from this card"). */
@@ -304,6 +319,8 @@ export type Continuous =
       while: Condition[];
     }
   | { apply: 'battle'; to: Affected; attacks: number; piercing: boolean; noDamageToYou: boolean; while: Condition[] }
+  /** The face-up monsters in `to` are kept in this battle position: any that isn't is changed to it (Dragon Capture Jar). */
+  | { apply: 'force_position'; to: Affected; position: Position; while: Condition[] }
   | {
       apply: 'lock';
       player: 'you' | 'opponent' | 'both';
@@ -334,7 +351,12 @@ export type Continuous =
    * "If this face-up card would be destroyed, you can detach `detach` Xyz Material(s) from it instead": its controller
    * is asked each time, in battle and against effects, while it has enough.
    */
-  | { apply: 'replace_destruction'; detach: number };
+  | { apply: 'replace_destruction'; detach: number }
+  /**
+   * Works from the hand, not the field: a player with every card named in `names` in their hand (this card's own name
+   * among them) wins the Duel (Exodia the Forbidden One).
+   */
+  | { apply: 'win_with_hand'; names: string[] };
 
 export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle', 'be_destroyed_by_effect', 'be_affected', 'activate_effects'] as const;
 /**
@@ -559,6 +581,7 @@ export interface PlayerState {
   deck: string[];
   hand: string[];
   monsters: Zones;
+  /** The five Spell & Trap Zones, then the Field Zone (`FIELD_ZONE`). */
   spellTraps: Zones;
   graveyard: string[];
   banished: string[];
@@ -639,7 +662,8 @@ export interface RollbackOffer {
 
 export interface DuelResult {
   winner: Seat | null;
-  reason: 'lp' | 'deckOut' | 'surrender';
+  /** `handWin`: a `win_with_hand` effect (Exodia). */
+  reason: 'lp' | 'deckOut' | 'surrender' | 'handWin';
 }
 
 /**
@@ -650,7 +674,9 @@ export interface DuelResult {
  */
 export const MONSTER_ZONES = 5;
 export const EXTRA_MONSTER_ZONES = [5, 6] as const;
+/** The five Spell & Trap Zones are `spellTraps` 0 to 4; the Field Zone, which holds one Field Spell, is 5. */
 export const SPELL_TRAP_ZONES = 5;
+export const FIELD_ZONE = 5;
 export const STARTING_LP = 8000;
 export const OPENING_HAND = 5;
 export const HAND_LIMIT = 6;
@@ -721,6 +747,8 @@ export type Op =
   | { op: 'negate_effects'; card: string }
   /** Sets the card being resolved face-down again instead of sending it to the GY. */
   | { op: 'set_again' }
+  /** Fusion Summons this Fusion Monster with these materials (sent to the GY), into `zone`. */
+  | { op: 'fusion_summon'; card: string; materials: string[]; from: FusionPlace[]; zone: number; position: Position }
   | { op: 'add_counters'; card: string; counter: Counter; count: number; max: number | null }
   | { op: 'remove_counters'; card: string; counter: Counter; count: number }
   | { op: 'declare_targets'; cards: string[] }
@@ -895,8 +923,8 @@ export type DuelEvent =
   | { type: 'specialSummoned'; player: Seat; card: string; zone: number; position: Position }
   /** The monster just Special Summoned is banished when it leaves the field. */
   | { type: 'banishWhenLeaves'; card: string }
-  /** A Synchro or Xyz Summon from the Extra Deck. Synchro materials go to the GY; Xyz materials are attached to it. */
-  | { type: 'extraSummoned'; player: Seat; card: string; how: 'synchro' | 'xyz'; materials: string[]; zone: number; position: Position }
+  /** A Fusion, Synchro or Xyz Summon from the Extra Deck. Fusion and Synchro materials go to the GY; Xyz materials are attached to it. */
+  | { type: 'extraSummoned'; player: Seat; card: string; how: 'fusion' | 'synchro' | 'xyz'; materials: string[]; zone: number; position: Position }
   /** `by`: the player whose card effect destroyed them. */
   | { type: 'destroyed'; cards: string[]; by: Seat }
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }

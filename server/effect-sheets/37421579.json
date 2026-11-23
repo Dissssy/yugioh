@@ -1,0 +1,14 @@
+{
+  "code": 37421579,
+  "textHash": "5d9863ddc5496b137a1aae336b700050be1e588845e5c90a960da70afc96f07d",
+  "model": "claude-opus-5-5",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Monster Egg",
+      "Hinotama Soul"
+    ]
+  },
+  "normalSummon": true
+}

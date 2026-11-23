@@ -1,0 +1,14 @@
+{
+  "code": 9293977,
+  "textHash": "ec9c51f7a1423c3fc8a5dae5813b17bd68bad5cfe46c06c791475e47a6bde8ac",
+  "model": "claude-opus-5-5",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Steel Ogre Grotto #1",
+      "Lesser Dragon"
+    ]
+  },
+  "normalSummon": true
+}

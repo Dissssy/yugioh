@@ -1,7 +1,7 @@
 // Folding events into state. Every change to a duel goes through evolve, so replaying the log rebuilds any past board.
 
 import { produce } from 'immer';
-import { continuousOnField } from './continuous.ts';
+import { continuousOnField, positionsToForce } from './continuous.ts';
 import { fits } from './script.ts';
 import {
   EXTRA_MONSTER_ZONES,
@@ -55,7 +55,7 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     deck: [...p.deck],
     hand: [],
     monsters: Array(MONSTER_ZONES + EXTRA_MONSTER_ZONES.length).fill(null),
-    spellTraps: Array(SPELL_TRAP_ZONES).fill(null),
+    spellTraps: Array(SPELL_TRAP_ZONES + 1).fill(null),
     graveyard: [],
     banished: [],
     extra: [...p.extra],
@@ -91,6 +91,19 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
 }
 
 export function evolve(state: DuelState, event: DuelEvent): DuelState {
+  return holdPositions(fold(state, event));
+}
+
+/** Monsters a continuous effect keeps in a battle position are changed to it as soon as they aren't (Dragon Capture Jar). */
+function holdPositions(state: DuelState): DuelState {
+  const changes = positionsToForce(state);
+  if (changes.length === 0) return state;
+  return produce(state, (s) => {
+    for (const { card, position } of changes) Object.assign(onField(s, card), { position, positionChangedTurn: s.turn });
+  });
+}
+
+function fold(state: DuelState, event: DuelEvent): DuelState {
   return produce(state, (s) => {
     switch (event.type) {
       case 'duelStarted':
@@ -379,8 +392,8 @@ export function evolve(state: DuelState, event: DuelEvent): DuelState {
         return;
       }
       case 'extraSummoned': {
-        // Synchro Materials go to the GY; Xyz Materials go under the Xyz Monster.
-        if (event.how === 'synchro') for (const id of event.materials) sendToGraveyard(s, id);
+        // Fusion and Synchro Materials go to the GY; Xyz Materials go under the Xyz Monster.
+        if (event.how !== 'xyz') for (const id of event.materials) sendToGraveyard(s, id);
         else for (const id of event.materials) removeFromPlay(s, id);
         take(s.players[event.player].extra, event.card);
         const materials = event.how === 'xyz' ? [...event.materials] : [];
@@ -511,9 +524,9 @@ function summoned(s: DuelState, id: string, player: Seat, how: SummonKind, group
 
 /** Whether a Summon is one of those wanted (empty for any). Synchro and Xyz Summons are Special Summons too. */
 export const summonMatches = (how: SummonKind, wanted: SummonKind[]) =>
-  wanted.length === 0 || wanted.includes(how) || (wanted.includes('special') && (how === 'synchro' || how === 'xyz'));
+  wanted.length === 0 || wanted.includes(how) || (wanted.includes('special') && (how === 'fusion' || how === 'synchro' || how === 'xyz'));
 
-export const summonName: Record<SummonKind, string> = { normal: 'Normal', flip: 'Flip', special: 'Special', synchro: 'Synchro', xyz: 'Xyz' };
+export const summonName: Record<SummonKind, string> = { normal: 'Normal', flip: 'Flip', special: 'Special', fusion: 'Fusion', synchro: 'Synchro', xyz: 'Xyz' };
 
 /** A card's printed Level. An Xyz Monster's number is its Rank, not a Level, so it has none. */
 export const levelOf = (card: CardData): number | null => (/\bXYZ\b/i.test(card.type) ? null : card.level);

@@ -6,7 +6,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { desc, inArray, sql } from 'drizzle-orm';
@@ -25,6 +25,47 @@ export const PREMADE_DECKS = [
   { slug: 'duelist-toolbox', name: 'Starter Deck: Duelist Toolbox', set: 'Starter Deck: Duelist Toolbox' },
   { slug: 'freezing-chains', name: 'Structure Deck: Freezing Chains', set: 'Structure Deck: Freezing Chains' },
 ] as const;
+
+/**
+ * Every English TCG set by release date (server/card-sets.json, docs/card-pool.md): its list code, name, kind, release
+ * date, and the YGOPRODeck set it maps to (null where YGOPRODeck has none).
+ */
+export interface CardSet {
+  code: string;
+  name: string;
+  kind: string;
+  released: string;
+  ygoprodeck: string | null;
+}
+
+/**
+ * The card pool grows down the set list, oldest first: every card printed in the sets up to and including this one
+ * (by list code) is in the pool, along with the premade decks' cards. Pool cards get effect sheets and images.
+ */
+export const POOL_THROUGH = 'LOB';
+
+export async function readCardSets(): Promise<CardSet[]> {
+  return JSON.parse(await readFile(new URL('../card-sets.json', import.meta.url), 'utf8')) as CardSet[];
+}
+
+/** The YGOPRODeck set names of the sets in the pool. */
+export async function poolSetNames(through = POOL_THROUGH): Promise<string[]> {
+  const sets = await readCardSets();
+  const end = sets.findIndex((s) => s.code === through);
+  if (end < 0) throw new Error(`No set "${through}" in card-sets.json`);
+  return sets.slice(0, end + 1).flatMap((s) => (s.ygoprodeck ? [s.ygoprodeck] : []));
+}
+
+/** Passcodes of every card in the pool: printed in a pool set, or in a premade deck. */
+export async function poolCardIds(db: Db): Promise<number[]> {
+  const names = await poolSetNames();
+  const printed = await db
+    .select({ id: cards.id })
+    .from(cards)
+    .where(sql`exists (select 1 from jsonb_array_elements(${cards.raw}->'card_sets') s where s->>'set_name' in ${names})`);
+  const premade = await db.select({ main: decks.main, extra: decks.extra }).from(decks).where(sql`${decks.slug} is not null`);
+  return [...new Set([...printed.map((r) => r.id), ...premade.flatMap((d) => [...d.main, ...d.extra])])];
+}
 
 const apiCard = z.looseObject({
   id: z.number().int(),
@@ -54,7 +95,7 @@ export interface SyncOptions {
   log?: (message: string) => void;
 }
 
-/** Brings our card database, premade decks and their images up to date. Cheap when nothing changed. */
+/** Brings our card database, premade decks and the pool's images up to date. Cheap when nothing changed. */
 export async function syncCards(db: Db, options: SyncOptions) {
   const { api = YGOPRODECK_API, force = false, log = () => {} } = options;
   const [{ database_version: version }] = z
@@ -73,7 +114,7 @@ export async function syncCards(db: Db, options: SyncOptions) {
   }
   // From our copy every time, so a deck added to PREMADE_DECKS appears without waiting for a new YGOPRODeck version.
   await buildPremadeDecks(db);
-  await downloadDeckImages(db, options.imageDir, options.imageGapMs ?? 100, log);
+  await downloadPoolImages(db, options.imageDir, options.imageGapMs ?? 100, log);
   // A new database starts with the effect sheets kept in the repository.
   const imported = await importSheetFiles(db);
   if (imported) log(`Imported ${imported} effect sheets from server/effect-sheets/.`);
@@ -153,10 +194,9 @@ async function buildPremadeDecks(db: Db) {
   }
 }
 
-/** Downloads the full and small image of every card in a premade deck that we don't have yet. */
-async function downloadDeckImages(db: Db, imageDir: string, gapMs: number, log: (message: string) => void) {
-  const all = await db.select({ main: decks.main, extra: decks.extra }).from(decks);
-  const ids = [...new Set(all.flatMap((d) => [...d.main, ...d.extra]))];
+/** Downloads the full and small image of every pool card that we don't have yet. */
+async function downloadPoolImages(db: Db, imageDir: string, gapMs: number, log: (message: string) => void) {
+  const ids = await poolCardIds(db);
   if (ids.length === 0) return;
   const rows = await db.select({ id: cards.id, raw: cards.raw }).from(cards).where(inArray(cards.id, ids));
   await mkdir(join(imageDir, 'small'), { recursive: true });

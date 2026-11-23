@@ -9,6 +9,7 @@ import {
   HANDS,
   MONSTER_ZONES,
   OPENING_HAND,
+  FIELD_ZONE,
   SPELL_TRAP_ZONES,
   type Blocked,
   type CardData,
@@ -38,7 +39,23 @@ export class Run {
   emit(event: DuelEvent) {
     this.events.push(event);
     this.state = evolve(this.state, event);
+    // A card reaching the hand may complete a hand that wins the Duel.
+    if (!this.state.result && (event.type === 'drew' || (event.type === 'moved' && event.to === 'hand'))) {
+      const winners = handWinners(this.state);
+      if (winners.length > 0) this.emit({ type: 'duelEnded', result: { winner: winners.length === 1 ? winners[0]! : null, reason: 'handWin' } });
+    }
   }
+}
+
+/** The players holding every card a `win_with_hand` effect of a card in their hand names (Exodia). */
+function handWinners(state: DuelState): Seat[] {
+  return ([0, 1] as const).filter((seat) => {
+    const hand = state.players[seat].hand;
+    const names = new Set(hand.map((id) => cardOf(state, id).name));
+    return hand.some((id) =>
+      state.sheets[cardOf(state, id).code]?.effects.some((e) => e.status !== 'flagged' && e.continuous?.apply === 'win_with_hand' && e.continuous.names.every((n) => names.has(n))),
+    );
+  });
 }
 
 export class Illegal extends Error {}
@@ -58,6 +75,22 @@ const ownMonsters = (state: DuelState, seat: Seat) =>
   state.players[seat].monsters.filter((c): c is FieldCard => c !== null);
 const isZone = (i: number, count: number) => Number.isInteger(i) && i >= 0 && i < count;
 const freeZones = (zones: (FieldCard | null)[]) => zones.flatMap((z, i) => (z ? [] : [i]));
+
+const isFieldSpell = (card: CardData) => card.kind === 'spell' && card.race === 'Field';
+
+/**
+ * The zones a Spell or Trap from the hand may be Set or activated in: an empty Spell & Trap Zone, or for a Field Spell
+ * the Field Zone, even when it holds one already (that one goes to the GY: see `placeSpellTrap`).
+ */
+export function spellTrapZonesFor(state: DuelState, seat: Seat, card: CardData): number[] {
+  return isFieldSpell(card) ? [FIELD_ZONE] : freeZones(state.players[seat].spellTraps.slice(0, SPELL_TRAP_ZONES));
+}
+
+/** Before a card goes to `zone`: a Field Spell already in the Field Zone is sent to the GY. */
+function clearFieldZone(run: Run, seat: Seat, zone: number) {
+  const old = zone === FIELD_ZONE ? run.state.players[seat].spellTraps[FIELD_ZONE] : null;
+  if (old) run.emit({ type: 'moved', card: old.id, owner: run.state.instances[old.id]!.owner, from: 'spellTraps', to: 'graveyard' });
+}
 
 // ---------------------------------------------------------------------------
 // Starting a duel
@@ -205,8 +238,8 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
             if ((fresh || extraNormalSummon(state, seat, id)) && (tributes === 0 || !tributeSummonLocked(state, seat))) actions.push({ type: 'normalSummon', card: id, tributes, tributeFrom, zones });
             if (fresh) actions.push({ type: 'setMonster', card: id, tributes, tributeFrom, zones });
           }
-        } else if (freeZones(p.spellTraps).length > 0) {
-          actions.push({ type: 'setSpellTrap', card: id, zones: freeZones(p.spellTraps) });
+        } else if (spellTrapZonesFor(state, seat, card).length > 0) {
+          actions.push({ type: 'setSpellTrap', card: id, zones: spellTrapZonesFor(state, seat, card) });
         }
       }
       for (const id of p.extra) {
@@ -243,7 +276,7 @@ type ExtraSummon = Extract<LegalAction, { type: 'extraSummon' }>;
 function extraSummonAction(state: DuelState, seat: Seat, id: string): ExtraSummon | null {
   const card = cardOf(state, id);
   const materials = state.sheets[card.code]?.materials;
-  if (!materials || specialSummonForbidden(state, seat, id)) return null;
+  if (!materials || materials.summon === 'fusion' || specialSummonForbidden(state, seat, id)) return null;
   const sets = materials.summon === 'xyz' ? xyzMaterials(state, seat, materials) : card.level === null ? [] : synchroMaterials(state, seat, materials, card);
   const options = sets.flatMap((set) => {
     const zones = zonesAfterLeaving(state, seat, set);
@@ -330,7 +363,7 @@ function extraSummon(run: Run, seat: Seat, intent: Extract<Intent, { type: 'extr
 // they are the judge's call. Triggers go on the chain in their own step (chain.ts).
 
 /** Spell/Trap properties that can be activated. Field Spells come later. */
-const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play', 'Continuous', 'Equip'];
+const ACTIVATABLE_SPELLS = ['Normal', 'Quick-Play', 'Continuous', 'Equip', 'Field'];
 const ACTIVATABLE_TRAPS = ['Normal', 'Continuous', 'Counter'];
 
 type Activate = Extract<LegalAction, { type: 'activate' }>;
@@ -388,7 +421,7 @@ function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
       if (at.zone !== 'hand' && !set) return no('Only from your hand or a Spell & Trap Zone.');
       if (set?.faceUp) return no('It is already face-up.');
       if (quick && set && set.placedTurn === state.turn) return no("A Quick-Play Spell Set this turn can't be activated until a later turn.");
-      if (at.zone === 'hand' && freeZones(p.spellTraps).length === 0) return no('Your Spell & Trap Zones are full.');
+      if (at.zone === 'hand' && spellTrapZonesFor(state, seat, card).length === 0) return no('Your Spell & Trap Zones are full.');
     } else if (card.kind === 'trap' && effect.kind === 'activation') {
       if (!ACTIVATABLE_TRAPS.includes(card.race)) return no(`${card.race} Traps can't be activated on this site yet.`);
       if (!set) return no('A Trap must be Set first, and activated on a later turn.');
@@ -430,7 +463,7 @@ function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
     // activation, in the window the last link on the chain opened.
     const cause = effect.when?.event === 'activated' ? lastActivation(state) : effect.when ? (window?.cause ?? null) : null;
     if (effect.when && (!cause || !whenMatches(state, effect.when, cause, id, seat))) return no(`Only at its moment: ${effect.window || 'when the event it answers happens'}.`);
-    const zones = card.kind !== 'monster' && at.zone === 'hand' ? freeZones(p.spellTraps) : null;
+    const zones = card.kind !== 'monster' && at.zone === 'hand' ? spellTrapZonesFor(state, seat, card) : null;
     return { effect: index, candidate: { ...activateAction(state, id, index, zones), cause } };
   });
 }
@@ -667,9 +700,10 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
     case 'setSpellTrap': {
       check(isMainPhase(state), 'You can only Set cards in a Main Phase.');
       check(p.hand.includes(intent.card), 'That card is not in your hand.');
-      check(cardOf(state, intent.card).kind !== 'monster', 'Only Spells and Traps go in the Spell & Trap Zone.');
-      check(isZone(intent.zone, SPELL_TRAP_ZONES), 'There is no Spell & Trap Zone there.');
-      check(p.spellTraps[intent.zone] === null, 'That Spell & Trap Zone is not empty.');
+      const card = cardOf(state, intent.card);
+      check(card.kind !== 'monster', 'Only Spells and Traps go in the Spell & Trap Zone.');
+      check(spellTrapZonesFor(state, seat, card).includes(intent.zone), isFieldSpell(card) ? 'A Field Spell goes in the Field Zone.' : 'Choose an empty Spell & Trap Zone.');
+      clearFieldZone(run, seat, intent.zone);
       run.emit({ type: 'spellTrapSet', player: seat, card: intent.card, zone: intent.zone });
       return;
     }
@@ -915,6 +949,7 @@ function activate(run: Run, seat: Seat, intent: Extract<Intent, { type: 'activat
   if (isProcedure(state, intent.card, intent.effect)) return run.emit({ type: 'procedureUsed', player: seat, card: intent.card, effect: intent.effect });
   const fromHand = options.find((a) => a.zones !== null);
   if (fromHand) check(intent.zone !== null && fromHand.zones!.includes(intent.zone), 'Choose an empty Spell & Trap Zone.');
+  if (fromHand) clearFieldZone(run, seat, intent.zone!);
   run.emit({ type: 'effectActivated', player: seat, card: intent.card, effect: intent.effect, zone: fromHand ? intent.zone : null, cause: options[0]!.cause });
 }
 

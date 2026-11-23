@@ -4,7 +4,7 @@ import { waitingFor } from './chain.ts';
 import { blockedAttacks, blockedEffects, legalActions, normalSummonUsed } from './rules.ts';
 import { statsOf } from './continuous.ts';
 import { describeFilter } from './script.ts';
-import { evolve, locate, replay } from './state.ts';
+import { evolve, locate, replay, summonName } from './state.ts';
 import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, LogEntry, LogEvent, Phase, Place, PlayerView, Seat, SeatStep, Sight, StartView } from './types.ts';
 
 /** Whether `sight` sees the hidden cards `owner` holds. */
@@ -342,7 +342,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
       const { winner, reason } = event.result;
       if (winner === null) return 'The duel ended in a draw';
       const loser = who(winner === 0 ? 1 : 0);
-      const why = { lp: `${loser}'s LP reached 0`, deckOut: `${loser} couldn't draw`, surrender: `${loser} surrendered` }[reason];
+      const why = { lp: `${loser}'s LP reached 0`, deckOut: `${loser} couldn't draw`, surrender: `${loser} surrendered`, handWin: `${who(winner)} held every piece of a winning hand` }[reason];
       return `${who(winner)} won: ${why}`;
     }
     case 'judged':
@@ -363,7 +363,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'specialSummoned':
       return `${who(event.player)} Special Summoned ${name(event.card)} in ${event.position} position`;
     case 'extraSummoned':
-      return `${who(event.player)} ${event.how === 'synchro' ? 'Synchro' : 'Xyz'} Summoned ${name(event.card)} in ${event.position} position, using ${names(event.materials)}`;
+      return `${who(event.player)} ${summonName[event.how]} Summoned ${name(event.card)} in ${event.position} position, using ${names(event.materials)}`;
     case 'destroyed':
       return `${names(event.cards)} destroyed`;
     case 'lpChanged':

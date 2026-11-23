@@ -1,0 +1,14 @@
+{
+  "code": 1641882,
+  "textHash": "7000da827d6cc8668eccf5996b6518a90115fe17572d5bf2c69aa9304d970a87",
+  "model": "claude-opus-5-5",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Petit Angel",
+      "Mystical Sheep #2"
+    ]
+  },
+  "normalSummon": true
+}

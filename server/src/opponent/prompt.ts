@@ -3,7 +3,7 @@
 // then the decks, then the duel log one entry per block (it only grows), and only the board and options after that.
 
 import type Anthropic from '@anthropic-ai/sdk';
-import type { CardData, CardView, FieldCardView, JudgingView, LogEntry, PlayerSideView, PlayerView } from '@yugioh/engine';
+import { FIELD_ZONE, type CardData, type CardView, type FieldCardView, type JudgingView, type LogEntry, type PlayerSideView, type PlayerView } from '@yugioh/engine';
 import { describeStats, zoneName } from './moves.ts';
 
 export const SYSTEM = `You are Claude, playing a Yu-Gi-Oh! TCG duel on a website against a person. Play to win, under the official rules.
@@ -71,13 +71,13 @@ function fieldCard(f: FieldCardView): string {
 }
 
 function side(p: PlayerSideView, label: string, own: boolean): string {
-  const zones = (list: (FieldCardView | null)[]) =>
-    list.map((f, i) => (f ? `${zoneName(i)}: ${fieldCard(f)}` : null)).filter(Boolean).join('; ') || 'empty';
+  const zones = (list: (FieldCardView | null)[], name = zoneName) =>
+    list.map((f, i) => (f ? `${name(i)}: ${fieldCard(f)}` : null)).filter(Boolean).join('; ') || 'empty';
   return [
     `## ${label}: ${p.name}, ${p.lp} LP`,
     `Hand (${p.hand.length}): ${own ? p.hand.map(cardName).join(', ') || 'none' : `${p.hand.length} cards you can't see`}`,
     `Monster Zones: ${zones(p.monsters)}`,
-    `Spell & Trap Zones: ${zones(p.spellTraps)}`,
+    `Spell & Trap Zones: ${zones(p.spellTraps, (i) => (i === FIELD_ZONE ? 'Field Zone' : zoneName(i)))}`,
     `GY: ${p.graveyard.map(cardName).join(', ') || 'empty'}`,
     `Banished: ${p.banished.map(cardName).join(', ') || 'none'}`,
     `Deck: ${p.deckCount} cards. Extra Deck: ${own ? p.extra.map(cardName).join(', ') || 'empty' : `${p.extra.length} cards`}`,
