@@ -38,9 +38,9 @@ flowchart LR
   api[API tokens] --> headless[Headless duels]
 ```
 
-## Not planned yet: the deck builder
+## The deck builder
 
-Two items below need custom decks, and the deck builder (architecture layer 8: search, Main/Extra limits, banlists, `.ydk` import) has no detailed plan yet. It isn't in this document's list, but it has to come before challenger decks step 2 and draft mode. A wider card pool comes with it: every card a player can put in a deck needs a compiled sheet and eval coverage, so the pool grows in batches Ethan picks, as architecture.md already says.
+Planned in [deck-builder.md](deck-builder.md). It has to come before challenger decks step 2 and draft mode.
 
 ## Replays
 
