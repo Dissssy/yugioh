@@ -1,0 +1,24 @@
+{
+  "code": 41356845,
+  "textHash": "0f16888150325e8c8f958e91137a7af99a116d43d297209c9e30ea07b32513d4",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Any time you could activate a Trap",
+      "cost": "",
+      "effect": "Flip the target face-up, then destroy it if its DEF is 2000 or less, or return it face-down if its DEF is more than 2000.",
+      "targets": "1 face-down Defense Position monster on the field",
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}
