@@ -26,6 +26,7 @@ import { CopyLink } from '../CopyLink.tsx';
 import { Loading, Notice } from '../pages/Notice.tsx';
 import { useCatalog, type Catalog } from './catalog.ts';
 import { CardSearch, PoolFace } from './CardSearch.tsx';
+import { DownloadYdk } from './ydk.tsx';
 import { clicks, startDrag, useDropTarget, type Dragged } from './interaction.ts';
 
 /** How long the deck rests unchanged before it saves. */
@@ -122,6 +123,7 @@ function Builder({
           </label>
           {shared && <CopyLink path={`/decks/${deck.id}`} />}
           <CopyDeck deck={{ name: `${name} (copy)`, shared: false, banlistId, ...list }} />
+          <DownloadYdk name={name} deck={list} />
           <DeleteDeck id={deck.id} />
         </div>
         {problems.length > 0 ? (

@@ -144,6 +144,8 @@ export interface BanlistSave {
 export interface CatalogCard extends CardData {
   archetype: string | null;
   inPool: boolean;
+  /** Passcodes of the card's alternate artworks, if it has any. */
+  altCodes?: number[];
 }
 
 /** What the judge, appeals and the AI opponent cost in one duel. */
