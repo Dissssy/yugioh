@@ -1,4 +1,5 @@
 import type { CardData, DuelResult, EffectSheet, SeatStep } from '@yugioh/engine';
+import type { Banlist, DeckList } from './decks.ts';
 import type { UserSettings } from './settings.ts';
 
 // JSON shapes exchanged between the web client and the server.
@@ -50,7 +51,11 @@ export interface DeckSummary {
   problems: string[];
 }
 
-export type DuelStatus = 'waiting' | 'active' | 'finished';
+/**
+ * `waiting` for an opponent, then `preparing` while both players choose their decks (docs/deck-builder.md, The pre-duel
+ * stage), then `active` from rock-paper-scissors on.
+ */
+export type DuelStatus = 'waiting' | 'preparing' | 'active' | 'finished';
 
 /**
  * A duel as listed in the lobby: who plays it with which deck, how it ended, and whether the viewer can take the
@@ -61,6 +66,8 @@ export interface DuelSummary {
   status: DuelStatus;
   /** The banlist both decks follow. */
   banlist: string;
+  /** Whether both players must bring a premade deck, changing it only by Side Deck swaps. */
+  premadeOnly: boolean;
   createdAt: string;
   finishedAt: string | null;
   /** Seat 0 is the challenger; seat 1 is null while the duel is waiting. */
@@ -73,8 +80,27 @@ export interface DuelSummary {
 
 export interface DuelPlayer {
   name: string;
-  deck: string;
+  /** The deck's name: the viewer's own once chosen, the opponent's once the duel starts. */
+  deck: string | null;
+  /** Whether the player has pressed Ready in the pre-duel stage. */
+  ready: boolean;
 }
+
+/** A player's copy of a deck for one duel. Changing it changes no saved deck. */
+export interface DuelDeck extends DeckList {
+  name: string;
+  /** Copied from a premade deck and changed only by Side Deck swaps, so its section sizes aren't checked. */
+  premade: boolean;
+}
+
+/** What a player builds from in the pre-duel stage: their copy of a deck so far, and the banlist it must follow. */
+export interface DuelPrep {
+  deck: DuelDeck | null;
+  banlist: Banlist;
+}
+
+/** The duel's copy of a deck: one of the player's decks or a premade one, or a list they built or uploaded. */
+export type DuelDeckSave = { deckId: number } | ({ name: string } & DeckList);
 
 /** How a duel ended: the winner (null for a draw), why, and on which turn. */
 export interface DuelOutcome extends DuelResult {

@@ -106,3 +106,12 @@ export function deckProblems(
     }
   return problems;
 }
+
+/**
+ * Whether `after` only swaps cards between the Side Deck and the Main or Extra Deck of `before`: the same cards, and
+ * each section the same size.
+ */
+export function isSideSwap(before: DeckList, after: DeckList): boolean {
+  const all = (d: DeckList) => [...d.main, ...d.extra, ...d.side].sort((a, b) => a - b).join();
+  return SECTIONS.every((s) => before[s].length === after[s].length) && all(before) === all(after);
+}

@@ -28,7 +28,7 @@ export async function matchReport(db: Db, id: string): Promise<MatchReport | nul
     createdAt: row.createdAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
     seats: [row.seat0, row.seat1],
-    decks: [row.deck0.name, row.deck1?.name ?? null],
+    decks: [row.deck0?.name ?? null, row.deck1?.name ?? null],
     events: rows.map((r) => ({ seq: r.seq, at: r.createdAt.toISOString(), event: r.event as DuelEvent })),
   };
 }

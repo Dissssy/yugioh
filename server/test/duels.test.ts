@@ -2,12 +2,12 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DuelUpdate, Intent, PlayerView } from '@yugioh/engine';
-import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelSummary, Me, Replay } from '@yugioh/shared';
+import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelDeck, DuelSummary, Me, Replay } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { and, eq } from 'drizzle-orm';
 import { guests, matchEvents } from '../src/db/schema.ts';
 import { deleteIdleGuests, GUEST_GRACE_MS } from '../src/guests.ts';
-import { ADMIN_EMAIL, Browser, startHarness, Stream, type Harness } from './harness.ts';
+import { ADMIN_EMAIL, Browser, startDuelVia, startHarness, Stream, type Harness } from './harness.ts';
 
 let h: Harness;
 beforeAll(async () => {
@@ -55,57 +55,75 @@ describe('a challenge link played by a guest', () => {
   let duel: DuelSummary;
   let decks: DeckSummary[];
 
-  const challenge = async (by: Browser) =>
-    (await by.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: decks[0]!.id }) })).body;
+  const challenge = async (by: Browser) => (await by.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: '{}' })).body;
+  const call = <T>(b: Browser, path: string, body: unknown, method = 'POST') => b.json<T>(`${h.baseUrl}/api/duels/${duel.id}${path}`, { method, body: JSON.stringify(body) });
 
-  it('lets a signed-out visitor accept a challenge link as a guest', async () => {
+  it('lets a signed-out visitor accept a challenge link as a guest, and both choose their decks before it starts', async () => {
     admin = await login({ sub: 'admin', email: ADMIN_EMAIL, email_verified: true });
     await admin.json(`${h.baseUrl}/api/me/username`, { method: 'POST', body: JSON.stringify({ username: 'Ethan' }) });
     decks = (await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`)).body;
-    const created = await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, {
-      method: 'POST',
-      body: JSON.stringify({ deckId: decks[0]!.id }),
-    });
+    const created = await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: '{}' });
     expect(created.status).toBe(201);
     duel = created.body;
-    expect(duel).toMatchObject({ status: 'waiting', yourSeat: 0, canJoin: false, players: [{ name: 'Ethan', deck: decks[0]!.name }, null], result: null });
+    expect(duel).toMatchObject({ status: 'waiting', banlist: 'TCG', premadeOnly: false, yourSeat: 0, canJoin: false, players: [{ name: 'Ethan', deck: null, ready: false }, null], result: null });
 
     guest = new Browser();
     const preview = await guest.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`);
     expect(preview.body).toMatchObject({ status: 'waiting', yourSeat: null, canJoin: true, players: [{ name: 'Ethan' }, null] });
 
     // Joining signed out needs a name to play under.
-    const nameless = await guest.json(`${h.baseUrl}/api/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify({ deckId: decks[1]!.id }) });
+    const nameless = await call(guest, '/join', {});
     expect(nameless.status).toBe(401);
     expect(await guestCount()).toBe(0);
 
-    const joined = await guest.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}/join`, {
-      method: 'POST',
-      body: JSON.stringify({ deckId: decks[1]!.id, guestName: ' Kaiba ' }),
-    });
+    const joined = await call<DuelSummary>(guest, '/join', { guestName: ' Kaiba ' });
     expect(joined.body).toMatchObject({
-      status: 'active',
+      status: 'preparing',
       yourSeat: 1,
       players: [
-        { name: 'Ethan', deck: decks[0]!.name },
-        { name: 'Kaiba (guest)', deck: decks[1]!.name },
+        { name: 'Ethan', deck: null, ready: false },
+        { name: 'Kaiba (guest)', deck: null, ready: false },
       ],
     });
     expect(await me(guest)).toEqual({ kind: 'guest', guest: { name: 'Kaiba' } });
     expect((await guest.json<DuelSummary[]>(`${h.baseUrl}/api/duels`)).body).toEqual([expect.objectContaining({ id: duel.id, yourSeat: 1 })]);
+    // The duel hasn't started, so there's nothing to watch or play yet.
+    expect((await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`)).status).toBe(404);
+
+    // The guest picks a premade deck; only they see which until the duel starts.
+    expect((await call<{ deck: DuelDeck | null }>(guest, '/deck', undefined, 'GET')).body.deck).toBeNull();
+    const picked = await call<{ deck: DuelDeck }>(guest, '/deck', { deckId: decks[1]!.id }, 'PUT');
+    expect(picked.body.deck).toMatchObject({ name: decks[1]!.name, premade: true });
+    expect((await call<{ deck: DuelDeck }>(guest, '/deck', undefined, 'GET')).body.deck).toEqual(picked.body.deck);
+    expect((await admin.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`)).body.players[1]).toEqual({ name: 'Kaiba (guest)', deck: null, ready: false });
+    expect((await call<DuelSummary>(guest, '/ready', { ready: true })).body.players[1]).toEqual({ name: 'Kaiba (guest)', deck: decks[1]!.name, ready: true });
+
+    // Ready needs a deck, and one that follows the banlist.
+    expect((await call<{ error: string }>(admin, '/ready', { ready: true })).body.error).toBe('Choose a deck first.');
+    const { deck } = (await call<{ deck: DuelDeck }>(admin, '/deck', { deckId: decks[0]!.id }, 'PUT')).body;
+    const tooSmall = await call<{ deck: DuelDeck }>(admin, '/deck', { name: 'Thin', main: deck.main.slice(1), extra: deck.extra, side: deck.side }, 'PUT');
+    expect(tooSmall.body.deck.premade).toBe(false);
+    expect((await call<{ error: string }>(admin, '/ready', { ready: true })).body.error).toMatch(/Main Deck/);
+    await call(admin, '/deck', { deckId: decks[0]!.id }, 'PUT');
+    const started = await call<DuelSummary>(admin, '/ready', { ready: true });
+    expect(started.body).toMatchObject({
+      status: 'active',
+      players: [
+        { name: 'Ethan', deck: decks[0]!.name, ready: true },
+        { name: 'Kaiba (guest)', deck: decks[1]!.name, ready: true },
+      ],
+    });
+    expect((await call(guest, '/deck', { deckId: decks[0]!.id }, 'PUT')).status).toBe(409);
 
     // Guests can't create challenges.
-    expect((await guest.json(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: decks[0]!.id }) })).status).toBe(403);
+    expect((await guest.json(`${h.baseUrl}/api/duels`, { method: 'POST', body: '{}' })).status).toBe(403);
   });
 
   it('turns away a third visitor without creating a guest for them, but lets them watch', async () => {
     const late = new Browser();
     const seen = await late.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`);
     expect(seen.body).toMatchObject({ status: 'active', yourSeat: null });
-    const again = await late.json(`${h.baseUrl}/api/duels/${duel.id}/join`, {
-      method: 'POST',
-      body: JSON.stringify({ deckId: decks[1]!.id, guestName: 'Joey' }),
-    });
+    const again = await call(late, '/join', { guestName: 'Joey' });
     expect(again.status).toBe(409);
     expect(await me(late)).toEqual({ kind: 'anonymous' });
     expect(await guestCount()).toBe(1);
@@ -312,12 +330,8 @@ describe('a challenge link played by a guest', () => {
   });
 
   it('lets the guest take more challenges under the same identity', async () => {
-    const second = await challenge(admin);
-    const joined = await guest.json<DuelSummary>(`${h.baseUrl}/api/duels/${second.id}/join`, {
-      method: 'POST',
-      body: JSON.stringify({ deckId: decks[1]!.id }),
-    });
-    expect(joined.body).toMatchObject({ status: 'active', yourSeat: 1 });
+    const second = await startDuelVia(h.baseUrl, admin, guest, [decks[0]!.id, decks[1]!.id]);
+    expect(second).toMatchObject({ status: 'active', yourSeat: 0 });
     expect((await guest.json<DuelSummary[]>(`${h.baseUrl}/api/duels`)).body).toHaveLength(2);
     expect(await guestCount()).toBe(1);
     // Finish it, so only finished duels hold the guest.
@@ -332,12 +346,8 @@ describe('a challenge link played by a guest', () => {
   });
 
   it('keeps a guest with a duel still going, and hands their seats to an approved account they log in to', async () => {
-    const third = await challenge(admin);
     const visitor = new Browser();
-    await visitor.json(`${h.baseUrl}/api/duels/${third.id}/join`, {
-      method: 'POST',
-      body: JSON.stringify({ deckId: decks[1]!.id, guestName: 'Mai' }),
-    });
+    const third = await startDuelVia(h.baseUrl, admin, visitor, [decks[0]!.id, decks[1]!.id], { guestName: 'Mai' });
     expect(await deleteIdleGuests(h.db, new Date(Date.now() + 10 * GUEST_GRACE_MS))).toBe(0);
 
     // A pending account doesn't take the guest's seats.
@@ -358,7 +368,7 @@ describe('a challenge link played by a guest', () => {
     const self = new Browser();
     await self.json(`${h.baseUrl}/api/duels/${own.id}/join`, {
       method: 'POST',
-      body: JSON.stringify({ deckId: decks[1]!.id, guestName: 'Also Ethan' }),
+      body: JSON.stringify({ guestName: 'Also Ethan' }),
     });
     await login({ sub: 'admin', email: ADMIN_EMAIL, email_verified: true }, self);
     expect(await me(self)).toMatchObject({ kind: 'user' });

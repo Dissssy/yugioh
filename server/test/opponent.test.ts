@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { reviewLog, type DuelEvent, type DuelUpdate } from '@yugioh/engine';
 import { NO_BANLIST, type AdminDuels, type DeckSummary, type DuelSummary } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
-import { decks as deckTable, matchEvents, matches, users } from '../src/db/schema.ts';
+import { matchEvents, matches, users } from '../src/db/schema.ts';
+import { deckForDuel } from '../src/deckRoutes.ts';
 import { Duels } from '../src/duels.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
 import { MISSING_PREFIX, Opponents } from '../src/opponent/opponent.ts';
@@ -15,10 +16,7 @@ import { ADMIN_EMAIL, Browser, seeded, startHarness, Stream, type Harness } from
 let h: Harness;
 let decks: DeckSummary[];
 
-const duelDeck = async (id: number) => {
-  const row = (await h.db.query.decks.findFirst({ where: eq(deckTable.id, id) }))!;
-  return { name: row.name, main: row.main, extra: row.extra };
-};
+const duelDeck = (id: number) => deckForDuel(h.db, id, null).then((d) => d!);
 let admin: Browser;
 beforeAll(async () => {
   h = await startHarness();
@@ -118,8 +116,13 @@ describe('playing against Claude', () => {
 
     const ids: string[] = [];
     for (const [a, b] of [[0, 1], [1, 0], [1, 1]] as const) {
-      const id = await duels.create(owner!.id, 'ai:a', 'A', await duelDeck(decks[a]!.id), NO_BANLIST);
-      await duels.join(id, await duelDeck(decks[b]!.id), async () => ({ key: 'ai:b', name: 'B' }));
+      const id = await duels.create(owner!.id, 'ai:a', 'A', NO_BANLIST, false);
+      await duels.join(id, async () => ({ key: 'ai:b', name: 'B' }));
+      for (const [key, deck] of [['ai:a', a], ['ai:b', b]] as const) {
+        const copy = await duelDeck(decks[deck]!.id);
+        await duels.setDeck(id, key, () => copy);
+        await duels.ready(id, key, true, async () => []);
+      }
       ids.push(id);
       // Loading the duel starts both AI seats.
       const updates: DuelUpdate[] = [];

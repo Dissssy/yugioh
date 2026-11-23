@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router';
 import { api, errorText, useBanlists, useDecks, useDuels } from '../api.ts';
 import { DuelCard } from '../DuelCard.tsx';
 
-const statusOrder: Record<DuelStatus, number> = { active: 0, waiting: 1, finished: 2 };
+const statusOrder: Record<DuelStatus, number> = { active: 0, preparing: 1, waiting: 2, finished: 3 };
 
 /** The viewer's duels, live ones first. */
 export function Duels() {
@@ -39,45 +39,46 @@ export function NewChallenge() {
   const queryClient = useQueryClient();
   const banlists = useBanlists();
   const [banlistId, setBanlistId] = useState<number | null>(null);
+  const [premadeOnly, setPremadeOnly] = useState(false);
   const banlist = banlistId ?? banlists.data?.find((b) => b.isDefault)?.id;
-  const decks = useDecks({ banlist });
-  const [deckId, setDeckId] = useState<number | null>(null);
   const create = useMutation({
-    mutationFn: (id: number) => api<DuelSummary>('/duels', { method: 'POST', body: JSON.stringify({ deckId: id, banlistId: banlist }) }),
+    mutationFn: () => api<DuelSummary>('/duels', { method: 'POST', body: JSON.stringify({ banlistId: banlist, premadeOnly }) }),
     onSuccess: (duel) => {
       void queryClient.invalidateQueries({ queryKey: ['duels'] });
       void navigate(`/duel/${duel.id}`);
     },
   });
-  // A deck chosen before the banlist changed may not follow the new one.
-  const chosen = decks.data?.find((d) => d.id === deckId && d.problems.length === 0)?.id ?? firstLegal(decks.data);
   return (
     <section className="box">
       <h2>New challenge</h2>
-      {decks.data?.length === 0 ? (
-        <p className="muted">Card data hasn't been imported yet, so there are no decks to play with.</p>
-      ) : (
-        <>
-          <p className="muted small">
-            Pick your deck, then send the challenge link to your opponent. <Link to="/decks">Build a deck</Link>
-          </p>
-          <label className="field">
-            <span className="small">Banlist both decks follow</span>
-            <select value={banlist ?? ''} onChange={(e) => setBanlistId(Number(e.target.value))}>
-              {banlists.data?.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          </label>
-          <DeckPicker decks={decks.data} value={chosen} onChange={setDeckId} />
-          <div className="actions">
-            <button className="primary" onClick={() => chosen !== null && create.mutate(chosen)} disabled={create.isPending || chosen === null}>
-              Create challenge
-            </button>
-            {create.isError && <span className="error">{errorText(create.error)}</span>}
-          </div>
-        </>
-      )}
+      <p className="muted small">
+        Send the challenge link to your opponent. Once they accept, you both choose your decks. <Link to="/decks">Build a deck</Link>
+      </p>
+      <label className="field">
+        <span className="small">Banlist both decks follow</span>
+        <select value={banlist ?? ''} onChange={(e) => setBanlistId(Number(e.target.value))}>
+          {banlists.data?.map((b) => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
+      </label>
+      <fieldset className="field">
+        <legend className="small">Decks</legend>
+        <label className="switch">
+          <input type="radio" name="premade" checked={!premadeOnly} onChange={() => setPremadeOnly(false)} />
+          Any legal deck
+        </label>
+        <label className="switch">
+          <input type="radio" name="premade" checked={premadeOnly} onChange={() => setPremadeOnly(true)} />
+          Premade decks only, with Side Deck swaps
+        </label>
+      </fieldset>
+      <div className="actions">
+        <button className="primary" onClick={() => create.mutate()} disabled={create.isPending || banlist === undefined}>
+          Create challenge
+        </button>
+        {create.isError && <span className="error">{errorText(create.error)}</span>}
+      </div>
     </section>
   );
 }
@@ -128,19 +129,21 @@ export function PlayClaude() {
 export const firstLegal = (decks: DeckSummary[] | undefined) => decks?.find((d) => d.problems.length === 0)?.id ?? null;
 
 /**
- * The decks as a set of tiles; the chosen one is lit. A deck that breaks the rules can't be picked and says why.
- * `name` groups the radio buttons when a page has two pickers.
+ * The decks as a set of tiles; the chosen one is lit. A deck that breaks the rules says why, and can't be picked unless
+ * `pickIllegal`. `name` groups the radio buttons when a page has two pickers.
  */
 export function DeckPicker({
   decks,
   value,
   onChange,
   name = 'deck',
+  pickIllegal = false,
 }: {
   decks: DeckSummary[] | undefined;
   value: number | null;
   onChange: (id: number) => void;
   name?: string;
+  pickIllegal?: boolean;
 }) {
   return (
     <div className="deck-picker" role="radiogroup" aria-label="Deck">
@@ -148,7 +151,7 @@ export function DeckPicker({
           const illegal = d.problems.length > 0;
           return (
             <label key={d.id} className={`deck-choice${d.id === value ? ' chosen' : ''}${illegal ? ' illegal' : ''}`}>
-              <input type="radio" name={name} checked={d.id === value} disabled={illegal} onChange={() => onChange(d.id)} />
+              <input type="radio" name={name} checked={d.id === value} disabled={illegal && !pickIllegal} onChange={() => onChange(d.id)} />
               <span className="deck-stack" aria-hidden>
                 <span className="card back" />
                 <span className="card back" />

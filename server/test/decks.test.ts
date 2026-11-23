@@ -1,6 +1,6 @@
 import { get } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { addBlocker, deckProblems, NO_BANLIST, parseYdk, toYdk, type BanlistDetail, type BanlistSummary, type CatalogCard, type DeckDetail, type DeckList, type DeckSave, type DeckSummary, type DuelSummary, type RuleCard } from '@yugioh/shared';
+import { addBlocker, deckProblems, isSideSwap, NO_BANLIST, parseYdk, toYdk, type BanlistDetail, type BanlistSummary, type CatalogCard, type DeckDetail, type DeckList, type DeckSave, type DeckSummary, type DuelDeck, type DuelSummary, type RuleCard } from '@yugioh/shared';
 import { eq } from 'drizzle-orm';
 import { syncCards } from '../src/cards.ts';
 import { users } from '../src/db/schema.ts';
@@ -95,6 +95,15 @@ describe('the card catalog', () => {
   });
 });
 
+describe('Side Deck swaps', () => {
+  it('allows moving cards between the Side Deck and the rest one for one', () => {
+    const deck = { main: [1, 2], extra: [3], side: [4] };
+    expect(isSideSwap(deck, { main: [4, 1], extra: [3], side: [2] })).toBe(true);
+    expect(isSideSwap(deck, { main: [1, 2, 4], extra: [3], side: [] })).toBe(false);
+    expect(isSideSwap(deck, { main: [1, 2], extra: [3], side: [5] })).toBe(false);
+  });
+});
+
 describe('.ydk files', () => {
   const known: Record<number, boolean> = { 1: false, 2: false, 3: true };
   const resolve = (code: number) => (code === 9 ? { code: 1, extraDeck: false } : code in known ? { code, extraDeck: known[code]! } : undefined);
@@ -138,21 +147,41 @@ describe("players' decks", () => {
     expect((await yugi.fetch(`${h.baseUrl}/api/decks/${deck.id}`, { method: 'DELETE' })).status).toBe(404);
   });
 
-  it('brings only legal decks of your own into a duel, as a copy', async () => {
+  it('brings a copy of a deck into a duel, which must follow the rules before the player is ready', async () => {
     const ethan = await player('admin', 'Ethan');
     const yugi = await player('yugi', 'Yugi');
     const draft = (await post(ethan, '/decks', save({ main: [] }))).body as DeckSummary;
-    expect((await post(ethan, '/duels', { deckId: draft.id })).status).toBe(400);
     const deck = (await post(ethan, '/decks', save({ name: 'Synchro Speed' }))).body as DeckSummary;
-    const duel = (await post(ethan, '/duels', { deckId: deck.id })).body as DuelSummary;
-    expect(duel.players[0]!.deck).toBe('Synchro Speed');
-    expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: deck.id })).status).toBe(404);
+    const duel = (await post(ethan, '/duels', {})).body as DuelSummary;
+    expect((await post(yugi, `/duels/${duel.id}/join`, {})).status).toBe(200);
+    expect((await post(yugi, `/duels/${duel.id}/deck`, { deckId: deck.id }, 'PUT')).status).toBe(404);
+    expect((await post(ethan, `/duels/${duel.id}/deck`, { deckId: draft.id }, 'PUT')).status).toBe(200);
+    expect((await post(ethan, `/duels/${duel.id}/ready`, { ready: true })).status).toBe(422);
+    expect((await post(ethan, `/duels/${duel.id}/deck`, { deckId: deck.id }, 'PUT')).status).toBe(200);
     // Editing or deleting the deck afterwards doesn't touch the duel.
     expect((await post(ethan, `/decks/${deck.id}`, save({ name: 'Renamed', main: [] }), 'PUT')).status).toBe(200);
-    expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: premade[1]!.id })).status).toBe(200);
+    await post(yugi, `/duels/${duel.id}/deck`, { deckId: premade[1]!.id }, 'PUT');
+    expect((await post(yugi, `/duels/${duel.id}/ready`, { ready: true })).status).toBe(200);
+    expect((await post(ethan, `/duels/${duel.id}/ready`, { ready: true })).status).toBe(200);
     expect((await ethan.fetch(`${h.baseUrl}/api/decks/${deck.id}`, { method: 'DELETE' })).status).toBe(204);
     const after = (await ethan.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`)).body;
     expect(after).toMatchObject({ status: 'active', players: [{ deck: 'Synchro Speed' }, { deck: premade[1]!.name }] });
+  });
+
+  it('keeps a premade-only challenge to premade decks, changed only by Side Deck swaps', async () => {
+    const ethan = await player('admin', 'Ethan');
+    const yugi = await player('yugi', 'Yugi');
+    const own = (await post(yugi, '/decks', save())).body as DeckSummary;
+    const duel = (await post(ethan, '/duels', { premadeOnly: true })).body as DuelSummary;
+    expect(duel.premadeOnly).toBe(true);
+    await post(yugi, `/duels/${duel.id}/join`, {});
+    expect((await post(yugi, `/duels/${duel.id}/deck`, { deckId: own.id }, 'PUT')).status).toBe(422);
+    const { deck } = (await post(yugi, `/duels/${duel.id}/deck`, { deckId: premade[1]!.id }, 'PUT')).body as { deck: DuelDeck };
+    const reordered = { name: deck.name, main: deck.main.toReversed(), extra: deck.extra, side: deck.side };
+    expect(((await post(yugi, `/duels/${duel.id}/deck`, reordered, 'PUT')).body as { deck: DuelDeck }).deck.premade).toBe(true);
+    const sided = { ...reordered, main: deck.main.slice(1), side: [...deck.side, deck.main[0]!] };
+    expect((await post(yugi, `/duels/${duel.id}/deck`, sided, 'PUT')).status).toBe(422);
+    expect((await post(yugi, `/duels/${duel.id}/ready`, { ready: true })).status).toBe(200);
   });
 });
 
@@ -178,7 +207,7 @@ describe('banlists', () => {
     expect(created.status).toBe(201);
     const list = created.body as BanlistSummary;
     expect((await yugi.json(`${h.baseUrl}/api/banlists/${list.id}`)).status).toBe(404);
-    expect((await post(yugi, '/duels', { deckId: premade[1]!.id, banlistId: list.id })).status).toBe(404);
+    expect((await post(yugi, '/duels', { banlistId: list.id })).status).toBe(404);
     expect((await post(ethan, '/banlists', { name: 'Bad', limits: { [banned]: 3 }, shared: false })).status).toBe(400);
 
     // The decks list checks against a list when asked, and a deck saved for the list is checked against it.
@@ -190,16 +219,21 @@ describe('banlists', () => {
     // Premade decks follow the list too, but not the section sizes.
     expect(underIt.find((d) => d.id === premade[0]!.id)?.problems).toEqual([`${sample.main[0]!.name} is Forbidden under House rules`]);
 
-    const duel = (await post(ethan, '/duels', { deckId: premade[1]!.id, banlistId: list.id })).body as DuelSummary;
+    const duel = (await post(ethan, '/duels', { banlistId: list.id })).body as DuelSummary;
     expect(duel.banlist).toBe('House rules');
+    await post(yugi, `/duels/${duel.id}/join`, {});
     // Yugi can't see the list, but picks a deck for the duel under it.
     const forDuel = (await yugi.json<DeckSummary[]>(`${h.baseUrl}/api/decks?duel=${duel.id}`)).body;
     expect(forDuel.find((d) => d.id === yugiDeck.id)?.problems).toHaveLength(1);
-    expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: yugiDeck.id })).status).toBe(400);
+    const ready = async (deckId: number) => {
+      await post(yugi, `/duels/${duel.id}/deck`, { deckId }, 'PUT');
+      return post(yugi, `/duels/${duel.id}/ready`, { ready: true });
+    };
+    expect((await ready(yugiDeck.id)).body).toEqual({ error: `${sample.main[0]!.name} is Forbidden under House rules` });
     // The duel keeps its copy of the list, so deleting the list changes nothing.
     expect((await ethan.fetch(`${h.baseUrl}/api/banlists/${list.id}`, { method: 'DELETE' })).status).toBe(204);
-    expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: yugiDeck.id })).status).toBe(400);
-    expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: premade[0]!.id })).status).toBe(400);
-    expect((await post(yugi, `/duels/${duel.id}/join`, { deckId: premade[1]!.id })).status).toBe(200);
+    expect((await ready(yugiDeck.id)).status).toBe(422);
+    expect((await ready(premade[0]!.id)).status).toBe(422);
+    expect((await ready(premade[1]!.id)).status).toBe(200);
   });
 });

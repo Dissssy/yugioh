@@ -19,33 +19,20 @@ export function DownloadYdk({ name, deck }: { name: string; deck: DeckList }) {
 }
 
 /**
- * Makes a new deck from a `.ydk` file and opens it. Passcodes no card has are left out and counted, so the deck isn't
- * opened before the player has read that.
+ * A button that reads a `.ydk` file the player picks. `onDeck` gets the file's name without `.ydk`, the deck, and how
+ * many passcodes no card has, which are left out.
  */
-export function ImportYdk() {
+export function UploadYdk({ onDeck, disabled = false, label = 'Upload .ydk' }: { onDeck: (name: string, deck: DeckList, unknown: number) => void; disabled?: boolean; label?: string }) {
   const { catalog } = useCatalog();
   const input = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [skipped, setSkipped] = useState<{ id: number; count: number } | null>(null);
-  const create = useMutation({
-    mutationFn: async (file: File) => {
-      const parsed = parseYdk(await file.text(), (code) => catalog!.resolve(code));
-      const { unknown, ...lists } = parsed;
-      const name = file.name.replace(/\.ydk$/i, '').trim().slice(0, 60) || 'Imported deck';
-      const deck = await api<DeckSummary>('/decks', { method: 'POST', body: JSON.stringify({ name, ...lists, shared: false, banlistId: null }) });
-      return { deck, unknown: unknown.length };
-    },
-    onSuccess: ({ deck, unknown }) => {
-      void queryClient.invalidateQueries({ queryKey: ['decks'] });
-      if (unknown === 0) void navigate(`/decks/${deck.id}`);
-      else setSkipped({ id: deck.id, count: unknown });
-    },
-  });
+  const read = async (file: File) => {
+    const { unknown, ...deck } = parseYdk(await file.text(), (code) => catalog!.resolve(code));
+    onDeck(file.name.replace(/\.ydk$/i, '').trim().slice(0, 60), deck, unknown.length);
+  };
   return (
     <>
-      <button type="button" onClick={() => input.current?.click()} disabled={!catalog || create.isPending}>
-        Import .ydk
+      <button type="button" onClick={() => input.current?.click()} disabled={!catalog || disabled}>
+        {label}
       </button>
       <input
         ref={input}
@@ -55,14 +42,37 @@ export function ImportYdk() {
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = '';
-          if (file) create.mutate(file);
+          if (file) void read(file);
         }}
       />
+    </>
+  );
+}
+
+/** Says how many of an uploaded file's cards weren't recognised, if any. */
+export const skippedText = (count: number) => `${count} ${count === 1 ? "card wasn't" : "cards weren't"} recognised and left out.`;
+
+/** Makes a new deck from a `.ydk` file and opens it, unless cards were left out: the player reads that first. */
+export function ImportYdk() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [skipped, setSkipped] = useState<{ id: number; count: number } | null>(null);
+  const create = useMutation({
+    mutationFn: ({ name, deck }: { name: string; deck: DeckList; unknown: number }) =>
+      api<DeckSummary>('/decks', { method: 'POST', body: JSON.stringify({ name: name || 'Imported deck', ...deck, shared: false, banlistId: null }) }),
+    onSuccess: (deck, { unknown }) => {
+      void queryClient.invalidateQueries({ queryKey: ['decks'] });
+      if (unknown === 0) void navigate(`/decks/${deck.id}`);
+      else setSkipped({ id: deck.id, count: unknown });
+    },
+  });
+  return (
+    <>
+      <UploadYdk label="Import .ydk" disabled={create.isPending} onDeck={(name, deck, unknown) => create.mutate({ name, deck, unknown })} />
       {create.isError && <span className="error small">{errorText(create.error)}</span>}
       {skipped && (
         <span className="small">
-          Imported, but {skipped.count} {skipped.count === 1 ? "card wasn't" : "cards weren't"} recognised and left out.{' '}
-          <Link to={`/decks/${skipped.id}`}>Open the deck</Link>
+          Imported, but {skippedText(skipped.count)} <Link to={`/decks/${skipped.id}`}>Open the deck</Link>
         </span>
       )}
     </>
