@@ -18,6 +18,14 @@ one is in the pool, along with the premade decks' cards. Pool cards get effect s
 compiles only cards without a current sheet, so a set adds sheets only for the cards that are new to the pool) and
 images. `server/scripts/fixture.ts` rebuilds the tests' card fixture from the same list.
 
+## Writing sheets in a thread
+
+Sheets can be written by Claude in a Claude Code thread instead of the paid compile, so the API budget stays with the
+game. `npm run sheets:todo <dir>` writes the pool cards that still need a sheet (`cards.json`, with each card's text
+hash) and the instructions (`instructions.md`: the file format and the same prompt the compile uses). The thread writes
+`server/effect-sheets/<code>.json` for each, with `"model": "claude-code"`, and `npm run sheets:check` validates every
+pool sheet (schema, text hash, speed, kinds, Extra Deck materials) and exits non-zero on a problem.
+
 ## New cards per year
 
 Counted at each card's first printing in the list, without the 156 cards the four premade decks already had
@@ -79,3 +87,12 @@ has grown). Audit of the 50 sheets: four Equip and Field Spells (Sogen, Beast Fa
 Arrow) came back with an invalid continuous part and were filled in by hand, as was Dragon Capture Jar's. Armed
 Ninja, Reaper of the Cards and Hane-Hane go to the judge (revealing a Set card isn't vocabulary yet; Hane-Hane's
 return to the hand was a compile miss). New eval cases cover Polymerization, Sogen and Dragon Capture Jar.
+
+### Promos: Dark Duel Stories and Forbidden Memories (DDS, FMR)
+
+Five cards, written in a thread rather than compiled. Salamandra, Metalmorph and Harpie's Pet Dragon are scripted.
+Acid Trap Hole and Red-Eyes Black Metal Dragon go to the judge: flipping a monster and then deciding by its DEF isn't
+vocabulary yet, and Special Summon procedures only start from the hand, not the Deck. Metalmorph's damage-calculation
+gain is also left to the judge, and the Harpie's Pet Dragon count matches any card whose name contains "Harpie Lady".
+
+The compile used to drop Flip effects' scripts; `flip` is now a scripted kind.

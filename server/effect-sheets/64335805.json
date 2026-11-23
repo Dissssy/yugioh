@@ -1,0 +1,24 @@
+{
+  "code": 64335805,
+  "textHash": "f6475f735472cc20e74334de0ae00b6ef048555bcf471aebf7dc571de7ebfb10",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "condition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is in your Deck, if you control \"Red-Eyes B. Dragon\" equipped with \"Metalmorph\"",
+      "cost": "",
+      "effect": "Cannot be Normal Summoned/Set. Must first be Special Summoned (from your Deck) by Tributing \"Red-Eyes B. Dragon\" equipped with \"Metalmorph\".",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": false
+}

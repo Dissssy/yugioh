@@ -13,6 +13,8 @@
     "sheets:compile": "node --env-file-if-exists=../.env src/sheets.ts compile",
     "sheets:import": "node --env-file-if-exists=../.env src/sheets.ts import",
     "sheets:export": "node --env-file-if-exists=../.env src/sheets.ts export",
+    "sheets:todo": "node --env-file-if-exists=../.env src/sheets.ts todo",
+    "sheets:check": "node --env-file-if-exists=../.env src/sheets.ts check",
     "judge:eval": "node --env-file-if-exists=../.env src/judge/evals.ts",
     "duel:report": "node --env-file-if-exists=../.env src/matchReport.ts"
   },

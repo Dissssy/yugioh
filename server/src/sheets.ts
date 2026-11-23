@@ -6,12 +6,17 @@
 //   npm run sheets:compile -- --force [names] recompile all of them, or only the named cards
 //   npm run sheets:import [-- --force]        load server/effect-sheets/*.json into the database (missing ones only)
 //   npm run sheets:export                     write every sheet in the database to server/effect-sheets/
+//   npm run sheets:todo -- <dir>              write the pool cards that need a sheet, and how to write one, to <dir>
+//   npm run sheets:check                      check every pool card's sheet file against the schema and the card
+//
+// `todo` and `check` are for writing sheets by hand or in a Claude Code session instead of the API compile
+// (docs/card-pool.md): the files go straight into server/effect-sheets/ and are loaded like any other.
 //
 // A sheet with a verified effect is never recompiled.
 
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -203,6 +208,29 @@ const compiled = z.object({
   materials: z.string().nullable(),
   normalSummon: z.boolean(),
 });
+
+/** The kinds of effect a script can run: everything that goes on the chain (FLIP effects too), and Summoning procedures. */
+const SCRIPTED_KINDS: SheetEffect['kind'][] = ['activation', 'ignition', 'quick', 'trigger', 'flip', 'condition'];
+
+/**
+ * What is wrong with a sheet for this card beyond its schema, which the API compile also rules out: text it wasn't
+ * written from, a spell speed its kind and card type don't give, a script or continuous part on the wrong kind of
+ * effect, or a monster without materials it needs.
+ */
+export function sheetProblems(sheet: EffectSheet, card: { type: string; race: string; frameType: string; textHash: string }): string[] {
+  const problems: string[] = [];
+  if (sheet.textHash !== card.textHash) problems.push('its textHash is not the card text\'s');
+  for (const [i, e] of sheet.effects.entries()) {
+    if (e.speed !== speedOf(e.kind, card)) problems.push(`effect ${i}: speed is ${e.speed}, but a ${e.kind} effect of this card is ${speedOf(e.kind, card)}`);
+    if (e.script && !SCRIPTED_KINDS.includes(e.kind)) problems.push(`effect ${i}: a ${e.kind} effect can't have a script`);
+    if (e.continuous && e.kind !== 'continuous') problems.push(`effect ${i}: a ${e.kind} effect can't have a continuous part`);
+    if (e.kind === 'trigger' && !e.when) problems.push(`effect ${i}: a trigger needs a when, or it never fires`);
+  }
+  const extra = /^(fusion|synchro|xyz)/.exec(card.frameType)?.[1];
+  if (extra && sheet.materials?.summon !== extra) problems.push(`a ${extra} monster needs ${extra} materials`);
+  if (!extra && sheet.materials) problems.push('only a Fusion, Synchro or Xyz Monster has materials');
+  return problems;
+}
 
 /** An effect's spell speed follows from its kind and the card's type, so code sets it rather than the model. */
 export function speedOf(kind: SheetEffect['kind'], card: { type: string; race: string }): SheetEffect['speed'] {
@@ -538,7 +566,7 @@ export async function compileSheets(db: Db, options: { force?: boolean; names?: 
       const checked = script.safeParse(parseJson(e.script));
       const problem = !checked.success
         ? z.prettifyError(checked.error)
-        : !['activation', 'ignition', 'quick', 'trigger', 'condition'].includes(e.kind)
+        : !SCRIPTED_KINDS.includes(e.kind)
           ? `a ${e.kind} effect can't have a script`
           : null;
       if (problem) log(`${row.name}: effect ${i}'s script is invalid, so the judge will apply it (${problem})`);
@@ -569,6 +597,52 @@ function parseJson(text: string): unknown {
   }
 }
 
+/**
+ * Writes what writing sheets in a session needs to `dir`: `instructions.md` (the compile prompt, and how a sheet file
+ * differs from the compiler's answer) and `cards.json` (each pool card that needs a sheet: its passcode, text hash and
+ * text). Returns how many cards.
+ */
+export async function writeTodo(db: Db, dir: string): Promise<number> {
+  const todo = await cardsToCompile(db, false, []);
+  await mkdir(dir, { recursive: true });
+  const fileFormat = `# Writing a sheet file
+
+Write each sheet to server/effect-sheets/<code>.json as the whole stored sheet, not the compiler's answer below:
+{"code", "textHash", "model", "effects", "materials", "normalSummon"}. code and textHash come from cards.json; model
+is "claude-code". Each effect has every property of the compiler's effects plus "speed" and "status" ("unverified"),
+and its "when", "script", "continuous" and the sheet's "materials" are JSON objects (or null), not JSON strings. Keys
+go in the order this file lists them, as \`npm run sheets:export\` writes them. Speed: an activation of a Counter Trap
+is 3, of another Trap or a Quick-Play Spell 2; a quick effect 2; everything else 1. Normal Monsters need no sheet.
+Then run \`npm run sheets:check\` and fix whatever it lists.
+
+The compiler's instructions follow.
+
+`;
+  await writeFile(join(dir, 'instructions.md'), fileFormat + compilePrompt());
+  const rows = todo.map((r) => ({ code: r.id, textHash: r.textHash, name: r.name, type: r.type, race: r.race, text: r.text }));
+  await writeFile(join(dir, 'cards.json'), `${JSON.stringify(rows, null, 2)}\n`);
+  return rows.length;
+}
+
+/** Every problem with the pool's sheet files, by card name: a card with an effect and no file, a file that doesn't parse, or `sheetProblems`. */
+export async function checkSheetFiles(db: Db, dir = SHEET_DIR): Promise<Record<string, string[]>> {
+  const ids = await poolCardIds(db);
+  const rows = ids.length ? await db.select().from(cards).where(inArray(cards.id, ids)) : [];
+  const found: Record<string, string[]> = {};
+  for (const row of rows) {
+    if (row.frameType === 'normal') continue;
+    const path = sheetPath(row.id, dir);
+    if (!existsSync(path)) {
+      found[row.name] = ['no sheet file'];
+      continue;
+    }
+    const parsed = sheetSchema.safeParse(JSON.parse(await readFile(path, 'utf8')));
+    const problems = parsed.success ? sheetProblems(parsed.data, row) : [z.prettifyError(parsed.error)];
+    if (problems.length) found[row.name] = problems;
+  }
+  return found;
+}
+
 /** The passcodes of all sheet files. */
 export async function listSheetCodes(dir = SHEET_DIR): Promise<number[]> {
   return (await readdir(dir)).filter((f) => f.endsWith('.json')).map((f) => Number(f.slice(0, -5)));
@@ -582,6 +656,13 @@ if (import.meta.main) {
   if (command === 'compile') await compileSheets(db, { force: values.force, names, log: console.log });
   else if (command === 'import') console.log(`Imported ${await importSheetFiles(db, { force: values.force })} sheets.`);
   else if (command === 'export') console.log(`Exported ${await exportSheetFiles(db)} sheets to ${SHEET_DIR}.`);
-  else console.error('Usage: node src/sheets.ts compile|import|export [--force] [card names]');
+  else if (command === 'todo' && names[0]) console.log(`${await writeTodo(db, names[0])} cards need a sheet; see ${names[0]}.`);
+  else if (command === 'check') {
+    const found = Object.entries(await checkSheetFiles(db));
+    for (const [name, problems] of found) console.log(`${name}:\n  ${problems.join('\n  ')}`);
+    console.log(found.length ? `${found.length} cards have problems.` : 'Every pool card has a valid, current sheet.');
+    process.exitCode = found.length ? 1 : 0;
+  }
+  else console.error('Usage: node src/sheets.ts compile|import|export [--force] [card names] | todo <dir> | check');
   await db.$client.end();
 }
