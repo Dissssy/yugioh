@@ -9,6 +9,7 @@ import { HANDS, type Intent } from '@yugioh/engine';
 import { isAdmin } from '@yugioh/shared';
 import type { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
+import { defaultBanlist, toBanlist, visibleBanlist } from './banlistRoutes.ts';
 import { deckForDuel } from './deckRoutes.ts';
 import type { Duels, SeatClaim } from './duels.ts';
 import { createGuest } from './guests.ts';
@@ -44,6 +45,8 @@ const contestBody = z.object({ seq: z.number().int().min(0), note: z.string().ma
 const reportBody = z.object({ code: z.number().int(), note: z.string().trim().min(1).max(1000) });
 
 const deckChoice = z.object({ deckId: z.number().int() });
+/** A challenge names the challenger's deck and the banlist both decks follow; the default list if none. */
+const challengeBody = deckChoice.extend({ banlistId: z.number().int().optional() });
 const replayFrom = z.enum(['0', '1', 'both']).transform((v) => (v === 'both' ? v : (Number(v) as 0 | 1)));
 /** The seat a spectator has at the bottom of the board. */
 const watchFrom = z.enum(['0', '1']).transform((v) => Number(v) as 0 | 1);
@@ -87,12 +90,14 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const p = player(res);
     if (!p) return;
     if (p.viewer.kind !== 'user') return void res.status(403).json({ error: 'account_required' });
-    const body = deckChoice.safeParse(req.body);
+    const body = challengeBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
-    const deck = await deckForDuel(db, catalog, body.data.deckId, p.viewer.user.id);
+    const banlist = await (body.data.banlistId === undefined ? defaultBanlist(db) : visibleBanlist(db, body.data.banlistId, p.viewer.user.id));
+    if (!banlist) return void res.status(404).json({ error: 'banlist_not_found' });
+    const deck = await deckForDuel(db, catalog, body.data.deckId, p.viewer.user.id, toBanlist(banlist));
     if (deck === 'not_found') return void res.status(404).json({ error: 'deck_not_found' });
     if (deck === 'deck_illegal') return void res.status(400).json({ error: 'deck_illegal' });
-    const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), deck);
+    const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), deck, toBanlist(banlist));
     res.status(201).json(await duels.summarize((await duels.find(duelId))!, p.key, false));
   });
 
@@ -125,7 +130,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     }
     const row = await duels.find(req.params.id);
     if (!row) return void res.status(404).json({ error: 'not_found' });
-    const deck = await deckForDuel(db, catalog, body.data.deckId, viewer.kind === 'user' ? viewer.user.id : null);
+    const deck = await deckForDuel(db, catalog, body.data.deckId, viewer.kind === 'user' ? viewer.user.id : null, row.banlist);
     if (deck === 'not_found') return void res.status(404).json({ error: 'deck_not_found' });
     if (deck === 'deck_illegal') return void res.status(400).json({ error: 'deck_illegal' });
     if (!(await duels.join(row.id, deck, claim))) return void res.status(409).json({ error: 'seat_taken' });

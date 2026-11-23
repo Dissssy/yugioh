@@ -21,8 +21,24 @@ export const SECTION_SIZE: Record<Section, { min: number; max: number }> = {
 
 export const SECTION_NAME: Record<Section, string> = { main: 'Main Deck', extra: 'Extra Deck', side: 'Side Deck' };
 
-/** Copies of one card a deck may hold across all three sections. */
+/** Copies of one card a deck may hold across all three sections, unless a banlist allows fewer. */
 export const MAX_COPIES = 3;
+
+/**
+ * A banlist (docs/deck-builder.md, Banlists): how many copies of each listed card a deck may hold, 0 (Forbidden),
+ * 1 (Limited) or 2 (Semi-Limited). Cards it doesn't list may have 3. Keys are passcodes.
+ */
+export interface Banlist {
+  name: string;
+  limits: Record<string, number>;
+}
+
+export const NO_BANLIST: Banlist = { name: 'No list', limits: {} };
+
+/** Copies of a card the banlist allows. */
+export const allowed = (banlist: Banlist, code: number) => banlist.limits[code] ?? MAX_COPIES;
+
+export const LIMIT_NAME = ['Forbidden', 'Limited', 'Semi-Limited', 'Unlimited'] as const;
 
 /** What the rules need to know about a card. */
 export interface RuleCard {
@@ -39,19 +55,21 @@ export const homeSection = (card: Pick<RuleCard, 'extraDeck'>): Section => (card
 export const copiesIn = (deck: DeckList, code: number) =>
   SECTIONS.reduce((n, s) => n + deck[s].filter((c) => c === code).length, 0);
 
-/** Why `card` can't be added to `section` of the deck, or null if it can. */
-export function addBlocker(deck: DeckList, code: number, card: RuleCard, section: Section): string | null {
+/** Why `card` can't be added to `section` of the deck under the banlist, or null if it can. */
+export function addBlocker(deck: DeckList, code: number, card: RuleCard, section: Section, banlist: Banlist): string | null {
   if (!card.inPool) return 'Not in the game yet';
+  const limit = allowed(banlist, code);
+  if (limit === 0) return `Forbidden under ${banlist.name}`;
   if (section !== 'side' && section !== homeSection(card))
     return card.extraDeck ? 'Goes in the Extra Deck' : "Doesn't go in the Extra Deck";
   const copies = copiesIn(deck, code);
-  if (copies >= MAX_COPIES) return `You have ${copies} of ${MAX_COPIES}`;
+  if (copies >= limit) return `You have ${copies} of ${limit}`;
   if (deck[section].length >= SECTION_SIZE[section].max) return `${SECTION_NAME[section]} is full`;
   return null;
 }
 
-/** Everything that keeps the deck out of a duel, in plain words. An empty list means it's legal. */
-export function deckProblems(deck: DeckList, cardOf: (code: number) => RuleCard | undefined): string[] {
+/** Everything that keeps the deck out of a duel under the banlist, in plain words. An empty list means it's legal. */
+export function deckProblems(deck: DeckList, cardOf: (code: number) => RuleCard | undefined, banlist: Banlist): string[] {
   const problems: string[] = [];
   for (const section of SECTIONS) {
     const { min, max } = SECTION_SIZE[section];
@@ -73,7 +91,10 @@ export function deckProblems(deck: DeckList, cardOf: (code: number) => RuleCard 
       seen.add(code);
       if (!card.inPool) problems.push(`${card.name} isn't in the game yet`);
       const copies = copiesIn(deck, code);
-      if (copies > MAX_COPIES) problems.push(`${copies} copies of ${card.name}; at most ${MAX_COPIES}`);
+      const limit = allowed(banlist, code);
+      if (limit === 0) problems.push(`${card.name} is Forbidden under ${banlist.name}`);
+      else if (copies > limit)
+        problems.push(`${copies} copies of ${card.name}; ${limit === MAX_COPIES ? 'at most' : `${banlist.name} allows`} ${limit}`);
     }
   return problems;
 }

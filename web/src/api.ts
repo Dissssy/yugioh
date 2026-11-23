@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { DeckSummary, DuelSummary, Me } from '@yugioh/shared';
+import type { BanlistDetail, BanlistSummary, DeckSummary, DuelSummary, Me } from '@yugioh/shared';
 
 export class ApiError extends Error {
   status: number;
@@ -24,7 +24,18 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') });
 
-export const useDecks = () => useQuery({ queryKey: ['decks'], queryFn: () => api<DeckSummary[]>('/decks') });
+/**
+ * The decks the viewer may pick: premade and their own. Each deck's problems are under its own banlist, or under the
+ * given banlist or duel's banlist when picking a deck for a duel.
+ */
+export const useDecks = (check: { banlist?: number; duel?: string } = {}) =>
+  useQuery({
+    queryKey: ['decks', check],
+    queryFn: () => api<DeckSummary[]>(`/decks?${new URLSearchParams(Object.entries(check).map(([k, v]) => [k, String(v)]))}`),
+  });
+export const useBanlists = () => useQuery({ queryKey: ['banlists'], queryFn: () => api<BanlistSummary[]>('/banlists') });
+export const useBanlist = (id: number | null) =>
+  useQuery({ queryKey: ['banlist', id], queryFn: () => api<BanlistDetail>(`/banlists/${id}`), enabled: id !== null });
 export const useDuels = () => useQuery({ queryKey: ['duels'], queryFn: () => api<DuelSummary[]>('/duels') });
 
 /** The error message the server gave, or a generic one. */

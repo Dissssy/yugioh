@@ -1,11 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   addBlocker,
+  allowed,
   copiesIn,
+  LIMIT_NAME,
+  MAX_COPIES,
   deckProblems,
   homeSection,
   SECTION_NAME,
   SECTIONS,
+  type Banlist,
+  type BanlistSummary,
   type CatalogCard,
   type DeckDetail,
   type DeckList,
@@ -13,50 +18,49 @@ import {
   type DeckSummary,
   type Section,
 } from '@yugioh/shared';
-import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { api, errorText } from '../api.ts';
-import { CardFace } from '../board/Card.tsx';
+import { api, errorText, useBanlist, useBanlists } from '../api.ts';
 import { CardDetail } from '../board/CardDetail.tsx';
 import { CopyLink } from '../CopyLink.tsx';
 import { Loading, Notice } from '../pages/Notice.tsx';
 import { useCatalog, type Catalog } from './catalog.ts';
+import { CardSearch, PoolFace } from './CardSearch.tsx';
+import { clicks, startDrag, useDropTarget, type Dragged } from './interaction.ts';
 
 /** How long the deck rests unchanged before it saves. */
 const SAVE_DELAY_MS = 700;
-/** Results drawn at first, and added each time the list scrolls to its end. */
-const PAGE = 120;
-
-type Kind = 'all' | 'monster' | 'spell' | 'trap' | 'extra';
-const KINDS: [Kind, string][] = [
-  ['all', 'All'],
-  ['monster', 'Monsters'],
-  ['spell', 'Spells'],
-  ['trap', 'Traps'],
-  ['extra', 'Extra Deck'],
-];
-type Sort = 'name' | 'atk' | 'def' | 'level';
-
 const KIND_ORDER = { monster: 0, spell: 1, trap: 2 } as const;
 /** Decks show monsters, then Spells, then Traps, each by name, so copies sit together. */
 const deckOrder = (a: CatalogCard, b: CatalogCard) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name);
 
-/** What a drag carries: a card, and the section it came from when it was in the deck. */
-interface Dragged {
-  code: number;
-  from: Section | null;
-}
-const DRAG_TYPE = 'application/x-deck-card';
-
 /** The owner's deck, editable, saving itself as it changes (docs/deck-builder.md, The page). */
 export function DeckBuilder({ deck }: { deck: DeckDetail }) {
   const { catalog, isError } = useCatalog();
-  if (isError) return <Notice title="Can't load the cards" tone="error">Reload the page to try again.</Notice>;
-  if (!catalog) return <Loading />;
-  return <Builder deck={deck} catalog={catalog} />;
+  const banlists = useBanlists();
+  const [banlistId, setBanlistId] = useState(deck.banlistId);
+  // A deck without a banlist of its own is built for the default list, the first one.
+  const banlist = useBanlist(banlistId ?? banlists.data?.find((b) => b.isDefault)?.id ?? null);
+  if (isError || banlists.isError || banlist.isError) return <Notice title="Can't load the cards" tone="error">Reload the page to try again.</Notice>;
+  if (!catalog || !banlists.data || !banlist.data) return <Loading />;
+  return <Builder deck={deck} catalog={catalog} banlists={banlists.data} banlist={banlist.data} banlistId={banlistId} onBanlist={setBanlistId} />;
 }
 
-function Builder({ deck, catalog }: { deck: DeckDetail; catalog: Catalog }) {
+function Builder({
+  deck,
+  catalog,
+  banlists,
+  banlist,
+  banlistId,
+  onBanlist,
+}: {
+  deck: DeckDetail;
+  catalog: Catalog;
+  banlists: BanlistSummary[];
+  banlist: Banlist;
+  banlistId: number | null;
+  onBanlist: (id: number | null) => void;
+}) {
   const [name, setName] = useState(deck.name);
   const [shared, setShared] = useState(deck.shared);
   const [list, setList] = useState<DeckList>(() => ({
@@ -66,12 +70,13 @@ function Builder({ deck, catalog }: { deck: DeckDetail; catalog: Catalog }) {
   }));
   const [shown, setShown] = useState<CatalogCard | null>(() => catalog.byCode.get(deck.main[0]?.code ?? -1) ?? null);
   const [tab, setTab] = useState<'deck' | 'search'>('deck');
-  const save = useAutosave(deck.id, { name: name.trim() || 'Untitled deck', shared, ...list });
-  const problems = useMemo(() => deckProblems(list, (c) => catalog.byCode.get(c)), [list, catalog]);
+  const save = useAutosave(deck.id, { name: name.trim() || 'Untitled deck', shared, banlistId, ...list });
+  const problems = useMemo(() => deckProblems(list, (c) => catalog.byCode.get(c), banlist), [list, catalog, banlist]);
+  const blocker = useCallback((card: CatalogCard) => addBlocker(list, card.code, card, homeSection(card), banlist), [list, banlist]);
 
   const add = (code: number, section: Section) => {
     const card = catalog.byCode.get(code);
-    if (!card || addBlocker(list, code, card, section)) return;
+    if (!card || addBlocker(list, code, card, section, banlist)) return;
     setList((l) => ({ ...l, [section]: [...l[section], code] }));
   };
   const remove = (code: number, section: Section) =>
@@ -84,7 +89,7 @@ function Builder({ deck, catalog }: { deck: DeckDetail; catalog: Catalog }) {
     if (!card || from === to) return;
     // The card is already counted once, so check the destination as if it had left.
     const without = { ...list, [from]: list[from].toSpliced(list[from].lastIndexOf(code), 1) };
-    if (addBlocker(without, code, card, to)) return;
+    if (addBlocker(without, code, card, to, banlist)) return;
     setList({ ...without, [to]: [...without[to], code] });
   };
   const drop = (to: Section) => (d: Dragged) => (d.from ? move(d.code, d.from, to) : add(d.code, to));
@@ -92,7 +97,7 @@ function Builder({ deck, catalog }: { deck: DeckDetail; catalog: Catalog }) {
   return (
     <section className="builder" data-tab={tab}>
       <aside className="box builder-detail">
-        {shown ? <ShownCard card={shown} list={list} onAdd={add} onRemove={remove} /> : <p className="muted">Point at a card to see it here.</p>}
+        {shown ? <ShownCard card={shown} list={list} banlist={banlist} onAdd={add} onRemove={remove} /> : <p className="muted">Point at a card to see it here.</p>}
       </aside>
 
       <div className="builder-deck">
@@ -103,11 +108,20 @@ function Builder({ deck, catalog }: { deck: DeckDetail; catalog: Catalog }) {
         </div>
         <div className="row builder-actions">
           <label className="switch">
+            Banlist
+            <select value={banlistId ?? ''} onChange={(e) => onBanlist(e.target.value === '' ? null : Number(e.target.value))}>
+              <option value="">Default ({banlists.find((b) => b.isDefault)?.name})</option>
+              {banlists.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="switch">
             <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} />
             Anyone with the link can see it
           </label>
           {shared && <CopyLink path={`/decks/${deck.id}`} />}
-          <CopyDeck deck={{ name: `${name} (copy)`, shared: false, ...list }} />
+          <CopyDeck deck={{ name: `${name} (copy)`, shared: false, banlistId, ...list }} />
           <DeleteDeck id={deck.id} />
         </div>
         {problems.length > 0 ? (
@@ -135,7 +149,15 @@ function Builder({ deck, catalog }: { deck: DeckDetail; catalog: Catalog }) {
         ))}
       </div>
 
-      <CardSearch catalog={catalog} list={list} onShow={setShown} onAdd={(c) => add(c.code, homeSection(c))} onDrop={(d) => d.from && remove(d.code, d.from)} />
+      <CardSearch
+        catalog={catalog}
+        blocker={blocker}
+        badges={(card) => <DeckBadges card={card} list={list} banlist={banlist} />}
+        onShow={setShown}
+        onAct={(c) => add(c.code, homeSection(c))}
+        onDrop={(d) => d.from && remove(d.code, d.from)}
+        actHint="Right-click to add"
+      />
     </section>
   );
 }
@@ -202,7 +224,7 @@ function DeckSection({
               onFocus={() => onShow(card)}
               {...clicks(() => onShow(card), () => onRemove(card.code))}
             >
-              <CardFace card={card} />
+              <PoolFace card={card} />
             </button>
           ))}
         </div>
@@ -211,99 +233,24 @@ function DeckSection({
   );
 }
 
-function CardSearch({
-  catalog,
-  list,
-  onShow,
-  onAdd,
-  onDrop,
-}: {
-  catalog: Catalog;
-  list: DeckList;
-  onShow: (c: CatalogCard) => void;
-  onAdd: (c: CatalogCard) => void;
-  onDrop: (d: Dragged) => void;
-}) {
-  const [text, setText] = useState('');
-  const [kind, setKind] = useState<Kind>('all');
-  const [sort, setSort] = useState<Sort>('name');
-  const [shownCount, setShownCount] = useState(PAGE);
-  const query = text.trim();
-  const target = useDropTarget(onDrop);
-
-  // Search order (or the chosen sort when there's no search), then cards that can be added ahead of those that can't.
-  const results = useMemo(() => {
-    const found = query ? catalog.search(query).flatMap((c) => catalog.byCode.get(c) ?? []) : catalog.cards.slice();
-    const fits = found.filter(
-      (c) => kind === 'all' || (kind === 'extra' ? c.extraDeck : c.kind === kind && !c.extraDeck),
-    );
-    if (!query && sort !== 'name') fits.sort((a, b) => (b[sort] ?? -1) - (a[sort] ?? -1));
-    const ranked = fits.map((card) => ({ card, blocker: addBlocker(list, card.code, card, homeSection(card)) }));
-    return [...ranked.filter((r) => !r.blocker), ...ranked.filter((r) => r.blocker)];
-  }, [catalog, query, kind, sort, list]);
-
-  useEffect(() => setShownCount(PAGE), [query, kind, sort]);
-  const more = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = more.current;
-    if (!el) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) setShownCount((n) => n + PAGE);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [results, shownCount]);
-
+/** A search result's corner marks: copies in the deck, and the banlist's limit when it has one. */
+function DeckBadges({ card, list, banlist }: { card: CatalogCard; list: DeckList; banlist: Banlist }) {
+  const copies = copiesIn(list, card.code);
   return (
-    <div className={`box builder-search${target.over ? ' drop-over' : ''}`} {...target.props}>
-      <input
-        type="search"
-        className="search-box"
-        placeholder="Search names and card text"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        aria-label="Search cards"
-      />
-      <div className="row search-filters">
-        <div className="chips" role="radiogroup" aria-label="Kind">
-          {KINDS.map(([k, label]) => (
-            <button key={k} role="radio" aria-checked={kind === k} className={`chip${kind === k ? ' on' : ''}`} onClick={() => setKind(k)}>
-              {label}
-            </button>
-          ))}
-        </div>
-        {!query && (
-          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort by">
-            <option value="name">Name</option>
-            <option value="atk">ATK</option>
-            <option value="def">DEF</option>
-            <option value="level">Level</option>
-          </select>
-        )}
-      </div>
-      <p className="muted small">
-        {results.length} {results.length === 1 ? 'card' : 'cards'}
-      </p>
-      <div className="search-results">
-        {results.slice(0, shownCount).map(({ card, blocker }) => (
-          <button
-            key={card.code}
-            className={`plain result${blocker ? ' blocked' : ''}`}
-            draggable={!blocker}
-            onDragStart={(e) => startDrag(e, { code: card.code, from: null })}
-            onMouseEnter={() => onShow(card)}
-            onFocus={() => onShow(card)}
-            {...clicks(() => onShow(card), () => (blocker ? onShow(card) : onAdd(card)))}
-            title={blocker ?? 'Right-click to add'}
-          >
-            <CardFace card={card} />
-            {copiesIn(list, card.code) > 0 && <span className="copies">{copiesIn(list, card.code)}</span>}
-            {blocker && <span className="blocker">{blocker}</span>}
-          </button>
-        ))}
-        {shownCount < results.length && <div ref={more} className="more" />}
-      </div>
-    </div>
+    <>
+      {copies > 0 && <span className="copies">{copies}</span>}
+      <LimitBadge limit={allowed(banlist, card.code)} />
+    </>
+  );
+}
+
+/** A banlist limit as a mark in the card's corner, as the game shows it; nothing for 3. */
+export function LimitBadge({ limit }: { limit: number }) {
+  if (limit >= MAX_COPIES) return null;
+  return (
+    <span className={`limit-badge l${limit}`} title={LIMIT_NAME[limit]}>
+      {limit === 0 ? '✕' : limit}
+    </span>
   );
 }
 
@@ -311,19 +258,23 @@ function CardSearch({
 function ShownCard({
   card,
   list,
+  banlist,
   onAdd,
   onRemove,
 }: {
   card: CatalogCard;
   list: DeckList;
+  banlist: Banlist;
   onAdd: (code: number, s: Section) => void;
   onRemove: (code: number, s: Section) => void;
 }) {
   const sections: Section[] = [homeSection(card), 'side'];
-  const blocked = addBlocker(list, card.code, card, homeSection(card));
+  const blocked = addBlocker(list, card.code, card, homeSection(card), banlist);
+  const limit = allowed(banlist, card.code);
   return (
     <>
       {blocked && <p className="blocker-text">{blocked}</p>}
+      {limit < MAX_COPIES && limit > 0 && <p className="muted small">{LIMIT_NAME[limit]} under {banlist.name}</p>}
       <div className="copy-controls">
         {sections.map((s) => {
           const n = list[s].filter((c) => c === card.code).length;
@@ -332,12 +283,12 @@ function ShownCard({
               <span>{SECTION_NAME[s]}</span>
               <button onClick={() => onRemove(card.code, s)} disabled={n === 0} aria-label={`Remove one from the ${SECTION_NAME[s]}`}>−1</button>
               <span className="copy-count">{n}</span>
-              <button onClick={() => onAdd(card.code, s)} disabled={addBlocker(list, card.code, card, s) !== null} aria-label={`Add one to the ${SECTION_NAME[s]}`}>+1</button>
+              <button onClick={() => onAdd(card.code, s)} disabled={addBlocker(list, card.code, card, s, banlist) !== null} aria-label={`Add one to the ${SECTION_NAME[s]}`}>+1</button>
             </div>
           );
         })}
       </div>
-      <CardDetail card={card} />
+      <CardDetail card={card} image={card.inPool} />
       {card.archetype && <p className="muted small">Archetype: {card.archetype}</p>}
     </>
   );
@@ -382,51 +333,4 @@ function DeleteDeck({ id }: { id: number }) {
   ) : (
     <button className="quiet" onClick={() => setSure(true)}>Delete</button>
   );
-}
-
-/**
- * A card's clicks: right-click adds or removes it, a left click shows it. A touch has no right-click, so a tap adds or
- * removes instead (the card shows on long-press through focus).
- */
-function clicks(show: () => void, act: () => void) {
-  return {
-    onPointerDown: (e: PointerEvent) => void (lastPointer = e.pointerType),
-    onClick: () => (lastPointer === 'touch' ? act() : show()),
-    onContextMenu: (e: MouseEvent) => {
-      e.preventDefault();
-      if (lastPointer !== 'touch') act();
-    },
-  };
-}
-/** The kind of pointer that last pressed a card. Kept outside React: showing the card re-renders between press and click. */
-let lastPointer = 'mouse';
-
-function startDrag(e: DragEvent, d: Dragged) {
-  e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(d));
-  e.dataTransfer.effectAllowed = 'move';
-}
-
-/** A place a dragged card can be dropped, lit while one is over it. */
-function useDropTarget(onDrop: (d: Dragged) => void) {
-  const [over, setOver] = useState(false);
-  const accepts = (e: DragEvent) => e.dataTransfer.types.includes(DRAG_TYPE);
-  return {
-    over,
-    props: {
-      onDragOver: (e: DragEvent) => {
-        if (!accepts(e)) return;
-        e.preventDefault();
-        setOver(true);
-      },
-      onDragLeave: (e: DragEvent) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
-      },
-      onDrop: (e: DragEvent) => {
-        setOver(false);
-        if (!accepts(e)) return;
-        e.preventDefault();
-        onDrop(JSON.parse(e.dataTransfer.getData(DRAG_TYPE)) as Dragged);
-      },
-    },
-  };
 }

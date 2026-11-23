@@ -39,7 +39,7 @@ function DeckView({ deck, canCopy }: { deck: DeckDetail; canCopy: boolean }) {
           <h1>{name}</h1>
         </div>
         <div className="row">
-          {canCopy && <CopyDeck className="primary" label="Copy to my decks" deck={{ name, main: codes(main), extra: codes(extra), side: codes(side), shared: false }} />}
+          {canCopy && <CopyDeck className="primary" label="Copy to my decks" deck={{ name, main: codes(main), extra: codes(extra), side: codes(side), shared: false, banlistId: null }} />}
           {deck.shared && <CopyLink path={`/decks/${deck.id}`} />}
         </div>
         <CardGrid title="Main Deck" cards={main} onShow={setHovered} />

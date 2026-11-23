@@ -59,6 +59,8 @@ export type DuelStatus = 'waiting' | 'active' | 'finished';
 export interface DuelSummary {
   id: string;
   status: DuelStatus;
+  /** The banlist both decks follow. */
+  banlist: string;
   createdAt: string;
   finishedAt: string | null;
   /** Seat 0 is the challenger; seat 1 is null while the duel is waiting. */
@@ -91,6 +93,8 @@ export interface DeckDetail {
   id: number;
   name: string;
   premade: boolean;
+  /** The banlist it's built for; null for the default list. */
+  banlistId: number | null;
   /** Whether the viewer owns it and may edit it. */
   mine: boolean;
   /** Whether anyone with the link may see it. */
@@ -103,9 +107,36 @@ export interface DeckDetail {
 /** What the deck builder saves: the whole deck each time. */
 export interface DeckSave {
   name: string;
+  banlistId: number | null;
   main: number[];
   extra: number[];
   side: number[];
+  shared: boolean;
+}
+
+/** A banlist to pick from: a default list, or one of the viewer's own (docs/deck-builder.md, Banlists). */
+export interface BanlistSummary {
+  id: number;
+  name: string;
+  /** One of the default lists, rebuilt from YGOPRODeck on every card import. */
+  isDefault: boolean;
+  /** A default list's fixed name in code (`tcg`, `ocg`, `goat`, `none`); null for players' lists. */
+  slug: string | null;
+  /** How many cards it limits. */
+  listed: number;
+}
+
+/** A banlist for anyone who may see it: a default list, its owner, or anyone with the link once shared. */
+export interface BanlistDetail extends BanlistSummary {
+  mine: boolean;
+  shared: boolean;
+  /** Copies allowed of each listed card by passcode: 0, 1 or 2. */
+  limits: Record<string, number>;
+}
+
+export interface BanlistSave {
+  name: string;
+  limits: Record<string, number>;
   shared: boolean;
 }
 

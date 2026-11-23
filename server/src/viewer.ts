@@ -26,3 +26,9 @@ export function displayName(viewer: Viewer): string {
   if (viewer.kind === 'user') return viewer.user.username;
   return viewer.kind === 'guest' ? guestName(viewer.guest.name) : 'Visitor';
 }
+
+/** The account that may own decks and banlists: approved accounts only. */
+export function builderId(res: Response): number | null {
+  const viewer = viewerOf(res);
+  return viewer.kind === 'user' && viewer.user.status === 'approved' ? viewer.user.id : null;
+}

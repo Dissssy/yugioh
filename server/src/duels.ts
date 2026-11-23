@@ -38,7 +38,7 @@ import {
   type Seat,
   type Sight,
 } from '@yugioh/engine';
-import type { DuelSummary, Replay } from '@yugioh/shared';
+import { NO_BANLIST, type Banlist, type DuelSummary, type Replay } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
 import { matchEvents, matches, sheetReports, type DuelDeck } from './db/schema.ts';
@@ -137,15 +137,15 @@ export class Duels {
     this.responseFloorMs = responseFloorMs;
   }
 
-  async create(userId: number, seatKey: string, name: string, deck: DuelDeck): Promise<string> {
+  async create(userId: number, seatKey: string, name: string, deck: DuelDeck, banlist: Banlist): Promise<string> {
     const id = randomBytes(12).toString('base64url');
-    await this.db.insert(matches).values({ id, createdBy: userId, seat0: seatKey, name0: name, deck0: deck });
+    await this.db.insert(matches).values({ id, createdBy: userId, seat0: seatKey, name0: name, deck0: deck, banlist });
     return id;
   }
 
   /** A duel against the AI opponent: the player takes seat 0 and the AI seat 1, and it starts at once. */
   async createAgainstAi(userId: number, seatKey: string, name: string, deck: DuelDeck, aiDeck: DuelDeck): Promise<string> {
-    const id = await this.create(userId, seatKey, name, deck);
+    const id = await this.create(userId, seatKey, name, deck, NO_BANLIST);
     await this.join(id, aiDeck, async () => ({ key: aiKey('claude'), name: 'Claude' }));
     return id;
   }
@@ -172,6 +172,7 @@ export class Duels {
     return {
       id: row.id,
       status: row.status,
+      banlist: row.banlist.name,
       createdAt: row.createdAt.toISOString(),
       finishedAt: row.finishedAt?.toISOString() ?? null,
       players: [

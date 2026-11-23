@@ -90,7 +90,7 @@ function Waiting({ duel }: { duel: DuelSummary }) {
 
 /** Accepting a challenge. A signed-out visitor either logs in or gives a name and plays as a guest. */
 function Join({ duel, me }: { duel: DuelSummary; me: Me }) {
-  const decks = useDecks();
+  const decks = useDecks({ duel: duel.id });
   const queryClient = useQueryClient();
   const [deckId, setDeckId] = useState<number | null>(null);
   const [guestName, setGuestName] = useState('');
@@ -113,9 +113,10 @@ function Join({ duel, me }: { duel: DuelSummary; me: Me }) {
       <h1>{duel.players[0].name} challenges you</h1>
       <div className="notice-body">
         <p>
-          They play <strong>{duel.players[0].deck}</strong>. Pick the deck you'll play.
+          They play <strong>{duel.players[0].deck}</strong>. Pick the deck you'll play. Both decks follow the{' '}
+          <strong>{duel.banlist}</strong> banlist.
         </p>
-        <DeckPicker value={chosen} onChange={setDeckId} />
+        <DeckPicker decks={decks.data} value={chosen} onChange={setDeckId} />
         {asGuest && (
           <label className="field">
             <span className="small muted">Your name</span>

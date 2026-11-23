@@ -1,14 +1,20 @@
 import type { CardData } from '@yugioh/engine';
-import { CardImage, TokenFace } from './Card.tsx';
+import { CardImage, TextFace, TokenFace } from './Card.tsx';
 import type { Stats } from './CardTooltip.tsx';
 
-/** The full card: big image, stats and text. `stats` are its ATK and DEF on the field now, shown when an effect changed them. */
-export function CardDetail({ card, stats = null }: { card: CardData; stats?: Stats | null }) {
+/** The full card: big image (drawn as text when `image` is false), stats and text. `stats` are its ATK and DEF on the field now, shown when an effect changed them. */
+export function CardDetail({ card, stats = null, image = true }: { card: CardData; stats?: Stats | null; image?: boolean }) {
   const changed = stats && (stats.atk !== card.atk || stats.def !== card.def);
   const tone = (now: number, was: number | null) => (was === null || now === was ? undefined : now > was ? 'up' : 'down');
   return (
     <div className="card-detail">
-      {card.type === 'Token' ? <TokenFace card={card} className="token-detail" /> : <CardImage key={card.code} card={card} size="full" className="detail-image" />}
+      {card.type === 'Token' ? (
+        <TokenFace card={card} className="token-detail" />
+      ) : image ? (
+        <CardImage key={card.code} card={card} size="full" className="detail-image" />
+      ) : (
+        <TextFace card={card} className="detail-image" />
+      )}
       <div className="card-meta">
         <h3>{card.name}</h3>
         <p className="muted">

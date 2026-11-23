@@ -1,6 +1,6 @@
 # Deck builder
 
-Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Step 1 of the build order is built; the rest isn't yet. This plan replaces the one-line "deck builder" entry in
+Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Steps 1 and 2 of the build order are built; the rest isn't yet. This plan replaces the one-line "deck builder" entry in
 [architecture.md](architecture.md) layer 8 and the "not planned yet" note in [next-steps.md](next-steps.md).
 
 ## What Ethan asked for
@@ -77,8 +77,9 @@ joined, so a deck can never get into a duel illegally.
 - At most 3 copies of a card across all three, or fewer if the banlist says so.
 - Every card must be in the pool.
 
-Premade decks aren't checked: they are their sets as printed, and some sets aren't 40 cards (Duelist Toolbox has 38).
-A copy of one is a player's deck, so it is checked.
+Premade decks aren't checked: they play as printed under any banlist. Some sets aren't 40 cards (Duelist Toolbox has
+38), and some print cards the current lists Forbid (Giant Trunade in Duelist Toolbox; Trishula and two others in
+Freezing Chains under TCG). A copy of one is a player's deck, so it is checked.
 
 ### Finished decks
 
@@ -96,7 +97,14 @@ A banlist is a name and a limit per card: 0, 1 or 2. Any card it doesn't list is
   like the TCG list from 2002, would be an admin-made list.
 - **Players' lists** work like decks: private by default, shareable by link, and you can copy any list you can see.
   The editor is the same card search. Each result gets a 0 / 1 / 2 / 3 picker in place of +1 and −1.
-- Admins can edit the default lists.
+- The default lists can't be edited, since every card import rebuilds them. Copy one to change it.
+- Each deck is built for a banlist, picked in the builder (the default list unless it says otherwise). Search reasons
+  and the deck's problems follow it, and the decks page shows legality under it. Picking a deck for a challenge checks
+  it against the challenge's banlist instead.
+- The editor (`/banlists/:id`) lists the limited cards by limit. Right-click in the search steps a card down: 3, 2, 1,
+  Forbidden, then back to 3. The **Listed** filter shows only the cards the list limits.
+- A duel keeps a copy of its banlist (`matches.banlist`), so editing or deleting the list later changes nothing.
+- Duels against Claude follow no banlist.
 
 ## Decks and sharing
 
@@ -150,7 +158,7 @@ Each step is a working product on its own.
    the builder page with search and reasons, and `checkDeck` with the basic rules (no banlist yet). Decks save as you
    go, can be copied and shared, and are listed under your decks in the account menu. Challenges and joins offer your
    legal decks as well as the premade ones.
-2. **Banlists.** The `banlists` table, the four defaults from the card import, the banlist editor, and a banlist on
+2. **Banlists** (built). The `banlists` table, the four defaults from the card import, the banlist editor, and a banlist on
    each challenge that both decks are checked against.
 3. **`.ydk` import and export** in the builder.
 4. **The pre-duel stage.** The `preparing` status, the duel's copy of each deck, Side Deck swaps, guests building,

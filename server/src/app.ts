@@ -5,10 +5,11 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
-import { isAdmin, type AdminDuels, type Me, type Rulings, type UserSettings } from '@yugioh/shared';
+import { isAdmin, NO_BANLIST, type AdminDuels, type Me, type Rulings, type UserSettings } from '@yugioh/shared';
 import { findUserBySub, listUsers, setRole, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import { duelCosts } from './costs.ts';
+import { banlistRoutes } from './banlistRoutes.ts';
 import { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
 import { deckForDuel, deckRoutes } from './deckRoutes.ts';
@@ -170,8 +171,11 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     if (!ai.opponent) return void res.status(503).json({ error: "Playing against Claude needs an Anthropic API key, and this server has none." });
     const body = aiDuelBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'Pick a deck for each side.' });
-    // Claude plays premade decks only: its deck plans (docs/ai-opponent.md) are written for them.
-    const [deck, aiDeck] = await Promise.all([deckForDuel(db, catalog, body.data.deckId, v.user.id), deckForDuel(db, catalog, body.data.aiDeckId, null)]);
+    // Claude plays premade decks only: its deck plans (docs/ai-opponent.md) are written for them. No banlist applies.
+    const [deck, aiDeck] = await Promise.all([
+      deckForDuel(db, catalog, body.data.deckId, v.user.id, NO_BANLIST),
+      deckForDuel(db, catalog, body.data.aiDeckId, null, NO_BANLIST),
+    ]);
     if (deck === 'not_found' || aiDeck === 'not_found') return void res.status(404).json({ error: 'deck_not_found' });
     if (deck === 'deck_illegal' || aiDeck === 'deck_illegal') return void res.status(400).json({ error: 'deck_illegal' });
     const id = await duels.createAgainstAi(v.user.id, userKey(v.user.id), v.user.username, deck, aiDeck);
@@ -223,6 +227,7 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
   });
 
   app.use('/api', deckRoutes(db, catalog));
+  app.use('/api', banlistRoutes(db, catalog));
   app.use('/api', duelRoutes(db, catalog, duels, guestCookie));
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'not_found' }));
 

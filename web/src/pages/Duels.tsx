@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DeckSummary, DuelStatus, DuelSummary } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { api, errorText, useDecks, useDuels } from '../api.ts';
+import { api, errorText, useBanlists, useDecks, useDuels } from '../api.ts';
 import { DuelCard } from '../DuelCard.tsx';
 
 const statusOrder: Record<DuelStatus, number> = { active: 0, waiting: 1, finished: 2 };
@@ -35,18 +35,22 @@ export function Duels() {
 }
 
 export function NewChallenge() {
-  const decks = useDecks();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const banlists = useBanlists();
+  const [banlistId, setBanlistId] = useState<number | null>(null);
+  const banlist = banlistId ?? banlists.data?.find((b) => b.isDefault)?.id;
+  const decks = useDecks({ banlist });
   const [deckId, setDeckId] = useState<number | null>(null);
   const create = useMutation({
-    mutationFn: (id: number) => api<DuelSummary>('/duels', { method: 'POST', body: JSON.stringify({ deckId: id }) }),
+    mutationFn: (id: number) => api<DuelSummary>('/duels', { method: 'POST', body: JSON.stringify({ deckId: id, banlistId: banlist }) }),
     onSuccess: (duel) => {
       void queryClient.invalidateQueries({ queryKey: ['duels'] });
       void navigate(`/duel/${duel.id}`);
     },
   });
-  const chosen = deckId ?? firstLegal(decks.data);
+  // A deck chosen before the banlist changed may not follow the new one.
+  const chosen = decks.data?.find((d) => d.id === deckId && d.problems.length === 0)?.id ?? firstLegal(decks.data);
   return (
     <section className="box">
       <h2>New challenge</h2>
@@ -57,7 +61,15 @@ export function NewChallenge() {
           <p className="muted small">
             Pick your deck, then send the challenge link to your opponent. <Link to="/decks">Build a deck</Link>
           </p>
-          <DeckPicker value={chosen} onChange={setDeckId} />
+          <label className="field">
+            <span className="small">Banlist both decks follow</span>
+            <select value={banlist ?? ''} onChange={(e) => setBanlistId(Number(e.target.value))}>
+              {banlists.data?.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </label>
+          <DeckPicker decks={decks.data} value={chosen} onChange={setDeckId} />
           <div className="actions">
             <button className="primary" onClick={() => chosen !== null && create.mutate(chosen)} disabled={create.isPending || chosen === null}>
               Create challenge
@@ -72,7 +84,9 @@ export function NewChallenge() {
 
 /** The admin's duel against Claude (docs/ai-opponent.md): their deck and Claude's, and it starts at once. */
 export function PlayClaude() {
-  const decks = useDecks();
+  const banlists = useBanlists();
+  // Duels against Claude follow no banlist.
+  const decks = useDecks({ banlist: banlists.data?.find((b) => b.slug === 'none')?.id });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [deckId, setDeckId] = useState<number | null>(null);
@@ -94,9 +108,9 @@ export function PlayClaude() {
       <h2>Play against Claude</h2>
       <p className="muted small">Admin only. Claude plays its seat from what that seat can see, one move at a time.</p>
       <h3 className="small">Your deck</h3>
-      <DeckPicker name="deck-you" value={mine} onChange={setDeckId} />
+      <DeckPicker decks={decks.data} name="deck-you" value={mine} onChange={setDeckId} />
       <h3 className="small">Claude's deck</h3>
-      <DeckPicker name="deck-claude" value={claude} onChange={setAiDeckId} premadeOnly />
+      <DeckPicker decks={decks.data?.filter((d) => d.premade)} name="deck-claude" value={claude} onChange={setAiDeckId} />
       <div className="actions">
         <button
           className="primary"
@@ -118,22 +132,19 @@ export const firstLegal = (decks: DeckSummary[] | undefined) => decks?.find((d) 
  * `name` groups the radio buttons when a page has two pickers.
  */
 export function DeckPicker({
+  decks,
   value,
   onChange,
   name = 'deck',
-  premadeOnly = false,
 }: {
+  decks: DeckSummary[] | undefined;
   value: number | null;
   onChange: (id: number) => void;
   name?: string;
-  premadeOnly?: boolean;
 }) {
-  const decks = useDecks();
   return (
     <div className="deck-picker" role="radiogroup" aria-label="Deck">
-      {decks.data
-        ?.filter((d) => d.premade || !premadeOnly)
-        .map((d) => {
+      {decks?.map((d) => {
           const illegal = d.problems.length > 0;
           return (
             <label key={d.id} className={`deck-choice${d.id === value ? ' chosen' : ''}${illegal ? ' illegal' : ''}`}>
