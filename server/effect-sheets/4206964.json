@@ -43,7 +43,8 @@
           "flip"
         ],
         "canMiss": false,
-        "by": null
+        "by": null,
+        "targeting": null
       },
       "script": {
         "conditions": [],

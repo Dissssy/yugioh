@@ -173,7 +173,19 @@ function beginTurn(run: Run, player: Seat, turn: number) {
     run.emit({ type: 'drew', player, count: 1 });
   }
   run.emit({ type: 'phaseChanged', phase: 'standby' });
+  // A window in the Standby Phase, only while a card used there is in play (Aqua Spirit), so other turns skip a prompt
+  // nobody needs. Main Phase 1 follows once it is over (continuation below).
+  if (standbyCards(run.state)) return run.emit({ type: 'checkpoint', cause: { event: 'phase', phase: 'standby', player, group: run.state.resolvedLinks }, then: { do: 'main1' } });
   run.emit({ type: 'phaseChanged', phase: 'main1' });
+}
+
+/** Whether a card in a hand, on the field or in a GY has an effect used in the Standby Phase. */
+function standbyCards(state: DuelState): boolean {
+  return Object.entries(state.instances).some(([id, { code }]) => {
+    const zone = locate(state, id)?.zone;
+    if (zone === 'deck' || zone === 'extra' || zone === 'banished' || zone === 'materials') return false;
+    return (state.sheets[code]?.effects ?? []).some((e) => e.script?.conditions.some((c) => c.if === 'phase' && c.phases.includes('standby')));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -828,7 +840,10 @@ function attack(run: Run, seat: Seat, attackerId: string, target: number | 'dire
 /** The events that come once a sequence is over: the attack's damage, or the end of the turn. */
 export function continuation(state: DuelState, then: Then): DuelEvent[] {
   const run = new Run(state);
-  if (then.do === 'damage_step') damageStep(run);
+  if (then.do === 'main1') {
+    run.emit({ type: 'phaseChanged', phase: 'main1' });
+    run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
+  } else if (then.do === 'damage_step') damageStep(run);
   else if (then.do === 'damage') damage(run);
   else if (then.do === 'endTurn') endTurn(run, then.discard);
   return run.events;

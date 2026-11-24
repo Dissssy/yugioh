@@ -284,10 +284,13 @@ type CardRow = typeof cards.$inferSelect;
 
 export function toCardData(row: CardRow): CardData {
   const kind = row.frameType === 'spell' ? 'spell' : row.frameType === 'trap' ? 'trap' : 'monster';
+  // YGOPRODeck's `type` leaves "Effect" out for Extra Deck monsters ("Synchro Monster" for Brionac); its `typeline`
+  // (the monster type, then the rest of the line) has every word, so filters on "Effect" fit them.
+  const typeline = (row.raw as { typeline?: string[] }).typeline;
   return {
     code: row.id,
     name: row.name,
-    type: row.type,
+    type: typeline ? [...typeline.slice(1), 'Monster'].join(' ') : row.type,
     kind,
     extraDeck: isExtraDeck(row.frameType),
     text: row.text,

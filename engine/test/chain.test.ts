@@ -95,7 +95,7 @@ const filter = (f: Partial<CardFilter>): CardFilter => ({
   original: false,
   ...f,
 });
-const when = (w: Partial<When> & Pick<When, 'event'>): When => ({ self: false, filter: null, how: [], canMiss: false, by: null, ...w });
+const when = (w: Partial<When> & Pick<When, 'event'>): When => ({ self: false, filter: null, how: [], canMiss: false, by: null, targeting: null, ...w });
 const script = (s: Partial<Script>): Script => ({ conditions: [], cost: [], targets: null, options: [{ label: '', cost: [], steps: [] }], unapplied: null, ...s });
 const effect = (e: Partial<SheetEffect> & Pick<SheetEffect, 'kind'>): SheetEffect => ({
   speed: 1,

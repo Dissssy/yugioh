@@ -11,7 +11,7 @@
       "opt": "hard",
       "window": "Either player's turn, from a Set position; you must control at least 1 \"Ice Barrier\" Synchro Monster",
       "cost": "",
-      "effect": "Apply these effects, in sequence, depending on the number of \"Ice Barrier\" Synchro Monsters you control with different names; ● 1+: Banish 1 card your opponent controls. ● 2+: Banish 1 card from your opponent's GY. ● 3+: Banish 1 random card from your opponent's hand.",
+      "effect": "Apply these effects, in sequence, depending on the number of \"Ice Barrier\" Synchro Monsters you control with different names; \u25cf 1+: Banish 1 card your opponent controls. \u25cf 2+: Banish 1 card from your opponent's GY. \u25cf 3+: Banish 1 random card from your opponent's hand.",
       "targets": null,
       "when": null,
       "script": {
@@ -301,9 +301,57 @@
         },
         "how": [],
         "canMiss": false,
-        "by": null
+        "by": null,
+        "targeting": {
+          "side": "you",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [
+            "monster"
+          ],
+          "types": [
+            "Synchro"
+          ],
+          "races": [],
+          "attributes": [],
+          "named": "Ice Barrier",
+          "except": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        }
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "self"
+            },
+            "to": "banished"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "negate_activation",
+                "destroy": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

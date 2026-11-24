@@ -196,6 +196,7 @@ const when = z.object({
   how: z.array(summonKind),
   canMiss: z.boolean(),
   by: z.enum(['you', 'opponent']).nullable(),
+  targeting: cardFilter.nullable(),
 }) satisfies z.ZodType<When>;
 
 const materials = z.union([
@@ -502,12 +503,13 @@ Filters ({"side", "places", "kinds", "types", "races", "attributes", "named", "e
 
 # When
 
-{"event", "self", "filter", "how", "canMiss", "by"}, every property required:
+{"event", "self", "filter", "how", "canMiss", "by", "targeting"}, every property required:
 - event: "summoned" (a monster is Summoned), "attack_declared" (a monster declares an attack; the event's card is the attacker), "attacked" (a monster is targeted for an attack: "When this card is targeted for an attack"; the event's card is the target), "destroyed_by_battle", "battle_destroying" (a monster destroys another by battle: "When this card destroys a monster by battle"; the event's card is the destroyer, so self is true), "battle_damage" (a monster inflicts battle damage to its controller's opponent), "direct_attack_damage" (the same, only by a direct attack: "When this card inflicts battle damage to your opponent by a direct attack"), "activated" (a card or effect is activated: "When a Trap Card is activated", "When a monster effect is activated"; the event's card is the one whose activation it is, and the filter says which: kinds ["trap"], or kinds ["monster"] with places []), "destroyed_by_effect" (a card on the field is destroyed by a card effect: "If this face-up card is destroyed by your opponent's card effect"; the filter is checked as the card was on the field, only its side and faceUp), "damage_step_start" (the start of the Damage Step; the event's card is the attacker, so "if this card attacks" is self true), "damage_step_end" (the end of the Damage Step: "At the end of the Damage Step, if this card attacked or was attacked" is self true, which matches either monster in the battle), "end_phase" (the End Phase starts: "During the End Phase"; self false, filter null; "of the turn this card was Summoned" is a summoned_this_turn condition) or "sent_to_graveyard" (a card goes from the field to the GY by any means: "When this card you control is sent to the Graveyard", "When this card is sent from the field to the Graveyard"; the effect's from is "graveyard"). An event outside this list (sent to the GY from the hand or Deck, flipped, targeted, leaves the field): when null, and the effect never fires; say so in its window.
 - self: true when it must happen to this card ("When this card is Normal Summoned", "If this card inflicts battle damage").
 - filter: the card it happens to must fit this filter (with self, for "When this face-up Attack Position card is targeted for an attack": faceUp true, position "attack") as it is after the event ("When your opponent Normal Summons a monster with 1000 or more ATK": side "opponent", places ["monsters"], atk {"min": 1000, "max": null}; "When an opponent's monster declares an attack": side "opponent", places ["monsters"]); null for any card. "you" and "opponent" are from this card's controller's view.
 - how: for "summoned", which Summons count: any of "normal" (a Tribute Summon is one), "flip", "special" (any Special Summon, Fusion, Synchro and Xyz Summons included), "fusion", "synchro", "xyz"; [] for "Summoned" with no kind. "If this card is Synchro Summoned" is ["synchro"].
 - by: for "destroyed_by_effect", whose card effect it must be: "you", "opponent" ("by your opponent's card effect"), or null for anyone's. null for other events.
+- targeting: for "activated", a filter one of the activation's targets must fit ("When your opponent activates a card or effect that targets an "Ice Barrier" Synchro Monster(s) you control": side "you", places ["monsters"], types ["Synchro"], named "Ice Barrier", faceUp true); null for any activation, and for other events.
 - canMiss: true only for an optional trigger worded "When ...: You can" (it misses the timing unless its event was the last thing to happen); false for "If ..." and for mandatory triggers.
 
 Examples:

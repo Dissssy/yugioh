@@ -1262,6 +1262,40 @@ export const CASES: EvalCase[] = [
     activate: 'Defense Draw',
     legal: false,
   },
+  {
+    name: "aqua spirit changes the position of an opponent's monster in their standby phase and locks it",
+    board: [{ monsters: ['Aqua Spirit'] }, { monsters: ['Axe Raider'] }],
+    before: () => [[0, { type: 'endTurn', discard: [] }]],
+    activate: 'Aqua Spirit',
+    effect: 1,
+    picks: [['Axe Raider']],
+    legal: true,
+    check: (b) =>
+      all(
+        b.monster('Axe Raider')?.position === 'defense' ? null : 'Axe Raider is not in Defense Position',
+        b.state.granted.some((g) => g.effect.apply === 'restrict' && g.effect.cannot.includes('change_position')) ? null : 'no position lock',
+      ),
+  },
+  {
+    name: 'aqua spirit waits for the standby phase',
+    board: [{ monsters: ['Aqua Spirit'] }, { monsters: ['Axe Raider'] }],
+    activate: 'Aqua Spirit',
+    effect: 1,
+    legal: false,
+  },
+  {
+    name: 'terror of trishula negates an effect that targets an ice barrier synchro monster',
+    board: [{ monsters: ['Brionac, Dragon of the Ice Barrier'], gy: ['Terror of Trishula'] }, { set: ['Half Shut'] }],
+    before: (id) => [
+      [0, { type: 'endTurn', discard: [] }],
+      [1, { type: 'activate', card: id('Half Shut'), effect: 0, zone: null }],
+    ],
+    activate: 'Terror of Trishula',
+    effect: 1,
+    picks: [['Brionac, Dragon of the Ice Barrier']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Terror of Trishula', '0:banished'), b.state.chain.some((l) => l.negated) ? null : 'Half Shut is not negated'),
+  },
   // Control, Tokens, and effects used from the hand or GY.
   {
     name: 'crackdown takes control of a face-up monster for good',

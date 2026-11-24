@@ -36,7 +36,8 @@
           "synchro"
         ],
         "canMiss": true,
-        "by": null
+        "by": null,
+        "targeting": null
       },
       "script": {
         "conditions": [],
@@ -102,7 +103,8 @@
         "filter": null,
         "how": [],
         "canMiss": false,
-        "by": "opponent"
+        "by": "opponent",
+        "targeting": null
       },
       "script": null,
       "continuous": null,
