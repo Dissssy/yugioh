@@ -37,10 +37,36 @@ export type Me =
   | { kind: 'guest'; guest: { name: string } }
   | { kind: 'user'; user: User; settings: UserSettings; logins: Logins };
 
-/** The Discord Activity's open games where it was opened (docs/discord.md); `dm` when that is a DM, not a server. */
+/**
+ * The Discord Activity's open games where it was opened (docs/discord.md); `dm` when that is a DM, not a server.
+ * `previews` has a small picture of each duel being played, by duel ID.
+ */
 export interface OpenGames {
   dm: boolean;
   games: DuelSummary[];
+  previews: Record<string, GamePreview>;
+}
+
+/** A card on the field in a preview: its passcode when face-up, null when face-down. */
+export interface PreviewCard {
+  code: number | null;
+  defense: boolean;
+}
+
+/** One player's side in a preview, laid out like the engine's: Monster Zones 0-6 (5 and 6 the Extra Monster Zones), Spell & Trap Zones 0-5 (5 the Field Zone). */
+export interface PreviewSide {
+  name: string;
+  lp: number;
+  hand: number;
+  monsters: (PreviewCard | null)[];
+  spellTraps: (PreviewCard | null)[];
+}
+
+/** What a spectator sees of a duel being played, small: only cards both players can see are named. */
+export interface GamePreview {
+  turn: number;
+  turnPlayer: 0 | 1;
+  players: [PreviewSide, PreviewSide];
 }
 
 /** Which logins an account has: Auth0 on the website, Discord, or both once linked (docs/discord.md). */

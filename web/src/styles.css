@@ -129,6 +129,20 @@ main { --page-h: calc(100dvh - 52px); max-width: 1180px; margin: 0 auto; padding
   .duel-card { grid-template-columns: minmax(0, 1fr); }
   .duel-card-actions { grid-column: 1; grid-row: auto; grid-template-columns: 1fr 1fr; }
 }
+/* A live duel in miniature on the open games (MiniBoard): both fields as spectators see them */
+.mini-board { grid-column: 1; display: grid; justify-items: center; gap: 4px; padding: 8px 0 2px; border-top: 1px dashed var(--line); }
+.mini-field { display: grid; gap: 2px; padding: 4px; border-radius: 6px; background: color-mix(in srgb, var(--fg) 5%, transparent); }
+.mini-row { display: grid; grid-template-columns: repeat(7, 22px); gap: 3px; }
+.mini-row.extra { padding: 2px 0; }
+.mini-zone { --card-w: 22px; --card-h: 32px; width: 22px; height: 32px; display: grid; place-items: center; border-radius: 2px; outline: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.mini-row.extra .mini-zone:empty { outline-style: dashed; }
+.mini-row:not(.extra) .mini-zone:first-child:empty, .mini-row:not(.extra) .mini-zone:last-child:empty, .mini-row.extra .mini-zone:not(:nth-child(3)):not(:nth-child(5)) { outline: 0; }
+.mini-zone img, .mini-zone .card { width: 22px; height: 32px; border-radius: 2px; object-fit: cover; }
+.mini-zone .card.back { border-width: 1px; }
+.mini-zone.defense > * { rotate: 90deg; }
+.mini-score { margin: 0; display: flex; gap: 6px; align-items: baseline; }
+.mini-score.active .mini-name { color: var(--accent); font-weight: 700; }
+.mini-score.active::before { content: '\25B6'; font-size: 0.7em; color: var(--accent); }
 .vs { font-size: 0.75em; font-weight: 800; color: var(--gold); text-transform: uppercase; }
 .empty { display: grid; justify-items: center; gap: 12px; padding: 32px 0; text-align: center; }
 .empty .card { opacity: 0.5; }

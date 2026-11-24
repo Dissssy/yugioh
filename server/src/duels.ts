@@ -32,13 +32,15 @@ import {
   type DuelState,
   type DuelUpdate,
   type EffectSheet,
+  type FieldCardView,
   type Intent,
   type JudgeRecord,
   type JudgingView,
+  type PlayerSideView,
   type Seat,
   type Sight,
 } from '@yugioh/engine';
-import { NO_BANLIST, type Banlist, type DuelDeck, type DuelSummary, type Replay } from '@yugioh/shared';
+import { NO_BANLIST, type Banlist, type DuelDeck, type DuelSummary, type GamePreview, type PreviewCard, type PreviewSide, type Replay } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
 import { matchEvents, matches, sheetReports } from './db/schema.ts';
@@ -185,6 +187,15 @@ export class Duels {
       orderBy: [desc(matches.createdAt)],
       limit: 50,
     });
+  }
+
+  /** A duel being played as a spectator sees it, small, for the open games (docs/discord.md). */
+  async preview(id: string): Promise<GamePreview> {
+    const view = viewFor((await this.load(id)).state, 0, 'none');
+    const card = (c: FieldCardView | null): PreviewCard | null =>
+      c && { code: c.faceUp && 'card' in c.card ? c.card.card.code : null, defense: c.position === 'defense' };
+    const side = (p: PlayerSideView): PreviewSide => ({ name: p.name, lp: p.lp, hand: p.hand.length, monsters: p.monsters.map(card), spellTraps: p.spellTraps.map(card) });
+    return { turn: view.turn, turnPlayer: view.turnPlayer, players: [side(view.players[0]), side(view.players[1])] };
   }
 
   /** Duels the player sits in. */

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { DeckSummary, DuelStatus, DuelSummary } from '@yugioh/shared';
+import type { DeckSummary, DuelStatus, DuelSummary, OpenGames } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, errorText, useBanlists, useDecks, useDuels } from '../api.ts';
@@ -42,7 +42,7 @@ const gameGroups: { title: string; statuses: DuelStatus[] }[] = [
 ];
 
 /** In the Discord Activity: every duel started where it was opened, to sit down at, watch, or replay. */
-export function OpenGamesList({ games, title = 'Open games' }: { games: DuelSummary[]; title?: string }) {
+export function OpenGamesList({ games, previews, title = 'Open games' }: { games: DuelSummary[]; previews: OpenGames['previews']; title?: string }) {
   return (
     <section className="box duels">
       <h2>{title}</h2>
@@ -62,7 +62,7 @@ export function OpenGamesList({ games, title = 'Open games' }: { games: DuelSumm
                 <ul className="duel-list">
                   {group.map((d) => (
                     <li key={d.id}>
-                      <DuelCard duel={d} />
+                      <DuelCard duel={d} preview={previews[d.id]} />
                     </li>
                   ))}
                 </ul>

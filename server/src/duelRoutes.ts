@@ -112,7 +112,9 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     if (place === null) return void res.status(404).json({ error: 'Open games are only in the Discord Activity.' });
     const rows = await duels.openGames(place);
     const games = await Promise.all(rows.map((row) => duels.summarize(row, playerKey(viewer), mayJoin(viewer))));
-    res.json({ dm: place.startsWith('dm:'), games } satisfies OpenGames);
+    const playing = rows.filter((row) => row.status === 'active');
+    const previews = Object.fromEntries(await Promise.all(playing.map(async (row) => [row.id, await duels.preview(row.id)] as const)));
+    res.json({ dm: place.startsWith('dm:'), games, previews } satisfies OpenGames);
   });
 
   // Anyone holding the link may look at a duel; the random ID is what keeps it private.
