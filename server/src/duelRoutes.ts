@@ -2,7 +2,7 @@
 // A challenge link is also the way in for people without an account: joining it signed out creates a guest.
 
 import { gzipSync } from 'node:zlib';
-import { Router, type Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { HANDS, type Intent } from '@yugioh/engine';
@@ -12,6 +12,7 @@ import type { Db } from './db/client.ts';
 import { defaultBanlist, toBanlist, visibleBanlist } from './banlistRoutes.ts';
 import { deckForDuel } from './deckRoutes.ts';
 import { started, type Duels, type SeatClaim } from './duels.ts';
+import { DuelFeed } from './duelFeed.ts';
 import { createGuest } from './guests.ts';
 import { displayName, guestKey, guestName, placeOfRes, playerKey, viewerOf, type Viewer } from './viewer.ts';
 
@@ -67,8 +68,24 @@ export interface GuestCookie {
 /** How often an idle event stream sends a comment, so proxies don't close it. */
 const KEEPALIVE_MS = 25_000;
 
+/** Answers with a Server-Sent Events stream, and returns the function that sends one message on it. */
+function eventStream(req: Request, res: Response, onClose: () => void): (data: unknown) => void {
+  res.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-cache',
+    'x-accel-buffering': 'no', // keeps nginx from buffering the stream
+  });
+  const keepalive = setInterval(() => res.write(': keepalive\n\n'), KEEPALIVE_MS);
+  req.on('close', () => {
+    clearInterval(keepalive);
+    onClose();
+  });
+  return (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
 export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: GuestCookie) {
   const router = Router();
+  const feed = new DuelFeed(duels);
 
   /** Playing needs an approved account or a guest identity. */
   const player = (res: Response): { viewer: Viewer; key: string } | null => {
@@ -89,6 +106,15 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     if (!p) return;
     const rows = await duels.list(p.key);
     res.json(await Promise.all(rows.map((row) => duels.summarize(row, p.key, true))));
+  });
+
+  // The player's duels as they change: each one's summary again whenever it may have, from any page of the site.
+  router.get('/me/duels/stream', (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    let stop = () => {};
+    const send = eventStream(req, res, () => stop());
+    stop = feed.follow(p.key, send);
   });
 
   router.post('/duels', async (req, res) => {
@@ -208,17 +234,9 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
     const key = playerKey(viewerOf(res));
     const seat = key === null ? null : await duels.seatOf(row.id, key);
-    res.writeHead(200, {
-      'content-type': 'text/event-stream',
-      'cache-control': 'no-cache',
-      'x-accel-buffering': 'no', // keeps nginx from buffering the stream
-    });
-    const stop = await duels.watch(row.id, seat ?? from.data, seat ?? 'none', (update) => res.write(`data: ${JSON.stringify(update)}\n\n`));
-    const keepalive = setInterval(() => res.write(': keepalive\n\n'), KEEPALIVE_MS);
-    req.on('close', () => {
-      clearInterval(keepalive);
-      stop();
-    });
+    let stop = () => {};
+    const send = eventStream(req, res, () => stop());
+    stop = await duels.watch(row.id, seat ?? from.data, seat ?? 'none', send);
   });
 
   // A finished duel to watch again, by anyone holding the link, from either seat or with every card face up

@@ -195,6 +195,20 @@ export function extraNormalSummon(state: DuelState, seat: Seat, id: string): { c
   return f ? { card: f.source, effect: f.index } : null;
 }
 
+/**
+ * What the duel waits on `seat` for: its own turn, or an answer (a response, a trigger, a pick, a rollback offer). Null
+ * when it waits on nobody, on the other player, or only for a pass the server makes by itself because there is nothing
+ * to activate. Questions from the judge aren't part of the state, so the server adds those.
+ */
+export function yourMove(state: DuelState, seat: Seat): 'turn' | 'answer' | null {
+  // Surrendering is always open, so it never makes the duel wait.
+  const actions = legalActions(state, seat).filter((a) => a.type !== 'surrender');
+  if (actions.some((a) => a.type === 'rollback')) return 'answer';
+  if (state.step.at === 'open') return actions.length > 0 ? 'turn' : null;
+  if (state.step.at === 'respond') return actions.some((a) => a.type !== 'pass') ? 'answer' : null;
+  return actions.length > 0 ? 'answer' : null;
+}
+
 export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
   if (state.result) return [];
   const actions: LegalAction[] = [];

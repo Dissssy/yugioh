@@ -65,6 +65,7 @@ Shift+Tab is a Shift press too. Zoom opens only when Shift is held alone for abo
 | L | Focus the log, on its newest entry |
 | T | Focus the chat box |
 | Q | Focus the chat box in Ask the judge mode ([ask-the-judge.md](ask-the-judge.md)) |
+| G | Open your next duel that is waiting on you, on any page ([ux-niceties.md](ux-niceties.md)) |
 | ? | Show the keys |
 
 **In the log:** Up and Down move between entries; Enter on a ruling opens its Contest form, and on an answer from the judge its Escalate. Esc goes back to the board.

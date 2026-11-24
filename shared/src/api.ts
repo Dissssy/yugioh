@@ -122,7 +122,15 @@ export interface DuelSummary {
   result: DuelOutcome | null;
   yourSeat: 0 | 1 | null;
   canJoin: boolean;
+  /** What the duel waits on the viewer for, when they play in it; see YourMove. */
+  yourMove: YourMove | null;
 }
+
+/**
+ * What a duel waits on its player for: choosing a deck and pressing Ready, playing their turn, or answering (a response
+ * window where they can activate something, a trigger, a pick, a question from the judge).
+ */
+export type YourMove = 'deck' | 'turn' | 'answer';
 
 export interface DuelPlayer {
   name: string;

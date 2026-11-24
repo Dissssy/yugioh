@@ -80,6 +80,7 @@ describe('a challenge link played by a guest', () => {
     expect(joined.body).toMatchObject({
       status: 'preparing',
       yourSeat: 1,
+      yourMove: 'deck',
       players: [
         { name: 'Ethan', deck: null, ready: false },
         { name: 'Kaiba (guest)', deck: null, ready: false },
@@ -108,6 +109,8 @@ describe('a challenge link played by a guest', () => {
     const started = await call<DuelSummary>(admin, '/ready', { ready: true });
     expect(started.body).toMatchObject({
       status: 'active',
+      // Both players pick rock, paper or scissors.
+      yourMove: 'answer',
       players: [
         { name: 'Ethan', deck: decks[0]!.name, ready: true },
         { name: 'Kaiba (guest)', deck: decks[1]!.name, ready: true },
@@ -141,6 +144,15 @@ describe('a challenge link played by a guest', () => {
   });
 
   it('streams each player their own view and applies intents', async () => {
+    const feed = new Stream(await guest.fetch(`${h.baseUrl}/api/me/duels/stream`));
+    /** The guest's feed, read until the duel waits on them for `move`. */
+    const feedUntil = async (move: DuelSummary['yourMove']) => {
+      for (;;) {
+        const summary = await feed.message<DuelSummary>();
+        expect(summary.id).toBe(duel.id);
+        if (summary.yourMove === move) return;
+      }
+    };
     const mine = new Stream(await admin.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
     const theirs = new Stream(await guest.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
     const send = (who: Browser, intent: Intent) =>
@@ -166,9 +178,13 @@ describe('a challenge link played by a guest', () => {
     expect((await send(guest, { type: 'rps', hand: 'paper' })).status).toBe(204);
     b = await theirs.next();
     expect(b.start).toEqual({ at: 'order', chooser: 1, hands: ['rock', 'paper'] });
+    // The guest's own feed follows along: they choose who goes first, then play their turn.
+    await feedUntil('answer');
     await mine.next();
     expect((await send(admin, { type: 'chooseOrder', goFirst: true })).status).toBe(422);
     expect((await send(guest, { type: 'chooseOrder', goFirst: true })).status).toBe(204);
+    await feedUntil('turn');
+    feed.close();
     do a = await mine.next();
     while (a.turn < 1);
     b = await theirs.next();

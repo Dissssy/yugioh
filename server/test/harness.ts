@@ -4,12 +4,14 @@ import { createServer } from 'node:http';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { OAuth2Server } from 'oauth2-mock-server';
 import type Anthropic from '@anthropic-ai/sdk';
 import { createApp } from '../src/app.ts';
+import type { Duels } from '../src/duels.ts';
+import { matchEvents } from '../src/db/schema.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
-import type { DuelUpdate, PlayerView } from '@yugioh/engine';
+import type { DuelEvent, DuelUpdate, PlayerView } from '@yugioh/engine';
 import type { DuelSummary } from '@yugioh/shared';
 import type { LoginClaims } from '../src/accounts.ts';
 import type { DiscordApi, DiscordUser } from '../src/discord.ts';
@@ -30,6 +32,8 @@ export interface Harness {
   setModel(model: ModelCall): void;
   /** Stands in for Discord's API, for the Activity's sign-in. */
   discord: FakeDiscord;
+  /** Replaces a started duel's log, to set up a board, and has the server read it again. */
+  rewriteLog(duelId: string, events: DuelEvent[]): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -92,7 +96,8 @@ export async function startHarness(): Promise<Harness> {
   const call = (params: Anthropic.MessageCreateParamsNonStreaming) => model(params);
   const discord = new FakeDiscord();
   const ai = { judge: call, appeal: call, judgeCalls: 300, appeals: 10, questions: 20, opponent: { call, model: 'claude-haiku-5-5', calls: 400, paceMs: 0 } };
-  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10, QUESTIONS_PER_DUEL: 20, AI_OPPONENT_MODEL: 'claude-haiku-5-5', AI_CALLS_PER_DUEL: 400, RESPONSE_FLOOR_MS: 0, RESET_SHEETS: false }, db, ai, discord, seeded(1)));
+  const app = createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10, QUESTIONS_PER_DUEL: 20, AI_OPPONENT_MODEL: 'claude-haiku-5-5', AI_CALLS_PER_DUEL: 400, RESPONSE_FLOOR_MS: 0, RESET_SHEETS: false }, db, ai, discord, seeded(1));
+  server.on('request', app);
 
   return {
     db,
@@ -102,6 +107,11 @@ export async function startHarness(): Promise<Harness> {
     setIdentity: (claims) => void (identity = claims),
     setModel: (m) => void (model = m),
     discord,
+    async rewriteLog(duelId, events) {
+      await db.delete(matchEvents).where(eq(matchEvents.matchId, duelId));
+      await db.insert(matchEvents).values(events.map((event, seq) => ({ matchId: duelId, seq, event })));
+      (app.locals.duels as Duels).forget(duelId);
+    },
     async close() {
       server.closeAllConnections();
       await new Promise((r) => server.close(r));
@@ -199,13 +209,17 @@ export class Stream {
       if (update.type !== 'judging') return update.type === 'sync' ? update.view : update.steps.at(-1)!.view;
     }
   }
-  async update(): Promise<DuelUpdate> {
+  update(): Promise<DuelUpdate> {
+    return this.message<DuelUpdate>();
+  }
+  /** The next message, for streams other than a duel's. */
+  async message<T>(): Promise<T> {
     for (;;) {
       const end = this.buffer.indexOf('\n\n');
       if (end >= 0) {
         const message = this.buffer.slice(0, end);
         this.buffer = this.buffer.slice(end + 2);
-        if (message.startsWith('data: ')) return JSON.parse(message.slice(6)) as DuelUpdate;
+        if (message.startsWith('data: ')) return JSON.parse(message.slice(6)) as T;
         continue;
       }
       const { value, done } = await this.reader.read();

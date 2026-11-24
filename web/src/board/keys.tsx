@@ -42,6 +42,7 @@ export const KEYS: { group: string; keys: Key[] }[] = [
       { keys: 'L', letter: 'l', shortcut: 'log', does: 'Go to the log, on its newest entry (Enter on a ruling to contest it)' },
       { keys: 'T', letter: 't', shortcut: 'chat', does: 'Type in the chat' },
       { keys: 'Q', letter: 'q', shortcut: 'ask', does: 'Ask the judge a question' },
+      { keys: 'G', does: 'Go to your next duel that is waiting on you (works on every page)' },
       { keys: '?', letter: '?', shortcut: 'help', does: 'Show these keys' },
     ],
   },

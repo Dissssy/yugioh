@@ -4,7 +4,8 @@ import { zonePick, type Intent, type LegalAction, type PlayerView, type Position
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { api, errorText, useMe } from '../api.ts';
+import { api, errorText, useCanPlay, useMe } from '../api.ts';
+import { DuelSwitcher } from '../duelFeed.tsx';
 import { OpponentCardsSetting } from '../pages/Account.tsx';
 import { useSettings } from '../settings.ts';
 import { ActionMenu } from './ActionMenu.tsx';
@@ -88,6 +89,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
   const [watchFrom, setWatchFrom] = useState<Seat>(0);
   const [settings, updateSettings] = useDuelSettings();
   const hasAccount = useMe().data?.kind === 'user';
+  const canPlay = useCanPlay();
   const { opponentCards } = useSettings();
   const reduceMotion = settings.reduceMotion || systemReducesMotion();
   const pace = useCallback((event: Parameters<typeof cueMs>[0], waiting: number) => cueMs(event, waiting, settings, reduceMotion), [settings, reduceMotion]);
@@ -903,6 +905,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                     </button>
                   )}
                 </div>
+                <DuelSwitcher enabled={canPlay} />
                 {canSurrender && confirmSurrender && (
                   <p className="row">
                     Surrender this duel?

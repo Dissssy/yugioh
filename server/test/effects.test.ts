@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startDuel, type DuelEvent, type DuelUpdate, type LogEntry } from '@yugioh/engine';
 import type { AdminDuels, BanlistSummary, DeckSummary, DuelSummary, Rulings } from '@yugioh/shared';
 import { loadCards, syncCards } from '../src/cards.ts';
-import { decks, matchEvents } from '../src/db/schema.ts';
+import { decks } from '../src/db/schema.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
 import { flagScripts, importSheetFiles, loadSheets, sheetOf } from '../src/sheets.ts';
 import { ADMIN_EMAIL, Browser, seeded, startDuelVia, startHarness, Stream, type Harness } from './harness.ts';
@@ -81,8 +81,7 @@ async function setUp(scripts: boolean): Promise<Setup> {
   for (const card of [poison, returning]) {
     if (!start.players[1].deck.slice(0, 5).includes(card)) events.push({ type: 'moved', card, owner: 1, from: 'deck', to: 'hand' });
   }
-  await h.db.delete(matchEvents).where(eq(matchEvents.matchId, duel.id));
-  await h.db.insert(matchEvents).values(events.map((event, seq) => ({ matchId: duel.id, seq, event })));
+  await h.rewriteLog(duel.id, events);
   return { admin, guest, duel, poison, returning };
 }
 
@@ -542,8 +541,7 @@ describe('a Summoning procedure', () => {
       { type: 'phaseChanged', phase: 'main1' },
     ];
     for (const card of [angler, prior]) if (!start.players[1].deck.slice(0, 5).includes(card)) events.push({ type: 'moved', card, owner: 1, from: 'deck', to: 'hand' });
-    await h.db.delete(matchEvents).where(eq(matchEvents.matchId, duel.id));
-    await h.db.insert(matchEvents).values(events.map((event, seq) => ({ matchId: duel.id, seq, event })));
+    await h.rewriteLog(duel.id, events);
     h.setModel(async () => {
       throw new Error('A Summoning procedure must not call the model.');
     });

@@ -1,6 +1,7 @@
 import type { DuelOutcome, DuelPlayer, DuelStatus, DuelSummary, GamePreview } from '@yugioh/shared';
 import { Link } from 'react-router';
 import { CopyLink } from './CopyLink.tsx';
+import { moveText } from './duelFeed.tsx';
 import { MiniBoard } from './MiniBoard.tsx';
 import { formatDate } from './pages/Home.tsx';
 
@@ -27,7 +28,13 @@ export function DuelCard({ duel, preview }: { duel: DuelSummary; preview?: GameP
       </div>
       {preview && <MiniBoard preview={preview} />}
       <p className="duel-card-how">
-        {duel.result ? <strong>{outcomeText(duel.result, duel.players, duel.yourSeat)}</strong> : <span className={`pill ${duel.status}`}>{statusText[duel.status]}</span>}
+        {duel.result ? (
+          <strong>{outcomeText(duel.result, duel.players, duel.yourSeat)}</strong>
+        ) : duel.yourMove ? (
+          <span className="pill needs-you">{moveText[duel.yourMove]}</span>
+        ) : (
+          <span className={`pill ${duel.status}`}>{statusText[duel.status]}</span>
+        )}
         <span className="muted">
           {challenge} · {formatDate(duel.finishedAt ?? duel.createdAt)}
         </span>
