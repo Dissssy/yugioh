@@ -46,7 +46,9 @@
         "apply": "stats",
         "to": {
           "side": "either",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [
             "monster"
           ],
@@ -92,7 +94,9 @@
         "apply": "stats",
         "to": {
           "side": "either",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [
             "monster"
           ],

@@ -23,6 +23,7 @@ import {
   fusionZones,
   zonePick,
   isProcedure,
+  distinctCount,
   conditionProblem,
   levelNow,
   levelOf,
@@ -131,6 +132,21 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       return picked;
     }
     const options = chooseFrom(state, sel, seat, self).filter(keep);
+    if (sel.distinct) {
+      // "With different names": one pick at a time, so a name already picked can't be picked again.
+      const total = Math.min(sel.max, distinctCount(state, options, true), limit);
+      const picked: string[] = [];
+      while (picked.length < total) {
+        const taken = new Set(picked.map((id) => cardOf(state, id).name));
+        const left = options.filter((id) => !taken.has(cardOf(state, id).name));
+        const required = picked.length < sel.min;
+        const of = sel.min === total ? `${picked.length + 1} of ${total}` : `${picked.length + 1}, up to ${total}`;
+        const [pick] = await ask({ prompt: `${name}: choose a ${describeFilter(sel.filter)} with a different name to ${verb} (${of}).`, cards: left, choices: [], min: required ? 1 : 0, max: 1 });
+        if (!pick) break;
+        picked.push(pick);
+      }
+      return picked;
+    }
     const max = Math.min(sel.max, options.length, limit);
     if (max === 0) return [];
     // A tie-break with no tie leaves nothing to choose.
@@ -187,7 +203,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         return said.join(' ');
       }
       case 'move': {
-        const fromHand = step.cards.from === 'choose' && step.cards.filter.place === 'hand' && step.to === 'graveyard';
+        const fromHand = step.cards.from === 'choose' && step.cards.filter.places.join() === 'hand' && step.to === 'graveyard';
         const verb = fromHand ? 'discard' : { hand: 'add to the hand', graveyard: 'send to the GY', banished: 'banish' }[step.to as 'hand'] ?? 'return to the Deck';
         let sel = step.cards;
         // A card in the GY may be banished instead of 1 card of a cost from the hand (Revealer of the Ice Barrier).
@@ -440,6 +456,15 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         if (!moved.length) return null;
         apply({ op: 'pledge_normal_summon', player: seat, cards: moved, damage: step.damage });
         return `${state.players[seat].name} takes ${step.damage} damage in the End Phase unless they Normal Summon the added monster, or a card with the same name, this turn.`;
+      }
+      case 'reveal': {
+        // "Reveal any number ... to select an equal number": no more than there are cards to target.
+        const limit = cost && script.targets?.max === 'cost' ? targetable(call.state, script, seat, self, link.cause).length : Infinity;
+        const cards = (await select(step.cards, 'reveal', limit)).filter((id) => state.players[seat].hand.includes(id));
+        if (!cards.length) return null;
+        apply({ op: 'reveal', cards });
+        if (cost) paid.push(...cards);
+        return cost ? null : `${state.players[seat].name} revealed ${list(cards.map((id) => cardOf(state, id).name))}.`;
       }
       case 'if_done':
       case 'only_if':

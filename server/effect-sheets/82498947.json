@@ -19,7 +19,9 @@
         "apply": "restrict",
         "to": {
           "side": "opponent",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -48,7 +50,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],

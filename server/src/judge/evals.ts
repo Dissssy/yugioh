@@ -755,7 +755,7 @@ export const CASES: EvalCase[] = [
     check: (b) =>
       all(
         expectAt(b, 'Silent Angler', '0:monsters'),
-        b.state.forbidden.some((f) => f.player === 0 && f.what === 'special_summon' && f.filter?.place === 'hand') ? null : 'no ban on Special Summons from the hand',
+        b.state.forbidden.some((f) => f.player === 0 && f.what === 'special_summon' && f.filter?.places.join() === 'hand') ? null : 'no ban on Special Summons from the hand',
       ),
   },
   {
@@ -946,6 +946,61 @@ export const CASES: EvalCase[] = [
     before: (id) => [[0, { type: 'activate', card: id('Zuijin of the Ice Barrier'), effect: 0, zone: null }]],
     activate: 'Zuijin of the Ice Barrier',
     effect: 1,
+    legal: false,
+  },
+  {
+    name: 'winds over the ice barrier banishes itself to add a banished ice barrier monster',
+    board: [{ gy: ['Winds Over the Ice Barrier', 'Axe Raider'], banished: ['Prior of the Ice Barrier'] }, {}],
+    activate: 'Winds Over the Ice Barrier',
+    effect: 1,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Prior of the Ice Barrier', '0:hand'), expectAt(b, 'Winds Over the Ice Barrier', '0:banished')),
+  },
+  {
+    name: 'dupe frog cannot add another dupe frog',
+    board: [{ monsters: ['Axe Raider'] }, { monsters: ['Dupe Frog'], deck: ['Dupe Frog'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Axe Raider'), target: 0 }],
+    ],
+    seat: 1,
+    activate: 'Dupe Frog',
+    effect: 2,
+    legal: false,
+  },
+  {
+    name: 'dance princess of the ice barrier reveals two ice barrier monsters to return two set cards',
+    board: [
+      { monsters: ['Dance Princess of the Ice Barrier', 'Prior of the Ice Barrier'], hand: ['Speaker for the Ice Barriers', 'Medium of the Ice Barrier', 'Axe Raider'] },
+      { set: ['Sakuretsu Armor', 'Trap Hole', 'Twister'] },
+    ],
+    activate: 'Dance Princess of the Ice Barrier',
+    picks: [['Speaker for the Ice Barriers', 'Medium of the Ice Barrier'], ['Sakuretsu Armor', 'Trap Hole']],
+    legal: true,
+    check: (b) =>
+      all(expectAt(b, 'Sakuretsu Armor', '1:hand'), expectAt(b, 'Trap Hole', '1:hand'), expectAt(b, 'Twister', '1:spellTraps'), expectAt(b, 'Speaker for the Ice Barriers', '0:hand'), expectAt(b, 'Medium of the Ice Barrier', '0:hand')),
+  },
+  {
+    name: 'dance princess of the ice barrier needs another ice barrier monster',
+    board: [{ monsters: ['Dance Princess of the Ice Barrier'], hand: ['Speaker for the Ice Barriers'] }, { set: ['Trap Hole'] }],
+    activate: 'Dance Princess of the Ice Barrier',
+    legal: false,
+  },
+  {
+    name: 'magic triangle of the ice barrier reveals 3 names to destroy a card and summon',
+    board: [
+      { hand: ['Magic Triangle of the Ice Barrier', 'Speaker for the Ice Barriers', 'Speaker for the Ice Barriers', 'Medium of the Ice Barrier', 'Prior of the Ice Barrier'] },
+      { monsters: ['Dark Blade'] },
+    ],
+    activate: 'Magic Triangle of the Ice Barrier',
+    picks: [['Speaker for the Ice Barriers'], ['Medium of the Ice Barrier'], ['Prior of the Ice Barrier'], ['Dark Blade'], ['Prior of the Ice Barrier'], ['Defense Position']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dark Blade', '1:gy'), expectAt(b, 'Prior of the Ice Barrier', '0:monsters'), expectAt(b, 'Medium of the Ice Barrier', '0:hand')),
+  },
+  {
+    name: 'magic triangle of the ice barrier needs 3 different names',
+    board: [{ hand: ['Magic Triangle of the Ice Barrier', 'Speaker for the Ice Barriers', 'Speaker for the Ice Barriers', 'Medium of the Ice Barrier'] }, { monsters: ['Dark Blade'] }],
+    activate: 'Magic Triangle of the Ice Barrier',
     legal: false,
   },
   // Starter deck cards the judge used to rule on, now scripted.

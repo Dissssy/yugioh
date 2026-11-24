@@ -62,7 +62,7 @@
         "cannot": "activate",
         "filter": {
           "side": "either",
-          "place": "any",
+          "places": [],
           "kinds": [
             "spell",
             "trap"

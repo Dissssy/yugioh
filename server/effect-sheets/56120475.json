@@ -18,7 +18,9 @@
         "self": false,
         "filter": {
           "side": "opponent",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -42,7 +44,9 @@
         "targets": {
           "filter": {
             "side": "opponent",
-            "place": "monsters",
+            "places": [
+              "monsters"
+            ],
             "kinds": [],
             "types": [],
             "races": [],

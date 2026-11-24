@@ -55,7 +55,9 @@
         "cannot": "activate",
         "filter": {
           "side": "either",
-          "place": "hand",
+          "places": [
+            "hand"
+          ],
           "kinds": [
             "monster"
           ],

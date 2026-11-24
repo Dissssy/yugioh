@@ -20,7 +20,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "graveyard",
+              "places": [
+                "graveyard"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -100,7 +102,9 @@
                   "from": "random",
                   "filter": {
                     "side": "opponent",
-                    "place": "hand",
+                    "places": [
+                      "hand"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],

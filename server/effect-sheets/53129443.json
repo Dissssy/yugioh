@@ -29,7 +29,9 @@
                   "from": "all",
                   "filter": {
                     "side": "either",
-                    "place": "monsters",
+                    "places": [
+                      "monsters"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],

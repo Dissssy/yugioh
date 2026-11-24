@@ -46,7 +46,9 @@
         "apply": "stats",
         "to": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],

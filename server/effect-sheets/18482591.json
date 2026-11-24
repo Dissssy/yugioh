@@ -21,7 +21,7 @@
         "cannot": "activate",
         "filter": {
           "side": "either",
-          "place": "any",
+          "places": [],
           "kinds": [
             "spell"
           ],
@@ -44,7 +44,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],

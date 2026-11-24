@@ -20,7 +20,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -46,7 +48,9 @@
         "targets": {
           "filter": {
             "side": "opponent",
-            "place": "monsters",
+            "places": [
+              "monsters"
+            ],
             "kinds": [
               "monster"
             ],

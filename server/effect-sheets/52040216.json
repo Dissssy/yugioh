@@ -22,7 +22,9 @@
         "def": 300,
         "per": {
           "side": "either",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [
             "monster"
           ],

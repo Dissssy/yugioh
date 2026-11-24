@@ -18,7 +18,9 @@
         "self": true,
         "filter": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],

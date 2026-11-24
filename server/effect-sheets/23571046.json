@@ -20,7 +20,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -56,7 +58,9 @@
                     "if": "count",
                     "filter": {
                       "side": "you",
-                      "place": "monsters",
+                      "places": [
+                        "monsters"
+                      ],
                       "kinds": [
                         "monster"
                       ],

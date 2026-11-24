@@ -177,7 +177,7 @@ export function lockProblem(state: DuelState, seat: Seat, id: string, effect: nu
   // A player knows their own Set cards, so a lock on Spells applies to a Set Spell too.
   const fitting = (filter: CardFilter, lockSeat: Seat) =>
     set
-      ? identityFits(card, filter) && ['any', 'field', 'spellTraps'].includes(filter.place) && (filter.side === 'either' || (filter.side === 'you') === (at.seat === lockSeat))
+      ? identityFits(card, filter) && (!filter.places.length || filter.places.some((p) => p === 'field' || p === 'spellTraps')) && (filter.side === 'either' || (filter.side === 'you') === (at.seat === lockSeat))
       : fits(state, id, filter, lockSeat);
   for (const f of locksOn(state, seat)) {
     const lock = f.effect;

@@ -1,7 +1,7 @@
 {
   "code": 46239604,
   "textHash": "7be64d8d95f103560ec2002dc244560a4867cd0c32d5cc05835b7ff8a331259c",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "continuous",
@@ -37,7 +37,9 @@
         "apply": "restrict",
         "to": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -80,7 +82,52 @@
         "canMiss": true,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "deck",
+                      "graveyard"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Frog",
+                    "except": "Dupe Frog",
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null,
+                  "distinct": false
+                },
+                "to": "hand"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

@@ -33,7 +33,9 @@
         "self": true,
         "filter": {
           "side": "either",
-          "place": "field",
+          "places": [
+            "field"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -57,7 +59,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "field",
+            "places": [
+              "field"
+            ],
             "kinds": [],
             "types": [],
             "races": [],

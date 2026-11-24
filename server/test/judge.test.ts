@@ -262,9 +262,9 @@ async function fixtureCards() {
   );
 }
 
-const anyCard = (side: CardFilter['side'], place: CardFilter['place'], kinds: CardFilter['kinds'] = []): CardFilter => ({
+const anyCard = (side: CardFilter['side'], place: CardFilter['places'][number], kinds: CardFilter['kinds'] = []): CardFilter => ({
   side,
-  place,
+  places: [place],
   kinds,
   types: [],
   races: [],
@@ -281,7 +281,7 @@ const anyCard = (side: CardFilter['side'], place: CardFilter['place'], kinds: Ca
 /** Monster Reincarnation as a script: discard 1 card, then target 1 monster in your GY; add it to your hand. */
 const reincarnation: Script = {
   conditions: [],
-  cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 1, rank: null }, to: 'graveyard' }],
+  cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 1, rank: null, distinct: false }, to: 'graveyard' }],
   targets: { filter: anyCard('you', 'graveyard', ['monster']), min: 1, max: 1, others: true, event: false },
   options: [{ label: '', cost: [], steps: [{ do: 'move', cards: { from: 'targets' }, to: 'hand' }] }],
   unapplied: null,
@@ -325,7 +325,7 @@ describe('a scripted effect', () => {
   it('targets exactly as many cards as the cost discarded, and discards no more than there are to target (Brionac)', async () => {
     const brionac: Script = {
       ...reincarnation,
-      cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 60, rank: null }, to: 'graveyard' }],
+      cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 60, rank: null, distinct: false }, to: 'graveyard' }],
       targets: { filter: anyCard('opponent', 'field'), min: 1, max: 'cost', others: true, event: false },
     };
     let state = board();

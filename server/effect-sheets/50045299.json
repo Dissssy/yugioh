@@ -46,7 +46,9 @@
         "apply": "force_position",
         "to": {
           "side": "either",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [
             "monster"
           ],
@@ -85,7 +87,9 @@
         "apply": "restrict",
         "to": {
           "side": "either",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [
             "monster"
           ],

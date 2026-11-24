@@ -29,7 +29,9 @@
                   "from": "choose",
                   "filter": {
                     "side": "you",
-                    "place": "deck",
+                    "places": [
+                      "deck"
+                    ],
                     "kinds": [
                       "monster"
                     ],
@@ -52,7 +54,8 @@
                   },
                   "min": 1,
                   "max": 1,
-                  "rank": null
+                  "rank": null,
+                  "distinct": false
                 },
                 "to": "hand"
               }

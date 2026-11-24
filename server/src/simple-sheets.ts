@@ -86,7 +86,7 @@ const kindList = (words: string) => words.split(/,? and |, /).map((w) => w.trim(
 
 const monsters = (overrides: Partial<CardFilter>): CardFilter => ({
   side: 'either',
-  place: 'monsters',
+  places: ['monsters'],
   kinds: ['monster'],
   types: [],
   races: [],

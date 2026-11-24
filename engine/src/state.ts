@@ -345,6 +345,8 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
       case 'targeted':
         s.chain.at(-1)!.targets = event.cards;
         return;
+      case 'revealed':
+        return;
       case 'effectChosen':
         s.chain.at(-1)!.choice = event.choice;
         return;

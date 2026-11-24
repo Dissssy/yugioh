@@ -64,7 +64,9 @@
         "apply": "restrict",
         "to": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [
             "monster"
           ],
@@ -86,7 +88,7 @@
         ],
         "by": {
           "side": "either",
-          "place": "any",
+          "places": [],
           "kinds": [
             "spell",
             "trap"

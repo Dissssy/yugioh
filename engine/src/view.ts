@@ -361,6 +361,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `Targeting ${event.cards.map((id) => (id ? name(id) : 'a face-down card')).join(', ')}`;
     case 'effectChosen':
       return `Chose: ${event.choice}`;
+    case 'revealed':
+      return `${who(event.player)} revealed ${names(event.cards)}`;
     case 'moved': {
       const to = { hand: 'to the hand', deck_top: 'on top of the Deck', deck_bottom: 'to the bottom of the Deck', deck_shuffled: 'into the Deck', graveyard: 'to the GY', banished: 'banished' }[event.to];
       const from = { deck: 'Deck', hand: 'hand', monsters: 'field', spellTraps: 'field', materials: 'Xyz Materials', graveyard: 'GY', banished: 'banished cards', extra: 'Extra Deck' }[event.from];

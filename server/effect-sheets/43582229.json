@@ -20,7 +20,9 @@
         "targets": {
           "filter": {
             "side": "you",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],
@@ -81,7 +83,9 @@
         "apply": "restrict",
         "to": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [
             "monster"
           ],
@@ -103,7 +107,7 @@
         ],
         "by": {
           "side": "opponent",
-          "place": "any",
+          "places": [],
           "kinds": [
             "monster"
           ],
@@ -126,7 +130,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],

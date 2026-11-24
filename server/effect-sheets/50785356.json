@@ -30,7 +30,9 @@
         "targets": {
           "filter": {
             "side": "you",
-            "place": "monsters",
+            "places": [
+              "monsters"
+            ],
             "kinds": [
               "monster"
             ],

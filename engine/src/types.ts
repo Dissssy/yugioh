@@ -269,6 +269,11 @@ export type Step =
    * of your next turn, and with `whileFaceUp` only as long as this card stays face-up on the field (Spellbreaker).
    */
   | { do: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; whileFaceUp: boolean }
+  /**
+   * Shows the cards the selection picks from the activating player's hand to both players, usually as a cost ("reveal
+   * any number of "Ice Barrier" monsters in your hand"). Revealed cards count as paid for a `targets.max` of `cost`.
+   */
+  | { do: 'reveal'; cards: Selection }
   /** "and if you do": the steps after this one happen only if the step before it did something. */
   | { do: 'if_done' }
   /**
@@ -406,7 +411,15 @@ export interface StatValue {
 export type Selection =
   | { from: 'self' }
   | { from: 'targets' }
-  | { from: 'choose'; filter: CardFilter; min: number; max: number; rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null }
+  | {
+      from: 'choose';
+      filter: CardFilter;
+      min: number;
+      max: number;
+      rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null;
+      /** The cards picked must have different names from each other ("3 "Ice Barrier" monsters with different names"). */
+      distinct: boolean;
+    }
   | { from: 'all'; filter: CardFilter }
   /**
    * `count` cards that fit, picked at random by code ("discard 2 random cards from your opponent's hand"); fewer if
@@ -421,12 +434,18 @@ export type Selection =
    */
   | { from: 'event' };
 
+export const FILTER_PLACES = ['field', 'monsters', 'spellTraps', 'hand', 'deck', 'extra', 'graveyard', 'banished'] as const;
+export type FilterPlace = (typeof FILTER_PLACES)[number];
+
 /** Cards that fit a description such as "1 face-up Warrior monster your opponent controls". Empty lists and nulls don't restrict. */
 export interface CardFilter {
   /** Whose: the controller of a card on the field, or the player whose hand, Deck, GY or banished pile it is in. */
   side: 'you' | 'opponent' | 'either';
-  /** `any`: wherever it is (a monster effect activated from the hand or GY still is one). */
-  place: 'field' | 'monsters' | 'spellTraps' | 'hand' | 'deck' | 'graveyard' | 'banished' | 'any';
+  /**
+   * Where it is: any of these places ("from your Deck or GY" is two). Empty: wherever it is (a monster effect activated
+   * from the hand or GY still is one). `field` is either kind of zone on the field.
+   */
+  places: FilterPlace[];
   kinds: ('monster' | 'spell' | 'trap')[];
   /** Words that must all be in the card's type line, such as "Synchro", "Tuner", "Normal" ("non-Effect"), "Effect". */
   types: string[];
@@ -777,7 +796,9 @@ export type Op =
   | { op: 'add_counters'; card: string; counter: Counter; count: number; max: number | null }
   | { op: 'remove_counters'; card: string; counter: Counter; count: number }
   | { op: 'declare_targets'; cards: string[] }
-  | { op: 'choose_effect'; choice: string };
+  | { op: 'choose_effect'; choice: string }
+  /** Shows cards in the activating player's hand to both players; they stay in the hand. */
+  | { op: 'reveal'; cards: string[] };
 
 /** The tokens one Messages API call used, as the API reported them; the server prices them. */
 export interface ModelUsage {
@@ -943,6 +964,8 @@ export type DuelEvent =
   | { type: 'passed'; player: Seat }
   | { type: 'targeted'; cards: string[] }
   | { type: 'effectChosen'; choice: string }
+  /** `player` showed these cards from their hand to both players (a cost such as "reveal 3 "Ice Barrier" monsters"). */
+  | { type: 'revealed'; player: Seat; cards: string[] }
   | { type: 'moved'; card: string; owner: Seat; from: Place; to: Destination }
   | { type: 'deckShuffled'; player: Seat; order: string[] }
   | { type: 'specialSummoned'; player: Seat; card: string; zone: number; position: Position }

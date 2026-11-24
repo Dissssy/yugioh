@@ -39,7 +39,7 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   // An Xyz Material is not a card on the field, so no filter's place fits it.
   if (at.zone === 'materials') return false;
   const onField = at.zone === 'monsters' || at.zone === 'spellTraps';
-  if (filter.place !== 'any' && (filter.place === 'field' ? !onField : filter.place !== at.zone)) return false;
+  if (filter.places.length && !filter.places.some((p) => (p === 'field' ? onField : p === at.zone))) return false;
   const field = at.zone === 'monsters' || at.zone === 'spellTraps' ? state.players[at.seat][at.zone][at.index]! : null;
   if (filter.faceUp !== null && (!field || field.faceUp !== filter.faceUp)) return false;
   if (filter.position !== null && (at.zone !== 'monsters' || field!.position !== filter.position)) return false;
@@ -131,12 +131,18 @@ export function describeFilter(f: CardFilter, they = false): string {
     !r ? [] : r.min !== null && r.max !== null ? (r.min === r.max ? [`${name} ${r.min}`] : [`${name} ${r.min} to ${r.max}`]) : r.max !== null ? [`${name} ${r.max} or less`] : r.min !== null ? [`${name} ${r.min} or more`] : [];
   const stats = [...range('Level', f.level), ...range('ATK', f.atk), ...range('DEF', f.def)];
   if (stats.length) words.push(`with ${stats.join(' and ')}`);
-  if (f.place === 'any') return words.join(' ');
-  const pile = { hand: 'hand', deck: 'Deck', graveyard: 'GY', banished: 'banished cards' }[f.place as 'hand'];
-  const field = { field: 'on the field', monsters: 'in a Monster Zone', spellTraps: 'in a Spell & Trap Zone' }[f.place as 'field'];
+  if (!f.places.length) return words.join(' ');
   const [you, your] = they ? ['they control', 'their'] : ['you control', 'your'];
-  if (field) words.push(f.side === 'you' ? you : f.side === 'opponent' ? `${your} opponent controls` : field);
-  else words.push(f.side === 'you' ? `in ${your} ${pile}` : f.side === 'opponent' ? `in ${your} opponent's ${pile}` : `in either player's ${pile}`);
+  const pileNames = { hand: 'hand', deck: 'Deck', extra: 'Extra Deck', graveyard: 'GY', banished: 'banished cards' } as const;
+  const piles = f.places.flatMap((p) => (p in pileNames ? [pileNames[p as keyof typeof pileNames]] : []));
+  const field = f.places.find((p) => !(p in pileNames));
+  const parts: string[] = [];
+  if (field) parts.push(f.side === 'you' ? you : f.side === 'opponent' ? `${your} opponent controls` : { field: 'on the field', monsters: 'in a Monster Zone', spellTraps: 'in a Spell & Trap Zone' }[field as 'field']);
+  if (piles.length) {
+    const pile = piles.join(' or ');
+    parts.push(f.side === 'you' ? `in ${your} ${pile}` : f.side === 'opponent' ? `in ${your} opponent's ${pile}` : `in either player's ${pile}`);
+  }
+  words.push(parts.join(' or '));
   return words.join(' ');
 }
 
@@ -151,7 +157,8 @@ function zonesFreedBy(state: DuelState, cost: Step[], card: string): number {
     if (step.do !== 'move') return n;
     if (step.cards.from === 'self') return n + (locate(state, card)?.zone === 'monsters' ? 1 : 0);
     const f = step.cards.from === 'choose' ? step.cards.filter : null;
-    return f && f.side === 'you' && (f.place === 'monsters' || (f.place === 'field' && f.kinds.join() === 'monster')) ? n + (step.cards as { min: number }).min : n;
+    const only = f?.places.length === 1 ? f.places[0] : null;
+    return f && f.side === 'you' && (only === 'monsters' || (only === 'field' && f.kinds.join() === 'monster')) ? n + (step.cards as { min: number }).min : n;
   }, 0);
 }
 
@@ -189,10 +196,15 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, fre
   if (sel.from === 'battling' && battling(state, sel.filter, seat, card).length === 0) return `This card isn't battling a ${describeFilter(sel.filter)}.`;
   if (sel.from === 'all' && cardsFitting(state, sel.filter, seat, card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
   if (sel.from === 'random' && cardsFitting(state, sel.filter, seat, card).length < sel.min) return `There is no ${describeFilter(sel.filter)}.`;
-  if (sel.from === 'choose' && choosableFor(state, step, seat, card).length < sel.min) {
+  if (sel.from === 'choose' && distinctCount(state, choosableFor(state, step, seat, card), sel.distinct) < sel.min) {
     return sel.min === 1 ? `There is no ${describeFilter(sel.filter)}.` : `There are fewer than ${sel.min} of: ${describeFilter(sel.filter)}.`;
   }
   return null;
+}
+
+/** How many cards a `choose` may pick from these: with `distinct`, one per name. */
+export function distinctCount(state: DuelState, ids: string[], distinct: boolean): number {
+  return distinct ? new Set(ids.map((id) => cardOf(state, id).name)).size : ids.length;
 }
 
 /** The monster battling this card, if it fits the filter. */
@@ -257,7 +269,7 @@ export function feasibleOptions(state: DuelState, script: Script, seat: Seat, ca
 
 /** Whether a cost step discards or sends cards from the hand to the GY, which a `cost_substitute` card may stand in for. */
 export function fromHandToGraveyard(step: Step): step is Extract<Step, { do: 'move' }> & { cards: Extract<Selection, { from: 'choose' }> } {
-  return step.do === 'move' && step.to === 'graveyard' && step.cards.from === 'choose' && step.cards.filter.place === 'hand';
+  return step.do === 'move' && step.to === 'graveyard' && step.cards.from === 'choose' && step.cards.filter.places.join() === 'hand';
 }
 
 /**

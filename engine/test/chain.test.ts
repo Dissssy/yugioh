@@ -78,7 +78,7 @@ const cards: Record<number, CardData> = {
 
 const filter = (f: Partial<CardFilter>): CardFilter => ({
   side: 'either',
-  place: 'monsters',
+  places: ['monsters'],
   kinds: [],
   types: [],
   races: [],
@@ -194,18 +194,18 @@ const sheets: Record<number, EffectSheet> = {
   9: sheet(9, effect({ kind: 'activation', speed: 2 })),
   10: sheet(10, effect({ kind: 'activation', speed: 1 })),
   12: sheet(12, effect({ kind: 'trigger', when: when({ event: 'summoned', self: true, canMiss: true, by: null }) })),
-  20: sheet(20, effect({ kind: 'continuous', continuous: { apply: 'banish_instead', filter: filter({ side: 'opponent', place: 'field', kinds: ['spell', 'trap'] }) } })),
+  20: sheet(20, effect({ kind: 'continuous', continuous: { apply: 'banish_instead', filter: filter({ side: 'opponent', places: ['field'], kinds: ['spell', 'trap'] }) } })),
   21: sheet(21, effect({ kind: 'trigger', mandatory: true, when: when({ event: 'damage_step_end', self: true }) })),
-  22: sheet(22, effect({ kind: 'continuous', opt: 'soft', continuous: { apply: 'extra_normal_summon', filter: filter({ side: 'you', place: 'hand', named: 'Ice' }), while: [] } })),
+  22: sheet(22, effect({ kind: 'continuous', opt: 'soft', continuous: { apply: 'extra_normal_summon', filter: filter({ side: 'you', places: ['hand'], named: 'Ice' }), while: [] } })),
   24: sheet(24, effect({ kind: 'continuous', continuous: { apply: 'discard_or_negate', while: [] } })),
   25: sheet(25, effect({ kind: 'continuous', continuous: { apply: 'negate_battled_flips', while: [] } })),
-  30: sheet(30, effect({ kind: 'continuous', from: 'graveyard', opt: 'hard', continuous: { apply: 'cost_substitute', for: filter({ place: 'any', named: 'Ice' }) } })),
+  30: sheet(30, effect({ kind: 'continuous', from: 'graveyard', opt: 'hard', continuous: { apply: 'cost_substitute', for: filter({ places: [], named: 'Ice' }) } })),
   31: sheet(
     31,
     effect({
       kind: 'ignition',
       script: script({
-        cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', place: 'hand' }), min: 1, max: 1, rank: null }, to: 'graveyard' }],
+        cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', places: ['hand'] }), min: 1, max: 1, rank: null, distinct: false }, to: 'graveyard' }],
         options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1 }] }],
       }),
     }),
@@ -642,7 +642,7 @@ describe('locks an effect leaves behind', () => {
     const spells = (t: Table, seat: Seat) => legalActions(t.state, seat).flatMap((a) => (a.type === 'activate' ? [a.card] : []));
     const t = new Table(stacked(pad([2, 10, 2, 2, 2, 2]), pad([10, 2, 2, 2, 2, 2])));
     t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
-    const locked = applyOp(t.state, { op: 'lock', player: 'both', filter: filter({ place: 'any', kinds: ['spell'] }), until: 'your_next_end_phase', while_face_up: true }, ctx0('a0'));
+    const locked = applyOp(t.state, { op: 'lock', player: 'both', filter: filter({ places: [], kinds: ['spell'] }), until: 'your_next_end_phase', while_face_up: true }, ctx0('a0'));
     if (!locked.ok) throw new Error(locked.error);
     t.push(...locked.events);
     expect(spells(t, 0)).toEqual([]);

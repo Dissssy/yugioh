@@ -20,7 +20,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "monsters",
+            "places": [
+              "monsters"
+            ],
             "kinds": [],
             "types": [],
             "races": [],
@@ -97,7 +99,7 @@
         "self": true,
         "filter": {
           "side": "you",
-          "place": "any",
+          "places": [],
           "kinds": [],
           "types": [],
           "races": [],

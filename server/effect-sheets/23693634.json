@@ -22,7 +22,9 @@
         "def": 0,
         "per": {
           "side": "either",
-          "place": "graveyard",
+          "places": [
+            "graveyard"
+          ],
           "kinds": [
             "monster"
           ],
@@ -70,7 +72,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],

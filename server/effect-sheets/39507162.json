@@ -28,7 +28,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "hand",
+              "places": [
+                "hand"
+              ],
               "kinds": [],
               "types": [],
               "races": [],
@@ -68,7 +70,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],

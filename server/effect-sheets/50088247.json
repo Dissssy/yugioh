@@ -20,7 +20,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -61,7 +63,7 @@
                 "what": "special_summon",
                 "filter": {
                   "side": "you",
-                  "place": "any",
+                  "places": [],
                   "kinds": [
                     "monster"
                   ],
@@ -115,7 +117,9 @@
         "targets": {
           "filter": {
             "side": "you",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],

@@ -52,7 +52,9 @@
         "apply": "restrict",
         "to": {
           "side": "opponent",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],

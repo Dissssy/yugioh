@@ -294,6 +294,11 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'targeted', cards: op.cards });
       return;
     }
+    case 'reveal':
+      check(op.cards.length > 0 && new Set(op.cards).size === op.cards.length, 'Reveal at least one card, each once.');
+      for (const id of op.cards) check(state.players[ctx.player].hand.includes(id), 'Only cards in the hand can be revealed.');
+      run.emit({ type: 'revealed', player: ctx.player, cards: op.cards });
+      return;
     case 'choose_effect':
       check(ctx.stage === 'activation', 'The effect is chosen when the card is activated, not when it resolves.');
       check(state.chain.at(-1)!.choice === null, 'An effect was already chosen for this activation.');

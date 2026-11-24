@@ -20,7 +20,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "spellTraps",
+            "places": [
+              "spellTraps"
+            ],
             "kinds": [],
             "types": [],
             "races": [],

@@ -45,7 +45,9 @@
         "self": false,
         "filter": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [
             "Synchro"

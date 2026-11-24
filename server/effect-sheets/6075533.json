@@ -33,7 +33,7 @@
         "self": false,
         "filter": {
           "side": "opponent",
-          "place": "any",
+          "places": [],
           "kinds": [],
           "types": [],
           "races": [],

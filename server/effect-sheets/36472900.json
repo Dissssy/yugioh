@@ -24,7 +24,9 @@
         ],
         "by": {
           "side": "either",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],

@@ -27,7 +27,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "field",
+            "places": [
+              "field"
+            ],
             "kinds": [
               "spell",
               "trap"

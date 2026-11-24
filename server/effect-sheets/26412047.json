@@ -29,7 +29,9 @@
                   "from": "choose",
                   "filter": {
                     "side": "either",
-                    "place": "monsters",
+                    "places": [
+                      "monsters"
+                    ],
                     "kinds": [
                       "monster"
                     ],
@@ -50,7 +52,8 @@
                   "rank": {
                     "stat": "atk",
                     "order": "highest"
-                  }
+                  },
+                  "distinct": false
                 }
               }
             ]

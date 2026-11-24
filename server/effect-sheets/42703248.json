@@ -29,7 +29,9 @@
                   "from": "all",
                   "filter": {
                     "side": "either",
-                    "place": "spellTraps",
+                    "places": [
+                      "spellTraps"
+                    ],
                     "kinds": [
                       "spell",
                       "trap"

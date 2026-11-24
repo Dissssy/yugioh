@@ -37,6 +37,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   banishWhenLeaves: 0,
   targeted: 400,
   effectChosen: 0,
+  revealed: 400,
   moved: 450,
   specialSummoned: 550,
   tokenSummoned: 550,

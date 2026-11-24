@@ -62,7 +62,9 @@
               "from": "choose",
               "filter": {
                 "side": "you",
-                "place": "graveyard",
+                "places": [
+                  "graveyard"
+                ],
                 "kinds": [
                   "monster"
                 ],
@@ -80,7 +82,8 @@
               },
               "min": 1,
               "max": 1,
-              "rank": null
+              "rank": null,
+              "distinct": false
             },
             "to": "banished"
           }

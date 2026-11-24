@@ -19,7 +19,9 @@
         "apply": "extra_normal_summon",
         "filter": {
           "side": "you",
-          "place": "hand",
+          "places": [
+            "hand"
+          ],
           "kinds": [
             "monster"
           ],

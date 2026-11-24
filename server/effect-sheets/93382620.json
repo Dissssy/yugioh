@@ -18,7 +18,9 @@
         "self": false,
         "filter": {
           "side": "you",
-          "place": "graveyard",
+          "places": [
+            "graveyard"
+          ],
           "kinds": [
             "monster"
           ],
@@ -47,7 +49,9 @@
               "from": "all",
               "filter": {
                 "side": "you",
-                "place": "hand",
+                "places": [
+                  "hand"
+                ],
                 "kinds": [],
                 "types": [],
                 "races": [],
@@ -68,7 +72,9 @@
         "targets": {
           "filter": {
             "side": "you",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],

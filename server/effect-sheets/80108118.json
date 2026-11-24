@@ -27,7 +27,9 @@
             "if": "count",
             "filter": {
               "side": "opponent",
-              "place": "hand",
+              "places": [
+                "hand"
+              ],
               "kinds": [],
               "types": [],
               "races": [],
@@ -58,7 +60,9 @@
                   "from": "random",
                   "filter": {
                     "side": "opponent",
-                    "place": "hand",
+                    "places": [
+                      "hand"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],

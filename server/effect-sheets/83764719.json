@@ -20,7 +20,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],
