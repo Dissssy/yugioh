@@ -34,6 +34,10 @@ const env = z.object({
    * server/effect-sheets/ again, so a deploy plays the repository's sheets and nothing players flagged.
    */
   RESET_SHEETS: z.stringbool().default(false),
+  /** The Discord app behind the Activity (docs/discord.md). Without all three, the Activity can't sign anyone in. */
+  DISCORD_CLIENT_ID: z.string().min(1).optional(),
+  DISCORD_CLIENT_SECRET: z.string().min(1).optional(),
+  DISCORD_BOT_TOKEN: z.string().min(1).optional(),
 });
 
 export const cardImageDir = (source: NodeJS.ProcessEnv = process.env) => env.shape.CARD_IMAGE_DIR.parse(source.CARD_IMAGE_DIR);
@@ -41,5 +45,8 @@ export const cardImageDir = (source: NodeJS.ProcessEnv = process.env) => env.sha
 export type Config = z.infer<typeof env>;
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
-  return env.parse(source);
+  const config = env.parse(source);
+  const discord = [config.DISCORD_CLIENT_ID, config.DISCORD_CLIENT_SECRET, config.DISCORD_BOT_TOKEN];
+  if (discord.some(Boolean) && !discord.every(Boolean)) throw new Error('Set all of DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET and DISCORD_BOT_TOKEN, or none.');
+  return config;
 }

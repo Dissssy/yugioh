@@ -24,6 +24,9 @@ The shared Postgres runs as compose project `/git/postgres` (service `db`, Docke
    AUTH0_CLIENT_SECRET=
    ADMIN_EMAIL=
    ANTHROPIC_API_KEY=     # card effects and appeals; see effects.md
+   DISCORD_CLIENT_ID=     # optional, all three or none: the Discord Activity; see discord.md
+   DISCORD_CLIENT_SECRET=
+   DISCORD_BOT_TOKEN=
    ```
 
    compose.yaml sets `PORT` and `CARD_IMAGE_DIR` itself. Auth0 setup is in [accounts.md](accounts.md).

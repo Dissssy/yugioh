@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createApp } from './app.ts';
+import { discordApi } from './discord.ts';
 import { scheduleCardSync } from './cards.ts';
 import { resetSheets } from './sheets.ts';
 import { loadConfig } from './config.ts';
@@ -23,6 +24,9 @@ const model = client && ((params: Anthropic.MessageCreateParamsNonStreaming) => 
 if (!isPriced(config.AI_OPPONENT_MODEL)) throw new Error(`AI_OPPONENT_MODEL ${config.AI_OPPONENT_MODEL} has no price in server/src/judge/pricing.ts; add one so its calls are counted.`);
 const opponent = model && { call: model, model: config.AI_OPPONENT_MODEL, calls: config.AI_CALLS_PER_DUEL, paceMs: 800 };
 const ai = { judge: model, appeal: model, judgeCalls: config.JUDGE_CALLS_PER_DUEL, appeals: config.APPEALS_PER_DUEL, questions: config.QUESTIONS_PER_DUEL, opponent };
-createApp(config, db, ai).listen(config.PORT, () => {
+const { DISCORD_CLIENT_ID: clientId, DISCORD_CLIENT_SECRET: clientSecret, DISCORD_BOT_TOKEN: botToken } = config;
+const discord = clientId && clientSecret && botToken ? discordApi({ clientId, clientSecret, botToken }) : null;
+if (!discord) console.warn('No Discord app configured: the Discord Activity is off.');
+createApp(config, db, ai, discord).listen(config.PORT, () => {
   console.log(`Server listening on http://localhost:${config.PORT} (public URL ${config.BASE_URL})`);
 });

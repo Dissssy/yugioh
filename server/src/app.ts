@@ -6,13 +6,14 @@ import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
 import { isAdmin, NO_BANLIST, type AdminDuels, type Me, type Rulings, type UserSettings } from '@yugioh/shared';
-import { findUserBySub, listUsers, setRole, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
+import { findUserById, findUserBySub, listUsers, setRole, setStatus, setUsername, settingsOf, syncDiscordUser, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import { duelCosts } from './costs.ts';
 import { banlistRoutes } from './banlistRoutes.ts';
 import { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
 import { deckForDuel, deckRoutes } from './deckRoutes.ts';
+import type { DiscordApi } from './discord.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
@@ -25,9 +26,12 @@ import { userKey, viewerOf, type Viewer } from './viewer.ts';
 const GUEST_COOKIE = 'guest';
 /** The guest cookie outlives any reasonable duel; the guest row, not the cookie, decides access. */
 const GUEST_COOKIE_MS = 365 * 24 * 60 * 60 * 1000;
+/** Holds the account's ID for the Discord Activity, which signs in again every time it opens. */
+const DISCORD_COOKIE = 'discord';
+const DISCORD_COOKIE_MS = 7 * 24 * 60 * 60 * 1000;
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
-export function createApp(config: Config, db: Db, ai: Ai, random?: () => number) {
+export function createApp(config: Config, db: Db, ai: Ai, discord: DiscordApi | null, random?: () => number) {
   const app = express();
   app.set('trust proxy', 'loopback, linklocal, uniquelocal');
   const secure = config.BASE_URL.startsWith('https:');
@@ -64,6 +68,34 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     clear: (res) => void res.clearCookie(GUEST_COOKIE),
   };
 
+  // The Activity runs in an iframe on discord.com, where browsers only send a cookie marked SameSite=None. Partitioned
+  // keeps it to Discord's frames, as Discord's docs advise; no other site's pages can send it along.
+  const discordCookieOptions = { signed: true, httpOnly: true, secure: true, sameSite: 'none', partitioned: true } as const;
+
+  // The Activity asks for its client ID before it can ask Discord to sign the player in.
+  app.get('/api/discord', (_req, res) => {
+    if (!discord) return void res.status(404).json({ error: 'discord_off' });
+    res.json({ clientId: discord.clientId });
+  });
+
+  // Signs in someone in the Activity, from the code Discord's `authorize` gave it. Only people Discord shows inside
+  // a running copy of the Activity get in (see discord.ts). Answers with the access token the Activity needs for
+  // Discord's `authenticate`.
+  const discordSessionBody = z.object({ code: z.string().min(1), instanceId: z.string().min(1) });
+  app.post('/api/discord/session', async (req, res) => {
+    if (!discord) return void res.status(404).json({ error: 'discord_off' });
+    const body = discordSessionBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    const accessToken = await discord.exchangeCode(body.data.code);
+    if (!accessToken) return void res.status(401).json({ error: 'Discord refused the sign-in. Close the Activity and open it again.' });
+    const user = await discord.user(accessToken);
+    const inside = await discord.instanceUsers(body.data.instanceId);
+    if (!inside?.includes(user.id)) return void res.status(403).json({ error: 'Open the Activity from a Discord call to sign in.' });
+    const row = await syncDiscordUser(db, user.id);
+    res.cookie(DISCORD_COOKIE, String(row.id), { ...discordCookieOptions, maxAge: DISCORD_COOKIE_MS });
+    res.json({ accessToken });
+  });
+
   // Works out who is asking: a signed-in account, a guest, or nobody.
   app.use('/api', async (req, res, next) => {
     res.locals.viewer = await resolveViewer(req, res);
@@ -83,8 +115,21 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
       if (guest && user.status === 'approved' && (await adoptGuest(db, guest.id, userKey(user.id)))) guestCookie.clear(res);
       return { kind: 'user', user, settings: settingsOf(row) };
     }
+    const discordUser = await discordViewer(req, res);
+    if (discordUser) return discordUser;
     if (guest) return { kind: 'guest', guest: { name: guest.name }, guestId: guest.id };
     return { kind: 'anonymous' };
+  }
+
+  async function discordViewer(req: Request, res: Response): Promise<Viewer | null> {
+    const id: unknown = req.signedCookies[DISCORD_COOKIE];
+    if (typeof id !== 'string') return null;
+    const row = await findUserById(db, Number(id));
+    if (!row?.discordId) {
+      res.clearCookie(DISCORD_COOKIE, discordCookieOptions);
+      return null;
+    }
+    return { kind: 'user', user: toUser(row), settings: settingsOf(row) };
   }
 
   const viewer = viewerOf;

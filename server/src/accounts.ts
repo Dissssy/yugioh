@@ -41,19 +41,43 @@ function isUsernameTaken(error: unknown): boolean {
 export async function syncUser(db: Db, claims: LoginClaims, adminEmail: string): Promise<UserRow> {
   const email = claims.email?.toLowerCase() ?? null;
   const isSuper = claims.email_verified === true && email === adminEmail;
-  // A random username is rarely taken already; draw again when it is.
+  return withRandomUsername((username) =>
+    db
+      .insert(users)
+      .values({ auth0Sub: claims.sub, email, username, role: isSuper ? 'superAdmin' : 'player', status: isSuper ? 'approved' : 'pending' })
+      .onConflictDoUpdate({
+        target: users.auth0Sub,
+        set: isSuper
+          ? { email, role: 'superAdmin', status: 'approved' }
+          : { email, role: sql`case when ${users.role} = 'superAdmin' then 'player'::account_role else ${users.role} end` },
+      })
+      .returning(),
+  );
+}
+
+/**
+ * Creates or finds the account for someone signing in from the Discord Activity. Only the app's testers can open the
+ * Activity, so they are trusted like approved players: a new account starts approved, and a pending one is approved.
+ * An account an admin rejected stays rejected.
+ */
+export async function syncDiscordUser(db: Db, discordId: string): Promise<UserRow> {
+  return withRandomUsername((username) =>
+    db
+      .insert(users)
+      .values({ discordId, username, status: 'approved' })
+      .onConflictDoUpdate({
+        target: users.discordId,
+        set: { status: sql`case when ${users.status} = 'pending' then 'approved'::account_status else ${users.status} end` },
+      })
+      .returning(),
+  );
+}
+
+/** Runs an insert that gives a new account a random username, drawing again in the rare case it is taken. */
+async function withRandomUsername(insert: (username: string) => Promise<UserRow[]>): Promise<UserRow> {
   for (let attempt = 1; ; attempt++) {
     try {
-      const [row] = await db
-        .insert(users)
-        .values({ auth0Sub: claims.sub, email, username: randomUsername(), role: isSuper ? 'superAdmin' : 'player', status: isSuper ? 'approved' : 'pending' })
-        .onConflictDoUpdate({
-          target: users.auth0Sub,
-          set: isSuper
-            ? { email, role: 'superAdmin', status: 'approved' }
-            : { email, role: sql`case when ${users.role} = 'superAdmin' then 'player'::account_role else ${users.role} end` },
-        })
-        .returning();
+      const [row] = await insert(randomUsername());
       return row!;
     } catch (error) {
       if (attempt >= 5 || !isUsernameTaken(error)) throw error;
@@ -80,6 +104,10 @@ export async function updateSettings(db: Db, id: number, change: Partial<UserSet
     .where(eq(users.id, id))
     .returning();
   return settingsOf(row!);
+}
+
+export async function findUserById(db: Db, id: number): Promise<UserRow | undefined> {
+  return db.query.users.findFirst({ where: eq(users.id, id) });
 }
 
 export async function findUserBySub(db: Db, sub: string): Promise<UserRow | undefined> {

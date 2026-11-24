@@ -1,17 +1,21 @@
 import { sql } from 'drizzle-orm';
 import type { EffectSheet } from '@yugioh/engine';
 import type { Banlist, DuelDeck, DuelOutcome, UserSettings } from '@yugioh/shared';
-import { boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, check, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
 export const accountRole = pgEnum('account_role', ['player', 'admin', 'superAdmin']);
 
-/** An account. Only the admin ever sees the email; everyone else sees the username. */
+/**
+ * An account. It signs in through Auth0 on the website, through Discord in the Activity, or both once linked.
+ * Only the admin ever sees the email; everyone else sees the username.
+ */
 export const users = pgTable(
   'users',
   {
     id: serial('id').primaryKey(),
-    auth0Sub: text('auth0_sub').notNull().unique(),
+    auth0Sub: text('auth0_sub').unique(),
+    discordId: text('discord_id').unique(),
     email: text('email'),
     username: text('username').notNull(),
     status: accountStatus('status').notNull().default('pending'),
@@ -21,7 +25,10 @@ export const users = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   // Usernames are unique regardless of case, so `Yugi` and `yugi` can't both exist.
-  (t) => [uniqueIndex('users_username_lower_unique').on(sql`lower(${t.username})`)],
+  (t) => [
+    uniqueIndex('users_username_lower_unique').on(sql`lower(${t.username})`),
+    check('users_has_login', sql`${t.auth0Sub} is not null or ${t.discordId} is not null`),
+  ],
 );
 
 /**
