@@ -3,10 +3,11 @@
 import { randomBytes } from 'node:crypto';
 import type { CookieOptions, Express, Request, Response } from 'express';
 import { z } from 'zod';
-import { findUserByDiscordId, linkAccounts, syncDiscordUser, syncWebDiscordUser } from './accounts.ts';
+import { findUserByDiscordId, linkAccounts, syncDiscordUser } from './accounts.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db/client.ts';
 import type { DiscordApi } from './discord.ts';
+import { serverOpened, serverOpenedBy } from './discordServers.ts';
 import { viewerOf } from './viewer.ts';
 
 /** Holds the Discord user ID of whoever signed in with Discord. The account is looked up by it on every request. */
@@ -61,9 +62,9 @@ export function discordRoutes(app: Express, config: Config, db: Db, discord: Dis
   });
 
   // Signs in someone in the Activity, from the code Discord's `authorize` gave it. Anyone can run Discord's login
-  // against the app outside Discord, so only people Discord shows inside a running copy of the Activity get in, and
-  // only members of a server the app was added to, and its testers, can open it. Answers with the access token the
-  // Activity needs for Discord's `authenticate`.
+  // against the app outside Discord, so only people Discord shows inside a running copy of the Activity get in. Those in
+  // a server an admin trusts are approved; anywhere else (another server, a DM) they wait for approval. Answers with the access
+  // token the Activity needs for Discord's `authenticate`.
   const sessionBody = z.object({ code: z.string().min(1), instanceId: z.string().min(1) });
   app.post('/api/discord/session', async (req, res) => {
     if (!discord) return void res.status(404).json({ error: 'discord_off' });
@@ -74,7 +75,10 @@ export function discordRoutes(app: Express, config: Config, db: Db, discord: Dis
     const user = await discord.user(accessToken);
     const instance = await discord.instance(body.data.instanceId);
     if (!instance?.users.includes(user.id)) return void res.status(403).json({ error: 'Open the Activity from a Discord call to sign in.' });
-    await syncDiscordUser(db, user.id);
+    const server = instance.place.startsWith('guild:') ? instance.place.slice('guild:'.length) : null;
+    const trusted = server !== null && (await serverOpened(db, server));
+    const account = await syncDiscordUser(db, user.id, trusted);
+    if (server !== null) await serverOpenedBy(db, server, account.id);
     startSession(res, user.id, inFrame);
     res.cookie(PLACE_COOKIE, instance.place, { ...inFrame, maxAge: SESSION_MS });
     res.json({ accessToken });
@@ -103,11 +107,11 @@ export function discordRoutes(app: Express, config: Config, db: Db, discord: Dis
     const user = await discord.user(accessToken);
     const { returnTo, link } = login.data;
     if (link === undefined) {
-      await syncWebDiscordUser(db, user.id);
+      await syncDiscordUser(db, user.id, false);
       startSession(res, user.id, onSite);
       return void res.redirect(returnTo);
     }
-    const linked = await linkAccounts(db, link, (await syncWebDiscordUser(db, user.id)).id);
+    const linked = await linkAccounts(db, link, (await syncDiscordUser(db, user.id, false)).id);
     res.redirect('error' in linked ? `/account?linkError=${encodeURIComponent(linked.error)}` : '/account');
   });
 

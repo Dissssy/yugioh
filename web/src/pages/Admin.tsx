@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EffectSheet } from '@yugioh/engine';
-import { isAdmin, type AccountStatus, type AdminDuels, type AdminUser, type Me, type Role, type RulingCard, type Rulings } from '@yugioh/shared';
+import { isAdmin, type AccountStatus, type AdminDuels, type AdminUser, type DiscordServer, type Me, type Role, type RulingCard, type Rulings } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { api, errorText } from '../api.ts';
@@ -16,6 +16,7 @@ export function Admin({ me }: { me: Me }) {
   return (
     <>
       <Accounts superAdmin={me.user.role === 'superAdmin'} />
+      <DiscordServers />
       <RulingsSection />
       <RecentDuels />
     </>
@@ -195,6 +196,64 @@ function RulingEditor({ card }: { card: RulingCard }) {
         <p className="muted">This card has no effect sheet.</p>
       )}
     </div>
+  );
+}
+
+/**
+ * The Discord servers the Activity was opened in. Whoever opens it in a trusted one is approved automatically; anywhere
+ * else they wait here like a website signup. Hidden until the Activity has been opened in a server.
+ */
+function DiscordServers() {
+  const queryClient = useQueryClient();
+  const servers = useQuery({ queryKey: ['admin', 'discord-servers'], queryFn: () => api<DiscordServer[]>('/admin/discord-servers') });
+  const setTrusted = useMutation({
+    mutationFn: ({ id, trusted }: { id: string; trusted: boolean }) =>
+      api(`/admin/discord-servers/${id}`, { method: 'POST', body: JSON.stringify({ trusted }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'discord-servers'] }),
+  });
+
+  if (servers.isError) return <Failed what="Discord servers" error={servers.error} />;
+  if (!servers.data?.length) return null;
+  return (
+    <section className="box admin">
+      <div className="page-head">
+        <h1>Discord servers</h1>
+      </div>
+      <p className="muted small">
+        Everyone who opens the Activity in a trusted server is approved automatically. Elsewhere, new players wait for
+        approval above. Discord doesn't tell the site a server's name, so who opened it last shows which one it is.
+      </p>
+      {setTrusted.error && <p className="error">{errorText(setTrusted.error)}</p>}
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Server</th><th>Last opened</th><th>Approve players</th></tr>
+          </thead>
+          <tbody>
+            {servers.data.map((server) => (
+              <tr key={server.id}>
+                <td>{server.id}</td>
+                <td className="muted">
+                  {formatDate(server.lastOpenedAt)}
+                  {server.lastOpenedBy && <div className="small">by {server.lastOpenedBy}</div>}
+                </td>
+                <td>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={server.trusted}
+                      disabled={setTrusted.isPending}
+                      onChange={(e) => setTrusted.mutate({ id: server.id, trusted: e.target.checked })}
+                    />{' '}
+                    Trusted
+                  </label>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

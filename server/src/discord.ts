@@ -1,6 +1,6 @@
 // Signing in from inside the Discord Activity (docs/discord.md). Discord's login alone proves only who someone is,
 // and anyone can run it against our app outside Discord. So the server also asks Discord, with the app's bot token,
-// whether that person is in a running copy of the Activity, which only members of a server the app was added to, and the app's testers, can open.
+// whether that person is in a running copy of the Activity, and where it runs, since only servers an admin trusts approve.
 
 const API = 'https://discord.com/api/v10';
 

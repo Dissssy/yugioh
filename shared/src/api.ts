@@ -28,6 +28,14 @@ export interface AdminUser extends User {
   email: string | null;
 }
 
+/** A Discord server the Activity was opened in, for the admin to trust or not. */
+export interface DiscordServer {
+  id: string;
+  trusted: boolean;
+  lastOpenedAt: string;
+  lastOpenedBy: string | null;
+}
+
 /**
  * Who is making the request. A guest is someone without an account who accepted a challenge link; only accounts
  * have settings.

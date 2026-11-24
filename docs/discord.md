@@ -7,14 +7,14 @@ Built so far: signing in inside the Activity, Discord logins and account linking
 ## Who can play
 
 - Until an Activity is verified, anyone in a server the app was added to can launch it there and join it. Elsewhere (DMs, group DMs, or a user install from the app's link) only the app's owner, its developer team and its **App Testers** (up to 50, added by Discord username, each needing a verified email to accept) can launch or join it; anyone else sees "this server doesn't have access to the activity". Testers don't need Application Test Mode, which also turns off when Discord restarts.
-- Unverified Activities launch only in servers with **fewer than 25 members**, and in DMs and group DMs. Testers aren't exempt.
+- Discord's docs say unverified Activities launch only in servers with fewer than 25 members, but it launched fine in a 75-member server (tested 2026-11-24).
 - Verification would make the Activity visible to everyone on Discord and needs Discord's review. It isn't planned (the card art belongs to Konami).
 
 ## How signing in works
 
 1. Discord opens the site with `frame_id`, `instance_id` and other values in the address. `web/src/discord.ts` sees `frame_id`, loads Discord's Embedded App SDK and asks Discord to `authorize` the player (scope `identify`; Discord asks only the first time).
-2. The web app sends the code and the instance ID to `POST /api/discord/session`. The server trades the code for an access token, reads who the player is, and then asks Discord, with the app's bot token, who is in that running instance (`GET /applications/{app}/activity-instances/{instance}`). Anyone can run Discord's login against the app outside Discord, so the server lets someone in only when Discord lists them inside a running copy of the Activity, which only members of a server the app was added to, and testers, can open.
-3. The account is found or created by Discord user ID (`users.discord_id`). Everyone who gets in this way is trusted like an approved player: a new account starts approved, and a pending one is approved. An account an admin rejected stays rejected.
+2. The web app sends the code and the instance ID to `POST /api/discord/session`. The server trades the code for an access token, reads who the player is, and then asks Discord, with the app's bot token, who is in that running instance (`GET /applications/{app}/activity-instances/{instance}`). Anyone can run Discord's login against the app outside Discord, so the server lets someone in only when Discord lists them inside a running copy of the Activity. That alone doesn't make them trusted, since anyone can add the app to a server of their own.
+3. The account is found or created by Discord user ID (`users.discord_id`). Someone who opens the Activity in a server an admin marked **trusted** is trusted like an approved player: a new account starts approved, and a pending one is approved. Anywhere else (another server, a DM) a new account starts pending, like a website signup, and an approved one stays approved. An account an admin rejected stays rejected.
 4. The server sets a signed `discord` cookie holding the account ID, marked `SameSite=None; Secure; Partitioned` as Discord's docs advise for iframes, so the API and the live duel streams work as they do on the website. The Activity signs in again each time it opens.
 
 ## Open games
@@ -26,6 +26,10 @@ Inside a server, the Activity's home page shows **Open games** where the website
 **Choosing a deck right away.** Everywhere, website included, the challenger chooses and readies their deck as soon as the challenge exists, with "Nobody has taken up the challenge yet" and the challenge link beside it. Whoever takes the seat then chooses theirs, and the duel starts once both are ready.
 
 Where the Activity was opened comes from Discord's answer about the instance at sign-in: `guild:<server id>`, or `dm:<channel id>` in a DM. It is kept in a second signed cookie, `discord_place`, so it can't be made up. Duels store it in `matches.place`, and a site-wide scope can be added later the same way. `GET /api/open-games` returns `{ dm, games, previews }` and answers 404 outside the Activity.
+
+## Trusted servers
+
+Every server the Activity is opened in is recorded (`discord_servers`), and the Admin page lists them under **Discord servers** with who opened each last and a **Trusted** switch. Discord tells an app a server's name only through a bot, which this app doesn't have (its install link asks only for `applications.commands`), so servers show as IDs. Trusting a server approves its players the next time they open the Activity; until then, those already waiting can be approved under Accounts.
 
 ## Inside Discord's window
 
@@ -66,6 +70,7 @@ In the [Discord Developer Portal](https://discord.com/developers/applications):
    ```
 
    Set all three or none. Without them the Activity and Log in with Discord are off, and the rest of the site is unaffected.
+9. Open the Activity in your server once, then tick **Trusted** for it under **Discord servers** on the Admin page.
 
 To launch: join a voice channel (or a DM call) in Discord, open the Activities (rocket) button, and pick the app.
 
