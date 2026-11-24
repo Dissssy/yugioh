@@ -94,9 +94,9 @@ export function PhaseDial({
 
 /**
  * The row between the two fields: the two Extra Monster Zones with the phase dial between them, whose turn it is and
- * the chain on the left, and on the right what the duel is waiting for: a choice to make, a question, or whom it waits
- * on. A compact board shows the dial and the prompt in a bar beside it instead, where they have room, and the chain
- * takes the middle.
+ * the chain on the left, and on the right what the duel is doing: whom it waits on, or the player's own move in
+ * progress. A compact board shows the dial and the prompt in a bar beside it instead, where they have room, and the
+ * chain takes the middle. A decision the player must make (`decision`) sits over the field above or below the strip.
  */
 export function PhaseStrip({
   yours,
@@ -104,6 +104,7 @@ export function PhaseStrip({
   extraZones,
   middle,
   prompt,
+  decision,
 }: {
   yours: boolean;
   side: ReactNode;
@@ -111,6 +112,7 @@ export function PhaseStrip({
   extraZones: [ReactNode, ReactNode];
   middle: ReactNode;
   prompt: ReactNode;
+  decision?: ReactNode;
 }) {
   return (
     <div className={`phase-strip${yours ? ' yours' : ''}`} data-area="strip">
@@ -119,6 +121,7 @@ export function PhaseStrip({
       <div className="strip-middle">{middle}</div>
       {extraZones[1]}
       <div className="strip-prompt">{prompt}</div>
+      {decision}
     </div>
   );
 }

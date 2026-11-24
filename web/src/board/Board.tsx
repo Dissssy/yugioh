@@ -28,6 +28,7 @@ import { typing, useKeyboardNav } from './nav.ts';
 import { ReplayBar } from './ReplayBar.tsx';
 import { WatchBar } from './WatchBar.tsx';
 import { CopyLink } from '../CopyLink.tsx';
+import { DecisionPopup } from './DecisionPopup.tsx';
 import { useSmallFrame } from '../discord.ts';
 import { useDuel } from './useDuel.ts';
 import { useReplay } from './useReplay.ts';
@@ -619,35 +620,36 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
       <button onClick={() => send.mutate({ type: 'tax', discard: null })}>Let it be negated</button>
     </span>
   );
-  const respondNote =
+  /** Whether this player may respond now with something; with nothing, the window closes by itself once the response floor has passed. */
+  const canRespond = !!waiting && waiting.player === me && !!pass && (waiting.for !== 'respond' || actions.some((a) => a.type === 'activate'));
+  const respondNote = waiting && waiting.player === me && pass && canRespond && (
+    <span className="choice-prompt" role="group">
+      <span className="choice-text">
+        {waiting.for === 'triggers'
+          ? 'Activate a trigger effect?'
+          : topLink
+            ? `Respond to ${dataOf(topLink.card)?.name ?? 'the chain'}?`
+            : `Respond to ${waiting.cause ?? 'this'}?`}
+      </span>
+      <button className="primary" onClick={() => start(pass)}>
+        {waiting.for === 'triggers' ? "Don't activate" : 'Pass'}
+      </button>
+    </span>
+  );
+  /** Whom the duel waits on, when it isn't this player's decision. */
+  const waitNote =
     waiting &&
-    (waiting.player === me && pass ? (
-      <span className="choice-prompt" role="group">
-        <span className="choice-text">
-          {waiting.for === 'triggers'
-            ? 'Activate a trigger effect?'
-            : topLink
-              ? `Respond to ${dataOf(topLink.card)?.name ?? 'the chain'}?`
-              : `Respond to ${waiting.cause ?? 'this'}?`}
-        </span>
-        {waiting.for === 'respond' && !actions.some((a) => a.type === 'activate') ? (
-          // With nothing to respond with, the window closes by itself once the response floor has passed.
-          <button disabled title="You have nothing to respond with, so the duel moves on by itself.">
-            Pass
-          </button>
-        ) : (
-          <button className="primary" onClick={() => start(pass)}>
-            {waiting.for === 'triggers' ? "Don't activate" : 'Pass'}
-          </button>
-        )}
+    !canRespond &&
+    (waiting.player === me ? (
+      <span className="judging" role="status">
+        <span className="dot" />
+        No response to {topLink ? (dataOf(topLink.card)?.name ?? 'the chain') : (waiting.cause ?? 'this')}, moving on…
       </span>
     ) : (
-      waiting.player !== me && (
-        <span className="judging" role="status">
-          <span className="dot" />
-          Waiting for {view.players[waiting.player].name}…
-        </span>
-      )
+      <span className="judging" role="status">
+        <span className="dot" />
+        Waiting for {view.players[waiting.player].name}…
+      </span>
     ));
   /** The chain waiting to resolve, link 1 first. */
   const chainNote = view.chain.length > 0 && (
@@ -713,7 +715,17 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
       readOnly={readOnly}
     />
   );
-  const stripPrompt = prompt || choiceBar || judgeNote || rollbackNote || replaceNote || taxNote || respondNote || null;
+  /** A decision the duel waits on this player for: in a popup over the field, never squeezed into the strip. */
+  const decision = readOnly ? null : choiceBar || rollbackNote || replaceNote || taxNote || respondNote || null;
+  const decisionId = choice ? choice.prompt.id : rollbackNote ? 'rollback' : replaceNote ? `replace:${replace.card}` : taxNote ? 'tax' : `respond:${view.chain.length}:${waiting?.cause ?? ''}`;
+  // Kept off the cards being picked: over your own field when any of them are on the opponent's.
+  const decisionOver = choice?.prompt.cards.some((o) => o.seat === foe && o.zone !== null) ? 'mine' : 'foe';
+  const decisionPopup = decision && !openPile && (
+    <DecisionPopup id={decisionId} over={decisionOver}>
+      {decision}
+    </DecisionPopup>
+  );
+  const stripPrompt = prompt || (readOnly && rollbackNote) || judgeNote || waitNote || null;
 
   /** Runs a shortcut (docs/keyboard.md); false when it does nothing now, so the key keeps its usual meaning. */
   function shortcut(key: Shortcut): boolean {
@@ -806,6 +818,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                       extraZones={[<ExtraMonsterZone key="left" side="left" mine={myField} foe={foeField} />, <ExtraMonsterZone key="right" side="right" mine={myField} foe={foeField} />]}
                       middle={look.compact ? chainNote || null : dial}
                       prompt={look.compact ? null : stripPrompt}
+                      decision={decisionPopup}
                     />
                     <Field {...myField} />
                     <div className="hand-row own-row">
