@@ -75,6 +75,8 @@ function eventStream(req: Request, res: Response, onClose: () => void): (data: u
     'cache-control': 'no-cache',
     'x-accel-buffering': 'no', // keeps nginx from buffering the stream
   });
+  // Sent now, so the stream opens even if nothing is sent on it for a while.
+  res.flushHeaders();
   const keepalive = setInterval(() => res.write(': keepalive\n\n'), KEEPALIVE_MS);
   req.on('close', () => {
     clearInterval(keepalive);
