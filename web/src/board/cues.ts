@@ -22,6 +22,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   spellTrapSet: 400,
   flipSummoned: 500,
   flipped: 450,
+  turnedFaceDown: 400,
   positionChanged: 400,
   attackDeclared: 550,
   battleDamage: 650,

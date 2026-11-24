@@ -14,7 +14,128 @@
       "effect": "Flip the target face-up, then destroy it if its DEF is 2000 or less, or return it face-down if its DEF is more than 2000.",
       "targets": "1 face-down Defense Position monster on the field",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "places": [
+              "monsters"
+            ],
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": false,
+            "position": "defense",
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_position",
+                "cards": {
+                  "from": "targets"
+                },
+                "position": "defense"
+              },
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "targets",
+                    "filter": {
+                      "side": "either",
+                      "places": [
+                        "monsters"
+                      ],
+                      "kinds": [
+                        "monster"
+                      ],
+                      "types": [],
+                      "races": [],
+                      "attributes": [],
+                      "named": null,
+                      "except": null,
+                      "extraDeck": null,
+                      "faceUp": true,
+                      "position": null,
+                      "level": null,
+                      "atk": null,
+                      "def": {
+                        "min": null,
+                        "max": 2000
+                      },
+                      "original": false
+                    }
+                  }
+                ]
+              },
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              },
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "targets",
+                    "filter": {
+                      "side": "either",
+                      "places": [
+                        "monsters"
+                      ],
+                      "kinds": [
+                        "monster"
+                      ],
+                      "types": [],
+                      "races": [],
+                      "attributes": [],
+                      "named": null,
+                      "except": null,
+                      "extraDeck": null,
+                      "faceUp": true,
+                      "position": null,
+                      "level": null,
+                      "atk": null,
+                      "def": {
+                        "min": 2001,
+                        "max": null
+                      },
+                      "original": false
+                    }
+                  }
+                ]
+              },
+              {
+                "do": "change_position",
+                "cards": {
+                  "from": "targets"
+                },
+                "position": "face_down"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

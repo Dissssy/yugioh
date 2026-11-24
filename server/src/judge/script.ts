@@ -336,12 +336,20 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
           const at = locate(state, id);
           if (at?.zone !== 'monsters') continue;
           const m = state.players[at.seat].monsters[at.index]!;
-          const position = step.position === 'switch' ? (m.position === 'attack' ? 'defense' : 'attack') : step.position;
-          if (m.faceUp && m.position === position) continue;
-          apply({ op: 'change_position', card: id, position });
+          if (step.position === 'face_down') {
+            if (!m.faceUp) continue;
+            apply({ op: 'turn_face_down', card: id });
+          } else {
+            const position = step.position === 'switch' ? (m.position === 'attack' ? 'defense' : 'attack') : step.position;
+            if (m.faceUp && m.position === position) continue;
+            apply({ op: 'change_position', card: id, position });
+          }
           changed.push(id);
+          // A target this effect changed is still its target ("flip it face-up, then destroy it").
+          movedHere.add(id);
         }
-        return changed.length ? `${list(changed.map((id) => shown(id, before)))} changed battle position.` : null;
+        if (!changed.length) return null;
+        return `${list(changed.map((id) => shown(id, before)))} ${step.position === 'face_down' ? 'turned face-down' : 'changed battle position'}.`;
       }
       case 'take_control': {
         const taken: string[] = [];
@@ -508,7 +516,10 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       case 'reveal': {
         // "Reveal any number ... to select an equal number": no more than there are cards to target.
         const limit = cost ? costLimit() : Infinity;
-        const cards = (await select(step.cards, 'reveal', limit)).filter((id) => state.players[seat].hand.includes(id));
+        const cards = (await select(step.cards, 'reveal', limit)).filter((id) => {
+          const at = locate(state, id);
+          return state.players[seat].hand.includes(id) || ((at?.zone === 'monsters' || at?.zone === 'spellTraps') && !state.players[at.seat][at.zone][at.index]!.faceUp);
+        });
         if (!cards.length) return null;
         apply({ op: 'reveal', cards });
         if (cost) paid.push(...cards);
@@ -557,7 +568,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     let skipping = false;
     for (const step of steps) {
       if (step.do === 'only_if') {
-        skipping = step.conditions.some((c) => conditionProblem(state, c, seat, self));
+        skipping = step.conditions.some((c) => conditionProblem(state, c, seat, self, link.targets));
         continue;
       }
       if (skipping) continue;

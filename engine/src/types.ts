@@ -197,7 +197,13 @@ export type Condition =
   /** "except the turn it was sent there": this card wasn't sent to the GY this turn. */
   | { if: 'not_sent_this_turn' }
   /** "at damage calculation": an attack is in its Damage Step, before its damage is calculated. */
-  | { if: 'damage_calculation' };
+  | { if: 'damage_calculation' }
+  /**
+   * Every target of the effect still there fits `filter`, a Set card by what it is ("destroy it if it is a Spell Card",
+   * after revealing it; "destroy it if its DEF is 2000 or less"). Only an `only_if` can check it: targets are chosen
+   * after the activation's conditions.
+   */
+  | { if: 'targets'; filter: CardFilter };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
 /** A Token's printed stats ("Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)). */
@@ -265,8 +271,11 @@ export type Step =
   | { do: 'remove_counters'; cards: Selection; counter: Counter; count: number }
   /** The selected monsters' control passes to the activating player, until the End Phase or (null) for good. */
   | { do: 'take_control'; cards: Selection; until: 'end_phase' | null }
-  /** Changes the battle position of the monsters selected; `switch` turns Attack to Defense and Defense to Attack. A face-down monster turns face-up. */
-  | { do: 'change_position'; cards: Selection; position: Position | 'switch' }
+  /**
+   * Changes the battle position of the monsters selected; `switch` turns Attack to Defense and Defense to Attack. A
+   * face-down monster turns face-up. `face_down`: to face-down Defense Position ("return it face-down").
+   */
+  | { do: 'change_position'; cards: Selection; position: Position | 'switch' | 'face_down' }
   /** Special Summons `count` Tokens to that player's field. */
   | { do: 'summon_token'; player: 'you' | 'opponent'; token: Token; count: number; position: Position | 'choice' }
   /**
@@ -289,7 +298,8 @@ export type Step =
   | { do: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; whileFaceUp: boolean }
   /**
    * Shows the cards the selection picks from the activating player's hand to both players, usually as a cost ("reveal
-   * any number of "Ice Barrier" monsters in your hand"). Revealed cards count as paid for a `targets.max` of `cost`.
+   * any number of "Ice Barrier" monsters in your hand"), or Set cards on the field, which stay Set ("If the target is
+   * Set, reveal it"). Revealed cards count as paid for a `targets.max` of `cost`.
    */
   | { do: 'reveal'; cards: Selection }
   /**
@@ -877,8 +887,10 @@ export type Op =
   | { op: 'choose_effect'; choice: string }
   /** Records the cards paid as the cost of the activation, for its resolution. */
   | { op: 'declare_paid'; cards: string[] }
-  /** Shows cards in the activating player's hand to both players; they stay in the hand. */
+  /** Shows cards in the activating player's hand, or Set cards on the field, to both players; they stay where they are. */
   | { op: 'reveal'; cards: string[] }
+  /** Turns a face-up monster to face-down Defense Position ("return it face-down"). */
+  | { op: 'turn_face_down'; card: string }
   /** Sets a Spell/Trap from its holder's hand in their first free Spell & Trap Zone (a Field Spell in the Field Zone). */
   | { op: 'set_spell_trap'; card: string };
 
@@ -1026,6 +1038,8 @@ export type DuelEvent =
   | { type: 'spellTrapSet'; player: Seat; card: string; zone: number }
   | { type: 'flipSummoned'; player: Seat; card: string }
   | { type: 'positionChanged'; player: Seat; card: string; position: Position }
+  /** A face-up monster turned face-down in Defense Position: it loses its stat changes, abilities, counters and the cards tied to it. */
+  | { type: 'turnedFaceDown'; card: string }
   | { type: 'attackDeclared'; player: Seat; attacker: string; target: string | null }
   /** A face-down monster turns face-up, attacked or changed to a position by an effect (a Flip Summon is its own event). */
   | { type: 'flipped'; card: string }
@@ -1047,7 +1061,7 @@ export type DuelEvent =
   | { type: 'targeted'; cards: string[] }
   | { type: 'effectChosen'; choice: string }
   | { type: 'costPaid'; cards: string[] }
-  /** `player` showed these cards from their hand to both players (a cost such as "reveal 3 "Ice Barrier" monsters"). */
+  /** `player` showed these cards from their hand, or Set cards on the field, to both players (a cost such as "reveal 3 "Ice Barrier" monsters"). */
   | { type: 'revealed'; player: Seat; cards: string[] }
   | { type: 'moved'; card: string; owner: Seat; from: Place; to: Destination }
   | { type: 'deckShuffled'; player: Seat; order: string[] }

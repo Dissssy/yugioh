@@ -316,6 +316,15 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         s.attack = null;
         return;
       }
+      case 'turnedFaceDown': {
+        const card = onField(s, event.card);
+        Object.assign(card, { faceUp: false, position: 'defense', positionChangedTurn: s.turn, counters: {}, effectsNegated: false });
+        s.modifiers = s.modifiers.filter((m) => m.card !== event.card);
+        s.granted = s.granted.filter((g) => g.card !== event.card);
+        // Equip Spells and the like can't stay with a face-down monster.
+        for (const c of tiedTo(s, event.card)) sendToGraveyard(s, c.id);
+        return;
+      }
       case 'flipped':
         onField(s, event.card).faceUp = true;
         s.happened.push({ event: 'flipped', card: event.card, player: locate(s, event.card)!.seat, group });

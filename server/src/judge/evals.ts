@@ -1335,6 +1335,50 @@ export const CASES: EvalCase[] = [
         b.monster('Axe Raider')?.effectsNegated ? null : "Axe Raider's effects are not negated",
       ),
   },
+  {
+    name: 'armed ninja reveals a set spell and destroys it',
+    board: [{ setMonsters: ['Armed Ninja'] }, { set: ['Half Shut'] }],
+    // Half Shut could answer the chain, so its holder passes.
+    before: (id) => [
+      [0, { type: 'flipSummon', card: id('Armed Ninja') }],
+      [1, { type: 'pass' }],
+    ],
+    picks: [['Half Shut']],
+    legal: true,
+    check: (b) => expectAt(b, 'Half Shut', '1:gy'),
+  },
+  {
+    name: 'armed ninja leaves a set trap where it is',
+    board: [{ setMonsters: ['Armed Ninja'] }, { set: ['Raigeki Break'] }],
+    before: (id) => [[0, { type: 'flipSummon', card: id('Armed Ninja') }]],
+    picks: [['Raigeki Break']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Raigeki Break', '1:spellTraps'), b.state.players[1].spellTraps.some((c) => c && !c.faceUp) ? null : 'Raigeki Break is no longer Set'),
+  },
+  {
+    name: 'reaper of the cards reveals a set trap and destroys it',
+    board: [{ setMonsters: ['Reaper of the Cards'] }, { set: ['Raigeki Break'] }],
+    before: (id) => [[0, { type: 'flipSummon', card: id('Reaper of the Cards') }]],
+    picks: [['Raigeki Break']],
+    legal: true,
+    check: (b) => expectAt(b, 'Raigeki Break', '1:gy'),
+  },
+  {
+    name: 'acid trap hole destroys a face-down monster with 2000 or less def',
+    board: [{ set: ['Acid Trap Hole'] }, { setMonsters: ['Axe Raider'] }],
+    activate: 'Acid Trap Hole',
+    picks: [['Axe Raider']],
+    legal: true,
+    check: (b) => expectAt(b, 'Axe Raider', '1:gy'),
+  },
+  {
+    name: 'acid trap hole returns a monster with more than 2000 def face-down',
+    board: [{ set: ['Acid Trap Hole'] }, { setMonsters: ['Ryu-Ran'] }],
+    activate: 'Acid Trap Hole',
+    picks: [['Ryu-Ran']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Ryu-Ran', '1:monsters'), b.state.players[1].monsters.some((m) => m && !m.faceUp && m.position === 'defense') ? null : 'Ryu-Ran is not face-down'),
+  },
   // Control, Tokens, and effects used from the hand or GY.
   {
     name: 'crackdown takes control of a face-up monster for good',

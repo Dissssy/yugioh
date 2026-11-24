@@ -342,8 +342,15 @@ export function targetable(state: DuelState, script: Script, seat: Seat, card: s
 
 
 /** Why a condition doesn't hold for player `seat` and their card `card`, or null if it does. */
-export function conditionProblem(state: DuelState, c: Condition, seat: Seat, card: string): string | null {
+/** Why a condition doesn't hold now, or null. `targets` are the effect's targets while it resolves; null before they are chosen. */
+export function conditionProblem(state: DuelState, c: Condition, seat: Seat, card: string, targets: string[] | null = null): string | null {
   switch (c.if) {
+    case 'targets': {
+      if (targets === null) return null;
+      const there = targets.filter((id) => locate(state, id));
+      const fitting = (id: string) => (onFieldCard(state, id)?.faceUp === false ? identityFits(cardOf(state, id), c.filter) : fits(state, id, c.filter, seat));
+      return there.length > 0 && there.every(fitting) ? null : `It needs its target to be a ${describeFilter(c.filter)}.`;
+    }
     case 'before_battle_phase':
       return state.turnPlayer === seat && (state.phase === 'battle' || state.phase === 'main2' || state.phase === 'end') ? 'It can only be activated before you conduct your Battle Phase.' : null;
     case 'count': {
