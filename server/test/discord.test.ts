@@ -1,13 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import type { AdminUser, DeckSummary, DuelSummary, Me, OpenGames } from '@yugioh/shared';
+import type { AdminUser, DeckSummary, DiscordServer, DuelSummary, Me, OpenGames } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
-import { decks } from '../src/db/schema.ts';
+import { decks, discordServers } from '../src/db/schema.ts';
 import { ADMIN_EMAIL, Browser, startHarness, type Harness } from './harness.ts';
 
 let h: Harness;
 beforeAll(async () => {
   h = await startHarness();
+  // The tests' Activity runs in this server unless they say otherwise, and an admin trusts it.
+  await h.db.insert(discordServers).values({ id: 'test-server', trusted: true });
 });
 afterAll(() => h.close());
 
@@ -48,17 +50,26 @@ describe('signing in from the Discord Activity', () => {
     expect(await me(browser)).toMatchObject({ kind: 'user', user: { status: 'approved', role: 'player' } });
   });
 
-  it('leaves someone who opens it outside a trusted server waiting for approval, and approves them once they open it in one', async () => {
+  it('leaves someone who opens it outside a trusted server waiting, until an admin trusts that server', async () => {
     const mai = { id: '1003', username: 'mai' };
     h.discord.instances.set('elsewhere', [mai.id]);
-    h.discord.places.set('elsewhere', 'guild:someone-elses-server');
+    h.discord.places.set('elsewhere', 'guild:harpie-server');
     h.discord.instances.set('mai-dm', [mai.id]);
     h.discord.places.set('mai-dm', 'dm:42');
-    expect(await me((await openActivity(mai, 'elsewhere')).browser)).toMatchObject({ user: { status: 'pending' } });
+    const opened = (await openActivity(mai, 'elsewhere')).browser;
+    expect(await me(opened)).toMatchObject({ user: { status: 'pending' } });
     expect(await me((await openActivity(mai, 'mai-dm')).browser)).toMatchObject({ user: { status: 'pending' } });
 
-    h.discord.instances.set('call-1', [yugi.id, joey.id, mai.id]);
-    expect(await me((await openActivity(mai, 'call-1')).browser)).toMatchObject({ user: { status: 'approved' } });
+    // The admin sees the servers the Activity was opened in, and trusts this one.
+    const admin = await auth0Login('admin', ADMIN_EMAIL);
+    const servers = (await admin.json<DiscordServer[]>(`${h.baseUrl}/api/admin/discord-servers`)).body;
+    const opener = await me(opened);
+    expect(servers.find((s) => s.id === 'harpie-server')).toMatchObject({ trusted: false, lastOpenedBy: opener.kind === 'user' && opener.user.username });
+    expect((await opened.json(`${h.baseUrl}/api/admin/discord-servers/harpie-server`, { method: 'POST', body: JSON.stringify({ trusted: true }) })).status).toBe(403);
+    expect((await admin.json(`${h.baseUrl}/api/admin/discord-servers/nowhere`, { method: 'POST', body: JSON.stringify({ trusted: true }) })).status).toBe(404);
+    expect((await admin.json(`${h.baseUrl}/api/admin/discord-servers/harpie-server`, { method: 'POST', body: JSON.stringify({ trusted: true }) })).status).toBe(200);
+
+    expect(await me((await openActivity(mai, 'elsewhere')).browser)).toMatchObject({ user: { status: 'approved' } });
     // Approved stays approved anywhere.
     expect(await me((await openActivity(mai, 'mai-dm')).browser)).toMatchObject({ user: { status: 'approved' } });
   });

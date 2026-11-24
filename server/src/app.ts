@@ -14,6 +14,7 @@ import { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
 import { deckForDuel, deckRoutes } from './deckRoutes.ts';
 import type { DiscordApi } from './discord.ts';
+import { listServers, setTrusted } from './discordServers.ts';
 import { discordRoutes, endDiscordSession, placeOf, safeReturnTo } from './discordRoutes.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
@@ -171,6 +172,20 @@ export function createApp(config: Config, db: Db, ai: Ai, discord: DiscordApi | 
     const user = await setStatus(db, id.data, body.data.status);
     if (!user) return void res.status(409).json({ error: "Only a player's status can change. Take away an admin's admin first." });
     res.json(user);
+  });
+
+  // The Discord servers the Activity was opened in. Players who open it in a trusted one are approved automatically.
+  app.get('/api/admin/discord-servers', requireAdmin, async (_req, res) => {
+    res.json(await listServers(db));
+  });
+
+  const trustedBody = z.object({ trusted: z.boolean() });
+  app.post('/api/admin/discord-servers/:id', requireAdmin, async (req, res) => {
+    const id = z.string().safeParse(req.params.id);
+    const body = trustedBody.safeParse(req.body);
+    if (!id.success || !body.success) return void res.status(400).json({ error: 'bad_request' });
+    if (!(await setTrusted(db, id.data, body.data.trusted))) return void res.status(404).json({ error: 'not_found' });
+    res.json({ trusted: body.data.trusted });
   });
 
   // Only the super admin makes admins, and only of approved accounts.

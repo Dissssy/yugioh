@@ -38,14 +38,6 @@ const env = z.object({
   DISCORD_CLIENT_ID: z.string().min(1).optional(),
   DISCORD_CLIENT_SECRET: z.string().min(1).optional(),
   DISCORD_BOT_TOKEN: z.string().min(1).optional(),
-  /**
-   * Discord server IDs, comma-separated. Whoever opens the Activity in one of these servers is approved automatically;
-   * anyone opening it anywhere else waits for approval like a website signup.
-   */
-  DISCORD_TRUSTED_SERVERS: z
-    .string()
-    .default('')
-    .transform((ids) => ids.split(',').map((id) => id.trim()).filter(Boolean)),
 });
 
 export const cardImageDir = (source: NodeJS.ProcessEnv = process.env) => env.shape.CARD_IMAGE_DIR.parse(source.CARD_IMAGE_DIR);

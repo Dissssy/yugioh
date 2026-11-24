@@ -7,6 +7,7 @@ import { findUserByDiscordId, linkAccounts, syncDiscordUser } from './accounts.t
 import type { Config } from './config.ts';
 import type { Db } from './db/client.ts';
 import type { DiscordApi } from './discord.ts';
+import { serverOpened, serverOpenedBy } from './discordServers.ts';
 import { viewerOf } from './viewer.ts';
 
 /** Holds the Discord user ID of whoever signed in with Discord. The account is looked up by it on every request. */
@@ -49,7 +50,6 @@ export function discordRoutes(app: Express, config: Config, db: Db, discord: Dis
   // keeps it to Discord's frames, as Discord's docs advise. The website keeps the usual SameSite=Lax.
   const inFrame: CookieOptions = { signed: true, httpOnly: true, secure: true, sameSite: 'none', partitioned: true };
   const onSite: CookieOptions = { signed: true, httpOnly: true, secure, sameSite: 'lax' };
-  const trusted = new Set(config.DISCORD_TRUSTED_SERVERS.map((id) => `guild:${id}`));
 
   const startSession = (res: Response, discordId: string, options: CookieOptions) =>
     res.cookie(SESSION_COOKIE, discordId, { ...options, maxAge: SESSION_MS });
@@ -63,7 +63,7 @@ export function discordRoutes(app: Express, config: Config, db: Db, discord: Dis
 
   // Signs in someone in the Activity, from the code Discord's `authorize` gave it. Anyone can run Discord's login
   // against the app outside Discord, so only people Discord shows inside a running copy of the Activity get in. Those in
-  // a trusted server are approved; anywhere else (another server, a DM) they wait for approval. Answers with the access
+  // a server an admin trusts are approved; anywhere else (another server, a DM) they wait for approval. Answers with the access
   // token the Activity needs for Discord's `authenticate`.
   const sessionBody = z.object({ code: z.string().min(1), instanceId: z.string().min(1) });
   app.post('/api/discord/session', async (req, res) => {
@@ -75,7 +75,10 @@ export function discordRoutes(app: Express, config: Config, db: Db, discord: Dis
     const user = await discord.user(accessToken);
     const instance = await discord.instance(body.data.instanceId);
     if (!instance?.users.includes(user.id)) return void res.status(403).json({ error: 'Open the Activity from a Discord call to sign in.' });
-    await syncDiscordUser(db, user.id, trusted.has(instance.place));
+    const server = instance.place.startsWith('guild:') ? instance.place.slice('guild:'.length) : null;
+    const trusted = server !== null && (await serverOpened(db, server));
+    const account = await syncDiscordUser(db, user.id, trusted);
+    if (server !== null) await serverOpenedBy(db, server, account.id);
     startSession(res, user.id, inFrame);
     res.cookie(PLACE_COOKIE, instance.place, { ...inFrame, maxAge: SESSION_MS });
     res.json({ accessToken });

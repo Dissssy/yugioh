@@ -32,6 +32,18 @@ export const users = pgTable(
 );
 
 /**
+ * A Discord server the Activity has been opened in (docs/discord.md), recorded on each launch. An admin marks the
+ * servers whose players are approved automatically. Discord tells an app a server's name only through a bot, which the
+ * app doesn't have, so the admin tells servers apart by who opened the Activity there.
+ */
+export const discordServers = pgTable('discord_servers', {
+  id: text('id').primaryKey(),
+  trusted: boolean('trusted').notNull().default(false),
+  lastOpenedAt: timestamp('last_opened_at', { withTimezone: true }).notNull().defaultNow(),
+  lastOpenedBy: integer('last_opened_by').references(() => users.id, { onDelete: 'set null' }),
+});
+
+/**
  * Someone without an account who accepted a challenge link. The signed `guest` cookie holds the token.
  * A guest lasts while they sit in a duel that is going or finished recently; see guests.ts.
  */
