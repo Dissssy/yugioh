@@ -2,12 +2,12 @@
 // switcher, the G key, and the count in the tab's title.
 
 import { useQueryClient } from '@tanstack/react-query';
-import type { DuelSummary, YourMove } from '@yugioh/shared';
+import { newsOf, type DuelSummary, type YourMove } from '@yugioh/shared';
 import { useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useDuels } from './api.ts';
 import { typing } from './board/nav.ts';
-import { newsOf, tell } from './notify.tsx';
+import { tell } from './notify.tsx';
 
 /**
  * Keeps the viewer's duels, the list and each one's own summary, up to date while they can play, and tells them when a

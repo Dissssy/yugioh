@@ -27,6 +27,7 @@ const ai = { judge: model, appeal: model, judgeCalls: config.JUDGE_CALLS_PER_DUE
 const { DISCORD_CLIENT_ID: clientId, DISCORD_CLIENT_SECRET: clientSecret, DISCORD_BOT_TOKEN: botToken } = config;
 const discord = clientId && clientSecret && botToken ? discordApi({ clientId, clientSecret, botToken }) : null;
 if (!discord) console.warn('No Discord app configured: the Discord Activity is off.');
+if (!config.VAPID_PUBLIC_KEY) console.warn('No VAPID keys: players are notified only while the site is open (no Web Push).');
 createApp(config, db, ai, discord).listen(config.PORT, () => {
   console.log(`Server listening on http://localhost:${config.PORT} (public URL ${config.BASE_URL})`);
 });

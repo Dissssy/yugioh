@@ -38,6 +38,12 @@ const env = z.object({
   DISCORD_CLIENT_ID: z.string().min(1).optional(),
   DISCORD_CLIENT_SECRET: z.string().min(1).optional(),
   DISCORD_BOT_TOKEN: z.string().min(1).optional(),
+  /**
+   * Web Push keys (docs/ux-niceties.md), made once with `npx web-push generate-vapid-keys`. Without both, players
+   * are notified only while the site is open.
+   */
+  VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+  VAPID_PRIVATE_KEY: z.string().min(1).optional(),
 });
 
 export const cardImageDir = (source: NodeJS.ProcessEnv = process.env) => env.shape.CARD_IMAGE_DIR.parse(source.CARD_IMAGE_DIR);
@@ -48,5 +54,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
   const config = env.parse(source);
   const discord = [config.DISCORD_CLIENT_ID, config.DISCORD_CLIENT_SECRET, config.DISCORD_BOT_TOKEN];
   if (discord.some(Boolean) && !discord.every(Boolean)) throw new Error('Set all of DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET and DISCORD_BOT_TOKEN, or none.');
+  if (Boolean(config.VAPID_PUBLIC_KEY) !== Boolean(config.VAPID_PRIVATE_KEY)) throw new Error('Set both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY, or neither.');
   return config;
 }

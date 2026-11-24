@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { eq, sql } from 'drizzle-orm';
+import webpush from 'web-push';
 import { OAuth2Server } from 'oauth2-mock-server';
 import type Anthropic from '@anthropic-ai/sdk';
 import { createApp } from '../src/app.ts';
@@ -142,7 +143,10 @@ async function startFakeYgoprodeck() {
 }
 
 function fakeConfig(baseUrl: string, issuer: string) {
+  const vapid = webpush.generateVAPIDKeys();
   return {
+    VAPID_PUBLIC_KEY: vapid.publicKey,
+    VAPID_PRIVATE_KEY: vapid.privateKey,
     BASE_URL: baseUrl,
     PORT: 0,
     DATABASE_URL: '',

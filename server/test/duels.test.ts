@@ -5,7 +5,7 @@ import type { DuelUpdate, Intent, PlayerView } from '@yugioh/engine';
 import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelDeck, DuelSummary, Me, Replay } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { and, eq } from 'drizzle-orm';
-import { guests, matchEvents } from '../src/db/schema.ts';
+import { guests, matchEvents, pushSubscriptions } from '../src/db/schema.ts';
 import { deleteIdleGuests, GUEST_GRACE_MS } from '../src/guests.ts';
 import { ADMIN_EMAIL, Browser, startDuelVia, startHarness, Stream, type Harness } from './harness.ts';
 
@@ -120,6 +120,19 @@ describe('a challenge link played by a guest', () => {
 
     // Guests can't create challenges.
     expect((await guest.json(`${h.baseUrl}/api/duels`, { method: 'POST', body: '{}' })).status).toBe(403);
+  });
+
+  it("keeps a browser's Web Push subscription for the player until they turn it off", async () => {
+    const { body } = await guest.json<{ publicKey: string }>(`${h.baseUrl}/api/push`);
+    expect(body.publicKey.length).toBeGreaterThan(40);
+    const endpoint = 'https://push.example.com/send/abc';
+    const subscription = { endpoint, keys: { p256dh: 'p'.repeat(87), auth: 'a'.repeat(22) } };
+    expect((await guest.json(`${h.baseUrl}/api/me/push`, { method: 'PUT', body: JSON.stringify(subscription) })).status).toBe(204);
+    expect((await new Browser().json(`${h.baseUrl}/api/me/push`, { method: 'PUT', body: JSON.stringify(subscription) })).status).toBe(401);
+    const rows = await h.db.select().from(pushSubscriptions);
+    expect(rows).toEqual([expect.objectContaining({ endpoint, seatKey: expect.stringMatching(/^guest:/) })]);
+    expect((await guest.json(`${h.baseUrl}/api/me/push`, { method: 'DELETE', body: JSON.stringify({ endpoint }) })).status).toBe(204);
+    expect(await h.db.select().from(pushSubscriptions)).toEqual([]);
   });
 
   it('turns away a third visitor without creating a guest for them, but lets them watch', async () => {

@@ -54,6 +54,22 @@ export const guests = pgTable('guests', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * A browser that gets Web Push notifications for a player (an account's or a guest's seat key, as in matches), while
+ * the site is closed there (push.ts).
+ */
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    endpoint: text('endpoint').primaryKey(),
+    seatKey: text('seat_key').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('push_subscriptions_seat_key').on(t.seatKey)],
+);
+
 /** Every card from YGOPRODeck. The game reads cards from here and never calls the API live. */
 export const cards = pgTable('cards', {
   id: integer('id').primaryKey(), // the card's passcode
