@@ -20,7 +20,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "graveyard",
+              "places": [
+                "graveyard"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -34,17 +36,21 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 5,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ],
         "cost": [],
         "targets": {
           "filter": {
             "side": "you",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],
@@ -63,7 +69,8 @@
               "min": null,
               "max": 1500
             },
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 1,
           "max": 3,

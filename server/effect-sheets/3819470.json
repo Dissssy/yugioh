@@ -18,7 +18,9 @@
         "self": false,
         "filter": {
           "side": "either",
-          "place": "spellTraps",
+          "places": [
+            "spellTraps"
+          ],
           "kinds": [
             "trap"
           ],
@@ -32,7 +34,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "how": [],
         "canMiss": false,
@@ -45,6 +48,7 @@
             "do": "change_lp",
             "player": "you",
             "amount": 1000,
+            "per": null,
             "kind": "cost"
           }
         ],

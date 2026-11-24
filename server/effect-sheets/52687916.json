@@ -38,7 +38,9 @@
                   "from": "random",
                   "filter": {
                     "side": "opponent",
-                    "place": "hand",
+                    "places": [
+                      "hand"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],
@@ -50,7 +52,8 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 0,
                   "count": 1
@@ -63,7 +66,9 @@
                   "from": "choose",
                   "filter": {
                     "side": "opponent",
-                    "place": "field",
+                    "places": [
+                      "field"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],
@@ -75,11 +80,14 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 0,
                   "max": 1,
-                  "rank": null
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
                 },
                 "to": "banished"
               },
@@ -89,7 +97,9 @@
                   "from": "choose",
                   "filter": {
                     "side": "opponent",
-                    "place": "graveyard",
+                    "places": [
+                      "graveyard"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],
@@ -101,11 +111,14 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 0,
                   "max": 1,
-                  "rank": null
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
                 },
                 "to": "banished"
               }

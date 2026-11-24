@@ -44,10 +44,12 @@
                 "atk": {
                   "of": "self",
                   "stat": "atk",
+                  "filter": null,
                   "original": true,
                   "times": 2
                 },
                 "def": null,
+                "level": null,
                 "until": "end_of_battle_phase"
               }
             ]

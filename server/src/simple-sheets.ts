@@ -86,7 +86,7 @@ const kindList = (words: string) => words.split(/,? and |, /).map((w) => w.trim(
 
 const monsters = (overrides: Partial<CardFilter>): CardFilter => ({
   side: 'either',
-  place: 'monsters',
+  places: ['monsters'],
   kinds: ['monster'],
   types: [],
   races: [],
@@ -99,6 +99,7 @@ const monsters = (overrides: Partial<CardFilter>): CardFilter => ({
   level: null,
   atk: null,
   def: null,
+  original: false,
   ...overrides,
 });
 
@@ -147,7 +148,7 @@ function equipOf(text: string): { target: CardFilter; continuous: Continuous } |
     return filter && { target: monsters(filter), continuous: stats('linked', atk, def) };
   }
   if (/^If the equipped monster attacks a Defense Position monster, inflict piercing battle damage to your opponent\.$/.test(text)) {
-    return { target: monsters({}), continuous: { apply: 'battle', to: 'linked', attacks: 1, piercing: true, noDamageToYou: false, while: [] } };
+    return { target: monsters({}), continuous: { apply: 'battle', to: 'linked', attacks: 1, piercing: true, noDamageToYou: false, direct: false, while: [] } };
   }
   return null;
 }
@@ -182,7 +183,7 @@ function fieldStatsOf(text: string): Continuous[] | null {
 
 function monsterContinuousOf(text: string): Continuous[] | null {
   if (/^If this card attacks a Defense Position monster, inflict piercing battle damage(?: to your opponent)?\.$/.test(text)) {
-    return [{ apply: 'battle', to: 'self', attacks: 1, piercing: true, noDamageToYou: false, while: [] }];
+    return [{ apply: 'battle', to: 'self', attacks: 1, piercing: true, noDamageToYou: false, direct: false, while: [] }];
   }
   return allMonstersStats(text);
 }
@@ -190,11 +191,11 @@ function monsterContinuousOf(text: string): Continuous[] | null {
 /** A Normal Spell that only deals damage, gains LP or draws. */
 function spellStepOf(text: string): Step | null {
   let m = new RegExp(String.raw`^(?:Inflict ${N} (?:points of )?damage to your opponent(?:'s Life Points)?|Decrease your opponent's Life Points by ${N} points)\.$`).exec(text);
-  if (m) return { do: 'change_lp', player: 'opponent', amount: Number(m[1] ?? m[2]), kind: 'damage' };
+  if (m) return { do: 'change_lp', player: 'opponent', amount: Number(m[1] ?? m[2]), per: null, kind: 'damage' };
   m = new RegExp(String.raw`^(?:Increase your Life Points by ${N}(?: points)?|Gain ${N} (?:Life Points|LP))\.$`).exec(text);
-  if (m) return { do: 'change_lp', player: 'you', amount: Number(m[1] ?? m[2]), kind: 'gain' };
+  if (m) return { do: 'change_lp', player: 'you', amount: Number(m[1] ?? m[2]), per: null, kind: 'gain' };
   m = /^Draw (1|2|3) cards?\.$/.exec(text);
-  if (m) return { do: 'draw', player: 'you', count: Number(m[1]) };
+  if (m) return { do: 'draw', player: 'you', count: Number(m[1]), per: null };
   return null;
 }
 

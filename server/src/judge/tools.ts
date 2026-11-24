@@ -101,8 +101,8 @@ export const opTools = {
   forbid: {
     loose: true,
     description:
-      'For the rest of this turn, stop a player declaring attacks ("your opponent cannot declare an attack this turn"), conducting their Battle Phase ("you cannot conduct your Battle Phase this turn") or Special Summoning ("you cannot Special Summon monsters from your hand for the rest of this turn"). filter: for special_summon, the monsters it stops ("from your hand": place "hand"; "Level 5 or higher monsters": place "any", level min 5; null for any monster); null for the others. side "you" in it is that player.',
-    input: z.object({ player: seat, what: z.enum(FORBIDDEN), filter: cardFilter.nullable() }),
+      'For the rest of this turn, stop a player declaring attacks ("your opponent cannot declare an attack this turn"), conducting their Battle Phase ("you cannot conduct your Battle Phase this turn") or Special Summoning ("you cannot Special Summon monsters from your hand for the rest of this turn"). filter: for special_summon, the monsters it stops ("from your hand": place "hand"; "Level 5 or higher monsters": place "any", level min 5; null for any monster); null for the others. side "you" in it is that player. except: a monster the ban doesn\'t cover ("Other monsters cannot attack this turn": the card itself), else null.',
+    input: z.object({ player: seat, what: z.enum(FORBIDDEN), filter: cardFilter.nullable(), except: card.nullable() }),
   },
   add_counters: {
     loose: true,

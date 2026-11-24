@@ -1,7 +1,7 @@
 {
   "code": 70583986,
   "textHash": "b2176e75e0997b91c2b6b2647f230cdc9d74248847eb0f4e385426da027e89e1",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "ignition",
@@ -14,7 +14,63 @@
       "effect": "Return any number of face-up cards you control to the owner's hand. For each card returned to the owner's hand by this effect, this card gains 500 ATK until the End Phase.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "field"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": true,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": 60,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                },
+                "to": "hand"
+              },
+              {
+                "do": "modify_stats",
+                "cards": {
+                  "from": "self"
+                },
+                "atk": 500,
+                "def": 0,
+                "per": "moved",
+                "levelDelta": 0,
+                "levelSet": null,
+                "until": "end_of_turn"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

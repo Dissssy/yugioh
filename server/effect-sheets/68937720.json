@@ -21,6 +21,7 @@
             "do": "change_lp",
             "player": "you",
             "amount": 1000,
+            "per": null,
             "kind": "cost"
           }
         ],
@@ -55,7 +56,9 @@
         "cannot": "activate",
         "filter": {
           "side": "either",
-          "place": "hand",
+          "places": [
+            "hand"
+          ],
           "kinds": [
             "monster"
           ],
@@ -69,7 +72,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "perTurn": null,
         "setFirst": false,

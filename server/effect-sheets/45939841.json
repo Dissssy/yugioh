@@ -21,13 +21,16 @@
             "do": "change_lp",
             "player": "you",
             "amount": 500,
+            "per": null,
             "kind": "cost"
           }
         ],
         "targets": {
           "filter": {
             "side": "either",
-            "place": "field",
+            "places": [
+              "field"
+            ],
             "kinds": [
               "spell",
               "trap"
@@ -42,7 +45,8 @@
             "position": null,
             "level": null,
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 1,
           "max": 1,

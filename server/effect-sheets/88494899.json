@@ -62,7 +62,7 @@
         "cannot": "activate",
         "filter": {
           "side": "either",
-          "place": "any",
+          "places": [],
           "kinds": [
             "spell",
             "trap"
@@ -77,7 +77,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "perTurn": 1,
         "setFirst": false,

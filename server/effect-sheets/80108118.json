@@ -27,7 +27,9 @@
             "if": "count",
             "filter": {
               "side": "opponent",
-              "place": "hand",
+              "places": [
+                "hand"
+              ],
               "kinds": [],
               "types": [],
               "races": [],
@@ -39,10 +41,12 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 4,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ],
         "cost": [],
@@ -58,7 +62,9 @@
                   "from": "random",
                   "filter": {
                     "side": "opponent",
-                    "place": "hand",
+                    "places": [
+                      "hand"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],
@@ -70,7 +76,8 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "count": 1

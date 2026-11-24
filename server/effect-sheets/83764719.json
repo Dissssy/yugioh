@@ -20,7 +20,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],
@@ -34,7 +36,8 @@
             "position": null,
             "level": null,
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 1,
           "max": 1,

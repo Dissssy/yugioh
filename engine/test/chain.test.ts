@@ -74,11 +74,12 @@ const cards: Record<number, CardData> = {
   29: monster(29, 'Moulinglacia', 2800, 2200),
   30: monster(30, 'Revealer', 1100, 1500),
   31: monster(31, 'Ice Caller', 1000, 1000),
+  32: card(32, 'Defense Draw', 'trap', 'Normal'),
 };
 
 const filter = (f: Partial<CardFilter>): CardFilter => ({
   side: 'either',
-  place: 'monsters',
+  places: ['monsters'],
   kinds: [],
   types: [],
   races: [],
@@ -91,6 +92,7 @@ const filter = (f: Partial<CardFilter>): CardFilter => ({
   level: null,
   atk: null,
   def: null,
+  original: false,
   ...f,
 });
 const when = (w: Partial<When> & Pick<When, 'event'>): When => ({ self: false, filter: null, how: [], canMiss: false, by: null, ...w });
@@ -140,7 +142,7 @@ const sheets: Record<number, EffectSheet> = {
       kind: 'trigger',
       mandatory: true,
       when: when({ event: 'battle_damage', self: true }),
-      script: script({ options: [{ label: '', cost: [], steps: [{ do: 'modify_stats', cards: { from: 'self' }, atk: 200, def: 0, levelDelta: 0, levelSet: null, until: 'while_on_field' }] }] }),
+      script: script({ options: [{ label: '', cost: [], steps: [{ do: 'modify_stats', cards: { from: 'self' }, atk: 200, def: 0, per: null, levelDelta: 0, levelSet: null, until: 'while_on_field' }] }] }),
     }),
   ),
   6: sheet(
@@ -159,8 +161,9 @@ const sheets: Record<number, EffectSheet> = {
               {
                 do: 'set_stats',
                 cards: { from: 'self' },
-                atk: { of: 'targets', stat: 'atk', original: true, times: 1 },
-                def: { of: 'targets', stat: 'def', original: true, times: 1 },
+                atk: { of: 'targets', stat: 'atk', original: true, times: 1, filter: null },
+                def: { of: 'targets', stat: 'def', original: true, times: 1, filter: null },
+                level: null,
                 until: 'while_on_field',
               },
             ],
@@ -183,7 +186,7 @@ const sheets: Record<number, EffectSheet> = {
           {
             label: '',
             cost: [],
-            steps: [{ do: 'set_stats', cards: { from: 'self' }, atk: { of: 'self', stat: 'atk', original: true, times: 2 }, def: null, until: 'end_of_battle_phase' }],
+            steps: [{ do: 'set_stats', cards: { from: 'self' }, atk: { of: 'self', stat: 'atk', original: true, times: 2, filter: null }, def: null, level: null, until: 'end_of_battle_phase' }],
           },
         ],
       }),
@@ -193,23 +196,34 @@ const sheets: Record<number, EffectSheet> = {
   9: sheet(9, effect({ kind: 'activation', speed: 2 })),
   10: sheet(10, effect({ kind: 'activation', speed: 1 })),
   12: sheet(12, effect({ kind: 'trigger', when: when({ event: 'summoned', self: true, canMiss: true, by: null }) })),
-  20: sheet(20, effect({ kind: 'continuous', continuous: { apply: 'banish_instead', filter: filter({ side: 'opponent', place: 'field', kinds: ['spell', 'trap'] }) } })),
+  20: sheet(20, effect({ kind: 'continuous', continuous: { apply: 'banish_instead', filter: filter({ side: 'opponent', places: ['field'], kinds: ['spell', 'trap'] }) } })),
   21: sheet(21, effect({ kind: 'trigger', mandatory: true, when: when({ event: 'damage_step_end', self: true }) })),
-  22: sheet(22, effect({ kind: 'continuous', opt: 'soft', continuous: { apply: 'extra_normal_summon', filter: filter({ side: 'you', place: 'hand', named: 'Ice' }), while: [] } })),
+  22: sheet(22, effect({ kind: 'continuous', opt: 'soft', continuous: { apply: 'extra_normal_summon', filter: filter({ side: 'you', places: ['hand'], named: 'Ice' }), while: [] } })),
   24: sheet(24, effect({ kind: 'continuous', continuous: { apply: 'discard_or_negate', while: [] } })),
   25: sheet(25, effect({ kind: 'continuous', continuous: { apply: 'negate_battled_flips', while: [] } })),
-  30: sheet(30, effect({ kind: 'continuous', from: 'graveyard', opt: 'hard', continuous: { apply: 'cost_substitute', for: filter({ place: 'any', named: 'Ice' }) } })),
+  30: sheet(30, effect({ kind: 'continuous', from: 'graveyard', opt: 'hard', continuous: { apply: 'cost_substitute', for: filter({ places: [], named: 'Ice' }) } })),
   31: sheet(
     31,
     effect({
       kind: 'ignition',
       script: script({
-        cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', place: 'hand' }), min: 1, max: 1, rank: null }, to: 'graveyard' }],
-        options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1 }] }],
+        cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', places: ['hand'] }), min: 1, max: 1, rank: null, distinct: false, includeSelf: false }, to: 'graveyard' }],
+        options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1, per: null }] }],
       }),
     }),
   ),
   29: sheet(29, effect({ kind: 'continuous', continuous: { apply: 'forbid_on_leaving', what: 'battle_phase' } })),
+  32: sheet(
+    32,
+    effect({
+      kind: 'activation',
+      speed: 2,
+      script: script({
+        conditions: [{ if: 'turn', whose: 'opponent' }, { if: 'damage_calculation' }],
+        options: [{ label: '', cost: [], steps: [{ do: 'no_battle_damage' }, { do: 'if_done' }, { do: 'draw', player: 'you', count: 1, per: null }] }],
+      }),
+    }),
+  ),
   26: sheet(
     26,
     effect({ kind: 'continuous', continuous: { apply: 'restrict', to: filter({ side: 'opponent' }), others: false, cannot: ['activate_effects'], by: null, compare: null, once: false, while: [] } }),
@@ -641,7 +655,7 @@ describe('locks an effect leaves behind', () => {
     const spells = (t: Table, seat: Seat) => legalActions(t.state, seat).flatMap((a) => (a.type === 'activate' ? [a.card] : []));
     const t = new Table(stacked(pad([2, 10, 2, 2, 2, 2]), pad([10, 2, 2, 2, 2, 2])));
     t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
-    const locked = applyOp(t.state, { op: 'lock', player: 'both', filter: filter({ place: 'any', kinds: ['spell'] }), until: 'your_next_end_phase', while_face_up: true }, ctx0('a0'));
+    const locked = applyOp(t.state, { op: 'lock', player: 'both', filter: filter({ places: [], kinds: ['spell'] }), until: 'your_next_end_phase', while_face_up: true }, ctx0('a0'));
     if (!locked.ok) throw new Error(locked.error);
     t.push(...locked.events);
     expect(spells(t, 0)).toEqual([]);
@@ -709,6 +723,63 @@ describe('the end of the Damage Step', () => {
     t.play(1, { type: 'setMonster', card: 'b0', tributes: [], zone: 0 }).endTurn(1);
     t.play(0, { type: 'enterBattle' }).play(0, { type: 'attack', attacker: 'a0', target: 0 });
     expect(nextStep(t.state)).toMatchObject({ kind: 'trigger', trigger: { card: 'a0', cause: { event: 'damage_step_end', card: 'a0', target: 'b0' } } });
+  });
+});
+
+describe('the Damage Step', () => {
+  // Seat 1 Sets Defense Draw and Twister on turn 2; on turn 3 seat 0 attacks directly with Axe Raider.
+  const setup = () => {
+    const t = new Table(stacked(pad([1, 2, 2, 2, 2, 2]), pad([32, 9, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.play(1, { type: 'setSpellTrap', card: 'b0', zone: 0 }).play(1, { type: 'setSpellTrap', card: 'b1', zone: 1 }).endTurn(1);
+    return t.play(0, { type: 'enterBattle' }).play(1, { type: 'pass' }).play(0, { type: 'attack', attacker: 'a0', target: 'direct' });
+  };
+
+  it('opens a window before damage calculation, only for effects that may be used then (Defense Draw)', () => {
+    const t = setup();
+    expect(t.state.step).toMatchObject({ at: 'respond', priority: 1, cause: { event: 'attack_declared' } });
+    expect(t.activations(1)).toEqual(['b1']);
+    t.play(1, { type: 'pass' });
+    expect(t.state.step).toMatchObject({ at: 'respond', priority: 1, cause: { event: 'damage_step_start' } });
+    expect(t.activations(1)).toEqual(['b0']);
+    t.play(1, { type: 'activate', card: 'b0', effect: 0, zone: null });
+    t.resolve({ type: 'battleDamageZeroed', player: 1 });
+    expect(t.state.players[1].lp).toBe(8000);
+    expect(t.state.step).toEqual({ at: 'open' });
+  });
+
+  it('deals the damage once both players pass', () => {
+    const t = setup().play(1, { type: 'pass' }).play(1, { type: 'pass' });
+    expect(t.state.players[1].lp).toBe(8000 - 1700);
+  });
+});
+
+describe('abilities granted for the turn', () => {
+  const setup = () => {
+    const t = new Table(stacked(pad([1, 2, 2, 2, 2, 2]), pad([1, 2, 2, 2, 2, 2])));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).endTurn(0);
+    t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 }).endTurn(1);
+    return t.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 1 });
+  };
+
+  it('let a monster attack directly while the others cannot attack (Rapid Warrior)', () => {
+    const t = setup();
+    t.push({ type: 'forbidden', player: 0, what: 'declare_attack', filter: null, except: 'a0' }, { type: 'granted', card: 'a0', effect: { apply: 'battle', attacks: 1, piercing: false, direct: true } });
+    t.play(0, { type: 'enterBattle' });
+    expect(legalActions(t.state, 0).filter((a) => a.type === 'attack')).toEqual([{ type: 'attack', attacker: 'a0', targets: [0], direct: true }]);
+    t.play(0, { type: 'attack', attacker: 'a0', target: 'direct' });
+    expect(t.state.players[1].lp).toBe(8000 - 1700);
+    // The ability lasts only this turn.
+    t.play(0, { type: 'enterMain2' }).endTurn(0);
+    expect(t.state.granted).toEqual([]);
+  });
+
+  it('keep a monster from being destroyed by battle (Half Shut)', () => {
+    const t = setup();
+    t.push({ type: 'granted', card: 'a1', effect: { apply: 'restrict', cannot: ['be_destroyed_by_battle'] } });
+    t.play(0, { type: 'enterBattle' }).play(0, { type: 'attack', attacker: 'a1', target: 0 });
+    expect(t.state.players[0].monsters[1]?.id).toBe('a1');
+    expect(t.state.players[0].lp).toBe(8000 - 800);
   });
 });
 

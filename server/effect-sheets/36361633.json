@@ -28,7 +28,8 @@
                 "player": "opponent",
                 "what": "declare_attack",
                 "filter": null,
-                "wholeTurn": false
+                "wholeTurn": false,
+                "others": false
               }
             ]
           }

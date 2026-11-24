@@ -20,7 +20,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -34,10 +36,12 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 1,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ],
         "cost": [],
@@ -61,7 +65,7 @@
                 "what": "special_summon",
                 "filter": {
                   "side": "you",
-                  "place": "any",
+                  "places": [],
                   "kinds": [
                     "monster"
                   ],
@@ -78,9 +82,11 @@
                     "max": null
                   },
                   "atk": null,
-                  "def": null
+                  "def": null,
+                  "original": false
                 },
-                "wholeTurn": true
+                "wholeTurn": true,
+                "others": false
               }
             ]
           }
@@ -115,7 +121,9 @@
         "targets": {
           "filter": {
             "side": "you",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],
@@ -129,7 +137,8 @@
             "position": null,
             "level": null,
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 1,
           "max": 1,

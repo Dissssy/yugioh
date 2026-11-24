@@ -20,7 +20,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "graveyard",
+              "places": [
+                "graveyard"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -36,10 +38,12 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 5,
-            "max": 5
+            "max": 5,
+            "distinct": false
           }
         ],
         "cost": [],
@@ -100,7 +104,9 @@
                   "from": "random",
                   "filter": {
                     "side": "opponent",
-                    "place": "hand",
+                    "places": [
+                      "hand"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],
@@ -112,7 +118,8 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "count": 2

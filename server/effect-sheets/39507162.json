@@ -28,7 +28,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "hand",
+              "places": [
+                "hand"
+              ],
               "kinds": [],
               "types": [],
               "races": [],
@@ -40,10 +42,12 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 0,
-            "max": 1
+            "max": 1,
+            "distinct": false
           }
         ]
       },
@@ -68,7 +72,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -82,10 +88,12 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 0,
-            "max": 0
+            "max": 0,
+            "distinct": false
           }
         ]
       },

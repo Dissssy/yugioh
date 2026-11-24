@@ -1,7 +1,7 @@
 {
   "code": 72302403,
   "textHash": "21fa0db1c2623e482f72ec7a35cf1a1a11519aed7f3e69ab048f4195ac93cad2",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "continuous",
@@ -32,7 +32,80 @@
       "effect": "When this card is activated: If your opponent controls a face-down monster, flip all monsters they control face-up.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "count",
+                    "filter": {
+                      "side": "opponent",
+                      "places": [
+                        "monsters"
+                      ],
+                      "kinds": [
+                        "monster"
+                      ],
+                      "types": [],
+                      "races": [],
+                      "attributes": [],
+                      "named": null,
+                      "except": null,
+                      "extraDeck": null,
+                      "faceUp": false,
+                      "position": null,
+                      "level": null,
+                      "atk": null,
+                      "def": null,
+                      "original": false
+                    },
+                    "min": 1,
+                    "max": null,
+                    "distinct": false
+                  }
+                ]
+              },
+              {
+                "do": "change_position",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": false,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  }
+                },
+                "position": "defense"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     },
@@ -52,7 +125,9 @@
         "apply": "restrict",
         "to": {
           "side": "opponent",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -64,7 +139,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "others": false,
         "cannot": [

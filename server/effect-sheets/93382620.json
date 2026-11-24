@@ -18,7 +18,9 @@
         "self": false,
         "filter": {
           "side": "you",
-          "place": "graveyard",
+          "places": [
+            "graveyard"
+          ],
           "kinds": [
             "monster"
           ],
@@ -32,7 +34,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "how": [],
         "canMiss": false,
@@ -47,7 +50,9 @@
               "from": "all",
               "filter": {
                 "side": "you",
-                "place": "hand",
+                "places": [
+                  "hand"
+                ],
                 "kinds": [],
                 "types": [],
                 "races": [],
@@ -59,7 +64,8 @@
                 "position": null,
                 "level": null,
                 "atk": null,
-                "def": null
+                "def": null,
+                "original": false
               }
             },
             "to": "graveyard"
@@ -68,7 +74,9 @@
         "targets": {
           "filter": {
             "side": "you",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],
@@ -82,7 +90,8 @@
             "position": null,
             "level": null,
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 1,
           "max": 1,
@@ -109,6 +118,7 @@
                 },
                 "atk": 800,
                 "def": 0,
+                "per": null,
                 "levelDelta": 0,
                 "levelSet": null,
                 "until": "while_on_field"

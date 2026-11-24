@@ -23,7 +23,9 @@
               "from": "choose",
               "filter": {
                 "side": "you",
-                "place": "monsters",
+                "places": [
+                  "monsters"
+                ],
                 "kinds": [],
                 "types": [
                   "Normal"
@@ -37,11 +39,14 @@
                 "position": null,
                 "level": null,
                 "atk": null,
-                "def": null
+                "def": null,
+                "original": false
               },
               "min": 1,
               "max": 1,
-              "rank": null
+              "rank": null,
+              "distinct": false,
+              "includeSelf": false
             },
             "to": "graveyard"
           }
@@ -49,7 +54,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "graveyard",
+            "places": [
+              "graveyard"
+            ],
             "kinds": [
               "monster"
             ],
@@ -63,7 +70,8 @@
             "position": null,
             "level": null,
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 1,
           "max": 1,

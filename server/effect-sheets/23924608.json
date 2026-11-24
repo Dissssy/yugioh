@@ -24,7 +24,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "field",
+            "places": [
+              "field"
+            ],
             "kinds": [
               "spell",
               "trap"
@@ -39,7 +41,8 @@
             "position": null,
             "level": null,
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 1,
           "max": 2,
@@ -62,7 +65,8 @@
                 "player": "you",
                 "what": "battle_phase",
                 "filter": null,
-                "wholeTurn": true
+                "wholeTurn": true,
+                "others": false
               }
             ]
           }

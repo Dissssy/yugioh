@@ -18,7 +18,9 @@
         "self": false,
         "filter": {
           "side": "opponent",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -30,7 +32,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "how": [],
         "canMiss": false,
@@ -51,7 +54,9 @@
                   "from": "all",
                   "filter": {
                     "side": "opponent",
-                    "place": "monsters",
+                    "places": [
+                      "monsters"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],
@@ -63,7 +68,8 @@
                     "position": "attack",
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   }
                 }
               }

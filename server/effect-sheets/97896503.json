@@ -36,7 +36,9 @@
                   "from": "battling",
                   "filter": {
                     "side": "opponent",
-                    "place": "monsters",
+                    "places": [
+                      "monsters"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],
@@ -48,7 +50,8 @@
                     "position": "defense",
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   }
                 }
               }

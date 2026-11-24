@@ -3,7 +3,7 @@
 import { waitingFor } from './chain.ts';
 import { blockedAttacks, blockedEffects, legalActions, normalSummonUsed } from './rules.ts';
 import { statsOf } from './continuous.ts';
-import { describeFilter } from './script.ts';
+import { describeFilter, describeGrant } from './script.ts';
 import { evolve, locate, replay, summonName } from './state.ts';
 import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, LogEntry, LogEvent, Phase, Place, PlayerView, Seat, SeatStep, Sight, StartView } from './types.ts';
 
@@ -361,6 +361,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `Targeting ${event.cards.map((id) => (id ? name(id) : 'a face-down card')).join(', ')}`;
     case 'effectChosen':
       return `Chose: ${event.choice}`;
+    case 'revealed':
+      return `${who(event.player)} revealed ${names(event.cards)}`;
     case 'moved': {
       const to = { hand: 'to the hand', deck_top: 'on top of the Deck', deck_bottom: 'to the bottom of the Deck', deck_shuffled: 'into the Deck', graveyard: 'to the GY', banished: 'banished' }[event.to];
       const from = { deck: 'Deck', hand: 'hand', monsters: 'field', spellTraps: 'field', materials: 'Xyz Materials', graveyard: 'GY', banished: 'banished cards', extra: 'Extra Deck' }[event.from];
@@ -416,6 +418,10 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `${name(event.card)} ${state.cards[state.instances[event.card]!.code]!.race === 'Equip' ? 'equipped to' : 'tied to'} ${name(event.to)}`;
     case 'locked':
       return `${name(event.source)}: ${event.player === 'both' ? 'neither player can' : `${who(event.player === 'you' ? event.seat : event.seat === 0 ? 1 : 0)} can't`} activate ${event.filter ? describeFilter(event.filter) : 'cards'}s until ${event.untilTurn === state.turn ? 'the End Phase' : 'the End Phase of their next turn'}${event.whileFaceUp ? `, while ${name(event.source)} stays face-up` : ''}`;
+    case 'granted':
+      return `${name(event.card)} ${describeGrant(event.effect)} this turn`;
+    case 'battleDamageZeroed':
+      return `${who(event.player)} takes no battle damage from this battle`;
     case 'substituted':
       return `${who(event.player)} banished ${name(event.card)} from the GY instead of 1 card of the cost`;
     case 'pledged':
@@ -424,7 +430,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return event.what === 'battle_phase'
         ? `${who(event.player)} can't conduct their Battle Phase this turn`
         : event.what === 'declare_attack'
-          ? `${who(event.player)} can't declare an attack this turn`
+          ? `${who(event.player)} can't declare an attack${event.except ? ` with monsters other than ${name(event.except)}` : ''} this turn`
           : `${who(event.player)} can't Special Summon ${event.filter ? `a ${describeFilter(event.filter, true)}` : 'monsters'} this turn`;
     case 'procedureUsed':
       return null;

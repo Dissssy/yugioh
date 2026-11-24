@@ -18,7 +18,9 @@
         "self": true,
         "filter": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -30,7 +32,8 @@
           "position": "attack",
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "how": [],
         "canMiss": false,
@@ -48,7 +51,8 @@
               {
                 "do": "draw",
                 "player": "you",
-                "count": 1
+                "count": 1,
+                "per": null
               }
             ]
           }

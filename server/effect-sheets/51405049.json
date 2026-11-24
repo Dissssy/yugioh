@@ -20,7 +20,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -37,10 +39,12 @@
                 "max": 1
               },
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 1,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ],
         "cost": [],
@@ -56,7 +60,9 @@
                   "from": "choose",
                   "filter": {
                     "side": "you",
-                    "place": "deck",
+                    "places": [
+                      "deck"
+                    ],
                     "kinds": [
                       "monster"
                     ],
@@ -73,11 +79,14 @@
                       "max": 1
                     },
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "max": 1,
-                  "rank": null
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
                 },
                 "to": "hand"
               },

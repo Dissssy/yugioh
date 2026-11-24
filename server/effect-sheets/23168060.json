@@ -30,6 +30,7 @@
                 },
                 "atk": 0,
                 "def": 0,
+                "per": null,
                 "levelDelta": 0,
                 "levelSet": 3,
                 "until": "end_of_turn"

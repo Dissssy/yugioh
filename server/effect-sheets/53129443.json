@@ -29,7 +29,9 @@
                   "from": "all",
                   "filter": {
                     "side": "either",
-                    "place": "monsters",
+                    "places": [
+                      "monsters"
+                    ],
                     "kinds": [],
                     "types": [],
                     "races": [],
@@ -41,7 +43,8 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   }
                 }
               }

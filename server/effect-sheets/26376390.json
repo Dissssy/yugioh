@@ -27,7 +27,9 @@
         "targets": {
           "filter": {
             "side": "opponent",
-            "place": "monsters",
+            "places": [
+              "monsters"
+            ],
             "kinds": [],
             "types": [],
             "races": [],
@@ -39,7 +41,8 @@
             "position": null,
             "level": null,
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 1,
           "max": 1,
@@ -59,15 +62,18 @@
                 "atk": {
                   "of": "targets",
                   "stat": "atk",
+                  "filter": null,
                   "original": true,
                   "times": 1
                 },
                 "def": {
                   "of": "targets",
                   "stat": "def",
+                  "filter": null,
                   "original": true,
                   "times": 1
                 },
+                "level": null,
                 "until": "while_on_field"
               }
             ]

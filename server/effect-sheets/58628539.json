@@ -18,7 +18,9 @@
         "self": false,
         "filter": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -30,7 +32,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "how": [
           "xyz"
@@ -44,7 +47,9 @@
         "targets": {
           "filter": {
             "side": "either",
-            "place": "field",
+            "places": [
+              "field"
+            ],
             "kinds": [],
             "types": [],
             "races": [],
@@ -56,7 +61,8 @@
             "position": null,
             "level": null,
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 1,
           "max": 1,

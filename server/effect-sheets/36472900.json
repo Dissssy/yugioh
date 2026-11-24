@@ -24,7 +24,9 @@
         ],
         "by": {
           "side": "either",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -39,7 +41,8 @@
             "min": 1900,
             "max": null
           },
-          "def": null
+          "def": null,
+          "original": false
         },
         "compare": null,
         "once": false,

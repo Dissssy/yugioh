@@ -22,7 +22,9 @@
         "def": 0,
         "per": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -37,7 +39,8 @@
             "max": 2
           },
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "levelDelta": 0,
         "levelSet": null,

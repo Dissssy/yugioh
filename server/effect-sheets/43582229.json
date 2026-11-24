@@ -1,7 +1,7 @@
 {
   "code": 43582229,
   "textHash": "234887f03b179a4c6bcd1d47522c4859c4ee82a43922e2321514aabb869f226c",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "activation",
@@ -14,7 +14,57 @@
       "effect": "When this card is activated: You can target 1 Level 4 or lower \"Ice Barrier\" monster in your GY; Special Summon it.",
       "targets": "1 Level 4 or lower \"Ice Barrier\" monster in your GY (optional)",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "you",
+            "places": [
+              "graveyard"
+            ],
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": "Ice Barrier",
+            "except": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": {
+              "min": null,
+              "max": 4
+            },
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 0,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "targets"
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ]
+      },
       "continuous": null,
       "status": "unverified"
     },
@@ -34,7 +84,9 @@
         "apply": "restrict",
         "to": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [
             "monster"
           ],
@@ -48,7 +100,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "others": false,
         "cannot": [
@@ -56,7 +109,7 @@
         ],
         "by": {
           "side": "opponent",
-          "place": "any",
+          "places": [],
           "kinds": [
             "monster"
           ],
@@ -70,7 +123,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "compare": null,
         "once": false,
@@ -79,7 +133,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -93,10 +149,12 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 3,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ]
       },

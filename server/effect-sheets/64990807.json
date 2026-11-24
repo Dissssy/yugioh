@@ -1,7 +1,7 @@
 {
   "code": 64990807,
   "textHash": "f6384cf1c94419cf5f9367af599ef4bf2c2cef21175e03a7491d879830c7cb95",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "activation",
@@ -14,7 +14,117 @@
       "effect": "Destroy the opponent's card and Special Summon 1 \"Ice Barrier\" monster from your hand.",
       "targets": "1 card your opponent controls",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "reveal",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "places": [
+                  "hand"
+                ],
+                "kinds": [
+                  "monster"
+                ],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": "Ice Barrier",
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null,
+                "original": false
+              },
+              "min": 3,
+              "max": 3,
+              "rank": null,
+              "distinct": true,
+              "includeSelf": false
+            }
+          }
+        ],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "places": [
+              "field"
+            ],
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              },
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "hand"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Ice Barrier",
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

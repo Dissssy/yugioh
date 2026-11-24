@@ -45,7 +45,9 @@
         "self": false,
         "filter": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [
             "Synchro"
@@ -59,7 +61,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "how": [
           "synchro"
@@ -80,6 +83,7 @@
                 "do": "change_lp",
                 "player": "opponent",
                 "amount": 500,
+                "per": null,
                 "kind": "damage"
               }
             ]

@@ -19,7 +19,9 @@
         "apply": "restrict",
         "to": {
           "side": "you",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [
@@ -33,7 +35,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "others": true,
         "cannot": [
@@ -81,7 +84,9 @@
                   "from": "choose",
                   "filter": {
                     "side": "you",
-                    "place": "hand",
+                    "places": [
+                      "hand"
+                    ],
                     "kinds": [
                       "monster"
                     ],
@@ -98,11 +103,14 @@
                       "max": 4
                     },
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "max": 1,
-                  "rank": null
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
                 },
                 "position": "choice",
                 "banishWhenLeaves": false

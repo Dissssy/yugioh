@@ -21,6 +21,7 @@
         "attacks": 1,
         "piercing": true,
         "noDamageToYou": false,
+        "direct": false,
         "while": []
       },
       "status": "unverified"

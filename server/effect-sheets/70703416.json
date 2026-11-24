@@ -1,7 +1,7 @@
 {
   "code": 70703416,
   "textHash": "abefa1f60cc3c23cb412db012e69bea216989cb4438753222203307f2d7f29f0",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "continuous",
@@ -19,7 +19,9 @@
         "apply": "stats",
         "to": {
           "side": "opponent",
-          "place": "monsters",
+          "places": [
+            "monsters"
+          ],
           "kinds": [],
           "types": [],
           "races": [],
@@ -31,7 +33,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "atk": -500,
         "def": -500,
@@ -43,7 +46,9 @@
             "if": "count",
             "filter": {
               "side": "you",
-              "place": "monsters",
+              "places": [
+                "monsters"
+              ],
               "kinds": [
                 "monster"
               ],
@@ -57,10 +62,12 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 1,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ]
       },
@@ -77,7 +84,75 @@
       "effect": "Send 1 Level 3 or lower \"Ice Barrier\" monster from your Deck to the GY, and if you do, this card's Level becomes the same as that monster's, until the end of this turn.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "deck"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Ice Barrier",
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": {
+                      "min": null,
+                      "max": 3
+                    },
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                },
+                "to": "graveyard"
+              },
+              {
+                "do": "if_done"
+              },
+              {
+                "do": "set_stats",
+                "cards": {
+                  "from": "self"
+                },
+                "atk": null,
+                "def": null,
+                "level": {
+                  "of": "moved",
+                  "stat": "level",
+                  "filter": null,
+                  "original": true,
+                  "times": 1
+                },
+                "until": "end_of_turn"
+              }
+            ]
+          }
+        ]
+      },
       "continuous": null,
       "status": "unverified"
     }

@@ -1,7 +1,7 @@
 // The judge's ops, checked against the board. Each op either becomes events or is refused with a reason the
 // model can act on. Nothing here decides what a card's text means; it only refuses what the board can't allow.
 
-import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
+import { cardOf, check, clearFieldZone, endIfLpGone, Illegal, Run, spellTrapZonesFor } from './rules.ts';
 import { restriction, statsOf } from './continuous.ts';
 import { specialSummonForbidden, specialSummonProblem } from './script.ts';
 import { fusionMaterialsFit, fusionOf, fusionZones } from './fusion.ts';
@@ -36,7 +36,7 @@ export function applyOp(state: DuelState, op: Op, ctx: OpContext): OpResult {
 }
 
 /** The ops that change a card already in play, and so can't touch a card unaffected by the effect. */
-const AFFECTING = ['move', 'modify_stats', 'change_position', 'take_control', 'negate_effects', 'add_counters', 'remove_counters', 'detach', 'link'];
+const AFFECTING = ['move', 'modify_stats', 'grant', 'change_position', 'take_control', 'negate_effects', 'add_counters', 'remove_counters', 'detach', 'link'];
 
 /**
  * The op without the cards it can't touch: those unaffected by this effect (Freezing Chains of the Ice Barrier) and,
@@ -113,6 +113,17 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(op.until === null || op.until === 'end_phase', 'until is "end_phase" or null.');
       check(monsterZonesFor(state, op.controller, false).includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
       run.emit({ type: 'controlChanged', card: card.id, to: op.controller, zone: op.zone, until: op.until });
+      return;
+    }
+    case 'set_spell_trap': {
+      const at = locate(state, op.card);
+      check(at?.zone === 'hand', 'Only a card in the hand can be Set this way.');
+      const card = cardOf(state, op.card);
+      check(card.kind !== 'monster', 'Only Spells and Traps can be Set in the Spell & Trap Zone.');
+      const zone = spellTrapZonesFor(state, at!.seat, card)[0];
+      check(zone !== undefined, 'That player has no free Spell & Trap Zone.');
+      clearFieldZone(run, at!.seat, zone!);
+      run.emit({ type: 'spellTrapSet', player: at!.seat, card: op.card, zone: zone! });
       return;
     }
     case 'summon_token': {
@@ -276,7 +287,17 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       return;
     case 'forbid':
       check(op.what === 'special_summon' || op.filter === null, 'Only a Special Summon ban takes a filter.');
-      run.emit({ type: 'forbidden', player: op.player, what: op.what, filter: op.filter });
+      run.emit({ type: 'forbidden', player: op.player, what: op.what, filter: op.filter, except: op.except });
+      return;
+    case 'grant': {
+      const { at, card } = onField(state, op.card);
+      check(at.zone === 'monsters' && card.faceUp, 'Only a face-up monster can be given an ability.');
+      run.emit({ type: 'granted', card: op.card, effect: op.effect });
+      return;
+    }
+    case 'no_battle_damage':
+      check(state.attack, 'No attack is being made.');
+      run.emit({ type: 'battleDamageZeroed', player: op.player });
       return;
     case 'detach': {
       const at = known(state, op.card);
@@ -294,6 +315,11 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'targeted', cards: op.cards });
       return;
     }
+    case 'reveal':
+      check(op.cards.length > 0 && new Set(op.cards).size === op.cards.length, 'Reveal at least one card, each once.');
+      for (const id of op.cards) check(state.players[ctx.player].hand.includes(id), 'Only cards in the hand can be revealed.');
+      run.emit({ type: 'revealed', player: ctx.player, cards: op.cards });
+      return;
     case 'choose_effect':
       check(ctx.stage === 'activation', 'The effect is chosen when the card is activated, not when it resolves.');
       check(state.chain.at(-1)!.choice === null, 'An effect was already chosen for this activation.');

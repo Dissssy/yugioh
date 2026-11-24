@@ -1,7 +1,7 @@
 {
   "code": 11224934,
   "textHash": "12cc1272ff21cbc7698a165398bf9c129ca2dd3312d8f51f37ef1a72055c1275",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "activation",
@@ -14,7 +14,55 @@
       "effect": "Each face-up Xyz Monster you control gains 300 ATK for each Xyz Material attached to it, until the End Phase.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "modify_stats",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [
+                      "XYZ"
+                    ],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": true,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  }
+                },
+                "atk": 300,
+                "def": 0,
+                "per": "materials",
+                "levelDelta": 0,
+                "levelSet": null,
+                "until": "end_of_turn"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }
