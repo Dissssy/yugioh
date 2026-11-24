@@ -296,6 +296,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .ruling h2 { margin: 0; font-size: 1.1em; }
 .ruling p { margin: 0; }
 .ruling-report { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 8px; border-radius: 8px; border: 1px solid var(--line); }
+.send-review { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.send-review input { flex: 1 1 220px; min-width: 0; }
 .sheet-json { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: 0.8em; }
 
 /* Account menu and page */

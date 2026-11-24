@@ -276,3 +276,31 @@ export interface RulingCard {
   sheet: EffectSheet | null;
   reports: SheetReport[];
 }
+
+/** An admin API key as the super admin's list shows it; the key itself is shown once, when it is made. */
+export interface ApiKey {
+  id: number;
+  name: string;
+  createdBy: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export type ReviewStatus = 'open' | 'claimed' | 'fixed' | 'wont_fix';
+
+/** Something an admin sent to Claude to look at again (docs/review-api.md). */
+export interface ReviewRequest {
+  id: number;
+  matchId: string;
+  /** The log entry it is about, or null for the duel as a whole. */
+  seq: number | null;
+  code: number | null;
+  cardName: string | null;
+  note: string;
+  sentBy: string;
+  status: ReviewStatus;
+  result: string | null;
+  prUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

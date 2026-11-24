@@ -30,5 +30,8 @@ COPY --from=build /app/web/dist web/dist
 RUN mkdir -p /data/card-images && chown node:node /data/card-images
 USER node
 ENV PORT=3000 CARD_IMAGE_DIR=/data/card-images
+# Set by CI, so review bundles name the commit that is running (docs/review-api.md).
+ARG GIT_SHA
+ENV GIT_SHA=$GIT_SHA
 EXPOSE 3000
 CMD ["node", "server/src/index.ts"]

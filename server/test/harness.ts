@@ -97,7 +97,7 @@ export async function startHarness(): Promise<Harness> {
   const call = (params: Anthropic.MessageCreateParamsNonStreaming) => model(params);
   const discord = new FakeDiscord();
   const ai = { judge: call, appeal: call, judgeCalls: 300, appeals: 10, questions: 20, opponent: { call, model: 'claude-haiku-5-5', calls: 400, paceMs: 0 } };
-  const app = createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10, QUESTIONS_PER_DUEL: 20, AI_OPPONENT_MODEL: 'claude-haiku-5-5', AI_CALLS_PER_DUEL: 400, RESPONSE_FLOOR_MS: 0 }, db, ai, discord, seeded(1));
+  const app = createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10, QUESTIONS_PER_DUEL: 20, AI_OPPONENT_MODEL: 'claude-haiku-5-5', AI_CALLS_PER_DUEL: 400, RESPONSE_FLOOR_MS: 0, GIT_SHA: 'test-sha' }, db, ai, discord, seeded(1));
   server.on('request', app);
 
   return {

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EffectSheet } from '@yugioh/engine';
-import { isAdmin, type AccountStatus, type AdminDuels, type AdminUser, type DiscordServer, type Me, type Role, type RulingCard, type Rulings } from '@yugioh/shared';
+import { isAdmin, type AccountStatus, type AdminDuels, type AdminUser, type ApiKey, type DiscordServer, type Me, type ReviewRequest, type ReviewStatus, type Role, type RulingCard, type Rulings } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { api, errorText } from '../api.ts';
@@ -17,8 +17,10 @@ export function Admin({ me }: { me: Me }) {
     <>
       <Accounts superAdmin={me.user.role === 'superAdmin'} />
       <DiscordServers />
+      <Reviews />
       <RulingsSection />
       <RecentDuels />
+      {me.user.role === 'superAdmin' && <ApiKeys />}
     </>
   );
 }
@@ -41,6 +43,7 @@ const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`;
  */
 function RecentDuels() {
   const duels = useQuery({ queryKey: ['admin', 'duels'], queryFn: () => api<AdminDuels>('/admin/duels') });
+  const [sending, setSending] = useState<string | null>(null);
   if (duels.isError) return <Failed what="duels" error={duels.error} />;
   if (!duels.data) return null;
   return (
@@ -70,7 +73,9 @@ function RecentDuels() {
                 <td className="cell-actions">
                   {duel.status === 'finished' && <Link to={`/duel/${duel.id}/replay`}>Replay</Link>}{' '}
                   <a href={`/api/admin/duels/${duel.id}/report`} target="_blank" rel="noreferrer">Full log</a>{' '}
-                  <a href={`/api/admin/duels/${duel.id}/report?format=json`} target="_blank" rel="noreferrer">JSON</a>
+                  <a href={`/api/admin/duels/${duel.id}/report?format=json`} target="_blank" rel="noreferrer">JSON</a>{' '}
+                  <button className="quiet" onClick={() => setSending(sending === duel.id ? null : duel.id)}>Send to Claude</button>
+                  {sending === duel.id && <SendForm matchId={duel.id} onSent={() => setSending(null)} />}
                 </td>
               </tr>
             ))}
@@ -117,7 +122,8 @@ function RulingsSection() {
               <p>{r.note}</p>
               <button className="quiet" disabled={resolve.isPending} onClick={() => resolve.mutate(r.id)}>
                 Close report
-              </button>
+              </button>{' '}
+              <SendReport matchId={r.matchId} seq={r.seq} code={null} note={`Escalated question found a rule in code wrong: ${r.note}`} />
             </div>
           ))}
         </div>
@@ -176,7 +182,8 @@ function RulingEditor({ card }: { card: RulingCard }) {
           <p>{r.note}</p>
           <button className="quiet" disabled={resolve.isPending} onClick={() => resolve.mutate(r.id)}>
             Close report
-          </button>
+          </button>{' '}
+          <SendReport matchId={r.matchId} seq={r.seq} code={card.code} note={`${REPORT_FROM[r.from]}: ${r.note}`} />
         </div>
       ))}
       {card.sheet ? (
@@ -330,6 +337,151 @@ function Accounts({ superAdmin }: { superAdmin: boolean }) {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+type NewReview = { matchId: string; seq: number | null; code: number | null; note: string };
+
+function useSendReview() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (review: NewReview) => api<ReviewRequest>('/admin/reviews', { method: 'POST', body: JSON.stringify(review) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'reviews'] }),
+  });
+}
+
+/** Sends a duel to Claude: a log entry (the `#` number in the Full log) if it is about one moment, and what looks wrong. */
+function SendForm({ matchId, onSent }: { matchId: string; onSent: () => void }) {
+  const send = useSendReview();
+  const [seq, setSeq] = useState('');
+  const [note, setNote] = useState('');
+  return (
+    <form
+      className="send-review"
+      onSubmit={(e) => {
+        e.preventDefault();
+        send.mutate({ matchId, seq: seq ? Number(seq) : null, code: null, note }, { onSuccess: onSent });
+      }}
+    >
+      <input value={seq} onChange={(e) => setSeq(e.target.value.replace(/\D/g, ''))} placeholder="Log entry #, or blank for the whole duel" inputMode="numeric" />
+      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What looks wrong (e.g. Pot of Greed was never offered)" maxLength={2000} />
+      {send.isError && <p className="error">{errorText(send.error)}</p>}
+      <button className="primary" disabled={!note.trim() || send.isPending}>Send</button>
+    </form>
+  );
+}
+
+/** Sends a report on to Claude as it stands. */
+function SendReport(review: NewReview) {
+  const send = useSendReview();
+  if (send.isSuccess) return <span className="muted small">Sent to Claude</span>;
+  return (
+    <>
+      <button className="quiet" disabled={send.isPending} onClick={() => send.mutate(review)}>Send to Claude</button>
+      {send.isError && <span className="error">{errorText(send.error)}</span>}
+    </>
+  );
+}
+
+const REVIEW_STATUS: Record<ReviewStatus, string> = { open: 'waiting for Claude', claimed: 'Claude is on it', fixed: 'fixed', wont_fix: "won't fix" };
+
+/** What admins sent to Claude, and what came of it (docs/review-api.md). */
+function Reviews() {
+  const reviews = useQuery({ queryKey: ['admin', 'reviews'], queryFn: () => api<ReviewRequest[]>('/admin/reviews') });
+  if (reviews.isError) return <Failed what="review requests" error={reviews.error} />;
+  if (!reviews.data?.length) return null;
+  const waiting = reviews.data.filter((r) => r.status === 'open' || r.status === 'claimed').length;
+  return (
+    <section className="box admin">
+      <div className="page-head">
+        <h1>Sent to Claude</h1>
+        <span className={`pill${waiting ? ' waiting' : ''}`}>{waiting ? `${waiting} in progress` : 'All done'}</span>
+      </div>
+      <p className="muted small">A Claude thread checks for new requests every hour, fixes what it can in a pull request, and reports back here.</p>
+      {reviews.data.map((r) => (
+        <div key={r.id} className="ruling-report">
+          <p>
+            <span className="pill">{REVIEW_STATUS[r.status]}</span>{' '}
+            <span className="muted">
+              {formatDate(r.createdAt)} by {r.sentBy},{' '}
+              <a href={`/api/admin/duels/${r.matchId}/report`} target="_blank" rel="noreferrer">duel log</a>
+              {r.seq !== null && ` at #${r.seq}`}
+              {r.cardName && `, ${r.cardName}`}
+            </span>
+          </p>
+          <p>{r.note}</p>
+          {r.result && <p className="muted">{r.result}</p>}
+          {r.prUrl && <p><a href={r.prUrl} target="_blank" rel="noreferrer">{r.prUrl}</a></p>}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** Admin API keys, for tools such as the Claude thread that works the review queue. The super admin's alone. */
+function ApiKeys() {
+  const queryClient = useQueryClient();
+  const keys = useQuery({ queryKey: ['admin', 'keys'], queryFn: () => api<ApiKey[]>('/admin/keys') });
+  const [name, setName] = useState('');
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin', 'keys'] });
+  const create = useMutation({
+    mutationFn: () => api<{ id: number; key: string }>('/admin/keys', { method: 'POST', body: JSON.stringify({ name }) }),
+    onSuccess: () => {
+      setName('');
+      return refresh();
+    },
+  });
+  const revoke = useMutation({ mutationFn: (id: number) => api(`/admin/keys/${id}`, { method: 'DELETE' }), onSuccess: refresh });
+  if (keys.isError) return <Failed what="API keys" error={keys.error} />;
+  if (!keys.data) return null;
+  return (
+    <section className="box admin">
+      <div className="page-head">
+        <h1>API keys</h1>
+      </div>
+      <p className="muted small">
+        A key works on the admin API as an admin (reading duel logs, editing rulings, working review requests), never as
+        the super admin. Send it as <code>Authorization: Bearer &lt;key&gt;</code>.
+      </p>
+      {create.data && (
+        <p>
+          New key, shown only this once: <code>{create.data.key}</code>
+        </p>
+      )}
+      {(create.error ?? revoke.error) && <p className="error">{errorText((create.error ?? revoke.error)!)}</p>}
+      {keys.data.length > 0 && (
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Made by</th><th>Made</th><th>Last used</th><th /></tr>
+            </thead>
+            <tbody>
+              {keys.data.map((k) => (
+                <tr key={k.id}>
+                  <td><strong>{k.name}</strong></td>
+                  <td className="muted">{k.createdBy}</td>
+                  <td className="muted">{formatDate(k.createdAt)}</td>
+                  <td className="muted">{k.lastUsedAt ? formatDate(k.lastUsedAt) : 'never'}</td>
+                  <td className="cell-actions">
+                    <button className="quiet" disabled={revoke.isPending} onClick={() => revoke.mutate(k.id)}>Revoke</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <form
+        className="send-review"
+        onSubmit={(e) => {
+          e.preventDefault();
+          create.mutate();
+        }}
+      >
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="What the key is for" maxLength={100} />
+        <button className="primary" disabled={!name.trim() || create.isPending}>Make a key</button>
+      </form>
     </section>
   );
 }

@@ -29,6 +29,8 @@ const env = z.object({
    * activate, so the speed of a pass reveals nothing. A random extra of up to half as long is added.
    */
   RESPONSE_FLOOR_MS: z.coerce.number().int().nonnegative().default(2000),
+  /** The commit the image was built from, set by CI. Review bundles name it so a fix starts from the code that ran. */
+  GIT_SHA: z.string().default(''),
   /** The Discord app behind the Activity (docs/discord.md). Without all three, the Activity can't sign anyone in. */
   DISCORD_CLIENT_ID: z.string().min(1).optional(),
   DISCORD_CLIENT_SECRET: z.string().min(1).optional(),
