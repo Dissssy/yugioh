@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { evolve, replay, startDuel, statsOf, type DuelEvent, type DuelState, type DuelUpdate, type Intent, type PlayerView, type Seat } from '@yugioh/engine';
 import type { DeckSummary, DuelSummary } from '@yugioh/shared';
 import { loadCards, syncCards } from '../src/cards.ts';
-import { decks, effectSheets } from '../src/db/schema.ts';
+import { decks, effectSheets, matchEvents } from '../src/db/schema.ts';
 import { rule } from '../src/judge/script.ts';
-import { flagScripts, importSheetFiles, loadSheets, resetSheets } from '../src/sheets.ts';
+import { flagScripts, importSheetFiles, loadSheets } from '../src/sheets.ts';
 import { ADMIN_EMAIL, Browser, seeded, startDuelVia, startHarness, Stream, type Harness } from './harness.ts';
 
 let h: Harness;
@@ -202,13 +202,33 @@ describe('effect sheets stored in an older format', () => {
   });
 });
 
-describe('RESET_SHEETS', () => {
-  it('throws away flagged sheets so the files load afresh', async () => {
+describe('effect sheets at server start', () => {
+  const status = async () => (await loadSheets(h.db, await loadCards(h.db, [MIRROR_FORCE])))[MIRROR_FORCE]?.effects[0]?.status;
+
+  it('import only the files that changed since they were last imported, keeping changes made on the site', async () => {
+    await importSheetFiles(h.db, { force: true });
+    expect(await importSheetFiles(h.db)).toBe(0);
+
     await flagScripts(h.db, MIRROR_FORCE, 'test report');
-    await resetSheets(h.db);
-    expect(await h.db.select().from(effectSheets)).toEqual([]);
-    expect(await importSheetFiles(h.db)).toBeGreaterThan(0);
-    const cards = await loadCards(h.db, [MIRROR_FORCE]);
-    expect((await loadSheets(h.db, cards))[MIRROR_FORCE]?.effects[0]?.status).toBe('unverified');
+    expect(await importSheetFiles(h.db)).toBe(0);
+    expect(await status()).toBe('flagged');
+
+    // A fix to the file reaches the site at the next start.
+    await h.db.update(effectSheets).set({ fileHash: 'an older version of the file' }).where(eq(effectSheets.code, MIRROR_FORCE));
+    expect(await importSheetFiles(h.db)).toBe(1);
+    expect(await status()).toBe('unverified');
+  });
+
+  it('never take a sheet away from a running duel, even if the database has none for its cards', async () => {
+    const { duel, guest, stream } = await setUp();
+    await h.db.delete(effectSheets);
+    try {
+      // Loading the duel compares its sheets with the database's.
+      await (await stream(guest)).update();
+      const events = await h.db.select().from(matchEvents).where(eq(matchEvents.matchId, duel.id));
+      expect(events.filter((e) => (e.event as DuelEvent).type === 'sheetUpdated')).toEqual([]);
+    } finally {
+      await importSheetFiles(h.db, { force: true });
+    }
   });
 });

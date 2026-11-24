@@ -4,7 +4,7 @@
 //
 //   npm run sheets:compile                    sheets for pool cards that have none or whose text changed
 //   npm run sheets:compile -- --force [names] recompile all of them, or only the named cards
-//   npm run sheets:import [-- --force]        load server/effect-sheets/*.json into the database (missing ones only)
+//   npm run sheets:import [-- --force]        load server/effect-sheets/*.json into the database (changed ones only)
 //   npm run sheets:export                     write every sheet in the database to server/effect-sheets/
 //   npm run sheets:todo -- <dir>              write the pool cards that need a sheet, and how to write one, to <dir>
 //   npm run sheets:check                      check every pool card's sheet file against the schema and the card
@@ -26,7 +26,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { DESTINATIONS, FORBIDDEN, FUSION_PLACES, LOCK_UNTIL, RESTRICTIONS, UNTIL, type CardData, type Condition, type Continuous, type ModelUsage, type EffectSheet, type Materials, type Script, type Selection, type SheetEffect, type StatValue, type Step, type When } from '@yugioh/engine';
 import type { Db } from './db/client.ts';
-import { cards, effectSheets, sheetReports, sheetRevisions } from './db/schema.ts';
+import { cards, effectSheets, sheetRevisions } from './db/schema.ts';
 import { costOf, usageOf } from './judge/pricing.ts';
 import { strictSchema } from './judge/tools.ts';
 import { cardFilter } from './judge/cardFilter.ts';
@@ -284,13 +284,13 @@ function current(cardData: Record<number, CardData>, sheets: EffectSheet[]): Rec
 }
 
 /** Stores a new version of a sheet and keeps the old ones. */
-export async function saveSheet(db: Db, sheet: EffectSheet, reason: string): Promise<void> {
+export async function saveSheet(db: Db, sheet: EffectSheet, reason: string, fileHash?: string): Promise<void> {
   const checked = sheetSchema.parse(sheet);
   await db.transaction(async (tx) => {
     await tx
       .insert(effectSheets)
-      .values({ code: checked.code, sheet: checked })
-      .onConflictDoUpdate({ target: effectSheets.code, set: { sheet: checked, updatedAt: new Date() } });
+      .values({ code: checked.code, sheet: checked, fileHash: fileHash ?? null })
+      .onConflictDoUpdate({ target: effectSheets.code, set: { sheet: checked, updatedAt: new Date(), ...(fileHash ? { fileHash } : {}) } });
     await tx.insert(sheetRevisions).values({ code: checked.code, sheet: checked, reason });
   });
 }
@@ -321,35 +321,28 @@ export async function readSheetFiles(cardData: Record<number, CardData>, dir = S
   return current(cardData, sheets);
 }
 
+/** The hash of a repository sheet file's content, recorded with each import so the next start knows if it changed. */
+const fileHash = (sheet: EffectSheet) => createHash('sha256').update(JSON.stringify(sheetSchema.parse(sheet))).digest('hex');
+
 /**
- * Loads the sheet files into the database: those it lacks or holds only in an older format, or with `force` all of
- * them. Returns how many.
+ * Loads the sheet files into the database: each one the database lacks, holds only in an older format, or last
+ * imported from a different version of the file (a fix merged into the repository). A sheet changed in the database
+ * since (a report, an appeal, the admin) stays until its file changes. `force` loads every file. Returns how many.
  */
 export async function importSheetFiles(db: Db, options: { dir?: string; force?: boolean } = {}): Promise<number> {
   const { dir = SHEET_DIR, force = false } = options;
   const codes = await listSheetCodes(dir);
   const rows = codes.length ? await db.select().from(cards).where(inArray(cards.id, codes)) : [];
   const files = await readSheetFiles(Object.fromEntries(rows.map((r) => [r.id, { code: r.id, name: r.name, text: r.text } as CardData])), dir);
-  const have = new Set((await db.select().from(effectSheets)).filter((r) => sheetSchema.safeParse(r.sheet).success).map((r) => r.code));
+  const imported = new Map((await db.select().from(effectSheets)).filter((r) => sheetSchema.safeParse(r.sheet).success).map((r) => [r.code, r.fileHash]));
   let n = 0;
   for (const sheet of Object.values(files)) {
-    if (!force && have.has(sheet.code)) continue;
-    await saveSheet(db, sheet, 'imported');
+    const hash = fileHash(sheet);
+    if (!force && imported.get(sheet.code) === hash) continue;
+    await saveSheet(db, sheet, 'imported from the repository', hash);
     n++;
   }
   return n;
-}
-
-/**
- * Deletes every stored sheet, revision and report, so the next card sync loads the files afresh (`RESET_SHEETS`).
- * Duels keep the sheets they started with in their logs.
- */
-export async function resetSheets(db: Db): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx.delete(sheetReports);
-    await tx.delete(sheetRevisions);
-    await tx.delete(effectSheets);
-  });
 }
 
 /** Writes every sheet in the database to `dir`, one file per card. */

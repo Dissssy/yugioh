@@ -1,0 +1,1 @@
+ALTER TABLE "effect_sheets" ADD COLUMN "file_hash" text;

@@ -193,6 +193,8 @@ export const effectSheets = pgTable('effect_sheets', {
     .primaryKey()
     .references(() => cards.id, { onDelete: 'cascade' }),
   sheet: jsonb('sheet').$type<EffectSheet>().notNull(),
+  /** Hash of the repository file this card's sheet was last imported from, so a start imports only changed files. */
+  fileHash: text('file_hash'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

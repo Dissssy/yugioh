@@ -176,10 +176,7 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         return;
       }
     }
-    if (event.type === 'sheetUpdated') {
-      if (event.sheet) s.sheets[event.code] = event.sheet;
-      else delete s.sheets[event.code];
-    }
+    if (event.type === 'sheetUpdated') s.sheets[event.code] = event.sheet;
     // Every other event changes the board, or (a sheet update) how a card works, so earlier rulings no longer apply.
     if (s.rulings.length > 0) s.rulings = [];
     const group = s.resolvedLinks;

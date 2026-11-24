@@ -971,7 +971,7 @@ export type DuelEvent =
   /** Both accepted: the board goes back to `board` (the state before event `to`), and the corrected ruling applies. */
   | { type: 'rolledBack'; to: number; board: Board }
   /** A card's sheet changed while the duel was going (a report flagged it, or it was fixed); null if it no longer has one. */
-  | { type: 'sheetUpdated'; code: number; sheet: EffectSheet | null }
+  | { type: 'sheetUpdated'; code: number; sheet: EffectSheet }
   | { type: 'duelEnded'; result: DuelResult }
   /** A player's chat message. It changes nothing on the board and never reaches the judge. */
   /** A chat message; an emote's text is the emote's own (EMOTES). */

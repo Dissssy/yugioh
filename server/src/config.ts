@@ -29,11 +29,6 @@ const env = z.object({
    * activate, so the speed of a pass reveals nothing. A random extra of up to half as long is added.
    */
   RESPONSE_FLOOR_MS: z.coerce.number().int().nonnegative().default(2000),
-  /**
-   * Development only: at start, throw away every stored effect sheet, revision and report and load the sheets from
-   * server/effect-sheets/ again, so a deploy plays the repository's sheets and nothing players flagged.
-   */
-  RESET_SHEETS: z.stringbool().default(false),
   /** The Discord app behind the Activity (docs/discord.md). Without all three, the Activity can't sign anyone in. */
   DISCORD_CLIENT_ID: z.string().min(1).optional(),
   DISCORD_CLIENT_SECRET: z.string().min(1).optional(),

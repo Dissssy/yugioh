@@ -130,7 +130,6 @@ The full tables with the other options are in each plan.
 | Rulings history | Accept marks effects | `verified` |
 | Rulings history | Tuner schedule | Nightly, 10 cards max, plus Tune now |
 | Rulings history | Rulings for judge-only effects | A `rulings` list on the sheet effect |
-| Rulings history | `RESET_SHEETS` off | At launch |
 | Replays | Who can watch | Anyone with the link; live duels too, showing only public cards |
 | Replays | What players see | Either seat or both, chosen while watching (Ethan chose this, 2026-11-20) |
 | Playmats | Whose mat is shown | Each player's under their own half |
