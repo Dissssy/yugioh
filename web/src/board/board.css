@@ -176,9 +176,35 @@ main:has(.duel) { max-width: none; padding: 0; }
 .strip-middle { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .strip-prompt { grid-column: 6 / 8; display: flex; align-items: center; padding: 0 10px; min-width: 0; }
 .strip-prompt > * { flex-wrap: wrap; }
-/* The row is about one zone tall: a question with several answers packs tight, and what still doesn't fit lies over the zones below, never under them. */
-.strip-prompt { position: relative; z-index: 4; }
-.strip-prompt .judge-choice { gap: 4px 8px; }
+/* A decision to make: a card over one field, beside the middle strip, above the zones and below menus and pile viewers. */
+.phase-strip { position: relative; }
+.decision, .decision-tab { position: absolute; left: 50%; translate: -50% 0; z-index: 12; }
+.decision.over-foe, .decision-tab.over-foe { bottom: calc(100% + var(--gap) + 6px); }
+.decision.over-mine, .decision-tab.over-mine { top: calc(100% + var(--gap) + 6px); }
+.decision {
+  box-sizing: border-box;
+  width: min(calc(var(--zone) * 5), 100%, 560px);
+  min-width: min(300px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--surface, var(--bg));
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.28);
+  /* No taller than the field it covers, with the hand row above it; a longer question scrolls. */
+  max-height: calc(var(--zone) * 2.5 + var(--gap) * 2);
+  overflow-y: auto;
+  font-size: 0.95em;
+}
+.decision .choice-prompt { flex-wrap: wrap; justify-content: flex-start; gap: 6px 8px; }
+.decision .choice-prompt button, .decision .pick-choices button { padding: 3px 10px; }
+.duel.compact .decision { padding: 8px 10px; font-size: 0.85em; }
+.decision .choice-text { flex-basis: 100%; -webkit-line-clamp: unset; display: block; font-size: 1em; }
+.decision-hide { padding: 2px 8px; font-size: 0.8em; }
+.decision-tab { padding: 4px 12px; border: 1px solid var(--accent); border-radius: 999px; background: var(--surface, var(--bg)); box-shadow: 0 4px 12px rgb(0 0 0 / 0.2); font-size: 0.85em; }
 .zone.extra-zone { border-style: solid; border-color: color-mix(in srgb, var(--fg) 22%, transparent); }
 /* The phase dial: the phases on a strip that scrolls to keep the current one under the notch, fading to each side. */
 .phase-dial { --dial-item: calc(var(--zone) / 3); display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
