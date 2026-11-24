@@ -1,6 +1,6 @@
 import { get } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { addBlocker, deckProblems, isSideSwap, NO_BANLIST, parseYdk, toYdk, type BanlistDetail, type BanlistSummary, type CatalogCard, type DeckDetail, type DeckList, type DeckSave, type DeckSummary, type DuelDeck, type DuelSummary, type RuleCard } from '@yugioh/shared';
+import { addBlocker, deckProblems, isSideSwap, matchesTerms, NO_BANLIST, parseQuery, parseYdk, setTerm, termValue, toYdk, type BanlistDetail, type BanlistSummary, type CatalogCard, type DeckDetail, type DeckList, type DeckSave, type DeckSummary, type DuelDeck, type DuelSummary, type RuleCard } from '@yugioh/shared';
 import { eq } from 'drizzle-orm';
 import { syncCards } from '../src/cards.ts';
 import { users } from '../src/db/schema.ts';
@@ -92,6 +92,51 @@ describe('the card catalog', () => {
       get(`${h.baseUrl}/api/cards`, { headers: { 'if-none-match': res.headers.get('etag')! } }, (r) => resolve(r.resume().statusCode)),
     );
     expect(status).toBe(304);
+  });
+});
+
+describe('search terms', () => {
+  const card = (c: Partial<CatalogCard>): CatalogCard => ({
+    code: 1, name: 'Card', type: 'Effect Monster', kind: 'monster', extraDeck: false, text: '', level: 4, atk: 1000, def: 1000,
+    attribute: 'DARK', race: 'Dragon', archetype: null, inPool: true, ...c,
+  });
+  const cards = [
+    card({ code: 1, name: 'Luster Dragon', type: 'Normal Monster', level: 4, atk: 1900, def: 1600, attribute: 'WIND' }),
+    card({ code: 2, name: 'Blue-Eyes White Dragon', type: 'Normal Monster', level: 8, atk: 3000, def: 2500, attribute: 'LIGHT', archetype: 'Blue-Eyes' }),
+    card({ code: 3, name: 'Junk Synchron', type: 'Tuner Effect Monster', level: 3, atk: 1300, def: 500, race: 'Warrior', text: 'Special Summon 1 Level 2 or lower monster' }),
+    card({ code: 4, name: 'Mystical Space Typhoon', type: 'Spell Card', kind: 'spell', level: null, atk: null, def: null, attribute: null, race: 'Quick-Play' }),
+  ];
+  const find = (text: string) => {
+    const q = parseQuery(text);
+    return cards.filter((c) => matchesTerms(c, q.terms)).map((c) => c.code);
+  };
+
+  it('filters by numbers, comparisons and ranges, leaving the words for the text search', () => {
+    expect(parseQuery('dragon atk:>=1800 level:4').words).toBe('dragon');
+    expect(find('atk:>=1800')).toEqual([1, 2]);
+    expect(find('def:<1000')).toEqual([3]);
+    expect(find('level:3-4')).toEqual([1, 3]);
+    expect(find('lv:8')).toEqual([2]);
+    expect(parseQuery('atk:lots').errors).toHaveLength(1);
+  });
+
+  it('filters by attribute, type, kind, archetype and type-line words, and leaves out negated terms', () => {
+    expect(find('attr:light')).toEqual([2]);
+    expect(find('type:warrior')).toEqual([3]);
+    expect(find('type:quick-play')).toEqual([4]);
+    expect(find('kind:spell')).toEqual([4]);
+    expect(find('arch:"blue-eyes"')).toEqual([2]);
+    expect(find('is:tuner')).toEqual([3]);
+    expect(find('kind:monster -is:normal')).toEqual([3]);
+    expect(find('text:"special summon"')).toEqual([3]);
+  });
+
+  it('lets the filter menus read and write terms in the search box', () => {
+    expect(setTerm('dragon attr:dark', 'attr', 'LIGHT')).toBe('dragon attr:LIGHT');
+    expect(setTerm('dragon attribute:dark', 'attr', null)).toBe('dragon');
+    expect(setTerm('', 'arch', 'Dark Magician')).toBe('arch:"Dark Magician"');
+    expect(termValue('arch:"Dark Magician" atk:>=1000', 'arch')).toBe('Dark Magician');
+    expect(termValue('level:>=4', 'level')).toBeNull();
   });
 });
 

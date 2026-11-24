@@ -1,6 +1,6 @@
 # Deck builder
 
-Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Steps 1 to 4 of the build order are built; the rest isn't yet. This plan replaces the one-line "deck builder" entry in
+Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Steps 1 to 5 of the build order are built; the rest isn't yet. This plan replaces the one-line "deck builder" entry in
 [architecture.md](architecture.md) layer 8 and the "not planned yet" note in [next-steps.md](next-steps.md).
 
 ## What Ethan asked for
@@ -63,9 +63,17 @@ frame with its name and type.
 - **[MiniSearch](https://github.com/lucaong/minisearch)** does the fuzzy search over names and text, with names
   weighted higher. It's small, has no dependencies, and is fast on this size of list. Fuse.js was the other option, but
   it scans every card's full text on each search, which is slow at 14,000 cards.
-- **Search terms (later step):** `atk:>1800`, `def:<=1000`, `level:4`, `attr:dark`, `type:dragon`, `kind:trap`,
-  `arch:"blue-eyes"`, combined with the free text. Our own small parser turns them into filters, applied before
-  MiniSearch ranks the rest. A **?** button by the search bar opens the help listing every term.
+- **Search terms** (`shared/src/cardQuery.ts`): `field:value` terms beside the words, such as
+  `dragon atk:>=2000 attr:dark level:4`. Fields: `atk`, `def`, `level` (also `lv`, `rank`) take a number, a comparison
+  (`>`, `>=`, `<`, `<=`) or a range (`4-6`); `attr`, `type` (monster type or Spell/Trap property), `kind`
+  (monster, spell, trap, extra), `arch` (part of the archetype), `is` (a word of the type line: tuner, fusion, flip…),
+  `name` and `text` (exact parts). Quotes hold values with spaces, and `-` in front leaves matches out. The terms filter
+  the cards; the remaining words go to MiniSearch. A term that can't be read shows an error under the box.
+- **Filters**, as other builders have them (YGOPRODeck's card database, Master Duel, EDOPro): menus for Attribute,
+  Type or property, Level or Rank, Card type and Archetype. Each menu writes its term into the search box and shows the
+  term the box has, so typing and picking are one search, and the box always shows all of it. YGOPRODeck's typed
+  syntax was the model for the terms.
+- **?** by the search bar opens the help: every term with an example that adds itself to the search.
 
 ## Rules
 
@@ -164,7 +172,7 @@ Each step is a working product on its own.
 3. **`.ydk` import and export** (built) on the decks page and every deck page.
 4. **The pre-duel stage** (built). The `preparing` status, the duel's copy of each deck, Side Deck swaps, guests building,
    Ready, and the Premade only switch.
-5. **Search terms** and the help menu.
+5. **Search terms**, filters and the help menu (built).
 6. **Later, not in this plan:** best of 3 with siding between games, draft mode, and the challenge list and
    notifications.
 
