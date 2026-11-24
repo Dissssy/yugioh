@@ -213,12 +213,17 @@ describe('open games in the Activity', () => {
     await odion.json(at('/join'), { method: 'POST', body: '{}' });
     await odion.json(at('/deck'), { method: 'PUT', body: JSON.stringify({ deckId: deck!.id }) });
     expect((await odion.json<DuelSummary>(at('/ready'), { method: 'POST', body: JSON.stringify({ ready: true }) })).body.status).toBe('active');
+
+    // Everyone there sees a small picture of it: names and LP, how many cards each holds, and nothing hidden.
+    const { previews } = (await openGames(odion)).body;
+    expect(previews[duel.id]).toMatchObject({ turn: 0, players: [{ lp: 8000, hand: 0 }, { lp: 8000, hand: 0 }] });
+    expect(previews[duel.id]!.players[0].monsters).toHaveLength(7);
   });
 
   it('says when the Activity was opened in a DM', async () => {
     h.discord.instances.set('dm-call', ['3004']);
     h.discord.places.set('dm-call', 'dm:555');
     const weevil = (await openActivity({ id: '3004', username: 'weevil' }, 'dm-call')).browser;
-    expect((await openGames(weevil)).body).toEqual({ dm: true, games: [] });
+    expect((await openGames(weevil)).body).toEqual({ dm: true, games: [], previews: {} });
   });
 });

@@ -2,7 +2,7 @@
 
 As of 2026-11-24. The site also runs as a Discord Activity: the same web app, opened by Discord inside a call or a DM and served through Discord's proxy. It is built for the app's testers only, so it never needs Discord's app verification.
 
-Built so far: signing in inside the Activity, Discord logins and account linking on the website, open games, links that work from inside Discord, and a small view for Discord's pop-out. Planned next: live mini boards on the open games, and an easier setup guide for new testers.
+Built so far: signing in inside the Activity, Discord logins and account linking on the website, open games with live mini boards, links that work from inside Discord, and a small view for Discord's pop-out. Planned next: an easier setup guide for new testers.
 
 ## Who can play
 
@@ -19,13 +19,13 @@ Built so far: signing in inside the Activity, Discord logins and account linking
 
 ## Open games
 
-Inside a server, the Activity's home page shows **Open games** where the website shows "Your duels": every duel started in that server. They are grouped as open seats (Sit down), duels being played (Watch, or Play for the two players) and duels finished in the last day (Replay). The list refreshes every 5 seconds. **New open game** is the usual challenge form, so any banlist and deck rule can be chosen. A challenge made inside the Activity becomes one of that server's open games, with no link to send.
+Inside a server, the Activity's home page shows **Open games** where the website shows "Your duels": every duel started in that server. They are grouped as open seats (Sit down), duels being played (Watch, or Play for the two players) and duels finished in the last day (Replay). The list refreshes every 5 seconds. Each duel being played shows a **mini board**: both fields as a spectator sees them (face-down cards show their backs, defense position lies sideways), with each player's LP and hand size and a marker on whose turn it is. It updates with the list. `GET /api/open-games` sends these as `previews`, built from the spectator view, so nothing hidden ever reaches the page. **New open game** is the usual challenge form, so any banlist and deck rule can be chosen. A challenge made inside the Activity becomes one of that server's open games, with no link to send.
 
 **In a DM** (one-on-one or group), the Activity plays one game at a time, since whoever opened it most likely came to duel the other person. Opening the Activity goes straight into the DM's game that isn't finished yet, taking its empty seat if there is one. With no game going, the first person in gets the new-game form (banlist and deck rules) as **Start a game**. Discord doesn't tell an app how many people a DM has without a scope that needs Discord's approval, so group DMs work the same way. It goes into the game only when the Activity opens, so going back to the home page stays there.
 
 **Choosing a deck right away.** Everywhere, website included, the challenger chooses and readies their deck as soon as the challenge exists, with "Nobody has taken up the challenge yet" and the challenge link beside it. Whoever takes the seat then chooses theirs, and the duel starts once both are ready.
 
-Where the Activity was opened comes from Discord's answer about the instance at sign-in: `guild:<server id>`, or `dm:<channel id>` in a DM. It is kept in a second signed cookie, `discord_place`, so it can't be made up. Duels store it in `matches.place`, and a site-wide scope can be added later the same way. `GET /api/open-games` returns `{ dm, games }` and answers 404 outside the Activity.
+Where the Activity was opened comes from Discord's answer about the instance at sign-in: `guild:<server id>`, or `dm:<channel id>` in a DM. It is kept in a second signed cookie, `discord_place`, so it can't be made up. Duels store it in `matches.place`, and a site-wide scope can be added later the same way. `GET /api/open-games` returns `{ dm, games, previews }` and answers 404 outside the Activity.
 
 ## Inside Discord's window
 

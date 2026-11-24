@@ -1,7 +1,7 @@
 // The home page inside the Discord Activity (docs/discord.md): the open games where it was opened, or in a DM, the DM's
 // one game.
 import { useMutation } from '@tanstack/react-query';
-import type { DuelSummary } from '@yugioh/shared';
+import type { DuelSummary, OpenGames } from '@yugioh/shared';
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, errorText, useOpenGames } from '../api.ts';
@@ -16,10 +16,10 @@ export function ActivityHome({ title }: { title: string }) {
   const openGames = useOpenGames();
   if (openGames.isError) return <Notice title="Can't load the games" tone="error">{errorText(openGames.error)}</Notice>;
   if (!openGames.data) return <Loading />;
-  const { dm, games } = openGames.data;
-  if (dm) return <DmHome title={title} games={games} />;
+  const { dm, games, previews } = openGames.data;
+  if (dm) return <DmHome title={title} games={games} previews={previews} />;
   return (
-    <Dashboard title={title} list={<OpenGamesList games={games} />}>
+    <Dashboard title={title} list={<OpenGamesList games={games} previews={previews} />}>
       <NewChallenge />
     </Dashboard>
   );
@@ -29,7 +29,7 @@ export function ActivityHome({ title }: { title: string }) {
  * A DM plays one game at a time, since whoever opened the Activity there most likely came to duel the other person.
  * Opening it goes straight into that game, taking the empty seat; with no game going, the first one in starts it.
  */
-function DmHome({ title, games }: { title: string; games: DuelSummary[] }) {
+function DmHome({ title, games, previews }: { title: string; games: DuelSummary[]; previews: OpenGames['previews'] }) {
   const navigate = useNavigate();
   const current = games.find((g) => g.status !== 'finished');
   const join = useMutation({
@@ -46,7 +46,7 @@ function DmHome({ title, games }: { title: string; games: DuelSummary[] }) {
   }, [current?.id]);
 
   return (
-    <Dashboard title={title} list={<OpenGamesList games={games} title="Games in this DM" />}>
+    <Dashboard title={title} list={<OpenGamesList games={games} previews={previews} title="Games in this DM" />}>
       {current ? (
         <section className="box">
           <h2>A game is going</h2>

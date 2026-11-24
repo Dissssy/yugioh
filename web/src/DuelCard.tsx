@@ -1,6 +1,7 @@
-import type { DuelOutcome, DuelPlayer, DuelStatus, DuelSummary } from '@yugioh/shared';
+import type { DuelOutcome, DuelPlayer, DuelStatus, DuelSummary, GamePreview } from '@yugioh/shared';
 import { Link } from 'react-router';
 import { CopyLink } from './CopyLink.tsx';
+import { MiniBoard } from './MiniBoard.tsx';
 import { formatDate } from './pages/Home.tsx';
 
 const statusText: Record<DuelStatus, string> = { waiting: 'Waiting', preparing: 'Choosing decks', active: 'Live', finished: 'Finished' };
@@ -9,7 +10,7 @@ const statusText: Record<DuelStatus, string> = { waiting: 'Waiting', preparing: 
  * One duel at a glance: both players with their decks beneath, the winner marked, and how it ended. The card opens the
  * duel (or its replay, once finished); its share button copies the link anyone can open to watch it.
  */
-export function DuelCard({ duel }: { duel: DuelSummary }) {
+export function DuelCard({ duel, preview }: { duel: DuelSummary; preview?: GamePreview }) {
   const [a, b] = duel.players;
   const winner = duel.result?.winner ?? null;
   const finished = duel.status === 'finished';
@@ -24,6 +25,7 @@ export function DuelCard({ duel }: { duel: DuelSummary }) {
         </span>
         {b ? <Side player={b} won={winner === 1} lost={winner === 0} you={duel.yourSeat === 1} /> : <OpenSeat />}
       </div>
+      {preview && <MiniBoard preview={preview} />}
       <p className="duel-card-how">
         {duel.result ? <strong>{outcomeText(duel.result, duel.players, duel.yourSeat)}</strong> : <span className={`pill ${duel.status}`}>{statusText[duel.status]}</span>}
         <span className="muted">
