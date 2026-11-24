@@ -3,14 +3,21 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import type { DuelSummary, YourMove } from '@yugioh/shared';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useDuels } from './api.ts';
 import { typing } from './board/nav.ts';
+import { newsOf, tell } from './notify.tsx';
 
-/** Keeps the viewer's duels, the list and each one's own summary, up to date while they can play. */
+/**
+ * Keeps the viewer's duels, the list and each one's own summary, up to date while they can play, and tells them when a
+ * duel they aren't looking at needs them (notify.tsx).
+ */
 export function useDuelFeed(enabled: boolean) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const current = useRef<string | null>(null);
+  current.current = useCurrentDuel();
   useEffect(() => {
     if (!enabled) return;
     const source = new EventSource('/api/me/duels/stream');
@@ -18,13 +25,17 @@ export function useDuelFeed(enabled: boolean) {
     source.onopen = () => void queryClient.invalidateQueries({ queryKey: ['duels'] });
     source.onmessage = (e: MessageEvent<string>) => {
       const duel = JSON.parse(e.data) as DuelSummary;
+      const before = queryClient.getQueryData<DuelSummary[]>(['duels'])?.find((d) => d.id === duel.id) ?? queryClient.getQueryData<DuelSummary>(['duel', duel.id]);
+      const news = newsOf(before, duel);
+      const looking = current.current === duel.id && document.visibilityState === 'visible';
+      if (news) tell(duel, news, looking, () => void navigate(`/duel/${duel.id}`));
       queryClient.setQueryData<DuelSummary[]>(['duels'], (list) =>
         list && (list.some((d) => d.id === duel.id) ? list.map((d) => (d.id === duel.id ? duel : d)) : [duel, ...list]),
       );
       queryClient.setQueryData(['duel', duel.id], duel);
     };
     return () => source.close();
-  }, [enabled, queryClient]);
+  }, [enabled, queryClient, navigate]);
 }
 
 /** The duels being played or prepared that the viewer sits in, newest first. */

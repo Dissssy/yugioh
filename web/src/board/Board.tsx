@@ -7,6 +7,7 @@ import { Link } from 'react-router';
 import { api, errorText, useCanPlay, useMe } from '../api.ts';
 import { DuelSwitcher } from '../duelFeed.tsx';
 import { OpponentCardsSetting } from '../pages/Account.tsx';
+import { NotifySetting } from '../notify.tsx';
 import { useSettings } from '../settings.ts';
 import { ActionMenu } from './ActionMenu.tsx';
 import { Arrows, cardCentre, dropAt, dropCentre, type Point } from './aim.tsx';
@@ -961,6 +962,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                       />
                     </label>
                     {hasAccount && <OpponentCardsSetting />}
+                    {!readOnly && <NotifySetting />}
                     <p className="muted small">Hold Shift over a card to zoom in. Right-click a card, or press and hold it, to pin its details. Drag cards in your hand to reorder them. Press ? for the keyboard controls.</p>
                   </div>
                 )}

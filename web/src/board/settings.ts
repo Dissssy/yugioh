@@ -7,10 +7,12 @@ export interface DuelSettings {
   /** Sound volume, 0 to 1. */
   volume: number;
   muted: boolean;
+  /** Desktop notifications (notify.tsx), once the browser allows them. */
+  notify: boolean;
 }
 
 const KEY = 'duel-settings';
-const defaults: DuelSettings = { speed: 'normal', reduceMotion: false, volume: 0.6, muted: false };
+const defaults: DuelSettings = { speed: 'normal', reduceMotion: false, volume: 0.6, muted: false, notify: false };
 
 function load(): DuelSettings {
   try {
