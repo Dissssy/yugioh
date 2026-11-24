@@ -2,7 +2,8 @@
 // Cards that keep their ID glide between zones by themselves (Motion layoutId); everything here is extra:
 // cards arriving from somewhere hidden, summon impacts, Sets turning over, attacks, flips and hits.
 
-import type { LogEntry, LogEvent, PlayerView, Seat } from '@yugioh/engine';
+import type { LegalAction, LogEntry, LogEvent, PlayerView, Seat } from '@yugioh/engine';
+import type { Sound } from '../sound.ts';
 import { animate } from 'motion';
 import type { DuelSettings } from './settings.ts';
 import { idOf } from './Card.tsx';
@@ -231,4 +232,54 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
     default:
       return;
   }
+}
+
+/** The sound for one step, if it has one. `playing` is false for anyone watching, who has no turn of their own. */
+export function soundOf(event: LogEvent, view: PlayerView, playing: boolean): Sound | null {
+  switch (event.type) {
+    case 'drew':
+      return 'draw';
+    case 'moved':
+      return event.from === 'deck' && event.to === 'hand' ? 'draw' : null;
+    case 'monsterSet':
+    case 'spellTrapSet':
+      return 'set';
+    case 'normalSummoned':
+    case 'flipSummoned':
+    case 'specialSummoned':
+    case 'tokenSummoned':
+    case 'extraSummoned':
+      return 'summon';
+    case 'flipped':
+      return 'flip';
+    case 'attackDeclared':
+      return 'attack';
+    case 'battleDamage':
+      return 'hit';
+    case 'lpChanged':
+      return event.kind === 'damage' ? 'hit' : event.kind === 'gain' ? 'gain' : null;
+    case 'destroyed':
+    case 'destroyedByBattle':
+      return 'destroy';
+    case 'effectActivated':
+      return 'activate';
+    case 'turnStarted':
+      return playing && event.player === view.you ? 'yourTurn' : null;
+    case 'duelEnded':
+      return !playing || event.result.winner === view.you ? 'win' : 'lose';
+    default:
+      return null;
+  }
+}
+
+const ANSWERS: LegalAction['type'][] = ['rps', 'chooseOrder', 'rollback', 'replace', 'tax'];
+
+/**
+ * Whether the duel waits on this player's answer: a pick before the duel, a trigger, a rollback offer, or a response
+ * window where they can activate something (one where they can't closes by itself).
+ */
+export function awaitsAnswer(view: PlayerView): boolean {
+  if (view.actions.some((a) => ANSWERS.includes(a.type))) return true;
+  const waiting = view.waiting;
+  return waiting?.player === view.you && (waiting.for !== 'respond' || view.actions.some((a) => a.type === 'activate'));
 }

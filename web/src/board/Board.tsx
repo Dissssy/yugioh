@@ -13,7 +13,8 @@ import { Arrows, cardCentre, dropAt, dropCentre, type Point } from './aim.tsx';
 import { dataOf, idOf, imageUrl, preloadImages } from './Card.tsx';
 import { CardTooltipProvider } from './CardTooltip.tsx';
 import { ChoiceBar, ChoiceProvider, pileKey, useBoardChoice, type PileKind } from './choice.tsx';
-import { cueMs, playCue } from './cues.ts';
+import { awaitsAnswer, cueMs, playCue, soundOf } from './cues.ts';
+import { play as playSound } from '../sound.ts';
 import { ChatInput, DuelLog, type Asking, type Contest, type Escalate } from './DuelLog.tsx';
 import { dropKey, ExtraMonsterZone, Field, type FieldProps, type Row } from './Field.tsx';
 import { OwnHand, ReadOnlyHand, type HandDrag } from './Hand.tsx';
@@ -181,6 +182,18 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
     // Only a new step should play anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.seq]);
+
+  // Each step's sound, and a ping when the board comes to rest waiting on this player's answer.
+  useEffect(() => {
+    if (!cue || !shown) return;
+    const sound = soundOf(cue.event, shown.view, !readOnly);
+    if (sound) playSound(sound);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cue?.seq]);
+  const needsAnswer = !readOnly && !!shown && !shown.cue && (choice !== null || awaitsAnswer(shown.view));
+  useEffect(() => {
+    if (needsAnswer) playSound('answer');
+  }, [needsAnswer]);
 
   // Once the sent card has left the hand there is nothing left to hold; nor if the judge refused to let it go.
   useEffect(() => {
@@ -733,6 +746,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
   function shortcut(key: Shortcut): boolean {
     if (key === 'help') return (setShowKeys(true), true);
     if (key === 'log') return nav.focusArea('log', true);
+    if (key === 'mute') return (updateSettings({ muted: !settings.muted }), true);
     if (readOnly) return false;
     switch (key) {
       case 'pass':
@@ -896,6 +910,15 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                   <Link to="/">← Duels</Link>
                   <span className="spacer" />
                   <CopyLink path={replay ? `/duel/${duelId}/replay` : `/duel/${duelId}`} label="Share" />
+                  <button
+                    className="quiet"
+                    onClick={() => updateSettings({ muted: !settings.muted })}
+                    aria-pressed={settings.muted}
+                    title={settings.muted ? 'Sound off (M)' : 'Sound on (M)'}
+                    aria-label="Mute"
+                  >
+                    {settings.muted ? '🔇' : '🔊'}
+                  </button>
                   <button className="quiet" onClick={() => setShowSettings((s) => !s)} aria-expanded={showSettings}>
                     Settings
                   </button>
@@ -924,6 +947,18 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                     </label>
                     <label>
                       <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
+                    </label>
+                    <label>
+                      Sound volume{' '}
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={settings.muted ? 0 : settings.volume}
+                        onChange={(e) => updateSettings({ volume: Number(e.target.value), muted: false })}
+                        onPointerUp={() => playSound('activate')}
+                      />
                     </label>
                     {hasAccount && <OpponentCardsSetting />}
                     <p className="muted small">Hold Shift over a card to zoom in. Right-click a card, or press and hold it, to pin its details. Drag cards in your hand to reorder them. Press ? for the keyboard controls.</p>
