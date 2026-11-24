@@ -547,10 +547,10 @@ export class Duels {
     const seen = event?.type === 'judged' && logFor(duel.events.slice(0, seq + 1), seat).at(-1)?.seq === seq;
     if (!seen) return { ok: false, status: 404, error: 'There is no such ruling.' };
     if (duel.events.some((e, i) => e.type === 'rolledBack' && i > seq && e.to <= seq)) return { ok: false, status: 409, error: 'A rewind undid that ruling.' };
-    const key = `${seq}:${seat}`;
-    const appeals = duel.events.filter((e) => e.type === 'appealed');
-    if (duel.appealing.has(key) || appeals.some((e) => e.appeal.judged === seq && e.appeal.by === seat)) {
-      return { ok: false, status: 409, error: 'You already contested this ruling.' };
+    // One appeal per ruling, whoever asks: a second would look at the same board and the same ruling again.
+    const key = `${seq}`;
+    if (duel.appealing.has(key) || duel.events.some((e) => e.type === 'appealed' && e.appeal.judged === seq)) {
+      return { ok: false, status: 409, error: 'This ruling was already contested.' };
     }
     if (!escalated && this.appealsUsed(duel) >= this.ai.appeals) return { ok: false, status: 429, error: 'This duel has used all its appeals.' };
     duel.appealing.add(key);

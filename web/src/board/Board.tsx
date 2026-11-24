@@ -502,7 +502,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
     send: (seq, note) => escalateQuestion.mutate({ seq, note }),
   };
   const contest: Contest = {
-    can: (seq) => !contested.includes(seq) && !log.some((e) => e.event.type === 'appealed' && e.event.judged === seq && e.event.by === me),
+    can: (seq) => !contested.includes(seq) && !log.some((e) => e.event.type === 'appealed' && e.event.judged === seq),
     send: (seq, note) => contestRuling.mutate({ seq, note }),
   };
 
