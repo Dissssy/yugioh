@@ -367,6 +367,22 @@ describe('a challenge link played by a guest', () => {
     expect((await guest.json(`${h.baseUrl}/api/duels/${second.id}/intents`, { method: 'POST', body: '{"type":"surrender"}' })).status).toBe(204);
   });
 
+  it('starts a rematch with the same decks once both players ask for it', async () => {
+    const asked = await call<DuelSummary>(guest, '/rematch', {});
+    expect(asked.status).toBe(201);
+    expect(asked.body).toMatchObject({ status: 'preparing', rematchOf: duel.id, yourSeat: 1, yourMove: null, players: [{ ready: false }, { ready: true }] });
+    const rematch = asked.body.id;
+    // The opponent sees the offer on the finished duel, and is told by their feed.
+    expect((await admin.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`)).body.rematch).toBe(rematch);
+    expect((await admin.json<DuelSummary>(`${h.baseUrl}/api/duels/${rematch}`)).body).toMatchObject({ yourMove: 'deck' });
+    // Accepting is asking too; both reach the same duel, which starts.
+    const accepted = await call<DuelSummary>(admin, '/rematch', {});
+    expect(accepted.body).toMatchObject({ id: rematch, status: 'active', players: [{ deck: decks[0]!.name }, { deck: decks[1]!.name }] });
+    expect((await call<{ error: string }>(admin, '/rematch', {}, 'POST')).status).toBe(201);
+    expect((await admin.json<{ error: string }>(`${h.baseUrl}/api/duels/${rematch}/rematch`, { method: 'POST', body: '{}' })).status).toBe(409);
+    expect((await guest.json(`${h.baseUrl}/api/duels/${rematch}/intents`, { method: 'POST', body: '{"type":"surrender"}' })).status).toBe(204);
+  });
+
   it('deletes the guest a day after their last duel finishes', async () => {
     expect(await deleteIdleGuests(h.db)).toBe(0);
     expect(await me(guest)).toMatchObject({ kind: 'guest' });

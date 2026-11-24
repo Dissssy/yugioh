@@ -251,6 +251,14 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     res.json(await duels.summarize((await duels.find(req.params.id))!, p.key, false));
   });
 
+  router.post('/duels/:id/rematch', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const result = await duels.rematch(req.params.id, p.key, (deck, banlist) => catalog.problems(deck, banlist, deck.premade));
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.status(201).json(await duels.summarize((await duels.find(result.id))!, p.key, false));
+  });
+
   // The duel as the viewer may see it, sent now and after every change: a player's own seat, or for anyone else
   // holding the link, only what both players can see (`?from=0|1` picks the seat at the bottom).
   router.get('/duels/:id/stream', async (req, res) => {

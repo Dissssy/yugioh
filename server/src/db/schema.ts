@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { EffectSheet } from '@yugioh/engine';
 import type { Banlist, DuelDeck, DuelOutcome, UserSettings } from '@yugioh/shared';
-import { boolean, check, index, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
 export const accountRole = pgEnum('account_role', ['player', 'admin', 'superAdmin']);
@@ -161,8 +161,13 @@ export const matches = pgTable(
     ready1: boolean('ready1').notNull().default(false),
     /** `guild:<id>` or `dm:<id>`: whose open games show this duel, when it was started in the Activity (docs/discord.md). */
     place: text('place'),
+    /**
+     * The duel this one is a rematch of: the same players, seats, banlist and decks. A duel has at most one rematch, so
+     * the duels of a series (a later best of three) follow each other through this.
+     */
+    rematchOf: text('rematch_of').unique(),
   },
-  (t) => [index('matches_place').on(t.place, t.createdAt)],
+  (t) => [index('matches_place').on(t.place, t.createdAt), foreignKey({ columns: [t.rematchOf], foreignColumns: [t.id] }).onDelete('set null')],
 );
 
 /** The duel's append-only event log. The board is the fold of these events. */

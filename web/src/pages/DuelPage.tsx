@@ -39,8 +39,8 @@ export function DuelPage({ me }: { me: Me }) {
     );
   }
   // Players choose their decks from the moment they sit down, the challenger before anyone accepts.
-  if (d.status === 'waiting' || d.status === 'preparing') return <Prepare duel={d} />;
-  return <Board duelId={d.id} />;
+  if (d.status === 'waiting' || d.status === 'preparing') return <Prepare key={d.id} duel={d} />;
+  return <Board key={d.id} duelId={d.id} />;
 }
 
 /** A finished duel played back, for anyone holding the link (docs/next-steps.md, Replays). */

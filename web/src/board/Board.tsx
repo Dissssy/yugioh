@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState }
 import { Link } from 'react-router';
 import { api, errorText, useCanPlay, useMe } from '../api.ts';
 import { DuelSwitcher } from '../duelFeed.tsx';
+import { Rematch } from './Rematch.tsx';
 import { OpponentCardsSetting } from '../pages/Account.tsx';
 import { NotifySetting } from '../notify.tsx';
 import { useSettings } from '../settings.ts';
@@ -884,6 +885,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                       {result.winner === null ? 'Draw' : readOnly ? `${view.players[result.winner].name} wins` : result.winner === me ? 'Victory' : 'Defeat'}
                     </strong>
                     {resultText && <span>{resultText}</span>}
+                    {!readOnly && <Rematch duelId={duelId} />}
                     <span className="row">
                       <Link className="button" to={`/duel/${duelId}/replay`}>
                         Watch the replay

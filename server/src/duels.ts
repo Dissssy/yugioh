@@ -237,7 +237,35 @@ export class Duels {
       yourSeat,
       canJoin: canJoin && row.status === 'waiting' && seatKey !== row.seat0,
       yourMove: yourSeat === null ? null : await this.moveOf(row, yourSeat),
+      rematchOf: row.rematchOf,
+      rematch: row.status === 'finished' ? ((await this.db.query.matches.findFirst({ columns: { id: true }, where: eq(matches.rematchOf, row.id) }))?.id ?? null) : null,
     };
+  }
+
+  /**
+   * A player asks for a rematch of a finished duel, or accepts the one their opponent asked for: the same players in
+   * the same seats, with the same banlist and decks, and this player Ready. It starts once both are; either may change
+   * their deck before that, as in any duel's pre-duel stage. An AI opponent is Ready at once. Returns the rematch's ID.
+   */
+  async rematch(id: string, seatKey: string, problems: (deck: DuelDeck, banlist: Banlist) => Promise<string[]>): Promise<{ ok: true; id: string } | Refusal> {
+    const row = await this.find(id);
+    const seat = row ? seatIn(row, seatKey) : null;
+    if (!row || seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
+    if (row.status !== 'finished') return { ok: false, status: 409, error: 'A rematch can only follow a finished duel.' };
+    const { seat0, seat1, name0, name1, banlist, premadeOnly, place, deck0, deck1, createdBy } = row;
+    await this.db
+      .insert(matches)
+      .values({ id: randomBytes(12).toString('base64url'), createdBy, seat0, seat1, name0, name1, banlist, premadeOnly, place, deck0, deck1, status: 'preparing', rematchOf: id })
+      .onConflictDoNothing({ target: matches.rematchOf });
+    const next = (await this.db.query.matches.findFirst({ where: eq(matches.rematchOf, id) }))!;
+    // Asking again once it has started just leads to it.
+    if (next.status !== 'preparing') return { ok: true, id: next.id };
+    const ai = [seat0, seat1].find(isAiKey);
+    if (ai) await this.ready(next.id, ai, true, problems);
+    const readied = await this.ready(next.id, seatKey, true, problems);
+    if (!readied.ok) return readied;
+    this.onChange?.(id);
+    return { ok: true, id: next.id };
   }
 
   /** What the duel waits on this seat's player for (YourMove). */
