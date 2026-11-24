@@ -1,0 +1,16 @@
+# Duel niceties
+
+Status, 2026-11-24: Ethan asked for sound effects, desktop notifications and easier switching between duels, and
+approved every extra idea below. Each step is its own PR and works on its own.
+
+| Step | What | Status |
+| --- | --- | --- |
+| 1 | **Your duels, live.** One feed per player (`GET /api/me/duels/stream`) sends a duel's summary to both its players whenever it may have changed. `DuelSummary.yourMove` says what the duel waits on you for: `deck`, `turn` or `answer` (a response you can make, a trigger, a pick, a judge's question, a rollback offer). Windows the server passes by itself for you don't count. The top bar (and the duel screen's panel, which has no top bar) shows your other live duels as chips, lit while they wait on you. **G** opens the next one waiting on you. The tab title counts them: "(2) Yu-Gi-Oh Duels". | Built |
+| 2 | **Sound effects**, generated in code with ZzFX (Ethan chose generated now, recorded CC0 samples maybe later; the sound table is one file). One sound per board event, a chime for your turn and a ping when you need to answer. Mute and volume per browser, next to animation speed. | Next |
+| 3 | **Desktop notifications** from the same feed, from any page or a background tab: your turn, an answer needed, a challenge accepted, your opponent ready. Not for the duel you're looking at. Hidden in the Discord Activity, whose frame can't ask for permission. | Planned |
+| 4 | **Web Push**, so notifications arrive with the site closed: asynchronous dueling. | Planned |
+| 5 | **Rematch** at the end of a duel with the same decks, shaped to grow into best of three. | Planned |
+| 6 | **Opponent online dot** and an **unread chat badge** with a soft sound. | Planned |
+| 7 | **Quick emotes** (Good game, Thinking…, Nice play) with their own sounds, and **phone vibration** on your turn. | Planned |
+
+Deferred: a "voice" for text, like animal babble, maybe only for chat and short judge rulings.

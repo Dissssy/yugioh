@@ -24,6 +24,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') });
 
+/** Whether the viewer may play: an approved account, or a guest. */
+export function useCanPlay(): boolean {
+  const me = useMe().data;
+  return me?.kind === 'guest' || (me?.kind === 'user' && me.user.status === 'approved');
+}
+
 /**
  * The decks the viewer may pick: premade and their own. Each deck's problems are under its own banlist, or under the
  * given banlist or duel's banlist when picking a deck for a duel.
@@ -36,7 +42,7 @@ export const useDecks = (check: { banlist?: number; duel?: string } = {}) =>
 export const useBanlists = () => useQuery({ queryKey: ['banlists'], queryFn: () => api<BanlistSummary[]>('/banlists') });
 export const useBanlist = (id: number | null) =>
   useQuery({ queryKey: ['banlist', id], queryFn: () => api<BanlistDetail>(`/banlists/${id}`), enabled: id !== null });
-export const useDuels = () => useQuery({ queryKey: ['duels'], queryFn: () => api<DuelSummary[]>('/duels') });
+export const useDuels = (enabled = true) => useQuery({ queryKey: ['duels'], queryFn: () => api<DuelSummary[]>('/duels'), enabled });
 /** The open games where the Discord Activity was opened (docs/discord.md), kept fresh while the page is open. */
 export const useOpenGames = () => useQuery({ queryKey: ['open-games'], queryFn: () => api<OpenGames>('/open-games'), refetchInterval: 5000 });
 

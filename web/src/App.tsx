@@ -1,7 +1,8 @@
 import { Link, NavLink, Route, Routes, useLocation } from 'react-router';
 import { isAdmin } from '@yugioh/shared';
 import { AccountMenu, Avatar } from './AccountMenu.tsx';
-import { loginHref, useMe } from './api.ts';
+import { loginHref, useCanPlay, useMe } from './api.ts';
+import { DuelSwitcher, useDuelFeed, useDuelSwitching } from './duelFeed.tsx';
 import { Account } from './pages/Account.tsx';
 import { Admin } from './pages/Admin.tsx';
 import { BanlistPage } from './decks/BanlistPage.tsx';
@@ -17,6 +18,9 @@ export function App() {
   const user = me.data?.kind === 'user' ? me.data.user : null;
   const guest = me.data?.kind === 'guest' ? me.data.guest : null;
   const location = useLocation();
+  const canPlay = useCanPlay();
+  useDuelFeed(canPlay);
+  useDuelSwitching(canPlay);
 
   return (
     <>
@@ -25,6 +29,7 @@ export function App() {
           <span className="brand-mark" aria-hidden />
           Yu-Gi-Oh Duels
         </Link>
+        <DuelSwitcher enabled={canPlay} />
         <nav>
           {user && isAdmin(user.role) && <NavLink to="/admin" className="nav-link">Admin</NavLink>}
           {guest && (

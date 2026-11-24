@@ -21,6 +21,7 @@ import {
   type Seat,
   type SheetEffect,
   type When,
+  yourMove,
 } from '../src/index.ts';
 
 const monster = (code: number, name: string, atk: number, def: number, level = 4): CardData => ({
@@ -316,12 +317,14 @@ describe('responding to a summon', () => {
     // Only the responder acts; the summoner waits.
     expect(legalActions(t.state, 0)).toEqual([{ type: 'surrender' }]);
     expect(t.activations(1)).toEqual(['b0']);
+    expect([yourMove(t.state, 0), yourMove(t.state, 1)]).toEqual([null, 'answer']);
     t.play(1, { type: 'activate', card: 'b0', effect: 0, zone: null });
     expect(t.state.chain).toMatchObject([{ card: 'b0', cause: { card: 'a5' } }]);
     // Seat 0 holds nothing and seat 1 has used its card: both pass and the chain resolves.
     t.resolve({ type: 'targeted', cards: ['a5'] }, { type: 'destroyed', cards: ['a5'], by: 1 });
     expect(t.state.step).toEqual({ at: 'open' });
     expect(t.state.players[1].graveyard).toEqual(['b0']);
+    expect([yourMove(t.state, 0), yourMove(t.state, 1)]).toEqual(['turn', null]);
   });
 
   it("isn't offered for a monster its condition doesn't cover, and the duel moves on by itself", () => {

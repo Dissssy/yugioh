@@ -200,6 +200,8 @@ export function createApp(config: Config, db: Db, ai: Ai, discord: DiscordApi | 
   });
 
   const duels = new Duels(db, ai, random, config.RESPONSE_FLOOR_MS);
+  // Tests reach the running duels here, to set up a board.
+  app.locals.duels = duels;
   const catalog = new Catalog(db);
   if (ai.opponent) {
     const opponents = new Opponents(duels, db, ai.opponent, config.RESPONSE_FLOOR_MS, random);

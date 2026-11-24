@@ -23,6 +23,7 @@ import {
   triggerEvent,
   viewFor,
   visibleTo,
+  yourMove,
   zonePick,
   type ChainLink,
   type AiRecord,
@@ -40,7 +41,7 @@ import {
   type Seat,
   type Sight,
 } from '@yugioh/engine';
-import { NO_BANLIST, type Banlist, type DuelDeck, type DuelSummary, type GamePreview, type PreviewCard, type PreviewSide, type Replay } from '@yugioh/shared';
+import { NO_BANLIST, type Banlist, type DuelDeck, type DuelSummary, type YourMove, type GamePreview, type PreviewCard, type PreviewSide, type Replay } from '@yugioh/shared';
 import { loadCards } from './cards.ts';
 import type { Db, Tx } from './db/client.ts';
 import { matchEvents, matches, sheetReports } from './db/schema.ts';
@@ -134,6 +135,11 @@ const OPEN_GAMES_FINISHED_MS = 24 * 60 * 60 * 1000;
 export class Duels {
   /** Called once for each AI seat of a duel that is loaded and still going, so the AI opponent can start playing it. */
   onAiSeat: ((id: string, seat: Seat) => void) | null = null;
+  /**
+   * Called after anything that can change a duel's summary for its players: its log, a question from the judge, the
+   * empty seat being taken, a deck chosen or Ready pressed.
+   */
+  onChange: ((id: string) => void) | null = null;
   private live = new Map<string, Promise<LiveDuel>>();
   private db: Db;
   private ai: Ai;
@@ -168,6 +174,11 @@ export class Duels {
       await this.start(tx, row!);
     });
     return id;
+  }
+
+  /** Drops a loaded duel, so its log is read again on next use: for tests that set up a board in the database. */
+  forget(id: string) {
+    this.live.delete(id);
   }
 
   async find(id: string): Promise<MatchRow | undefined> {
@@ -225,7 +236,17 @@ export class Duels {
       result: row.result,
       yourSeat,
       canJoin: canJoin && row.status === 'waiting' && seatKey !== row.seat0,
+      yourMove: yourSeat === null ? null : await this.moveOf(row, yourSeat),
     };
+  }
+
+  /** What the duel waits on this seat's player for (YourMove). */
+  private async moveOf(row: MatchRow, seat: Seat): Promise<YourMove | null> {
+    if (row.status === 'preparing') return (seat === 0 ? row.ready0 : row.ready1) ? null : 'deck';
+    if (row.status !== 'active') return null;
+    const duel = await this.load(row.id);
+    if (duel.judging?.question?.player === seat) return 'answer';
+    return yourMove(duel.state, seat);
   }
 
   /**
@@ -233,7 +254,7 @@ export class Duels {
    * already taken or the claimant is the challenger.
    */
   async join(id: string, claim: SeatClaim): Promise<boolean> {
-    return this.db.transaction(async (tx) => {
+    const joined = await this.db.transaction(async (tx) => {
       const [waiting] = await tx
         .select()
         .from(matches)
@@ -245,6 +266,8 @@ export class Duels {
       await tx.update(matches).set({ seat1: player.key, name1: player.name, status: 'preparing' }).where(eq(matches.id, id));
       return true;
     });
+    if (joined) this.onChange?.(id);
+    return joined;
   }
 
   /**
@@ -252,7 +275,7 @@ export class Duels {
    * duel and the copy so far, and gives the new copy or why it can't be.
    */
   async setDeck(id: string, seatKey: string, next: (row: MatchRow, current: DuelDeck | null) => DuelDeck | string): Promise<{ ok: true; deck: DuelDeck } | Refusal> {
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx): Promise<{ ok: true; deck: DuelDeck } | Refusal> => {
       const [row] = await tx.select().from(matches).where(eq(matches.id, id)).for('update');
       const seat = row ? seatIn(row, seatKey) : null;
       if (!row || seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
@@ -265,6 +288,8 @@ export class Duels {
         .where(eq(matches.id, id));
       return { ok: true, deck };
     });
+    if (result.ok) this.onChange?.(id);
+    return result;
   }
 
   /**
@@ -272,7 +297,7 @@ export class Duels {
    * duel's banlist. Once both players are ready, the duel starts.
    */
   async ready(id: string, seatKey: string, ready: boolean, problems: (deck: DuelDeck, banlist: Banlist) => Promise<string[]>): Promise<ActResult> {
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx): Promise<ActResult> => {
       const [row] = await tx.select().from(matches).where(eq(matches.id, id)).for('update');
       const seat = row ? seatIn(row, seatKey) : null;
       if (!row || seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
@@ -291,6 +316,8 @@ export class Duels {
       if (updated!.ready0 && updated!.ready1) await this.start(tx, updated!);
       return { ok: true };
     });
+    if (result.ok) this.onChange?.(id);
+    return result;
   }
 
   /** Shuffles both decks and starts the duel; rock-paper-scissors then decides who goes first. */
@@ -746,6 +773,7 @@ export class Duels {
     duel.events.push(...events);
     duel.state = after;
     this.broadcast(before, events, first, duel);
+    this.onChange?.(duel.id);
   }
 
   /**
@@ -792,6 +820,7 @@ export class Duels {
 
   private broadcastJudging(duel: LiveDuel) {
     for (const l of duel.listeners) l.send({ type: 'judging', judging: judgingFor(duel, l.sight) });
+    this.onChange?.(duel.id);
   }
 }
 

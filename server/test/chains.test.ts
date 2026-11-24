@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { evolve, replay, startDuel, statsOf, type DuelEvent, type DuelState, type DuelUpdate, type Intent, type PlayerView, type Seat } from '@yugioh/engine';
 import type { DeckSummary, DuelSummary } from '@yugioh/shared';
 import { loadCards, syncCards } from '../src/cards.ts';
-import { decks, effectSheets, matchEvents } from '../src/db/schema.ts';
+import { decks, effectSheets } from '../src/db/schema.ts';
 import { rule } from '../src/judge/script.ts';
 import { flagScripts, importSheetFiles, loadSheets, resetSheets } from '../src/sheets.ts';
 import { ADMIN_EMAIL, Browser, seeded, startDuelVia, startHarness, Stream, type Harness } from './harness.ts';
@@ -78,8 +78,7 @@ async function setUp() {
     toHand(0, ids.magnaDrago),
     toHand(0, ids.copycat),
   ];
-  await h.db.delete(matchEvents).where(eq(matchEvents.matchId, duel.id));
-  await h.db.insert(matchEvents).values(events.map((event, seq) => ({ matchId: duel.id, seq, event })));
+  await h.rewriteLog(duel.id, events);
   const send = (who: Browser, intent: Intent) => who.json<{ error?: string }>(`${h.baseUrl}/api/duels/${duel.id}/intents`, { method: 'POST', body: JSON.stringify(intent) });
   const stream = async (who: Browser) => new Stream(await who.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
   return { admin, guest, duel, ids, send, stream, state: () => replay(events) };
