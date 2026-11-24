@@ -103,7 +103,8 @@ function mustBeProperlySummoned(state: DuelState, id: string): boolean {
 export function specialSummonProblem(state: DuelState, seat: Seat, id: string): string | null {
   const card = state.cards[state.instances[id]!.code]!;
   if (specialSummonForbidden(state, seat, id)) return `An effect stops you Special Summoning ${card.name} this turn.`;
-  if (mustBeProperlySummoned(state, id) && !state.properlySummoned.includes(id)) {
+  // From the Extra Deck, an effect that says so may Special Summon it directly (Trishula, Zero Dragon of the Ice Barrier).
+  if (mustBeProperlySummoned(state, id) && !state.properlySummoned.includes(id) && locate(state, id)?.zone !== 'extra') {
     return `${card.name} must first be ${card.extraDeck ? `${card.type.startsWith('XYZ') ? 'Xyz' : card.type.startsWith('Fusion') ? 'Fusion' : 'Synchro'} Summoned` : 'Special Summoned by its own procedure'} before an effect can Special Summon it.`;
   }
   return null;
@@ -249,6 +250,7 @@ function selected(state: DuelState, sel: Selection, seat: Seat, card: string): s
     case 'battling':
       return battling(state, sel.filter, seat, card);
     case 'event':
+    case 'moved':
       return [];
   }
 }

@@ -95,7 +95,6 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(card.kind === 'monster', `${card.name} is not a monster.`);
       check(at.zone !== 'monsters', `${card.name} is already on the field.`);
       check(at.zone !== 'spellTraps', `${card.name} is in a Spell & Trap Zone.`);
-      check(at.zone !== 'extra', 'Monsters in the Extra Deck are Summoned by their own procedures, not by this op.');
       const problem = specialSummonProblem(state, ctx.player, op.card);
       check(!problem, problem ?? '');
       const free = monsterZonesFor(state, op.controller, false);
@@ -319,6 +318,10 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(op.cards.length > 0 && new Set(op.cards).size === op.cards.length, 'Reveal at least one card, each once.');
       for (const id of op.cards) check(state.players[ctx.player].hand.includes(id), 'Only cards in the hand can be revealed.');
       run.emit({ type: 'revealed', player: ctx.player, cards: op.cards });
+      return;
+    case 'declare_paid':
+      check(ctx.stage === 'activation', 'The cost is paid when the effect is activated.');
+      run.emit({ type: 'costPaid', cards: op.cards });
       return;
     case 'choose_effect':
       check(ctx.stage === 'activation', 'The effect is chosen when the card is activated, not when it resolves.');

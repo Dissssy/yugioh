@@ -395,6 +395,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'damageStepStarted':
     case 'replacementOffered':
     case 'rollbackOffered':
+    case 'costPaid':
       return null;
     case 'rollbackAnswered':
       return `${who(event.player)} ${event.accept ? 'accepted' : 'declined'} the rewind`;

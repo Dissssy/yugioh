@@ -96,7 +96,7 @@ export type FusionPlace = (typeof FUSION_PLACES)[number];
 export interface When {
   /**
    * `summoned`: a monster is Summoned. `attack_declared`: a monster declares an attack (the event's card is the
-   * attacker). `attacked`: a monster is targeted for an attack (the event's card is the target). `destroyed_by_battle`: a monster is destroyed by battle. `battle_damage`: a monster inflicts battle
+   * attacker). `attacked`: a monster is targeted for an attack (the event's card is the target). `destroyed_by_battle`: a monster is destroyed by battle; `destroyed`: by battle or by a card effect. `battle_damage`: a monster inflicts battle
    * damage to its controller's opponent; `direct_attack_damage` only by a direct attack. `battle_destroying`: a monster destroys another by battle (the event's card is the one that destroyed it: "When this card destroys a monster by battle"). `activated`: a card or effect is activated (Counter Traps).
    * `destroyed_by_effect`: a card on the field is destroyed by a card effect; the filter is checked against the card as
    * it was on the field, for its side and whether it was face-up. `damage_step_start`: the start of the Damage Step (the
@@ -111,6 +111,7 @@ export interface When {
     | 'attacked'
     | 'destroyed_by_battle'
     | 'destroyed_by_effect'
+    | 'destroyed'
     | 'battle_destroying'
     | 'battle_damage'
     | 'direct_attack_damage'
@@ -131,7 +132,10 @@ export interface When {
    * happened during the last chain link to resolve). "If ..." triggers and mandatory ones never miss.
    */
   canMiss: boolean;
-  /** For `destroyed_by_effect`: whose card effect it must be ("by your opponent's card effect"); null for anyone's. */
+  /**
+   * For `destroyed_by_effect`: whose card effect it must be ("by your opponent's card effect"); for `destroyed`, whose
+   * card destroyed it, by battle or by an effect ("destroyed by an opponent's card"). Null for anyone's.
+   */
   by: 'you' | 'opponent' | null;
   /**
    * For `activated`: the activation must target a card that fits this ("that targets an "Ice Barrier" Synchro Monster
@@ -222,10 +226,11 @@ export type Step =
   /** `per` multiplies `atk` and `def` (see `Per`); null for a flat amount. */
   | { do: 'modify_stats'; cards: Selection; atk: number; def: number; per: Per | null; levelDelta: number; levelSet: number | null; until: Until }
   /**
-   * ATK, DEF and/or Level "become" a value (null leaves that stat alone). Gains and losses still apply on top. A Level
+   * ATK, DEF and/or Level "become" a value, read from a card or a number ("its ATK becomes 3300"); null leaves that stat
+   * alone. Gains and losses still apply on top. A Level
    * read from a card with none (an Xyz Monster) changes nothing.
    */
-  | { do: 'set_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; level: StatValue | null; until: Until }
+  | { do: 'set_stats'; cards: Selection; atk: StatValue | number | null; def: StatValue | number | null; level: StatValue | number | null; until: Until }
   /** ATK and/or DEF gain a value read when the step resolves ("it gains ATK equal to the Tributed monster's original ATK"). */
   | { do: 'gain_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
   /** `per` multiplies `amount` ("200 damage for each card in their hand"). */
@@ -434,8 +439,12 @@ export type Per = CardFilter | 'moved' | 'materials';
  * off the field has only its printed one). `times` multiplies it ("double its original ATK" is 2).
  */
 export interface StatValue {
-  /** `sum`: the total of the stat over the face-up cards that fit `filter` ("the total ATK of all Level 2 or lower monsters you control"). */
-  of: 'self' | 'targets' | 'cost' | 'moved' | 'sum';
+  /**
+   * `sum`: the total of the stat over the face-up cards that fit `filter` ("the total ATK of all Level 2 or lower
+   * monsters you control"). `each`: each card the step applies to, its own stat ("halve the ATK of all face-up
+   * monsters your opponent controls").
+   */
+  of: 'self' | 'targets' | 'cost' | 'moved' | 'sum' | 'each';
   stat: 'atk' | 'def' | 'level';
   /** For `sum`, the cards it adds up; else null. */
   filter: CardFilter | null;
@@ -455,7 +464,12 @@ export type Selection =
       from: 'choose';
       filter: CardFilter;
       min: number;
-      max: number;
+      /**
+       * `cost`: "that many", exactly as many as the cards paid as the cost (Winds Over the Ice Barrier's "Tribute any
+       * number ...; Special Summon that many"); the cost can't take more than there are cards to pick, and `min` is
+       * the least the activation needs.
+       */
+      max: number | 'cost';
       rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null;
       /** The cards picked must have different names from each other ("3 "Ice Barrier" monsters with different names"). */
       distinct: boolean;
@@ -474,7 +488,9 @@ export type Selection =
    * The card the event this effect answers happened to, without targeting it ("If a monster is Summoned: change that
    * Summoned monster to Defense Position"). Nothing if the effect answers no event.
    */
-  | { from: 'event' };
+  | { from: 'event' }
+  /** The cards the last `move` or `special_summon` step of this effect moved or Summoned ("Special Summon ..., its ATK becomes 3300"). */
+  | { from: 'moved' };
 
 export const FILTER_PLACES = ['field', 'monsters', 'spellTraps', 'hand', 'deck', 'extra', 'graveyard', 'banished'] as const;
 export type FilterPlace = (typeof FILTER_PLACES)[number];
@@ -572,6 +588,8 @@ export interface ChainLink {
   targets: string[];
   /** The effect chosen on activation when the text offers several ("Activate 1 of these effects"), as the judge worded it. */
   choice: string | null;
+  /** The cards paid as the cost on activation, for a resolution that reads them ("Special Summon that many"). */
+  paid: string[];
   /** The event it was activated for: what set off a trigger, or what a response responds to; else null. */
   cause: Happening | null;
   /** An effect negated its activation: it resolves doing nothing, and its card goes to the GY. */
@@ -857,6 +875,8 @@ export type Op =
   | { op: 'remove_counters'; card: string; counter: Counter; count: number }
   | { op: 'declare_targets'; cards: string[] }
   | { op: 'choose_effect'; choice: string }
+  /** Records the cards paid as the cost of the activation, for its resolution. */
+  | { op: 'declare_paid'; cards: string[] }
   /** Shows cards in the activating player's hand to both players; they stay in the hand. */
   | { op: 'reveal'; cards: string[] }
   /** Sets a Spell/Trap from its holder's hand in their first free Spell & Trap Zone (a Field Spell in the Field Zone). */
@@ -1026,6 +1046,7 @@ export type DuelEvent =
   | { type: 'passed'; player: Seat }
   | { type: 'targeted'; cards: string[] }
   | { type: 'effectChosen'; choice: string }
+  | { type: 'costPaid'; cards: string[] }
   /** `player` showed these cards from their hand to both players (a cost such as "reveal 3 "Ice Barrier" monsters"). */
   | { type: 'revealed'; player: Seat; cards: string[] }
   | { type: 'moved'; card: string; owner: Seat; from: Place; to: Destination }

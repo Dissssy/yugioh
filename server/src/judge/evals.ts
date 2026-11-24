@@ -1296,6 +1296,45 @@ export const CASES: EvalCase[] = [
     legal: true,
     check: (b) => all(expectAt(b, 'Terror of Trishula', '0:banished'), b.state.chain.some((l) => l.negated) ? null : 'Half Shut is not negated'),
   },
+  {
+    name: 'winds over the ice barrier tributes two ice barrier monsters to summon two with different names from the deck',
+    board: [{ hand: ['Winds Over the Ice Barrier'], monsters: ['Prior of the Ice Barrier', 'Cryomancer of the Ice Barrier'], deck: ['Zuijin of the Ice Barrier', 'Zuijin of the Ice Barrier', 'Strategist of the Ice Barrier'] }, {}],
+    activate: 'Winds Over the Ice Barrier',
+    picks: [['Prior of the Ice Barrier', 'Cryomancer of the Ice Barrier'], ['Zuijin of the Ice Barrier'], ['Strategist of the Ice Barrier'], ['Attack'], ['Attack']],
+    legal: true,
+    check: (b) =>
+      all(
+        expectAt(b, 'Prior of the Ice Barrier', '0:gy'),
+        expectAt(b, 'Cryomancer of the Ice Barrier', '0:gy'),
+        expectAt(b, 'Strategist of the Ice Barrier', '0:monsters'),
+        b.where('Zuijin of the Ice Barrier').filter((w) => w === '0:monsters').length === 1 ? null : 'not exactly one Zuijin was summoned',
+      ),
+  },
+  {
+    name: 'winds over the ice barrier needs an ice barrier monster in the deck',
+    board: [{ hand: ['Winds Over the Ice Barrier'], monsters: ['Prior of the Ice Barrier'] }, {}],
+    activate: 'Winds Over the Ice Barrier',
+    legal: false,
+  },
+  {
+    name: 'trishula zero brings out trishula at 3300 atk when the opponent destroys it',
+    board: [{ monsters: ['Trishula, Zero Dragon of the Ice Barrier'], extra: ['Trishula, Dragon of the Ice Barrier'] }, { monsters: ['Axe Raider'], set: ['Mirror Force'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Trishula, Zero Dragon of the Ice Barrier'), target: 0 }],
+      [1, { type: 'activate', card: id('Mirror Force'), effect: 0, zone: null }],
+    ],
+    activate: 'Trishula, Zero Dragon of the Ice Barrier',
+    effect: 2,
+    picks: [['Trishula, Dragon of the Ice Barrier'], ['Attack']],
+    legal: true,
+    check: (b) =>
+      all(
+        b.monster('Trishula, Dragon of the Ice Barrier')?.atk === 3300 ? null : `Trishula has ${b.monster('Trishula, Dragon of the Ice Barrier')?.atk} ATK`,
+        b.monster('Axe Raider')?.atk === 850 ? null : `Axe Raider has ${b.monster('Axe Raider')?.atk} ATK`,
+        b.monster('Axe Raider')?.effectsNegated ? null : "Axe Raider's effects are not negated",
+      ),
+  },
   // Control, Tokens, and effects used from the hand or GY.
   {
     name: 'crackdown takes control of a face-up monster for good',
@@ -1545,7 +1584,7 @@ export async function runCase(c: EvalCase, board: DuelState, model: ModelCall | 
   if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   let scratch = intent.events.slice(1).reduce(evolve, state);
   const procedure = isProcedure(state, id, c.effect ?? 0);
-  const link = procedure ? { player: seat, card: id, effect: c.effect ?? 0, targets: [], choice: null, cause: null, negated: false, setAgain: false, taxed: false } : scratch.chain.at(-1)!;
+  const link = procedure ? { player: seat, card: id, effect: c.effect ?? 0, targets: [], choice: null, paid: [], cause: null, negated: false, setAgain: false, taxed: false } : scratch.chain.at(-1)!;
   const checked = await rule({ stage: 'activation', state: scratch, link }, deps);
   const records = [checked.record];
   const result = (passed: boolean, detail: string): EvalResult => ({ name: c.name, passed, detail, records });

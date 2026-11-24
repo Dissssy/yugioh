@@ -123,6 +123,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     if (sel.from === 'targets') return link.targets.filter((id) => movedHere.has(id) || (script.targets && fits(state, id, script.targets.filter, seat)));
     if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, self);
     if (sel.from === 'battling') return battling(state, sel.filter, seat, self);
+    if (sel.from === 'moved') return moved.filter((id) => locate(state, id));
     if (sel.from === 'event') {
       const cause = link.cause && link.cause.event !== 'phase' ? link.cause.card : null;
       return cause && locate(state, cause) ? [cause] : [];
@@ -135,31 +136,41 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       return picked;
     }
     const options = chooseFrom(state, sel, seat, self).filter(keep);
+    // "That many": exactly as many as the cards paid as the cost.
+    const [least, most] = sel.max === 'cost' ? [paid.length, paid.length] : [sel.min, sel.max];
     if (sel.distinct) {
       // "With different names": one pick at a time, so a name already picked can't be picked again.
-      const total = Math.min(sel.max, distinctCount(state, options, true), limit);
+      const total = Math.min(most, distinctCount(state, options, true), limit);
       const picked: string[] = [];
       while (picked.length < total) {
         const taken = new Set(picked.map((id) => cardOf(state, id).name));
         const left = options.filter((id) => !taken.has(cardOf(state, id).name));
-        const required = picked.length < sel.min;
-        const of = sel.min === total ? `${picked.length + 1} of ${total}` : `${picked.length + 1}, up to ${total}`;
+        const required = picked.length < least;
+        const of = least === total ? `${picked.length + 1} of ${total}` : `${picked.length + 1}, up to ${total}`;
         const [pick] = await ask({ prompt: `${name}: choose a ${describeFilter(sel.filter)} with a different name to ${verb} (${of}).`, cards: left, choices: [], min: required ? 1 : 0, max: 1 });
         if (!pick) break;
         picked.push(pick);
       }
       return picked;
     }
-    const max = Math.min(sel.max, options.length, limit);
+    const max = Math.min(most, options.length, limit);
     if (max === 0) return [];
     // A tie-break with no tie leaves nothing to choose.
-    if (sel.rank && options.length === 1 && sel.min >= 1) return options;
-    const count = sel.min === max ? `${max}` : `${sel.min} to ${max}`;
-    return ask({ prompt: `${name}: choose ${count} ${describeFilter(sel.filter)} to ${verb}.`, cards: options, choices: [], min: Math.min(sel.min, max), max });
+    if (sel.rank && options.length === 1 && least >= 1) return options;
+    const count = least === max ? `${max}` : `${least} to ${max}`;
+    return ask({ prompt: `${name}: choose ${count} ${describeFilter(sel.filter)} to ${verb}.`, cards: options, choices: [], min: Math.min(least, max), max });
   };
 
   /** The cards the cost moved, first moved first, for a stat read from the cost. */
-  const paid: string[] = [];
+  /** The cards paid as the cost: while activating, as they are paid; while resolving, as the chain link recorded them. */
+  const paid: string[] = stage === 'resolution' ? [...link.paid] : [];
+  /** The most cards the cost may take when the effect then does something to "that many": no more than there are to target or pick. */
+  const costLimit = (): number => {
+    if (script.targets?.max === 'cost') return targetable(call.state, script, seat, self, link.cause).length;
+    const thatMany = script.options.flatMap((o) => o.steps).find((st) => 'cards' in st && st.cards.from === 'choose' && st.cards.max === 'cost');
+    if (!thatMany || !('cards' in thatMany) || thatMany.cards.from !== 'choose') return Infinity;
+    return distinctCount(state, chooseFrom(state, thatMany.cards, seat, self), thatMany.cards.distinct);
+  };
   /** The cards the last move step moved, for a pledge about "the added monster". */
   let moved: string[] = [];
   /** Whether a `cost_substitute` card already stood in for part of this cost. */
@@ -168,13 +179,14 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
    * A stat read when the step resolves: from this card, the first target still on the field (or in a pile, for original
    * stats), the first card paid as the cost, or the first card the last move step moved.
    */
-  const valueOf = (v: StatValue): number | null => {
+  const valueOf = (v: StatValue | number, each: string | null = null): number | null => {
+    if (typeof v === 'number') return v;
     if (v.of === 'sum') {
       // Face-up monsters only: a face-down one has no ATK to add.
       const cards = v.filter ? cardsFitting(state, { ...v.filter, faceUp: true }, seat, '') : [];
       return Math.round(cards.reduce((total, id) => total + ((v.stat === 'level' ? levelNow(state, id) : statsOf(state, id)[v.stat]) ?? 0), 0) * v.times);
     }
-    const id = { self, cost: paid[0], moved: moved[0], targets: link.targets.find((t) => script.targets && fits(state, t, script.targets.filter, seat)) }[v.of];
+    const id = v.of === 'each' ? each : { self, cost: paid[0], moved: moved[0], targets: link.targets.find((t) => script.targets && fits(state, t, script.targets.filter, seat)) }[v.of];
     if (!id || !locate(state, id)) return null;
     const at = locate(state, id)!;
     const onField = at.zone === 'monsters' && !v.original;
@@ -234,11 +246,11 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
           if (pick === banish) {
             apply({ op: 'substitute_cost', card: sub.card, effect: sub.effect });
             substituted = true;
-            sel = { ...step.cards, min: Math.max(0, step.cards.min - 1), max: Math.max(0, step.cards.max - 1) };
+            sel = { ...step.cards, min: Math.max(0, step.cards.min - 1), max: step.cards.max === 'cost' ? 'cost' : Math.max(0, step.cards.max - 1) };
           }
         }
         // "Discard any number of cards, then target that many": no more than there are cards to target.
-        const limit = cost && script.targets?.max === 'cost' ? targetable(call.state, script, seat, self, link.cause).length - (substituted ? 1 : 0) : Infinity;
+        const limit = cost ? costLimit() - (substituted ? 1 : 0) : Infinity;
         const cards = await select(sel, verb, limit);
         for (const id of cards) apply({ op: 'move', card: id, to: step.to });
         moved = cards;
@@ -263,6 +275,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
           apply(placed.op);
           movedHere.add(id);
         }
+        moved = cards.slice(0, free);
         return cards.length ? `${list(cards.slice(0, free).map((id) => shown(id, before)))} ${cards.length === 1 ? 'was' : 'were'} Special Summoned.` : null;
       }
       case 'modify_stats': {
@@ -288,27 +301,34 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
           const at = locate(state, id);
           return at?.zone === 'monsters' && state.players[at.seat].monsters[at.index]!.faceUp;
         });
-        const atk = step.atk && valueOf(step.atk);
-        const def = step.def && valueOf(step.def);
-        const level = step.level && valueOf(step.level);
-        // A stat read from a target that is gone can't be applied.
-        if ((step.atk && atk === null) || (step.def && def === null) || (step.level && level === null)) return null;
-        for (const id of cards) apply({ op: 'modify_stats', card: id, atk: 0, def: 0, atk_set: atk ?? null, def_set: def ?? null, level_delta: 0, level_set: level ?? null, until: step.until });
-        if (!cards.length) return null;
-        const parts = [atk != null && `ATK became ${atk}`, def != null && `DEF became ${def}`, level != null && `Level became ${level}`].filter(Boolean);
-        return `${list(cards.map((id) => shown(id, before)))}: ${parts.join(', ')}${untilText[step.until] ? ` ${untilText[step.until]}` : ''}.`;
+        const said: string[] = [];
+        for (const id of cards) {
+          const atk = step.atk === null ? null : valueOf(step.atk, id);
+          const def = step.def === null ? null : valueOf(step.def, id);
+          const level = step.level === null ? null : valueOf(step.level, id);
+          // A stat read from a target that is gone can't be applied.
+          if ((step.atk !== null && atk === null) || (step.def !== null && def === null) || (step.level !== null && level === null)) continue;
+          apply({ op: 'modify_stats', card: id, atk: 0, def: 0, atk_set: atk, def_set: def, level_delta: 0, level_set: level, until: step.until });
+          const parts = [atk !== null && `ATK became ${atk}`, def !== null && `DEF became ${def}`, level !== null && `Level became ${level}`].filter(Boolean);
+          said.push(`${shown(id, before)}: ${parts.join(', ')}${untilText[step.until] ? ` ${untilText[step.until]}` : ''}.`);
+        }
+        return said.length ? said.join(' ') : null;
       }
       case 'gain_stats': {
         const cards = (await select(step.cards, 'apply this to')).filter((id) => {
           const at = locate(state, id);
           return at?.zone === 'monsters' && state.players[at.seat].monsters[at.index]!.faceUp;
         });
-        const atk = step.atk ? (valueOf(step.atk) ?? 0) : 0;
-        const def = step.def ? (valueOf(step.def) ?? 0) : 0;
-        if (!cards.length || (atk === 0 && def === 0)) return null;
-        for (const id of cards) apply({ op: 'modify_stats', card: id, atk, def, atk_set: null, def_set: null, level_delta: 0, level_set: null, until: step.until });
-        const parts = [atk && `${atk > 0 ? '+' : ''}${atk} ATK`, def && `${def > 0 ? '+' : ''}${def} DEF`].filter(Boolean);
-        return `${list(cards.map((id) => shown(id, before)))}: ${parts.join(', ')}${untilText[step.until] ? ` ${untilText[step.until]}` : ''}.`;
+        const said: string[] = [];
+        for (const id of cards) {
+          const atk = step.atk ? (valueOf(step.atk, id) ?? 0) : 0;
+          const def = step.def ? (valueOf(step.def, id) ?? 0) : 0;
+          if (atk === 0 && def === 0) continue;
+          apply({ op: 'modify_stats', card: id, atk, def, atk_set: null, def_set: null, level_delta: 0, level_set: null, until: step.until });
+          const parts = [atk && `${atk > 0 ? '+' : ''}${atk} ATK`, def && `${def > 0 ? '+' : ''}${def} DEF`].filter(Boolean);
+          said.push(`${shown(id, before)}: ${parts.join(', ')}${untilText[step.until] ? ` ${untilText[step.until]}` : ''}.`);
+        }
+        return said.length ? said.join(' ') : null;
       }
       case 'change_position': {
         const changed: string[] = [];
@@ -487,7 +507,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       }
       case 'reveal': {
         // "Reveal any number ... to select an equal number": no more than there are cards to target.
-        const limit = cost && script.targets?.max === 'cost' ? targetable(call.state, script, seat, self, link.cause).length : Infinity;
+        const limit = cost ? costLimit() : Infinity;
         const cards = (await select(step.cards, 'reveal', limit)).filter((id) => state.players[seat].hand.includes(id));
         if (!cards.length) return null;
         apply({ op: 'reveal', cards });
@@ -573,6 +593,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         summary += ` (${choice})`;
       }
       for (const step of [...script.cost, ...option.cost]) await run(step, true);
+      if (paid.length) apply({ op: 'declare_paid', cards: paid });
       if (script.targets) {
         const used = new Set(ops.flatMap((o) => ('cards' in o ? o.cards : 'card' in o ? [o.card] : [])));
         // Legality is judged before the cost: only cards that fit then, and weren't used to pay it, can be targeted.
