@@ -37,7 +37,9 @@ export interface Harness {
 export class FakeDiscord implements DiscordApi {
   clientId = 'discord-client';
   private codes = new Map<string, DiscordUser>();
+  /** Running instances: who is in each, all in one test server unless a test says otherwise. */
   instances = new Map<string, string[]>();
+  places = new Map<string, string>();
   /** Who logs in with Discord on the website next. Discord approves at once and sends them straight back. */
   webUser: DiscordUser = { id: 'nobody', username: 'nobody' };
 
@@ -60,8 +62,9 @@ export class FakeDiscord implements DiscordApi {
     return this.codes.get(accessToken.slice('token:'.length))!;
   }
 
-  async instanceUsers(instanceId: string) {
-    return this.instances.get(instanceId) ?? null;
+  async instance(instanceId: string) {
+    const users = this.instances.get(instanceId);
+    return users ? { users, place: this.places.get(instanceId) ?? 'test-server' } : null;
   }
 }
 

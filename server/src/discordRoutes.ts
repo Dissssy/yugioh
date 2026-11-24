@@ -12,6 +12,11 @@ import { viewerOf } from './viewer.ts';
 /** Holds the Discord user ID of whoever signed in with Discord. The account is looked up by it on every request. */
 const SESSION_COOKIE = 'discord';
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Where the Activity was opened: the Discord server, or the channel for a DM. Its tables are the duels started there.
+ * Set only inside the Activity, from what Discord reports about the instance, so it can't be made up.
+ */
+const PLACE_COOKIE = 'discord_place';
 /** The website's Discord login in progress: the state it sent, where to go after, and the account to link. */
 const LOGIN_COOKIE = 'discord_login';
 /** An Auth0 login in progress that should be linked to this Discord account once it lands. */
@@ -25,8 +30,16 @@ export const safeReturnTo = (to: unknown) => (typeof to === 'string' && /^\/(?![
 
 /** Logs out of a Discord login, in the Activity's iframe or on the website. */
 export function endDiscordSession(res: Response) {
-  res.clearCookie(SESSION_COOKIE, { secure: true, sameSite: 'none', partitioned: true });
-  res.clearCookie(SESSION_COOKIE);
+  for (const name of [SESSION_COOKIE, PLACE_COOKIE]) {
+    res.clearCookie(name, { secure: true, sameSite: 'none', partitioned: true });
+    res.clearCookie(name);
+  }
+}
+
+/** The Discord server or DM the Activity was opened in, inside the Activity; null on the website. */
+export function placeOf(req: Request): string | null {
+  const place: unknown = req.signedCookies[PLACE_COOKIE];
+  return typeof place === 'string' ? place : null;
 }
 
 export function discordRoutes(app: Express, config: Config, db: Db, discord: DiscordApi | null) {
@@ -57,10 +70,11 @@ export function discordRoutes(app: Express, config: Config, db: Db, discord: Dis
     const accessToken = await discord.exchangeCode(body.data.code);
     if (!accessToken) return void res.status(401).json({ error: 'Discord refused the sign-in. Close the Activity and open it again.' });
     const user = await discord.user(accessToken);
-    const inside = await discord.instanceUsers(body.data.instanceId);
-    if (!inside?.includes(user.id)) return void res.status(403).json({ error: 'Open the Activity from a Discord call to sign in.' });
+    const instance = await discord.instance(body.data.instanceId);
+    if (!instance?.users.includes(user.id)) return void res.status(403).json({ error: 'Open the Activity from a Discord call to sign in.' });
     await syncDiscordUser(db, user.id);
     startSession(res, user.id, inFrame);
+    res.cookie(PLACE_COOKIE, instance.place, { ...inFrame, maxAge: SESSION_MS });
     res.json({ accessToken });
   });
 

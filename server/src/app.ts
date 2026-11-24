@@ -14,7 +14,7 @@ import { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
 import { deckForDuel, deckRoutes } from './deckRoutes.ts';
 import type { DiscordApi } from './discord.ts';
-import { discordRoutes, endDiscordSession, safeReturnTo } from './discordRoutes.ts';
+import { discordRoutes, endDiscordSession, placeOf, safeReturnTo } from './discordRoutes.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
@@ -80,6 +80,7 @@ export function createApp(config: Config, db: Db, ai: Ai, discord: DiscordApi | 
   // Works out who is asking: a signed-in account, a guest, or nobody.
   app.use('/api', async (req, res, next) => {
     res.locals.viewer = await resolveViewer(req, res);
+    res.locals.place = placeOf(req);
     next();
   });
 

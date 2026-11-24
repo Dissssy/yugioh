@@ -2,7 +2,7 @@
 
 As of 2026-11-24. The site also runs as a Discord Activity: the same web app, opened by Discord inside a call or a DM and served through Discord's proxy. It is built for the app's testers only, so it never needs Discord's app verification.
 
-Built so far: signing in inside the Activity, and Discord logins and account linking on the website. Planned next: a Tables page per server, live mini boards on the tables, and a pop-out layout.
+Built so far: signing in inside the Activity, Discord logins and account linking on the website, and the Tables. Planned next: a pop-out layout, share links that work from inside Discord, and live mini boards on the tables.
 
 ## Who can play
 
@@ -16,6 +16,12 @@ Built so far: signing in inside the Activity, and Discord logins and account lin
 2. The web app sends the code and the instance ID to `POST /api/discord/session`. The server trades the code for an access token, reads who the player is, and then asks Discord, with the app's bot token, who is in that running instance (`GET /applications/{app}/activity-instances/{instance}`). Anyone can run Discord's login against the app outside Discord, so the server lets someone in only when Discord lists them inside a running copy of the Activity, which only testers can open.
 3. The account is found or created by Discord user ID (`users.discord_id`). Testers are trusted like approved players: a new account starts approved, and a pending one is approved. An account an admin rejected stays rejected.
 4. The server sets a signed `discord` cookie holding the account ID, marked `SameSite=None; Secure; Partitioned` as Discord's docs advise for iframes, so the API and the live duel streams work as they do on the website. The Activity signs in again each time it opens.
+
+## Tables
+
+Inside the Activity the home page shows **Tables** where the website shows "Your duels": every duel started in the server the Activity was opened in (or, in a DM, that DM). They are grouped as open seats (Sit down), duels being played (Watch, or Play for the two players) and duels finished in the last day (Replay). The list refreshes every 5 seconds. **New table** is the usual challenge form: a challenge made inside the Activity goes on that server's tables, with no link to send.
+
+Where the Activity was opened comes from Discord's answer about the instance at sign-in (`location.guild_id`, or `channel_id` in a DM). It is kept in a second signed cookie, `discord_place`, so it can't be made up. Duels store it in `matches.place`. `GET /api/tables` lists them and answers 404 outside the Activity.
 
 ## Discord on the website, and linking
 

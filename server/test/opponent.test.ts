@@ -116,7 +116,7 @@ describe('playing against Claude', () => {
 
     const ids: string[] = [];
     for (const [a, b] of [[0, 1], [1, 0], [1, 1]] as const) {
-      const id = await duels.create(owner!.id, 'ai:a', 'A', NO_BANLIST, false);
+      const id = await duels.create(owner!.id, 'ai:a', 'A', NO_BANLIST, false, null);
       await duels.join(id, async () => ({ key: 'ai:b', name: 'B' }));
       for (const [key, deck] of [['ai:a', a], ['ai:b', b]] as const) {
         const copy = await duelDeck(decks[deck]!.id);

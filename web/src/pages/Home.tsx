@@ -1,6 +1,7 @@
 import type { Me } from '@yugioh/shared';
 import { Link } from 'react-router';
-import { Duels, NewChallenge, PlayClaude } from './Duels.tsx';
+import { inActivity } from '../discord.ts';
+import { Duels, NewChallenge, PlayClaude, Tables } from './Duels.tsx';
 import { Notice } from './Notice.tsx';
 
 export const formatDate = (iso: string) =>
@@ -48,7 +49,7 @@ export function Home({ me }: { me: Me }) {
   }
 }
 
-/** Two columns: things to do on the left, the viewer's duels on the right. */
+/** Two columns: things to do on the left; on the right the viewer's duels, or the tables in the Discord Activity. */
 function Dashboard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="dashboard">
@@ -56,7 +57,7 @@ function Dashboard({ title, children }: { title: string; children: React.ReactNo
         <h1>{title}</h1>
         {children}
       </div>
-      <Duels />
+      {inActivity ? <Tables /> : <Duels />}
     </div>
   );
 }

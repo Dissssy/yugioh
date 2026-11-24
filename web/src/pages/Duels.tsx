@@ -2,7 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DeckSummary, DuelStatus, DuelSummary } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { api, errorText, useBanlists, useDecks, useDuels } from '../api.ts';
+import { api, errorText, useBanlists, useDecks, useDuels, useTables } from '../api.ts';
+import { inActivity } from '../discord.ts';
 import { DuelCard } from '../DuelCard.tsx';
 
 const statusOrder: Record<DuelStatus, number> = { active: 0, preparing: 1, waiting: 2, finished: 3 };
@@ -34,6 +35,50 @@ export function Duels() {
   );
 }
 
+const tableGroups: { title: string; statuses: DuelStatus[] }[] = [
+  { title: 'Open seats', statuses: ['waiting'] },
+  { title: 'Playing now', statuses: ['preparing', 'active'] },
+  { title: 'Finished today', statuses: ['finished'] },
+];
+
+/** In the Discord Activity: every duel started where it was opened, to sit down at, watch, or replay. */
+export function Tables() {
+  const tables = useTables();
+  const duels = tables.data ?? [];
+  return (
+    <section className="box duels">
+      <h2>Tables</h2>
+      {tables.isError && <p className="error">Couldn't load the tables.</p>}
+      {tables.data && duels.length === 0 && (
+        <div className="empty">
+          <div className="card back" aria-hidden />
+          <p className="muted">No tables yet. Start one and it shows up here for everyone.</p>
+        </div>
+      )}
+      {duels.length > 0 && (
+        <div className="duel-list">
+          {tableGroups.map(({ title, statuses }) => {
+            const group = duels.filter((d) => statuses.includes(d.status));
+            if (group.length === 0) return null;
+            return (
+              <section key={title} className="table-group">
+                <h3 className="small muted">{title}</h3>
+                <ul className="duel-list">
+                  {group.map((d) => (
+                    <li key={d.id}>
+                      <DuelCard duel={d} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 const DECK_RULES: [boolean, string, string][] = [
   [false, 'Any legal deck', 'Your own decks, uploads or premade ones'],
   [true, 'Premade decks only', 'Changed only by Side Deck swaps'],
@@ -50,14 +95,16 @@ export function NewChallenge() {
     mutationFn: () => api<DuelSummary>('/duels', { method: 'POST', body: JSON.stringify({ banlistId: banlist, premadeOnly }) }),
     onSuccess: (duel) => {
       void queryClient.invalidateQueries({ queryKey: ['duels'] });
+      void queryClient.invalidateQueries({ queryKey: ['tables'] });
       void navigate(`/duel/${duel.id}`);
     },
   });
   return (
     <section className="box">
-      <h2>New challenge</h2>
+      <h2>{inActivity ? 'New table' : 'New challenge'}</h2>
       <p className="muted small">
-        Send the challenge link to your opponent. Once they accept, you both choose your decks. <Link to="/decks">Build a deck</Link>
+        {inActivity ? 'It shows up on the tables for everyone here.' : 'Send the challenge link to your opponent.'} Once
+        someone takes the other seat, you both choose your decks. <Link to="/decks">Build a deck</Link>
       </p>
       <label className="field">
         <span className="small">Banlist both decks follow</span>
@@ -80,7 +127,7 @@ export function NewChallenge() {
       </div>
       <div className="actions">
         <button className="primary" onClick={() => create.mutate()} disabled={create.isPending || banlist === undefined}>
-          Create challenge
+          {inActivity ? 'Start a table' : 'Create challenge'}
         </button>
         {create.isError && <span className="error">{errorText(create.error)}</span>}
       </div>
@@ -101,6 +148,7 @@ export function PlayClaude() {
     mutationFn: (body: { deckId: number; aiDeckId: number }) => api<DuelSummary>('/admin/duels/ai', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: (duel) => {
       void queryClient.invalidateQueries({ queryKey: ['duels'] });
+      void queryClient.invalidateQueries({ queryKey: ['tables'] });
       void navigate(`/duel/${duel.id}`);
     },
   });

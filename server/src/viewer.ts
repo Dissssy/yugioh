@@ -5,6 +5,8 @@ import type { Me } from '@yugioh/shared';
 export type Viewer = Exclude<Me, { kind: 'guest' }> | (Extract<Me, { kind: 'guest' }> & { guestId: number });
 
 export const viewerOf = (res: Response) => res.locals.viewer as Viewer;
+/** The Discord server or DM the Activity was opened in (docs/discord.md); null on the website. */
+export const placeOfRes = (res: Response) => res.locals.place as string | null;
 
 export const userKey = (id: number) => `user:${id}`;
 export const guestKey = (id: number) => `guest:${id}`;

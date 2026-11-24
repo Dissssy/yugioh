@@ -15,6 +15,12 @@ export interface DiscordUser {
   username: string;
 }
 
+/** A running copy of the Activity: the Discord user IDs in it, and the server (or, in a DM, the channel) it runs in. */
+export interface ActivityInstance {
+  users: string[];
+  place: string;
+}
+
 /** The calls the server makes to Discord. Tests replace them. */
 export interface DiscordApi {
   clientId: string;
@@ -26,8 +32,8 @@ export interface DiscordApi {
    */
   exchangeCode(code: string, redirectUri?: string): Promise<string | null>;
   user(accessToken: string): Promise<DiscordUser>;
-  /** The Discord user IDs in a running Activity instance. Null when no such instance is running. */
-  instanceUsers(instanceId: string): Promise<string[] | null>;
+  /** Who is in a running Activity instance, and where it runs. Null when no such instance is running. */
+  instance(instanceId: string): Promise<ActivityInstance | null>;
 }
 
 async function call<T>(path: string, init: RequestInit, missing?: number): Promise<T | null> {
@@ -53,10 +59,11 @@ export function discordApi(config: DiscordConfig): DiscordApi {
     async user(accessToken) {
       return (await call<DiscordUser>('/users/@me', { headers: { authorization: `Bearer ${accessToken}` } }))!;
     },
-    async instanceUsers(instanceId) {
+    async instance(instanceId) {
       const path = `/applications/${config.clientId}/activity-instances/${encodeURIComponent(instanceId)}`;
-      const instance = await call<{ users: string[] }>(path, { headers: { authorization: `Bot ${config.botToken}` } }, 404);
-      return instance?.users ?? null;
+      type Instance = { users: string[]; location: { guild_id?: string; channel_id: string } };
+      const instance = await call<Instance>(path, { headers: { authorization: `Bot ${config.botToken}` } }, 404);
+      return instance && { users: instance.users, place: instance.location.guild_id ?? instance.location.channel_id };
     },
   };
 }

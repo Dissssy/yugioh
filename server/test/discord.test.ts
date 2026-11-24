@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import type { AdminUser, Me } from '@yugioh/shared';
+import type { AdminUser, DuelSummary, Me } from '@yugioh/shared';
+import { syncCards } from '../src/cards.ts';
 import { decks } from '../src/db/schema.ts';
 import { ADMIN_EMAIL, Browser, startHarness, type Harness } from './harness.ts';
 
@@ -164,5 +165,37 @@ describe('Discord logins on the website', () => {
     expect(back.pathname).toBe('/account');
     expect(back.searchParams.get('linkError')).toMatch(/already linked/);
     expect(await me(other)).toMatchObject({ logins: { auth0: true, discord: false } });
+  });
+});
+
+describe('tables in the Activity', () => {
+  const challenge = (b: Browser) => b.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: '{}' });
+  const tables = (b: Browser) => b.json<DuelSummary[]>(`${h.baseUrl}/api/tables`);
+
+  it("lists the duels started in this server's Activity, for anyone there to join or watch", async () => {
+    await syncCards(h.db, { imageDir: h.imageDir, api: h.ygoprodeck, imageGapMs: 0 });
+    h.discord.instances.set('table-call', ['3001', '3002']);
+    const ishizu = (await openActivity({ id: '3001', username: 'ishizu' }, 'table-call')).browser;
+    const odion = (await openActivity({ id: '3002', username: 'odion' }, 'table-call')).browser;
+    const { body: duel } = await challenge(ishizu);
+
+    const { body: seen } = await tables(odion);
+    expect(seen.map((d) => d.id)).toEqual([duel.id]);
+    expect(seen[0]).toMatchObject({ status: 'waiting', canJoin: true, yourSeat: null });
+    expect((await tables(ishizu)).body[0]).toMatchObject({ id: duel.id, yourSeat: 0, canJoin: false });
+  });
+
+  it("keeps each server's tables to itself, and the website's challenges off them", async () => {
+    h.discord.instances.set('other-call', ['3003']);
+    h.discord.places.set('other-call', 'other-server');
+    const rex = (await openActivity({ id: '3003', username: 'rex' }, 'other-call')).browser;
+    expect((await tables(rex)).body).toEqual([]);
+
+    const site = await auth0Login('admin', ADMIN_EMAIL);
+    await challenge(site);
+    expect((await tables(site)).status).toBe(404);
+    h.discord.instances.set('table-call-2', ['3001']);
+    const again = (await openActivity({ id: '3001', username: 'ishizu' }, 'table-call-2')).browser;
+    expect((await tables(again)).body).toHaveLength(1);
   });
 });

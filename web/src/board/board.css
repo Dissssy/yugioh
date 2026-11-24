@@ -258,7 +258,7 @@ button.phase.go { border: 0; background: none; color: var(--fg); text-decoration
 
 /* Side panel */
 .panel { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 12px; border-left: 1px solid var(--line); }
-.panel .panel-top { flex-wrap: nowrap; }
+.panel .panel-top { row-gap: 4px; }
 .spacer { flex: 1; }
 .settings { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
 .settings p { margin: 0; }
@@ -423,6 +423,10 @@ form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit
 .duel-bar .phase-dial { --dial-item: 48px; }
 .bar-prompt > * { flex-wrap: wrap; }
 .bar-prompt .choice-text { -webkit-line-clamp: 4; }
+
+/* Compact zones: the opponent's Life Points plate fits the half zone above their field, name and LP on one line. */
+.duel.compact:not(.tight) .lp-plate { grid-auto-flow: column; align-items: baseline; gap: 8px; padding: 2px 10px; }
+.duel.compact:not(.tight) .lp { font-size: 1.1em; }
 
 /* Tight zones: Life Points plates a zone wide beside the hands, and smaller labels. */
 .duel.tight .lp-plate { min-width: 0; width: var(--zone); box-sizing: border-box; padding: 2px 4px; border-radius: 6px; }

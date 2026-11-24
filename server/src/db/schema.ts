@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { EffectSheet } from '@yugioh/engine';
 import type { Banlist, DuelDeck, DuelOutcome, UserSettings } from '@yugioh/shared';
-import { boolean, check, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
 export const accountRole = pgEnum('account_role', ['player', 'admin', 'superAdmin']);
@@ -106,30 +106,36 @@ export const decks = pgTable('decks', {
 export const matchStatus = pgEnum('match_status', ['waiting', 'preparing', 'active', 'finished']);
 
 /** A duel between two seats. Seat keys are `user:<id>` or `guest:<id>`; only accounts create duels. */
-export const matches = pgTable('matches', {
-  id: text('id').primaryKey(),
-  createdBy: integer('created_by')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  status: matchStatus('status').notNull().default('waiting'),
-  finishedAt: timestamp('finished_at', { withTimezone: true }),
-  seat0: text('seat0').notNull(),
-  seat1: text('seat1'),
-  /** The players' names as the duel shows them, kept from when they took their seats. */
-  name0: text('name0').notNull(),
-  name1: text('name1'),
-  /** How the duel ended, once it has. */
-  result: jsonb('result').$type<DuelOutcome>(),
-  /** The banlist both decks must follow, copied when the challenge was made. */
-  banlist: jsonb('banlist').$type<Banlist>().notNull(),
-  premadeOnly: boolean('premade_only').notNull().default(false),
-  /** Each player's copy of their deck for this duel, chosen in the pre-duel stage; the duel starts from it. */
-  deck0: jsonb('deck0').$type<DuelDeck>(),
-  deck1: jsonb('deck1').$type<DuelDeck>(),
-  ready0: boolean('ready0').notNull().default(false),
-  ready1: boolean('ready1').notNull().default(false),
-});
+export const matches = pgTable(
+  'matches',
+  {
+    id: text('id').primaryKey(),
+    createdBy: integer('created_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    status: matchStatus('status').notNull().default('waiting'),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    seat0: text('seat0').notNull(),
+    seat1: text('seat1'),
+    /** The players' names as the duel shows them, kept from when they took their seats. */
+    name0: text('name0').notNull(),
+    name1: text('name1'),
+    /** How the duel ended, once it has. */
+    result: jsonb('result').$type<DuelOutcome>(),
+    /** The banlist both decks must follow, copied when the challenge was made. */
+    banlist: jsonb('banlist').$type<Banlist>().notNull(),
+    premadeOnly: boolean('premade_only').notNull().default(false),
+    /** Each player's copy of their deck for this duel, chosen in the pre-duel stage; the duel starts from it. */
+    deck0: jsonb('deck0').$type<DuelDeck>(),
+    deck1: jsonb('deck1').$type<DuelDeck>(),
+    ready0: boolean('ready0').notNull().default(false),
+    ready1: boolean('ready1').notNull().default(false),
+    /** The Discord server (or DM) whose tables show this duel, when it was started in the Activity (docs/discord.md). */
+    place: text('place'),
+  },
+  (t) => [index('matches_place').on(t.place, t.createdAt)],
+);
 
 /** The duel's append-only event log. The board is the fold of these events. */
 export const matchEvents = pgTable(
