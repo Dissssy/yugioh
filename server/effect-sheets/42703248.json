@@ -1,7 +1,7 @@
 {
   "code": 42703248,
   "textHash": "f019183bede287e0c2597dd460eb62e7c58927cfa13a24ba942a0820f1a85b61",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "activation",
@@ -14,7 +14,46 @@
       "effect": "Return all Spell and Trap Cards on the field to the hand.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "either",
+                    "place": "spellTraps",
+                    "kinds": [
+                      "spell",
+                      "trap"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  }
+                },
+                "to": "hand"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

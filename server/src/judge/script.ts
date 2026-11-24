@@ -23,6 +23,7 @@ import {
   fusionZones,
   zonePick,
   isProcedure,
+  conditionProblem,
   levelNow,
   levelOf,
   locate,
@@ -441,6 +442,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         return `${state.players[seat].name} takes ${step.damage} damage in the End Phase unless they Normal Summon the added monster, or a card with the same name, this turn.`;
       }
       case 'if_done':
+      case 'only_if':
         // Handled where the steps run.
         return null;
       case 'extra_normal_summon':
@@ -456,6 +458,10 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     for (const step of steps) {
       if (step.do === 'if_done') {
         if (last === null) break;
+        continue;
+      }
+      if (step.do === 'only_if') {
+        if (step.conditions.some((c) => conditionProblem(state, c, seat, self))) break;
         continue;
       }
       last = await run(step, false);

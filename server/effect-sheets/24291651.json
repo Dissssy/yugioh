@@ -1,7 +1,7 @@
 {
   "code": 24291651,
   "textHash": "70e238c2a2bb7280b5cd9a3dc64d4bda5ba9ec1db443e836c4c8a87bf082ae84",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "trigger",
@@ -36,7 +36,27 @@
         "canMiss": true,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_position",
+                "cards": {
+                  "from": "self"
+                },
+                "position": "defense"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

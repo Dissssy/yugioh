@@ -270,7 +270,12 @@ export type Step =
    */
   | { do: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; whileFaceUp: boolean }
   /** "and if you do": the steps after this one happen only if the step before it did something. */
-  | { do: 'if_done' };
+  | { do: 'if_done' }
+  /**
+   * The steps after this one happen only if every condition holds now, as the effect resolves ("You must control a
+   * Tuner monster to activate and to resolve this effect": the same condition in the script's conditions and here).
+   */
+  | { do: 'only_if'; conditions: Condition[] };
 
 export const LOCK_UNTIL = ['this_end_phase', 'your_next_end_phase'] as const;
 export type LockUntil = (typeof LOCK_UNTIL)[number];

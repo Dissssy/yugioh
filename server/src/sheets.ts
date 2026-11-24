@@ -100,6 +100,7 @@ const step = z.union([
   z.object({ do: z.literal('add_counters'), cards: selection, counter: z.enum(['spell']), count: z.number().int().min(1), max: z.number().int().min(1).nullable() }),
   z.object({ do: z.literal('remove_counters'), cards: selection, counter: z.enum(['spell']), count: z.number().int().min(1) }),
   z.object({ do: z.literal('if_done') }),
+  z.object({ do: z.literal('only_if'), get conditions() { return z.array(condition); } }),
 ]) satisfies z.ZodType<Step>;
 
 const condition = z.union([
@@ -451,6 +452,7 @@ Steps (each "cards" is a selection):
 - {"do": "pledge_normal_summon", "damage"}: "During the End Phase of this turn, take 2000 damage if you did not Normal Summon the added monster, or a card with the same name": about the cards the step before it moved (put it right after that move).
 - {"do": "lock", "player", "filter", "until", "whileFaceUp"}: a lock the effect leaves behind: player ("you", "opponent" or "both") can't activate cards that fit filter until "this_end_phase" or "your_next_end_phase" (the End Phase of this card's controller's next turn), and with whileFaceUp only while this card stays face-up on the field ("Spell Cards cannot be activated until the End Phase of your next turn, as long as this card remains face-up on the field": both, kinds ["spell"], place "any", your_next_end_phase, whileFaceUp true).
 - {"do": "if_done"}: "and if you do" / "If you do": the steps after it happen only if the step right before it did something (moved, summoned or changed a card). "Reduce its Level by 2, and if you do, Special Summon this card": modify_stats on the target, if_done, special_summon self.
+- {"do": "only_if", "conditions"}: the steps after it happen only if every condition (as in the script's conditions) holds as the effect resolves. "You must control a Tuner monster to activate and to resolve this effect": the count condition in conditions, then only_if with it as the first step. "Apply these effects in sequence, depending on ...": each later part after an only_if.
 - {"do": "detach", "cards", "count"}: detach count Xyz Materials from an Xyz Monster the selection picks. "Detach 1 Xyz Material from this card" (usually a cost): cards {"from": "self"}, count 1. "Detach 1 Xyz Material from a monster you control": a choose selection of face-up Xyz monsters you control.
 
 Selections:
