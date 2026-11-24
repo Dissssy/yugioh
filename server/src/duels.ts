@@ -10,6 +10,7 @@ import { and, desc, eq, gt, ne, or } from 'drizzle-orm';
 import {
   cardOf,
   decide,
+  EMOTES,
   isProcedure,
   procedureDone,
   scriptOf,
@@ -32,6 +33,7 @@ import {
   type SeatStep,
   type DuelState,
   type DuelUpdate,
+  type Emote,
   type EffectSheet,
   type FieldCardView,
   type Intent,
@@ -237,7 +239,35 @@ export class Duels {
       yourSeat,
       canJoin: canJoin && row.status === 'waiting' && seatKey !== row.seat0,
       yourMove: yourSeat === null ? null : await this.moveOf(row, yourSeat),
+      rematchOf: row.rematchOf,
+      rematch: row.status === 'finished' ? ((await this.db.query.matches.findFirst({ columns: { id: true }, where: eq(matches.rematchOf, row.id) }))?.id ?? null) : null,
     };
+  }
+
+  /**
+   * A player asks for a rematch of a finished duel, or accepts the one their opponent asked for: the same players in
+   * the same seats, with the same banlist and decks, and this player Ready. It starts once both are; either may change
+   * their deck before that, as in any duel's pre-duel stage. An AI opponent is Ready at once. Returns the rematch's ID.
+   */
+  async rematch(id: string, seatKey: string, problems: (deck: DuelDeck, banlist: Banlist) => Promise<string[]>): Promise<{ ok: true; id: string } | Refusal> {
+    const row = await this.find(id);
+    const seat = row ? seatIn(row, seatKey) : null;
+    if (!row || seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
+    if (row.status !== 'finished') return { ok: false, status: 409, error: 'A rematch can only follow a finished duel.' };
+    const { seat0, seat1, name0, name1, banlist, premadeOnly, place, deck0, deck1, createdBy } = row;
+    await this.db
+      .insert(matches)
+      .values({ id: randomBytes(12).toString('base64url'), createdBy, seat0, seat1, name0, name1, banlist, premadeOnly, place, deck0, deck1, status: 'preparing', rematchOf: id })
+      .onConflictDoNothing({ target: matches.rematchOf });
+    const next = (await this.db.query.matches.findFirst({ where: eq(matches.rematchOf, id) }))!;
+    // Asking again once it has started just leads to it.
+    if (next.status !== 'preparing') return { ok: true, id: next.id };
+    const ai = [seat0, seat1].find(isAiKey);
+    if (ai) await this.ready(next.id, ai, true, problems);
+    const readied = await this.ready(next.id, seatKey, true, problems);
+    if (!readied.ok) return readied;
+    this.onChange?.(id);
+    return { ok: true, id: next.id };
   }
 
   /** What the duel waits on this seat's player for (YourMove). */
@@ -731,11 +761,12 @@ export class Duels {
   }
 
   /** A player's chat message. It joins the log in order with everything else, even while the judge is working. */
-  async chat(id: string, seatKey: string, text: string): Promise<ActResult> {
+  async chat(id: string, seatKey: string, message: { text: string } | { emote: Emote }): Promise<ActResult> {
     const duel = await this.load(id);
     const seat = await this.seatOf(id, seatKey);
     if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
-    await this.commit(duel, [{ type: 'chatted', player: seat, text }]);
+    const said = 'emote' in message ? { text: EMOTES[message.emote], emote: message.emote } : { text: message.text };
+    await this.commit(duel, [{ type: 'chatted', player: seat, ...said }]);
     return { ok: true };
   }
 
@@ -783,9 +814,15 @@ export class Duels {
   async watch(id: string, seat: Seat, sight: Sight, send: (update: DuelUpdate) => void): Promise<() => void> {
     const duel = await this.load(id);
     const listener = { seat, sight, send };
+    const before = online(duel);
     duel.listeners.add(listener);
     send(syncFor(duel, seat, sight));
-    return () => duel.listeners.delete(listener);
+    this.presenceChanged(duel, before, listener);
+    return () => {
+      const before = online(duel);
+      duel.listeners.delete(listener);
+      this.presenceChanged(duel, before, null);
+    };
   }
 
   /**
@@ -818,11 +855,22 @@ export class Duels {
     }
   }
 
+  /** Tells everyone following the duel who has it open, when that changed; and the new listener in any case. */
+  private presenceChanged(duel: LiveDuel, before: Seat[], joined: Listener | null) {
+    const now = online(duel);
+    const update: DuelUpdate = { type: 'presence', online: now };
+    if (isDeepStrictEqual(now, before)) joined?.send(update);
+    else for (const l of duel.listeners) l.send(update);
+  }
+
   private broadcastJudging(duel: LiveDuel) {
     for (const l of duel.listeners) l.send({ type: 'judging', judging: judgingFor(duel, l.sight) });
     this.onChange?.(duel.id);
   }
 }
+
+/** The players following their duel live, in seat order. */
+const online = (duel: LiveDuel): Seat[] => ([0, 1] as const).filter((seat) => [...duel.listeners].some((l) => l.sight === seat));
 
 /** A record for an effect nobody could rule on: an activation is refused, an effect does nothing. */
 function notRuled(state: DuelState, stage: 'activation' | 'resolution', player: Seat, card: string, effect: number, error: string): JudgeRecord {

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 /** What a shortcut does on the board, handled by Board. */
-export type Shortcut = 'pass' | 'next' | 'end' | 'confirm' | 'log' | 'chat' | 'ask' | 'help';
+export type Shortcut = 'pass' | 'next' | 'end' | 'confirm' | 'log' | 'chat' | 'ask' | 'mute' | 'help';
 
 interface Key {
   keys: string;
@@ -42,6 +42,7 @@ export const KEYS: { group: string; keys: Key[] }[] = [
       { keys: 'L', letter: 'l', shortcut: 'log', does: 'Go to the log, on its newest entry (Enter on a ruling to contest it)' },
       { keys: 'T', letter: 't', shortcut: 'chat', does: 'Type in the chat' },
       { keys: 'Q', letter: 'q', shortcut: 'ask', does: 'Ask the judge a question' },
+      { keys: 'M', letter: 'm', shortcut: 'mute', does: 'Turn the sound off or back on' },
       { keys: 'G', does: 'Go to your next duel that is waiting on you (works on every page)' },
       { keys: '?', letter: '?', shortcut: 'help', does: 'Show these keys' },
     ],

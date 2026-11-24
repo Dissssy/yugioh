@@ -5,7 +5,7 @@ import { gzipSync } from 'node:zlib';
 import { Router, type Request, type Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { HANDS, type Intent } from '@yugioh/engine';
+import { EMOTES, HANDS, type Emote, type Intent } from '@yugioh/engine';
 import { isAdmin, isSideSwap, SECTION_SIZE, type DuelDeckSave, type DuelPrep, type OpenGames } from '@yugioh/shared';
 import type { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
@@ -13,6 +13,7 @@ import { defaultBanlist, toBanlist, visibleBanlist } from './banlistRoutes.ts';
 import { deckForDuel } from './deckRoutes.ts';
 import { started, type Duels, type SeatClaim } from './duels.ts';
 import { DuelFeed } from './duelFeed.ts';
+import type { Push } from './push.ts';
 import { createGuest } from './guests.ts';
 import { displayName, guestKey, guestName, placeOfRes, playerKey, viewerOf, type Viewer } from './viewer.ts';
 
@@ -39,7 +40,7 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
 ]);
 
 const answerBody = z.object({ prompt: z.string(), picks: z.array(z.string()).max(60) });
-const chatBody = z.object({ text: z.string().trim().min(1).max(300) });
+const chatBody = z.union([z.object({ text: z.string().trim().min(1).max(300) }), z.object({ emote: z.enum(Object.keys(EMOTES) as [Emote, ...Emote[]]) })]);
 const askBody = z.object({ text: z.string().trim().min(1).max(500), card: z.number().int().nullable().default(null) });
 const escalateBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
 const contestBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
@@ -58,6 +59,9 @@ const replayFrom = z.enum(['0', '1', 'both']).transform((v) => (v === 'both' ? v
 const watchFrom = z.enum(['0', '1']).transform((v) => Number(v) as 0 | 1);
 /** Signed-out visitors also give the name they play under as a guest. */
 const joinBody = z.object({ guestName: z.string().trim().min(1).max(30).optional() });
+/** A browser's Web Push subscription, as PushSubscription.toJSON() gives it. */
+const pushBody = z.object({ endpoint: z.url().max(2000), keys: z.object({ p256dh: z.string().min(1).max(200), auth: z.string().min(1).max(100) }) });
+const unpushBody = z.object({ endpoint: z.string().max(2000) });
 
 /** Sets and clears the cookie that holds a guest's token. */
 export interface GuestCookie {
@@ -85,9 +89,9 @@ function eventStream(req: Request, res: Response, onClose: () => void): (data: u
   return (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: GuestCookie) {
+export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: GuestCookie, push: Push | null) {
   const router = Router();
-  const feed = new DuelFeed(duels);
+  const feed = new DuelFeed(duels, push);
 
   /** Playing needs an approved account or a guest identity. */
   const player = (res: Response): { viewer: Viewer; key: string } | null => {
@@ -117,6 +121,26 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     let stop = () => {};
     const send = eventStream(req, res, () => stop());
     stop = feed.follow(p.key, send);
+  });
+
+  // Web Push (push.ts): the key browsers subscribe with, if this server sends pushes, and a player's subscriptions.
+  router.get('/push', (_req, res) => {
+    if (!push) return void res.status(404).json({ error: 'This server sends no push notifications.' });
+    res.json({ publicKey: push.publicKey });
+  });
+  router.put('/me/push', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const body = pushBody.safeParse(req.body);
+    if (!push || !body.success) return void res.status(push ? 400 : 404).json({ error: 'bad_request' });
+    await push.subscribe(p.key, body.data);
+    res.status(204).end();
+  });
+  router.delete('/me/push', async (req, res) => {
+    const body = unpushBody.safeParse(req.body);
+    if (!push || !body.success) return void res.status(push ? 400 : 404).json({ error: 'bad_request' });
+    await push.unsubscribe(body.data.endpoint);
+    res.status(204).end();
   });
 
   router.post('/duels', async (req, res) => {
@@ -225,6 +249,14 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const result = await duels.ready(req.params.id, p.key, body.data.ready, (deck, banlist) => catalog.problems(deck, banlist, deck.premade));
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.json(await duels.summarize((await duels.find(req.params.id))!, p.key, false));
+  });
+
+  router.post('/duels/:id/rematch', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const result = await duels.rematch(req.params.id, p.key, (deck, banlist) => catalog.problems(deck, banlist, deck.premade));
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.status(201).json(await duels.summarize((await duels.find(result.id))!, p.key, false));
   });
 
   // The duel as the viewer may see it, sent now and after every change: a player's own seat, or for anyone else
@@ -344,7 +376,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
     if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
-    const result = await duels.chat(row.id, p.key, body.data.text);
+    const result = await duels.chat(row.id, p.key, body.data);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(204).end();
   });

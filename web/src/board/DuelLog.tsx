@@ -1,4 +1,4 @@
-import type { CardData, LogEntry, LogEvent } from '@yugioh/engine';
+import { EMOTES, type CardData, type Emote, type LogEntry, type LogEvent, type Seat } from '@yugioh/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /** How close to its end the log counts as following along. */
@@ -36,7 +36,20 @@ const OUTCOMES = {
  * The duel log, grouped by turn. The current turn is open; earlier turns fold away. Hovering an entry highlights
  * the cards it names. The judge's rulings stand out and can be contested; an appeal's verdict follows them.
  */
-export function DuelLog({ log, onHighlight, contest, escalate }: { log: LogEntry[]; onHighlight: (ids: string[]) => void; contest: Contest; escalate: Escalate }) {
+export function DuelLog({
+  log,
+  you,
+  onHighlight,
+  contest,
+  escalate,
+}: {
+  log: LogEntry[];
+  /** The player reading it, whose opponent's unread chat is counted; null for someone watching. */
+  you: Seat | null;
+  onHighlight: (ids: string[]) => void;
+  contest: Contest;
+  escalate: Escalate;
+}) {
   const [contesting, setContesting] = useState<number | null>(null);
   const [escalating, setEscalating] = useState<number | null>(null);
   const [note, setNote] = useState('');
@@ -48,10 +61,12 @@ export function DuelLog({ log, onHighlight, contest, escalate }: { log: LogEntry
   const current = log.at(-1)?.turn ?? 0;
   // New entries keep the log at its end, unless the player scrolled up to read. Only the log scrolls, never the page.
   const box = useRef<HTMLDivElement>(null);
+  const end = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true);
   useLayoutEffect(() => {
     if (box.current && atEnd.current) box.current.scrollTop = box.current.scrollHeight;
   }, [log.length]);
+  const unread = useUnreadChat(log, you, end);
   // So does the log changing size, as when the board makes way for the keyboard.
   useEffect(() => {
     const el = box.current;
@@ -88,7 +103,7 @@ export function DuelLog({ log, onHighlight, contest, escalate }: { log: LogEntry
                       : e.event.type === 'appealed' || e.event.type === 'escalated'
                         ? 'appeal'
                         : e.event.type === 'chatted'
-                          ? 'chat'
+                          ? `chat${e.event.emote ? ' emote' : ''}`
                           : e.event.type === 'asked'
                             ? 'question'
                             : undefined
@@ -165,6 +180,12 @@ export function DuelLog({ log, onHighlight, contest, escalate }: { log: LogEntry
           </ol>
         </details>
       ))}
+      <div ref={end} className="log-end" aria-hidden />
+      {unread > 0 && (
+        <button className="new-chat" onClick={() => end.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })}>
+          {unread} new message{unread === 1 ? '' : 's'} ↓
+        </button>
+      )}
     </div>
   );
 }
@@ -180,6 +201,7 @@ export interface Asking {
  */
 export function ChatInput({
   send,
+  emote,
   ask,
   sending,
   answering,
@@ -188,6 +210,8 @@ export function ChatInput({
   focus,
 }: {
   send: (text: string) => Promise<unknown>;
+  /** Sends an emote: a one-tap chat message with its own sound. */
+  emote: (emote: Emote) => void;
   ask: (text: string, card: number | null) => Promise<unknown>;
   sending: boolean;
   /** A question was sent and its answer hasn't arrived yet. */
@@ -228,6 +252,15 @@ export function ChatInput({
         )}
         {answering && <span className="muted small">The judge is answering…</span>}
       </span>
+      {!asking && (
+        <span className="emotes" role="group" aria-label="Emotes">
+          {(Object.entries(EMOTES) as [Emote, string][]).map(([key, text]) => (
+            <button key={key} type="button" className="quiet" disabled={sending} onClick={() => emote(key)}>
+              {text}
+            </button>
+          ))}
+        </span>
+      )}
       <input
         ref={input}
         aria-label={asking ? 'Question for the judge' : 'Chat message'}
@@ -241,4 +274,31 @@ export function ChatInput({
       </button>
     </form>
   );
+}
+
+/**
+ * How many of the opponent's chat messages the player hasn't seen: those that arrived while the end of the log was
+ * out of sight (scrolled up, below the board on a phone) or the tab was in the background.
+ */
+function useUnreadChat(log: LogEntry[], you: Seat | null, end: React.RefObject<HTMLDivElement | null>): number {
+  const theirs = you === null ? 0 : log.filter((e) => e.event.type === 'chatted' && e.event.player !== you).length;
+  const [seen, setSeen] = useState(theirs);
+  const [endInView, setEndInView] = useState(true);
+  const [pageVisible, setPageVisible] = useState(() => document.visibilityState === 'visible');
+  useEffect(() => {
+    const el = end.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => setEndInView(entry!.isIntersecting));
+    observer.observe(el);
+    const onVisibility = () => setPageVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [end]);
+  useEffect(() => {
+    if (endInView && pageVisible) setSeen(theirs);
+  }, [endInView, pageVisible, theirs]);
+  return Math.max(0, theirs - seen);
 }

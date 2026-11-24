@@ -27,6 +27,8 @@ The shared Postgres runs as compose project `/git/postgres` (service `db`, Docke
    DISCORD_CLIENT_ID=     # optional, all three or none: the Discord Activity; see discord.md
    DISCORD_CLIENT_SECRET=
    DISCORD_BOT_TOKEN=
+   VAPID_PUBLIC_KEY=      # optional, both or neither: notifications with the site closed (Web Push);
+   VAPID_PRIVATE_KEY=     # make them once with `npx web-push generate-vapid-keys`, and keep them (see ux-niceties.md)
    ```
 
    compose.yaml sets `PORT` and `CARD_IMAGE_DIR` itself. Auth0 setup is in [accounts.md](accounts.md).

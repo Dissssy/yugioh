@@ -974,7 +974,8 @@ export type DuelEvent =
   | { type: 'sheetUpdated'; code: number; sheet: EffectSheet | null }
   | { type: 'duelEnded'; result: DuelResult }
   /** A player's chat message. It changes nothing on the board and never reaches the judge. */
-  | { type: 'chatted'; player: Seat; text: string }
+  /** A chat message; an emote's text is the emote's own (EMOTES). */
+  | { type: 'chatted'; player: Seat; text: string; emote?: Emote }
   | { type: 'aiDecided'; record: AiRecord }
   | { type: 'asked'; record: AskRecord }
   | { type: 'escalated'; record: EscalationRecord };
@@ -1094,11 +1095,24 @@ export interface SeatStep {
   view: PlayerView;
 }
 
+/** One-tap chat messages, each with its own sound on the site. */
+export const EMOTES = {
+  goodLuck: 'Good luck!',
+  thinking: 'Thinking…',
+  nicePlay: 'Nice play!',
+  oops: 'Oops!',
+  thanks: 'Thanks!',
+  goodGame: 'Good game!',
+} as const;
+export type Emote = keyof typeof EMOTES;
+
 export type DuelUpdate =
   | { type: 'sync'; view: PlayerView; log: LogEntry[]; judging: JudgingView | null }
   | { type: 'steps'; steps: SeatStep[] }
   /** The judge started, asked a player something, got an answer, or finished (null). */
-  | { type: 'judging'; judging: JudgingView | null };
+  | { type: 'judging'; judging: JudgingView | null }
+  /** Which players have the duel open now. Sent after the sync and whenever it changes. */
+  | { type: 'presence'; online: Seat[] };
 
 /** The judge at work on an effect. Nothing it does reaches the board until it finishes. */
 export interface JudgingView {

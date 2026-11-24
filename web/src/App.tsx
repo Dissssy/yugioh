@@ -2,6 +2,7 @@ import { Link, NavLink, Route, Routes, useLocation } from 'react-router';
 import { isAdmin } from '@yugioh/shared';
 import { AccountMenu, Avatar } from './AccountMenu.tsx';
 import { loginHref, useCanPlay, useMe } from './api.ts';
+import { usePushSync } from './notify.tsx';
 import { DuelSwitcher, useDuelFeed, useDuelSwitching } from './duelFeed.tsx';
 import { Account } from './pages/Account.tsx';
 import { Admin } from './pages/Admin.tsx';
@@ -21,6 +22,7 @@ export function App() {
   const canPlay = useCanPlay();
   useDuelFeed(canPlay);
   useDuelSwitching(canPlay);
+  usePushSync(canPlay);
 
   return (
     <>

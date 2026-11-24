@@ -22,6 +22,7 @@ export function useDuel(duelId: string | null, pace: (event: LogEvent, waiting: 
   const [shown, setShown] = useState<Shown | null>(null);
   const [connected, setConnected] = useState(true);
   const [judging, setJudging] = useState<JudgingView | null>(null);
+  const [online, setOnline] = useState<Seat[]>([]);
   const paceRef = useRef(pace);
   paceRef.current = pace;
 
@@ -66,6 +67,7 @@ export function useDuel(duelId: string | null, pace: (event: LogEvent, waiting: 
         return;
       }
       if (update.type === 'judging') return setJudging(update.judging);
+      if (update.type === 'presence') return setOnline(update.online);
       queue.push(...update.steps);
       if (!playing) {
         playing = true;
@@ -79,5 +81,5 @@ export function useDuel(duelId: string | null, pace: (event: LogEvent, waiting: 
     };
   }, [duelId, watchFrom]);
 
-  return { shown, connected, judging };
+  return { shown, connected, judging, online };
 }

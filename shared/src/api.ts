@@ -124,6 +124,10 @@ export interface DuelSummary {
   canJoin: boolean;
   /** What the duel waits on the viewer for, when they play in it; see YourMove. */
   yourMove: YourMove | null;
+  /** The duel this one is a rematch of, if it is one. */
+  rematchOf: string | null;
+  /** This duel's rematch, once a player asked for one. */
+  rematch: string | null;
 }
 
 /**

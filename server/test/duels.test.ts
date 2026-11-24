@@ -5,7 +5,7 @@ import type { DuelUpdate, Intent, PlayerView } from '@yugioh/engine';
 import type { AdminDuels, AdminUser, DeckDetail, DeckSummary, DuelDeck, DuelSummary, Me, Replay } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { and, eq } from 'drizzle-orm';
-import { guests, matchEvents } from '../src/db/schema.ts';
+import { guests, matchEvents, pushSubscriptions } from '../src/db/schema.ts';
 import { deleteIdleGuests, GUEST_GRACE_MS } from '../src/guests.ts';
 import { ADMIN_EMAIL, Browser, startDuelVia, startHarness, Stream, type Harness } from './harness.ts';
 
@@ -122,6 +122,19 @@ describe('a challenge link played by a guest', () => {
     expect((await guest.json(`${h.baseUrl}/api/duels`, { method: 'POST', body: '{}' })).status).toBe(403);
   });
 
+  it("keeps a browser's Web Push subscription for the player until they turn it off", async () => {
+    const { body } = await guest.json<{ publicKey: string }>(`${h.baseUrl}/api/push`);
+    expect(body.publicKey.length).toBeGreaterThan(40);
+    const endpoint = 'https://push.example.com/send/abc';
+    const subscription = { endpoint, keys: { p256dh: 'p'.repeat(87), auth: 'a'.repeat(22) } };
+    expect((await guest.json(`${h.baseUrl}/api/me/push`, { method: 'PUT', body: JSON.stringify(subscription) })).status).toBe(204);
+    expect((await new Browser().json(`${h.baseUrl}/api/me/push`, { method: 'PUT', body: JSON.stringify(subscription) })).status).toBe(401);
+    const rows = await h.db.select().from(pushSubscriptions);
+    expect(rows).toEqual([expect.objectContaining({ endpoint, seatKey: expect.stringMatching(/^guest:/) })]);
+    expect((await guest.json(`${h.baseUrl}/api/me/push`, { method: 'DELETE', body: JSON.stringify({ endpoint }) })).status).toBe(204);
+    expect(await h.db.select().from(pushSubscriptions)).toEqual([]);
+  });
+
   it('turns away a third visitor without creating a guest for them, but lets them watch', async () => {
     const late = new Browser();
     const seen = await late.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`);
@@ -134,6 +147,8 @@ describe('a challenge link played by a guest', () => {
     // Anyone holding the link watches, seeing only what both players can: no hands, no Deck list, nothing to do.
     const watching = new Stream(await late.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream?from=1`));
     const view = await watching.next();
+    // Neither player has the duel open, and a spectator doesn't count.
+    expect(await watching.message()).toEqual({ type: 'presence', online: [] });
     watching.close();
     expect(view.you).toBe(1);
     expect(view.deckList).toEqual([]);
@@ -163,6 +178,11 @@ describe('a challenge link played by a guest', () => {
     let b = await theirs.next();
     expect(a.you).toBe(0);
     expect(b.you).toBe(1);
+    // Both players have it open now.
+    let presence: DuelUpdate;
+    do presence = await mine.message<DuelUpdate>();
+    while (presence.type === 'presence' && presence.online.length < 2);
+    expect(presence).toEqual({ type: 'presence', online: [0, 1] });
     expect(a.players[0].name).toBe('Ethan');
     expect(a.players[1].name).toBe('Kaiba (guest)');
 
@@ -267,13 +287,19 @@ describe('a challenge link played by a guest', () => {
         [{ type: 'chatted', player: 1, text: 'gg, Copycat never activated' }, 'Kaiba (guest): gg, Copycat never activated'],
       ]);
     }
+    // An emote is a chat message with its own text.
+    expect((await admin.json(`${url}/chat`, { method: 'POST', body: JSON.stringify({ emote: 'shrug' }) })).status).toBe(400);
+    expect((await admin.json(`${url}/chat`, { method: 'POST', body: JSON.stringify({ emote: 'goodGame' }) })).status).toBe(204);
+    const emote = await theirs.update();
+    expect(emote.type === 'steps' && emote.steps[0]!.entry).toMatchObject({ event: { type: 'chatted', player: 0, text: 'Good game!', emote: 'goodGame' }, text: 'Ethan: Good game!' });
+    await mine.update();
     mine.close();
     theirs.close();
     const again = new Stream(await admin.fetch(`${url}/stream`));
     const sync = await again.update();
     if (sync.type !== 'sync') throw new Error('expected sync');
-    expect(sync.log.at(-1)!.text).toBe('Kaiba (guest): gg, Copycat never activated');
-    expect(sync.log.at(-2)!.event.type).toBe('duelEnded');
+    expect(sync.log.at(-2)!.text).toBe('Kaiba (guest): gg, Copycat never activated');
+    expect(sync.log.at(-3)!.event.type).toBe('duelEnded');
     again.close();
   });
 
@@ -284,7 +310,7 @@ describe('a challenge link played by a guest', () => {
     expect(text).toContain(`Duel ${duel.id} (finished)`);
     expect(text).toMatch(/^#\d+ \d\d:\d\d:\d\d T1 \S.* Set .+ \[.+\] in zone 0$/m);
     expect(text).toMatch(/asked for \{"type":"surrender"\}$/m);
-    expect(text).toMatch(/Kaiba \(guest\): gg, Copycat never activated\n$/);
+    expect(text).toMatch(/Kaiba \(guest\): gg, Copycat never activated\n.*Ethan: Good game!\n$/);
     const { body } = await admin.json<{ events: { seq: number; event: { type: string } }[] }>(`${report}?format=json`);
     expect(body.events[0]!.event.type).toBe('duelStarted');
     expect(body.events.at(-1)!.event.type).toBe('chatted');
@@ -352,6 +378,22 @@ describe('a challenge link played by a guest', () => {
     expect(await guestCount()).toBe(1);
     // Finish it, so only finished duels hold the guest.
     expect((await guest.json(`${h.baseUrl}/api/duels/${second.id}/intents`, { method: 'POST', body: '{"type":"surrender"}' })).status).toBe(204);
+  });
+
+  it('starts a rematch with the same decks once both players ask for it', async () => {
+    const asked = await call<DuelSummary>(guest, '/rematch', {});
+    expect(asked.status).toBe(201);
+    expect(asked.body).toMatchObject({ status: 'preparing', rematchOf: duel.id, yourSeat: 1, yourMove: null, players: [{ ready: false }, { ready: true }] });
+    const rematch = asked.body.id;
+    // The opponent sees the offer on the finished duel, and is told by their feed.
+    expect((await admin.json<DuelSummary>(`${h.baseUrl}/api/duels/${duel.id}`)).body.rematch).toBe(rematch);
+    expect((await admin.json<DuelSummary>(`${h.baseUrl}/api/duels/${rematch}`)).body).toMatchObject({ yourMove: 'deck' });
+    // Accepting is asking too; both reach the same duel, which starts.
+    const accepted = await call<DuelSummary>(admin, '/rematch', {});
+    expect(accepted.body).toMatchObject({ id: rematch, status: 'active', players: [{ deck: decks[0]!.name }, { deck: decks[1]!.name }] });
+    expect((await call<{ error: string }>(admin, '/rematch', {}, 'POST')).status).toBe(201);
+    expect((await admin.json<{ error: string }>(`${h.baseUrl}/api/duels/${rematch}/rematch`, { method: 'POST', body: '{}' })).status).toBe(409);
+    expect((await guest.json(`${h.baseUrl}/api/duels/${rematch}/intents`, { method: 'POST', body: '{"type":"surrender"}' })).status).toBe(204);
   });
 
   it('deletes the guest a day after their last duel finishes', async () => {

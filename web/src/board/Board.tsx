@@ -1,19 +1,22 @@
 import './board.css';
 import { useMutation } from '@tanstack/react-query';
-import { zonePick, type Intent, type LegalAction, type PlayerView, type Position, type Seat } from '@yugioh/engine';
+import { zonePick, type Emote, type Intent, type LegalAction, type PlayerView, type Position, type Seat } from '@yugioh/engine';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { api, errorText, useCanPlay, useMe } from '../api.ts';
 import { DuelSwitcher } from '../duelFeed.tsx';
+import { Rematch } from './Rematch.tsx';
 import { OpponentCardsSetting } from '../pages/Account.tsx';
+import { NotifySetting } from '../notify.tsx';
 import { useSettings } from '../settings.ts';
 import { ActionMenu } from './ActionMenu.tsx';
 import { Arrows, cardCentre, dropAt, dropCentre, type Point } from './aim.tsx';
 import { dataOf, idOf, imageUrl, preloadImages } from './Card.tsx';
 import { CardTooltipProvider } from './CardTooltip.tsx';
 import { ChoiceBar, ChoiceProvider, pileKey, useBoardChoice, type PileKind } from './choice.tsx';
-import { cueMs, playCue } from './cues.ts';
+import { awaitsAnswer, cueMs, playCue, soundOf } from './cues.ts';
+import { play as playSound, say } from '../sound.ts';
 import { ChatInput, DuelLog, type Asking, type Contest, type Escalate } from './DuelLog.tsx';
 import { dropKey, ExtraMonsterZone, Field, type FieldProps, type Row } from './Field.tsx';
 import { OwnHand, ReadOnlyHand, type HandDrag } from './Hand.tsx';
@@ -96,6 +99,8 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
   const live = useDuel(replay ? null : duelId, pace, watching === 'live' ? watchFrom : null);
   const played = useReplay(replay ? duelId : null, pace);
   const { shown, connected, judging } = replay ? { shown: played.shown, connected: true, judging: null } : live;
+  /** Whether a player has the duel open, shown live but not in a replay. */
+  const onlineOf = (seat: Seat) => (replay ? undefined : live.online.includes(seat));
   const controls = played.controls;
   const [mode, setMode] = useReducer((_: Mode, next: Mode) => next, idle);
   /** The open pile viewer, by `pileKey`. */
@@ -155,7 +160,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
     mutationFn: (body: { prompt: string; picks: string[] }) => api(`/duels/${duelId}/answer`, { method: 'POST', body: JSON.stringify(body) }),
   });
   const chat = useMutation({
-    mutationFn: (text: string) => api(`/duels/${duelId}/chat`, { method: 'POST', body: JSON.stringify({ text }) }),
+    mutationFn: (message: { text: string } | { emote: Emote }) => api(`/duels/${duelId}/chat`, { method: 'POST', body: JSON.stringify(message) }),
   });
   const answers = shown?.log.filter((e) => e.event.type === 'asked').length ?? 0;
   const ask = useMutation({
@@ -181,6 +186,32 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
     // Only a new step should play anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.seq]);
+
+  // Each step's sound, and a ping when the board comes to rest waiting on this player's answer.
+  useEffect(() => {
+    if (!cue || !shown) return;
+    const sound = soundOf(cue.event, shown.view, !readOnly);
+    if (sound) playSound(sound);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cue?.seq]);
+  // Chat as it arrives: an emote plays its own sound (and is read out, if the player wants), the opponent's message a soft one.
+  const chats = shown?.log.filter((e) => e.event.type === 'chatted') ?? null;
+  const chatsBefore = useRef(chats?.length ?? null);
+  useEffect(() => {
+    const latest = chats?.at(-1)?.event;
+    if (!replay && chats && chatsBefore.current !== null && chats.length > chatsBefore.current && latest?.type === 'chatted') {
+      if (latest.emote) {
+        playSound(latest.emote);
+        say(latest.text);
+      } else if (latest.player !== shown!.view.you || readOnly) playSound('chat');
+    }
+    chatsBefore.current = chats?.length ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chats?.length]);
+  const needsAnswer = !readOnly && !!shown && !shown.cue && (choice !== null || awaitsAnswer(shown.view));
+  useEffect(() => {
+    if (needsAnswer) playSound('answer');
+  }, [needsAnswer]);
 
   // Once the sent card has left the hand there is nothing left to hold; nor if the judge refused to let it go.
   useEffect(() => {
@@ -733,6 +764,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
   function shortcut(key: Shortcut): boolean {
     if (key === 'help') return (setShowKeys(true), true);
     if (key === 'log') return nav.focusArea('log', true);
+    if (key === 'mute') return (updateSettings({ muted: !settings.muted }), true);
     if (readOnly) return false;
     switch (key) {
       case 'pass':
@@ -803,7 +835,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                 ) : (
                   <>
                     <div className="hand-row foe-row">
-                      <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={!view.start && view.turnPlayer === foe} target={lpTarget()} />
+                      <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={!view.start && view.turnPlayer === foe} target={lpTarget()} online={onlineOf(foe)} />
                       <ReadOnlyHand seat={foe} name={view.players[foe].name} cards={view.players[foe].hand} side="top" />
                     </div>
                     <Field {...foeField} />
@@ -824,7 +856,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                     />
                     <Field {...myField} />
                     <div className="hand-row own-row">
-                      <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={!view.start && view.turnPlayer === me} />
+                      <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={!view.start && view.turnPlayer === me} online={watching === 'live' ? onlineOf(me) : undefined} />
                       {watching === 'live' ? (
                         <ReadOnlyHand seat={me} name={view.players[me].name} cards={view.players[me].hand} side="bottom" />
                       ) : (
@@ -869,6 +901,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                       {result.winner === null ? 'Draw' : readOnly ? `${view.players[result.winner].name} wins` : result.winner === me ? 'Victory' : 'Defeat'}
                     </strong>
                     {resultText && <span>{resultText}</span>}
+                    {!readOnly && <Rematch duelId={duelId} />}
                     <span className="row">
                       <Link className="button" to={`/duel/${duelId}/replay`}>
                         Watch the replay
@@ -896,6 +929,15 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                   <Link to="/">← Duels</Link>
                   <span className="spacer" />
                   <CopyLink path={replay ? `/duel/${duelId}/replay` : `/duel/${duelId}`} label="Share" />
+                  <button
+                    className="quiet"
+                    onClick={() => updateSettings({ muted: !settings.muted })}
+                    aria-pressed={settings.muted}
+                    title={settings.muted ? 'Sound off (M)' : 'Sound on (M)'}
+                    aria-label="Mute"
+                  >
+                    {settings.muted ? '🔇' : '🔊'}
+                  </button>
                   <button className="quiet" onClick={() => setShowSettings((s) => !s)} aria-expanded={showSettings}>
                     Settings
                   </button>
@@ -925,7 +967,25 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                     <label>
                       <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
                     </label>
+                    {'speechSynthesis' in window && (
+                      <label>
+                        <input type="checkbox" checked={settings.speakEmotes} onChange={(e) => updateSettings({ speakEmotes: e.target.checked })} /> Read emotes out loud
+                      </label>
+                    )}
+                    <label>
+                      Sound volume{' '}
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={settings.muted ? 0 : settings.volume}
+                        onChange={(e) => updateSettings({ volume: Number(e.target.value), muted: false })}
+                        onPointerUp={() => playSound('activate')}
+                      />
+                    </label>
                     {hasAccount && <OpponentCardsSetting />}
+                    {!readOnly && <NotifySetting />}
                     <p className="muted small">Hold Shift over a card to zoom in. Right-click a card, or press and hold it, to pin its details. Drag cards in your hand to reorder them. Press ? for the keyboard controls.</p>
                   </div>
                 )}
@@ -935,14 +995,15 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                 {chat.isError && <p className="error">{errorText(chat.error)}</p>}
                 {ask.isError && <p className="error">{errorText(ask.error)}</p>}
                 {escalateQuestion.isError && <p className="error">{errorText(escalateQuestion.error)}</p>}
-                <DuelLog log={log} onHighlight={setHighlight} contest={readOnly ? never : contest} escalate={readOnly ? never : escalate} />
+                <DuelLog log={log} you={readOnly ? null : me} onHighlight={setHighlight} contest={readOnly ? never : contest} escalate={readOnly ? never : escalate} />
                 {controls ? (
                   <ReplayBar controls={controls} names={[view.players[0].name, view.players[1].name]} />
                 ) : watching === 'live' ? (
                   <WatchBar from={watchFrom} setFrom={setWatchFrom} names={[view.players[0].name, view.players[1].name]} />
                 ) : (
                   <ChatInput
-                    send={chat.mutateAsync}
+                    send={(text) => chat.mutateAsync({ text })}
+                    emote={(emote) => chat.mutate({ emote })}
                     ask={(text, card) => ask.mutateAsync({ text, card })}
                     sending={chat.isPending || ask.isPending}
                     answering={awaiting !== null && answers <= awaiting}

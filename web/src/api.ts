@@ -37,7 +37,7 @@ export function useCanPlay(): boolean {
 export const useDecks = (check: { banlist?: number; duel?: string } = {}) =>
   useQuery({
     queryKey: ['decks', check],
-    queryFn: () => api<DeckSummary[]>(`/decks?${new URLSearchParams(Object.entries(check).map(([k, v]) => [k, String(v)]))}`),
+    queryFn: () => api<DeckSummary[]>(`/decks?${new URLSearchParams(Object.entries(check).flatMap(([k, v]) => (v === undefined ? [] : [[k, String(v)]])))}`),
   });
 export const useBanlists = () => useQuery({ queryKey: ['banlists'], queryFn: () => api<BanlistSummary[]>('/banlists') });
 export const useBanlist = (id: number | null) =>

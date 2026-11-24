@@ -16,6 +16,7 @@ import { deckForDuel, deckRoutes } from './deckRoutes.ts';
 import type { DiscordApi } from './discord.ts';
 import { listServers, setTrusted } from './discordServers.ts';
 import { discordRoutes, endDiscordSession, placeOf, safeReturnTo } from './discordRoutes.ts';
+import { Push } from './push.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
@@ -271,7 +272,15 @@ export function createApp(config: Config, db: Db, ai: Ai, discord: DiscordApi | 
 
   app.use('/api', deckRoutes(db, catalog));
   app.use('/api', banlistRoutes(db, catalog));
-  app.use('/api', duelRoutes(db, catalog, duels, guestCookie));
+  const push =
+    config.VAPID_PUBLIC_KEY && config.VAPID_PRIVATE_KEY
+      ? new Push(db, {
+          publicKey: config.VAPID_PUBLIC_KEY,
+          privateKey: config.VAPID_PRIVATE_KEY,
+          subject: secure ? config.BASE_URL : `mailto:${config.ADMIN_EMAIL}`,
+        })
+      : null;
+  app.use('/api', duelRoutes(db, catalog, duels, guestCookie, push));
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'not_found' }));
 
   // Card images, downloaded by the card sync. They never change, so browsers may cache them for long.

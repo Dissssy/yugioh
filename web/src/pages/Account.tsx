@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router';
 import { api, errorText, useDiscordLogin } from '../api.ts';
 import { inActivity } from '../discord.ts';
 import { useSaveSettings, useSettings } from '../settings.ts';
+import { NotifySetting } from '../notify.tsx';
 import { Notice } from './Notice.tsx';
 import { Username } from './Username.tsx';
 
@@ -27,6 +28,7 @@ export function Account({ me }: { me: Me }) {
       <section className="box">
         <h2>Duels</h2>
         <OpponentCardsSetting />
+        <NotifySetting />
       </section>
     </div>
   );
