@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import type { AdminUser, DuelSummary, Me } from '@yugioh/shared';
+import type { AdminUser, DeckSummary, DuelSummary, Me, OpenGames } from '@yugioh/shared';
 import { syncCards } from '../src/cards.ts';
 import { decks } from '../src/db/schema.ts';
 import { ADMIN_EMAIL, Browser, startHarness, type Harness } from './harness.ts';
@@ -168,9 +168,9 @@ describe('Discord logins on the website', () => {
   });
 });
 
-describe('tables in the Activity', () => {
+describe('open games in the Activity', () => {
   const challenge = (b: Browser) => b.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: '{}' });
-  const tables = (b: Browser) => b.json<DuelSummary[]>(`${h.baseUrl}/api/tables`);
+  const openGames = (b: Browser) => b.json<OpenGames>(`${h.baseUrl}/api/open-games`);
 
   it("lists the duels started in this server's Activity, for anyone there to join or watch", async () => {
     await syncCards(h.db, { imageDir: h.imageDir, api: h.ygoprodeck, imageGapMs: 0 });
@@ -179,23 +179,46 @@ describe('tables in the Activity', () => {
     const odion = (await openActivity({ id: '3002', username: 'odion' }, 'table-call')).browser;
     const { body: duel } = await challenge(ishizu);
 
-    const { body: seen } = await tables(odion);
-    expect(seen.map((d) => d.id)).toEqual([duel.id]);
-    expect(seen[0]).toMatchObject({ status: 'waiting', canJoin: true, yourSeat: null });
-    expect((await tables(ishizu)).body[0]).toMatchObject({ id: duel.id, yourSeat: 0, canJoin: false });
+    const { body: seen } = await openGames(odion);
+    expect(seen.dm).toBe(false);
+    expect(seen.games.map((d) => d.id)).toEqual([duel.id]);
+    expect(seen.games[0]).toMatchObject({ status: 'waiting', canJoin: true, yourSeat: null });
+    expect((await openGames(ishizu)).body.games[0]).toMatchObject({ id: duel.id, yourSeat: 0, canJoin: false });
   });
 
-  it("keeps each server's tables to itself, and the website's challenges off them", async () => {
+  it("keeps each server's open games to itself, and the website's challenges off them", async () => {
     h.discord.instances.set('other-call', ['3003']);
-    h.discord.places.set('other-call', 'other-server');
+    h.discord.places.set('other-call', 'guild:other-server');
     const rex = (await openActivity({ id: '3003', username: 'rex' }, 'other-call')).browser;
-    expect((await tables(rex)).body).toEqual([]);
+    expect((await openGames(rex)).body.games).toEqual([]);
 
     const site = await auth0Login('admin', ADMIN_EMAIL);
     await challenge(site);
-    expect((await tables(site)).status).toBe(404);
+    expect((await openGames(site)).status).toBe(404);
     h.discord.instances.set('table-call-2', ['3001']);
     const again = (await openActivity({ id: '3001', username: 'ishizu' }, 'table-call-2')).browser;
-    expect((await tables(again)).body).toHaveLength(1);
+    expect((await openGames(again)).body.games).toHaveLength(1);
+  });
+
+  it('lets the challenger choose a deck and get ready before anyone sits down', async () => {
+    const ishizu = (await openActivity({ id: '3001', username: 'ishizu' }, 'table-call')).browser;
+    const odion = (await openActivity({ id: '3002', username: 'odion' }, 'table-call')).browser;
+    const { body: duel } = await challenge(ishizu);
+    const at = (path: string) => `${h.baseUrl}/api/duels/${duel.id}${path}`;
+    const [deck] = (await ishizu.json<DeckSummary[]>(`${h.baseUrl}/api/decks`)).body;
+    expect((await ishizu.json(at('/deck'), { method: 'PUT', body: JSON.stringify({ deckId: deck!.id }) })).status).toBe(200);
+    const ready = await ishizu.json<DuelSummary>(at('/ready'), { method: 'POST', body: JSON.stringify({ ready: true }) });
+    expect(ready.body).toMatchObject({ status: 'waiting', players: [{ ready: true }, null] });
+
+    await odion.json(at('/join'), { method: 'POST', body: '{}' });
+    await odion.json(at('/deck'), { method: 'PUT', body: JSON.stringify({ deckId: deck!.id }) });
+    expect((await odion.json<DuelSummary>(at('/ready'), { method: 'POST', body: JSON.stringify({ ready: true }) })).body.status).toBe('active');
+  });
+
+  it('says when the Activity was opened in a DM', async () => {
+    h.discord.instances.set('dm-call', ['3004']);
+    h.discord.places.set('dm-call', 'dm:555');
+    const weevil = (await openActivity({ id: '3004', username: 'weevil' }, 'dm-call')).browser;
+    expect((await openGames(weevil)).body).toEqual({ dm: true, games: [] });
   });
 });

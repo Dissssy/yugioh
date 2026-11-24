@@ -123,9 +123,11 @@ export interface OpponentModel {
 }
 
 /** A random float in [0, 1) from the system's secure generator, for shuffles and response timing. */
+/** Players prepare their decks from the moment they sit down: the challenger while waiting for an opponent, too. */
+const beforeStart = (row: MatchRow) => row.status === 'waiting' || row.status === 'preparing';
 const secureRandom = () => randomInt(2 ** 47) / 2 ** 47;
-/** How long a finished duel stays on its server's tables. */
-const TABLES_FINISHED_MS = 24 * 60 * 60 * 1000;
+/** How long a finished duel stays among its server's open games. */
+const OPEN_GAMES_FINISHED_MS = 24 * 60 * 60 * 1000;
 
 export class Duels {
   /** Called once for each AI seat of a duel that is loaded and still going, so the AI opponent can start playing it. */
@@ -175,9 +177,9 @@ export class Duels {
     return this.db.query.matches.findMany({ orderBy: [desc(matches.createdAt)], limit: 50 });
   }
 
-  /** The tables of a Discord server or DM (docs/discord.md): its duels still going, and those finished in the last day. */
-  async tables(place: string, now = new Date()): Promise<MatchRow[]> {
-    const since = new Date(now.getTime() - TABLES_FINISHED_MS);
+  /** The open games of a Discord server or DM (docs/discord.md): its duels still going, and those finished in the last day. */
+  async openGames(place: string, now = new Date()): Promise<MatchRow[]> {
+    const since = new Date(now.getTime() - OPEN_GAMES_FINISHED_MS);
     return this.db.query.matches.findMany({
       where: and(eq(matches.place, place), or(ne(matches.status, 'finished'), gt(matches.finishedAt, since))),
       orderBy: [desc(matches.createdAt)],
@@ -243,7 +245,7 @@ export class Duels {
       const [row] = await tx.select().from(matches).where(eq(matches.id, id)).for('update');
       const seat = row ? seatIn(row, seatKey) : null;
       if (!row || seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
-      if (row.status !== 'preparing') return { ok: false, status: 409, error: 'Decks can only be changed before the duel starts.' };
+      if (!beforeStart(row)) return { ok: false, status: 409, error: 'Decks can only be changed before the duel starts.' };
       const deck = next(row, deckOf(row, seat));
       if (typeof deck === 'string') return { ok: false, status: 422, error: deck };
       await tx
@@ -263,7 +265,7 @@ export class Duels {
       const [row] = await tx.select().from(matches).where(eq(matches.id, id)).for('update');
       const seat = row ? seatIn(row, seatKey) : null;
       if (!row || seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
-      if (row.status !== 'preparing') return { ok: false, status: 409, error: 'The duel has already started.' };
+      if (!beforeStart(row)) return { ok: false, status: 409, error: 'The duel has already started.' };
       const deck = deckOf(row, seat);
       if (ready) {
         if (!deck) return { ok: false, status: 422, error: 'Choose a deck first.' };

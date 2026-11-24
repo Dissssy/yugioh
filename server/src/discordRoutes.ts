@@ -13,7 +13,7 @@ import { viewerOf } from './viewer.ts';
 const SESSION_COOKIE = 'discord';
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 /**
- * Where the Activity was opened: the Discord server, or the channel for a DM. Its tables are the duels started there.
+ * Where the Activity was opened, as `guild:<id>` or `dm:<id>`. Its open games are the duels started there.
  * Set only inside the Activity, from what Discord reports about the instance, so it can't be made up.
  */
 const PLACE_COOKIE = 'discord_place';

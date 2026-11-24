@@ -13,6 +13,7 @@ import {
 } from '@yugioh/shared';
 import { useMemo, useState } from 'react';
 import { api, errorText, useDecks } from '../api.ts';
+import { CopyLink } from '../CopyLink.tsx';
 import { useCatalog, type Catalog } from '../decks/catalog.ts';
 import { DeckProblems, SaveState, useAutosave } from '../decks/DeckBuilder.tsx';
 import { DeckEditor } from '../decks/DeckEditor.tsx';
@@ -63,7 +64,15 @@ function Terms({ duel }: { duel: DuelSummary }) {
 
 function OpponentStatus({ duel }: { duel: DuelSummary }) {
   const them = duel.players[duel.yourSeat === 0 ? 1 : 0];
-  if (!them) return null;
+  if (!them)
+    return (
+      <span className="opponent small row">
+        <span className="waiting-label" role="status">
+          <span className="dot" /> Nobody has taken up the challenge yet
+        </span>
+        <CopyLink path={`/duel/${duel.id}`} label="Copy challenge link" />
+      </span>
+    );
   return <span className="opponent small">{them.ready ? <strong className="ok">{them.name} is ready</strong> : `${them.name} is choosing a deck`}</span>;
 }
 

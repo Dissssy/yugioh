@@ -2,7 +2,7 @@
 
 As of 2026-11-24. The site also runs as a Discord Activity: the same web app, opened by Discord inside a call or a DM and served through Discord's proxy. It is built for the app's testers only, so it never needs Discord's app verification.
 
-Built so far: signing in inside the Activity, Discord logins and account linking on the website, the Tables, links that work from inside Discord, and a small view for Discord's pop-out. Planned next: live mini boards on the tables, and an easier setup guide for new testers.
+Built so far: signing in inside the Activity, Discord logins and account linking on the website, open games, links that work from inside Discord, and a small view for Discord's pop-out. Planned next: live mini boards on the open games, and an easier setup guide for new testers.
 
 ## Who can play
 
@@ -17,11 +17,15 @@ Built so far: signing in inside the Activity, Discord logins and account linking
 3. The account is found or created by Discord user ID (`users.discord_id`). Testers are trusted like approved players: a new account starts approved, and a pending one is approved. An account an admin rejected stays rejected.
 4. The server sets a signed `discord` cookie holding the account ID, marked `SameSite=None; Secure; Partitioned` as Discord's docs advise for iframes, so the API and the live duel streams work as they do on the website. The Activity signs in again each time it opens.
 
-## Tables
+## Open games
 
-Inside the Activity the home page shows **Tables** where the website shows "Your duels": every duel started in the server the Activity was opened in (or, in a DM, that DM). They are grouped as open seats (Sit down), duels being played (Watch, or Play for the two players) and duels finished in the last day (Replay). The list refreshes every 5 seconds. **New table** is the usual challenge form: a challenge made inside the Activity goes on that server's tables, with no link to send.
+Inside a server, the Activity's home page shows **Open games** where the website shows "Your duels": every duel started in that server. They are grouped as open seats (Sit down), duels being played (Watch, or Play for the two players) and duels finished in the last day (Replay). The list refreshes every 5 seconds. **New open game** is the usual challenge form, so any banlist and deck rule can be chosen. A challenge made inside the Activity becomes one of that server's open games, with no link to send.
 
-Where the Activity was opened comes from Discord's answer about the instance at sign-in (`location.guild_id`, or `channel_id` in a DM). It is kept in a second signed cookie, `discord_place`, so it can't be made up. Duels store it in `matches.place`. `GET /api/tables` lists them and answers 404 outside the Activity.
+**In a DM** (one-on-one or group), the Activity plays one game at a time, since whoever opened it most likely came to duel the other person. Opening the Activity goes straight into the DM's game that isn't finished yet, taking its empty seat if there is one. With no game going, the first person in gets the new-game form (banlist and deck rules) as **Start a game**. Discord doesn't tell an app how many people a DM has without a scope that needs Discord's approval, so group DMs work the same way. It goes into the game only when the Activity opens, so going back to the home page stays there.
+
+**Choosing a deck right away.** Everywhere, website included, the challenger chooses and readies their deck as soon as the challenge exists, with "Nobody has taken up the challenge yet" and the challenge link beside it. Whoever takes the seat then chooses theirs, and the duel starts once both are ready.
+
+Where the Activity was opened comes from Discord's answer about the instance at sign-in: `guild:<server id>`, or `dm:<channel id>` in a DM. It is kept in a second signed cookie, `discord_place`, so it can't be made up. Duels store it in `matches.place`, and a site-wide scope can be added later the same way. `GET /api/open-games` returns `{ dm, games }` and answers 404 outside the Activity.
 
 ## Inside Discord's window
 

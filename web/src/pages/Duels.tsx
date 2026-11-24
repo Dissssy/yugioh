@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DeckSummary, DuelStatus, DuelSummary } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { api, errorText, useBanlists, useDecks, useDuels, useTables } from '../api.ts';
+import { api, errorText, useBanlists, useDecks, useDuels } from '../api.ts';
 import { inActivity } from '../discord.ts';
 import { DuelCard } from '../DuelCard.tsx';
 
@@ -35,33 +35,29 @@ export function Duels() {
   );
 }
 
-const tableGroups: { title: string; statuses: DuelStatus[] }[] = [
+const gameGroups: { title: string; statuses: DuelStatus[] }[] = [
   { title: 'Open seats', statuses: ['waiting'] },
   { title: 'Playing now', statuses: ['preparing', 'active'] },
   { title: 'Finished today', statuses: ['finished'] },
 ];
 
 /** In the Discord Activity: every duel started where it was opened, to sit down at, watch, or replay. */
-export function Tables() {
-  const tables = useTables();
-  const duels = tables.data ?? [];
+export function OpenGamesList({ games, title = 'Open games' }: { games: DuelSummary[]; title?: string }) {
   return (
     <section className="box duels">
-      <h2>Tables</h2>
-      {tables.isError && <p className="error">Couldn't load the tables.</p>}
-      {tables.data && duels.length === 0 && (
+      <h2>{title}</h2>
+      {games.length === 0 ? (
         <div className="empty">
           <div className="card back" aria-hidden />
-          <p className="muted">No tables yet. Start one and it shows up here for everyone.</p>
+          <p className="muted">No games yet. Start one and it shows up here for everyone.</p>
         </div>
-      )}
-      {duels.length > 0 && (
+      ) : (
         <div className="duel-list">
-          {tableGroups.map(({ title, statuses }) => {
-            const group = duels.filter((d) => statuses.includes(d.status));
+          {gameGroups.map(({ title, statuses }) => {
+            const group = games.filter((d) => statuses.includes(d.status));
             if (group.length === 0) return null;
             return (
-              <section key={title} className="table-group">
+              <section key={title} className="game-group">
                 <h3 className="small muted">{title}</h3>
                 <ul className="duel-list">
                   {group.map((d) => (
@@ -84,7 +80,8 @@ const DECK_RULES: [boolean, string, string][] = [
   [true, 'Premade decks only', 'Changed only by Side Deck swaps'],
 ];
 
-export function NewChallenge() {
+/** A new challenge. In the Discord Activity it is an open game there; in a DM, the DM's game. */
+export function NewChallenge({ dm = false }: { dm?: boolean }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const banlists = useBanlists();
@@ -95,16 +92,20 @@ export function NewChallenge() {
     mutationFn: () => api<DuelSummary>('/duels', { method: 'POST', body: JSON.stringify({ banlistId: banlist, premadeOnly }) }),
     onSuccess: (duel) => {
       void queryClient.invalidateQueries({ queryKey: ['duels'] });
-      void queryClient.invalidateQueries({ queryKey: ['tables'] });
+      void queryClient.invalidateQueries({ queryKey: ['open-games'] });
       void navigate(`/duel/${duel.id}`);
     },
   });
   return (
     <section className="box">
-      <h2>{inActivity ? 'New table' : 'New challenge'}</h2>
+      <h2>{dm ? 'Start a game' : inActivity ? 'New open game' : 'New challenge'}</h2>
       <p className="muted small">
-        {inActivity ? 'It shows up on the tables for everyone here.' : 'Send the challenge link to your opponent.'} Once
-        someone takes the other seat, you both choose your decks. <Link to="/decks">Build a deck</Link>
+        {dm
+          ? 'Whoever opens the Activity in this DM next takes the other seat.'
+          : inActivity
+            ? 'It shows up among the open games for everyone here.'
+            : 'You get a link to send your opponent.'}{' '}
+        You choose your deck straight away. <Link to="/decks">Build a deck</Link>
       </p>
       <label className="field">
         <span className="small">Banlist both decks follow</span>
@@ -127,7 +128,7 @@ export function NewChallenge() {
       </div>
       <div className="actions">
         <button className="primary" onClick={() => create.mutate()} disabled={create.isPending || banlist === undefined}>
-          {inActivity ? 'Start a table' : 'Create challenge'}
+          {dm ? 'Start the game' : inActivity ? 'Start an open game' : 'Create challenge'}
         </button>
         {create.isError && <span className="error">{errorText(create.error)}</span>}
       </div>
@@ -148,7 +149,7 @@ export function PlayClaude() {
     mutationFn: (body: { deckId: number; aiDeckId: number }) => api<DuelSummary>('/admin/duels/ai', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: (duel) => {
       void queryClient.invalidateQueries({ queryKey: ['duels'] });
-      void queryClient.invalidateQueries({ queryKey: ['tables'] });
+      void queryClient.invalidateQueries({ queryKey: ['open-games'] });
       void navigate(`/duel/${duel.id}`);
     },
   });
