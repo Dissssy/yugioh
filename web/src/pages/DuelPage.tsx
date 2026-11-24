@@ -2,18 +2,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DuelSummary, Me } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
-import { api, errorText, loginHref, useDecks } from '../api.ts';
+import { api, errorText, loginHref } from '../api.ts';
 import { Board } from '../board/Board.tsx';
-import { DeckPicker, firstLegal } from './Duels.tsx';
 import { Loading, Notice } from './Notice.tsx';
+import { Prepare } from './Prepare.tsx';
 
 export function DuelPage({ me }: { me: Me }) {
   const { id = '' } = useParams();
   const duel = useQuery({
     queryKey: ['duel', id],
     queryFn: () => api<DuelSummary>(`/duels/${id}`),
-    // While waiting for an opponent, check now and then whether they've arrived.
-    refetchInterval: (q) => (q.state.data?.status === 'waiting' ? 3000 : false),
+    // Until the duel starts, check now and then whether the opponent has arrived, or is ready.
+    refetchInterval: (q) => (q.state.data?.status === 'waiting' || q.state.data?.status === 'preparing' ? 3000 : false),
   });
 
   if (duel.isError)
@@ -29,6 +29,8 @@ export function DuelPage({ me }: { me: Me }) {
     // Anyone else holding the link watches: live, or the replay once it's over.
     if (d.status === 'finished') return <Navigate to={`/duel/${d.id}/replay`} replace />;
     if (d.status === 'active') return <Board key={d.id} duelId={d.id} watching="live" />;
+    if (d.status === 'preparing')
+      return <Notice title="The players are choosing their decks">The duel starts once both are ready. Keep this page open to watch it.</Notice>;
     if (d.canJoin) return <Join duel={d} me={me} />;
     return (
       <Notice title={`${d.players[0].name} challenges you`}>
@@ -37,6 +39,7 @@ export function DuelPage({ me }: { me: Me }) {
     );
   }
   if (d.status === 'waiting') return <Waiting duel={d} />;
+  if (d.status === 'preparing') return <Prepare duel={d} />;
   return <Board duelId={d.id} />;
 }
 
@@ -70,9 +73,7 @@ function Waiting({ duel }: { duel: DuelSummary }) {
       </p>
       <h1>Send this link to your opponent</h1>
       <div className="notice-body">
-        <p>
-          You'll play <strong>{duel.players[0].deck}</strong>. They can log in, or play as a guest without an account.
-        </p>
+        <p>They can log in, or play as a guest without an account. Once they accept, you both choose your decks.</p>
         <div className="row">
           <input readOnly value={link} onFocus={(e) => e.target.select()} />
           <button
@@ -82,7 +83,9 @@ function Waiting({ duel }: { duel: DuelSummary }) {
             {copied ? 'Copied' : 'Copy link'}
           </button>
         </div>
-        <p className="muted small">The duel starts as soon as they pick a deck.</p>
+        <p className="muted small">
+          Both decks follow the <strong>{duel.banlist}</strong> banlist{duel.premadeOnly ? ', and must be premade decks' : ''}.
+        </p>
       </div>
     </section>
   );
@@ -90,33 +93,24 @@ function Waiting({ duel }: { duel: DuelSummary }) {
 
 /** Accepting a challenge. A signed-out visitor either logs in or gives a name and plays as a guest. */
 function Join({ duel, me }: { duel: DuelSummary; me: Me }) {
-  const decks = useDecks({ duel: duel.id });
   const queryClient = useQueryClient();
-  const [deckId, setDeckId] = useState<number | null>(null);
   const [guestName, setGuestName] = useState('');
-  const chosen = deckId ?? firstLegal(decks.data);
   const asGuest = me.kind === 'anonymous';
   const join = useMutation({
-    mutationFn: (id: number) =>
-      api<DuelSummary>(`/duels/${duel.id}/join`, {
-        method: 'POST',
-        body: JSON.stringify(asGuest ? { deckId: id, guestName } : { deckId: id }),
-      }),
+    mutationFn: () => api<DuelSummary>(`/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify(asGuest ? { guestName } : {}) }),
     onSuccess: (next) => {
       queryClient.setQueryData(['duel', duel.id], next);
       if (asGuest) void queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
-  const ready = chosen !== null && (!asGuest || guestName.trim() !== '');
   return (
     <section className="notice box join">
       <h1>{duel.players[0].name} challenges you</h1>
       <div className="notice-body">
         <p>
-          They play <strong>{duel.players[0].deck}</strong>. Pick the deck you'll play. Both decks follow the{' '}
-          <strong>{duel.banlist}</strong> banlist.
+          Once you accept, you both choose your decks. Both decks follow the <strong>{duel.banlist}</strong> banlist
+          {duel.premadeOnly ? ', and must be premade decks' : ''}.
         </p>
-        <DeckPicker decks={decks.data} value={chosen} onChange={setDeckId} />
         {asGuest && (
           <label className="field">
             <span className="small muted">Your name</span>
@@ -124,8 +118,8 @@ function Join({ duel, me }: { duel: DuelSummary; me: Me }) {
           </label>
         )}
         <div className="actions">
-          <button className="primary big" onClick={() => chosen !== null && join.mutate(chosen)} disabled={join.isPending || !ready}>
-            {asGuest ? 'Play as guest' : 'Accept and start'}
+          <button className="primary big" onClick={() => join.mutate()} disabled={join.isPending || (asGuest && guestName.trim() === '')}>
+            {asGuest ? 'Play as guest' : 'Accept'}
           </button>
           {asGuest && (
             <span className="muted small">
@@ -136,7 +130,8 @@ function Join({ duel, me }: { duel: DuelSummary; me: Me }) {
         {join.isError && <p className="error">{errorText(join.error)}</p>}
         {asGuest && (
           <p className="muted small">
-            A guest can play any challenge they get a link to, until a day after their last duel finishes.
+            A guest can play any challenge they get a link to, until a day after their last duel finishes. Guests keep their
+            decks as .ydk files: download one before the duel, and upload it next time.
           </p>
         )}
       </div>

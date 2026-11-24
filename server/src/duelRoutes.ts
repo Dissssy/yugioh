@@ -6,12 +6,12 @@ import { Router, type Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { HANDS, type Intent } from '@yugioh/engine';
-import { isAdmin } from '@yugioh/shared';
+import { isAdmin, isSideSwap, SECTION_SIZE, type DuelDeckSave, type DuelPrep } from '@yugioh/shared';
 import type { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
 import { defaultBanlist, toBanlist, visibleBanlist } from './banlistRoutes.ts';
 import { deckForDuel } from './deckRoutes.ts';
-import type { Duels, SeatClaim } from './duels.ts';
+import { started, type Duels, type SeatClaim } from './duels.ts';
 import { createGuest } from './guests.ts';
 import { displayName, guestKey, guestName, playerKey, viewerOf, type Viewer } from './viewer.ts';
 
@@ -44,14 +44,19 @@ const escalateBody = z.object({ seq: z.number().int().min(0), note: z.string().m
 const contestBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
 const reportBody = z.object({ code: z.number().int(), note: z.string().trim().min(1).max(1000) });
 
-const deckChoice = z.object({ deckId: z.number().int() });
-/** A challenge names the challenger's deck and the banlist both decks follow; the default list if none. */
-const challengeBody = deckChoice.extend({ banlistId: z.number().int().optional() });
+/** A challenge names the banlist both decks follow (the default list if none), and whether decks must be premade. */
+const challengeBody = z.object({ banlistId: z.number().int().optional(), premadeOnly: z.boolean().default(false) });
+const codes = (max: number) => z.array(z.number().int()).max(max);
+const deckBody: z.ZodType<DuelDeckSave> = z.union([
+  z.object({ deckId: z.number().int() }),
+  z.object({ name: z.string().trim().min(1).max(60), main: codes(SECTION_SIZE.main.max), extra: codes(SECTION_SIZE.extra.max), side: codes(SECTION_SIZE.side.max) }),
+]);
+const readyBody = z.object({ ready: z.boolean() });
 const replayFrom = z.enum(['0', '1', 'both']).transform((v) => (v === 'both' ? v : (Number(v) as 0 | 1)));
 /** The seat a spectator has at the bottom of the board. */
 const watchFrom = z.enum(['0', '1']).transform((v) => Number(v) as 0 | 1);
 /** Signed-out visitors also give the name they play under as a guest. */
-const joinBody = deckChoice.extend({ guestName: z.string().trim().min(1).max(30).optional() });
+const joinBody = z.object({ guestName: z.string().trim().min(1).max(30).optional() });
 
 /** Sets and clears the cookie that holds a guest's token. */
 export interface GuestCookie {
@@ -93,11 +98,8 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const body = challengeBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const banlist = await (body.data.banlistId === undefined ? defaultBanlist(db) : visibleBanlist(db, body.data.banlistId, p.viewer.user.id));
-    if (!banlist) return void res.status(404).json({ error: 'banlist_not_found' });
-    const deck = await deckForDuel(db, catalog, body.data.deckId, p.viewer.user.id, toBanlist(banlist));
-    if (deck === 'not_found') return void res.status(404).json({ error: 'deck_not_found' });
-    if (deck === 'deck_illegal') return void res.status(400).json({ error: 'deck_illegal' });
-    const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), deck, toBanlist(banlist));
+    if (!banlist) return void res.status(404).json({ error: "That banlist doesn't exist." });
+    const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), toBanlist(banlist), body.data.premadeOnly);
     res.status(201).json(await duels.summarize((await duels.find(duelId))!, p.key, false));
   });
 
@@ -130,13 +132,57 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     }
     const row = await duels.find(req.params.id);
     if (!row) return void res.status(404).json({ error: 'not_found' });
-    const deck = await deckForDuel(db, catalog, body.data.deckId, viewer.kind === 'user' ? viewer.user.id : null, row.banlist);
-    if (deck === 'not_found') return void res.status(404).json({ error: 'deck_not_found' });
-    if (deck === 'deck_illegal') return void res.status(400).json({ error: 'deck_illegal' });
-    if (!(await duels.join(row.id, deck, claim))) return void res.status(409).json({ error: 'seat_taken' });
+    if (!(await duels.join(row.id, claim))) return void res.status(409).json({ error: 'Someone else took the seat.' });
     if (created.guestToken) guestCookie.set(res, created.guestToken);
-    const started = (await duels.find(row.id))!;
-    res.json(await duels.summarize(started, started.seat1, false));
+    const joined = (await duels.find(row.id))!;
+    res.json(await duels.summarize(joined, joined.seat1, false));
+  });
+
+  // The pre-duel stage (docs/deck-builder.md): each player's copy of their deck for this duel, and Ready.
+  router.get('/duels/:id/deck', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const row = await duels.find(req.params.id);
+    const seat = row && (await duels.seatOf(row.id, p.key));
+    if (!row || seat === null || seat === undefined) return void res.status(404).json({ error: 'not_found' });
+    res.json({ deck: seat === 0 ? row.deck0 : row.deck1, banlist: row.banlist } satisfies DuelPrep);
+  });
+
+  router.put('/duels/:id/deck', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const body = deckBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    const save = body.data;
+    let next: Parameters<Duels['setDeck']>[2];
+    if ('deckId' in save) {
+      const picked = await deckForDuel(db, save.deckId, p.viewer.kind === 'user' ? p.viewer.user.id : null);
+      if (!picked) return void res.status(404).json({ error: "That deck doesn't exist." });
+      next = (row) => (row.premadeOnly && !picked.premade ? 'This challenge is for premade decks only.' : picked);
+    } else {
+      const list = { main: save.main, extra: save.extra, side: save.side };
+      const { cards } = await catalog.get();
+      if (![...list.main, ...list.extra, ...list.side].every((c) => cards.has(c))) return void res.status(422).json({ error: "That deck has a card that doesn't exist." });
+      next = (row, current) => {
+        // A premade deck stays premade through Side Deck swaps; any other change makes it the player's own.
+        const swap = current !== null && isSideSwap(current, list);
+        if (row.premadeOnly && !swap) return 'This challenge is for premade decks only: swap cards with the Side Deck one for one.';
+        return { name: save.name, ...list, premade: swap && current.premade };
+      };
+    }
+    const result = await duels.setDeck(req.params.id, p.key, next);
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.json({ deck: result.deck });
+  });
+
+  router.post('/duels/:id/ready', async (req, res) => {
+    const p = player(res);
+    if (!p) return;
+    const body = readyBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'bad_request' });
+    const result = await duels.ready(req.params.id, p.key, body.data.ready, (deck, banlist) => catalog.problems(deck, banlist, deck.premade));
+    if (!result.ok) return void res.status(result.status).json({ error: result.error });
+    res.json(await duels.summarize((await duels.find(req.params.id))!, p.key, false));
   });
 
   // The duel as the viewer may see it, sent now and after every change: a player's own seat, or for anyone else
@@ -145,7 +191,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const from = watchFrom.safeParse(req.query.from ?? '0');
     if (!from.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
-    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
     const key = playerKey(viewerOf(res));
     const seat = key === null ? null : await duels.seatOf(row.id, key);
     res.writeHead(200, {
@@ -185,7 +231,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const body = intent.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
-    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
     const result = await duels.act(row.id, p.key, body.data);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(204).end();
@@ -198,7 +244,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const body = answerBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
-    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
     const result = await duels.answer(row.id, p.key, body.data.prompt, body.data.picks);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(204).end();
@@ -211,7 +257,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const body = contestBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
-    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
     const result = await duels.contest(row.id, p.key, body.data.seq, body.data.note);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(202).end();
@@ -224,7 +270,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const body = askBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
-    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
     const result = await duels.ask(row.id, p.key, body.data.text, body.data.card);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(202).end();
@@ -237,7 +283,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const body = escalateBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
-    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
     const result = await duels.escalate(row.id, p.key, body.data.seq, body.data.note);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(202).end();
@@ -250,7 +296,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const body = reportBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
-    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
     const result = await duels.report(row.id, p.key, body.data.code, body.data.note);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(204).end();
@@ -263,7 +309,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     const body = chatBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
-    if (!row || row.status === 'waiting') return void res.status(404).json({ error: 'not_started' });
+    if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
     const result = await duels.chat(row.id, p.key, body.data.text);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(204).end();

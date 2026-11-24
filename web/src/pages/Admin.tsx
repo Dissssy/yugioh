@@ -60,7 +60,7 @@ function RecentDuels() {
                 <td><a href={`/duel/${duel.id}`}><code>{duel.id}</code></a></td>
                 <td className="muted">{formatDate(duel.createdAt)}</td>
                 <td><span className="pill">{duel.status}</span></td>
-                <td className="muted">{duel.players.map((p) => (p ? `${p.name} (${p.deck})` : 'open seat')).join(' vs ')}</td>
+                <td className="muted">{duel.players.map((p) => (p ? `${p.name} (${p.deck ?? 'choosing'})` : 'open seat')).join(' vs ')}</td>
                 <td>{duel.judgeCalls}</td>
                 <td>{duel.appeals}</td>
                 <td>{duel.questions}</td>

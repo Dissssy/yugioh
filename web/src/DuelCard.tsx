@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { CopyLink } from './CopyLink.tsx';
 import { formatDate } from './pages/Home.tsx';
 
-const statusText: Record<DuelStatus, string> = { waiting: 'Waiting', active: 'Live', finished: 'Finished' };
+const statusText: Record<DuelStatus, string> = { waiting: 'Waiting', preparing: 'Choosing decks', active: 'Live', finished: 'Finished' };
 
 /**
  * One duel at a glance: both players with their decks beneath, the winner marked, and how it ended. The card opens the
@@ -31,7 +31,7 @@ export function DuelCard({ duel }: { duel: DuelSummary }) {
         </span>
       </p>
       <div className="duel-card-actions">
-        {duel.status !== 'waiting' && <CopyLink path={path} label="Share" />}
+        {(duel.status === 'active' || finished) && <CopyLink path={path} label="Share" />}
         <Link className="duel-card-open" to={path} aria-label={`${finished ? 'Watch the replay of' : 'Open'} ${a.name} vs ${b?.name ?? 'an open seat'}`}>
           {finished ? 'Replay' : duel.status === 'active' ? 'Play' : 'Open'}
         </Link>
@@ -52,7 +52,7 @@ function Side({ player, won, lost, you }: { player: DuelPlayer; won: boolean; lo
           </span>
         )}
       </strong>
-      <span className="duel-deck muted small">{player.deck}</span>
+      <span className="duel-deck muted small">{player.deck ?? (player.ready ? 'Ready' : 'Choosing a deck')}</span>
     </div>
   );
 }

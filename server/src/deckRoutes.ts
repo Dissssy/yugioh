@@ -4,12 +4,12 @@
 import { Router, type Response } from 'express';
 import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { NO_BANLIST, SECTION_SIZE, type Banlist, type DeckDetail, type DeckList, type DeckSummary } from '@yugioh/shared';
+import { NO_BANLIST, SECTION_SIZE, type Banlist, type DeckDetail, type DeckList, type DeckSummary, type DuelDeck } from '@yugioh/shared';
 import { defaultBanlist, toBanlist, visibleBanlist } from './banlistRoutes.ts';
 import { loadCards } from './cards.ts';
 import type { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
-import { decks, matches, type DuelDeck } from './db/schema.ts';
+import { decks, matches } from './db/schema.ts';
 import { builderId } from './viewer.ts';
 
 type DeckRow = typeof decks.$inferSelect;
@@ -36,20 +36,13 @@ const listOf = (row: DeckRow): DeckList => ({ main: row.main, extra: row.extra, 
 const problemsOf = (catalog: Catalog, row: DeckRow, banlist: Banlist) => catalog.problems(listOf(row), banlist, row.slug !== null);
 
 /**
- * The deck a player may bring to a duel under its banlist, copied for it: a premade deck, or a deck of their own.
- * `ownerId` is the player's account, null for a guest.
+ * A copy of a deck the player may bring to a duel: a premade deck, or a deck of their own. `ownerId` is the player's
+ * account, null for a guest. Whether it follows the duel's banlist is checked when they press Ready.
  */
-export async function deckForDuel(
-  db: Db,
-  catalog: Catalog,
-  id: number,
-  ownerId: number | null,
-  banlist: Banlist,
-): Promise<DuelDeck | 'not_found' | 'deck_illegal'> {
+export async function deckForDuel(db: Db, id: number, ownerId: number | null): Promise<DuelDeck | null> {
   const row = await db.query.decks.findFirst({ where: eq(decks.id, id) });
-  if (!row || (row.slug === null && (ownerId === null || row.ownerId !== ownerId))) return 'not_found';
-  if ((await problemsOf(catalog, row, banlist)).length > 0) return 'deck_illegal';
-  return { name: row.name, main: row.main, extra: row.extra };
+  if (!row || (row.slug === null && (ownerId === null || row.ownerId !== ownerId))) return null;
+  return { name: row.name, main: row.main, extra: row.extra, side: row.side, premade: row.slug !== null };
 }
 
 export function deckRoutes(db: Db, catalog: Catalog) {

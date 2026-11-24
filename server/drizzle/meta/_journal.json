@@ -78,6 +78,13 @@
       "when": 1795404421025,
       "tag": "0010_banlists",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795455644569,
+      "tag": "0011_pre_duel_stage",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,7 @@ import { loadCards, syncCards } from '../src/cards.ts';
 import { decks, effectSheets, matchEvents } from '../src/db/schema.ts';
 import { rule } from '../src/judge/script.ts';
 import { flagScripts, importSheetFiles, loadSheets, resetSheets } from '../src/sheets.ts';
-import { ADMIN_EMAIL, Browser, seeded, startHarness, Stream, type Harness } from './harness.ts';
+import { ADMIN_EMAIL, Browser, seeded, startDuelVia, startHarness, Stream, type Harness } from './harness.ts';
 
 let h: Harness;
 beforeAll(async () => {
@@ -42,9 +42,8 @@ async function login() {
 async function setUp() {
   const admin = await login();
   const deckList = (await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`)).body;
-  const duel = (await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: deckList[0]!.id }) })).body;
   const guest = new Browser();
-  await guest.json(`${h.baseUrl}/api/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify({ deckId: deckList[1]!.id, guestName: 'Kaiba' }) });
+  const duel = await startDuelVia(h.baseUrl, admin, guest, [deckList[0]!.id, deckList[1]!.id], { guestName: 'Kaiba' });
   const [d0, d1] = await Promise.all(deckList.map((d) => h.db.query.decks.findFirst({ where: eq(decks.id, d.id) })));
   const cards = await loadCards(h.db, [...d0!.main, ...d0!.extra, ...d1!.main, ...d1!.extra]);
   const sheets = await loadSheets(h.db, cards);

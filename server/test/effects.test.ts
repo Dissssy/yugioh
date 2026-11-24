@@ -8,7 +8,7 @@ import { loadCards, syncCards } from '../src/cards.ts';
 import { decks, matchEvents } from '../src/db/schema.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
 import { flagScripts, importSheetFiles, loadSheets, sheetOf } from '../src/sheets.ts';
-import { ADMIN_EMAIL, Browser, seeded, startHarness, Stream, type Harness } from './harness.ts';
+import { ADMIN_EMAIL, Browser, seeded, startDuelVia, startHarness, Stream, type Harness } from './harness.ts';
 
 let h: Harness;
 beforeAll(async () => {
@@ -55,9 +55,8 @@ interface Setup {
 async function setUp(scripts: boolean): Promise<Setup> {
   const admin = await login();
   const deckList = (await admin.json<DeckSummary[]>(`${h.baseUrl}/api/decks`)).body;
-  const duel = (await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: deckList[0]!.id }) })).body;
   const guest = new Browser();
-  await guest.json(`${h.baseUrl}/api/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify({ deckId: deckList[1]!.id, guestName: 'Kaiba' }) });
+  const duel = await startDuelVia(h.baseUrl, admin, guest, [deckList[0]!.id, deckList[1]!.id], { guestName: 'Kaiba' });
 
   // Replace the dealt duel with one where the guest goes first with both cards in their hand.
   const [d0, d1] = await Promise.all(deckList.map((d) => h.db.query.decks.findFirst({ where: eq(decks.id, d.id) })));
@@ -517,9 +516,8 @@ describe('a Summoning procedure', () => {
     const freezing = deckList.find((d) => d.name.includes('Freezing Chains'))!;
     // Freezing Chains prints cards the TCG list Forbids, so this duel follows no list.
     const noList = (await admin.json<BanlistSummary[]>(`${h.baseUrl}/api/banlists`)).body.find((b) => b.slug === 'none')!;
-    const duel = (await admin.json<DuelSummary>(`${h.baseUrl}/api/duels`, { method: 'POST', body: JSON.stringify({ deckId: deckList[0]!.id, banlistId: noList.id }) })).body;
     const guest = new Browser();
-    await guest.json(`${h.baseUrl}/api/duels/${duel.id}/join`, { method: 'POST', body: JSON.stringify({ deckId: freezing.id, guestName: 'Kaiba' }) });
+    const duel = await startDuelVia(h.baseUrl, admin, guest, [deckList[0]!.id, freezing.id], { banlistId: noList.id, guestName: 'Kaiba' });
     const [d0, d1] = await Promise.all([deckList[0]!, freezing].map((d) => h.db.query.decks.findFirst({ where: eq(decks.id, d.id) })));
     const cards = await loadCards(h.db, [...d0!.main, ...d0!.extra, ...d1!.main, ...d1!.extra]);
     await importSheetFiles(h.db, { force: true });

@@ -8,7 +8,7 @@ import { CopyLink } from '../CopyLink.tsx';
 import { Loading, Notice } from '../pages/Notice.tsx';
 import { useCatalog, type Catalog } from './catalog.ts';
 import { CardSearch } from './CardSearch.tsx';
-import { LimitBadge } from './DeckBuilder.tsx';
+import { LimitBadge } from './DeckEditor.tsx';
 
 /** How long the list rests unchanged before it saves. */
 const SAVE_DELAY_MS = 700;

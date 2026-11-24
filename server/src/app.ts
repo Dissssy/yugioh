@@ -172,12 +172,10 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     const body = aiDuelBody.safeParse(req.body);
     if (!body.success) return void res.status(400).json({ error: 'Pick a deck for each side.' });
     // Claude plays premade decks only: its deck plans (docs/ai-opponent.md) are written for them. No banlist applies.
-    const [deck, aiDeck] = await Promise.all([
-      deckForDuel(db, catalog, body.data.deckId, v.user.id, NO_BANLIST),
-      deckForDuel(db, catalog, body.data.aiDeckId, null, NO_BANLIST),
-    ]);
-    if (deck === 'not_found' || aiDeck === 'not_found') return void res.status(404).json({ error: 'deck_not_found' });
-    if (deck === 'deck_illegal' || aiDeck === 'deck_illegal') return void res.status(400).json({ error: 'deck_illegal' });
+    const [deck, aiDeck] = await Promise.all([deckForDuel(db, body.data.deckId, v.user.id), deckForDuel(db, body.data.aiDeckId, null)]);
+    if (!deck || !aiDeck || !aiDeck.premade) return void res.status(404).json({ error: "That deck doesn't exist." });
+    const [mine, claudes] = await Promise.all([catalog.problems(deck, NO_BANLIST, deck.premade), catalog.problems(aiDeck, NO_BANLIST, true)]);
+    if (mine.length > 0 || claudes.length > 0) return void res.status(422).json({ error: mine[0] ?? claudes[0] });
     const id = await duels.createAgainstAi(v.user.id, userKey(v.user.id), v.user.username, deck, aiDeck);
     res.status(201).json(await duels.summarize((await duels.find(id))!, userKey(v.user.id), false));
   });

@@ -1,6 +1,6 @@
 # Deck builder
 
-Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Steps 1 to 3 of the build order are built; the rest isn't yet. This plan replaces the one-line "deck builder" entry in
+Planned 2026-11-23 with Ethan, who settled the decisions at the end the same day. Steps 1 to 4 of the build order are built; the rest isn't yet. This plan replaces the one-line "deck builder" entry in
 [architecture.md](architecture.md) layer 8 and the "not planned yet" note in [next-steps.md](next-steps.md).
 
 ## What Ethan asked for
@@ -69,9 +69,9 @@ frame with its name and type.
 
 ## Rules
 
-One function in `shared` checks a deck: `checkDeck(deck, banlist, pool)`. It returns the problems with the deck as a
-whole and, for any card, why it can't be added. The page uses it as you build. The server uses it when a duel is
-joined, so a deck can never get into a duel illegally.
+Functions in `shared/src/decks.ts` check a deck: `deckProblems` gives the problems with the deck as a whole, and
+`addBlocker` why a card can't be added. The page uses them as you build. The server uses them when a player presses
+Ready, so a deck can never get into a duel illegally.
 
 - Main Deck 40 to 60, Extra Deck 0 to 15, Side Deck 0 to 15.
 - At most 3 copies of a card across all three, or fewer if the banlist says so.
@@ -120,39 +120,36 @@ A banlist is a name and a limit per card: 0, 1 or 2. Any card it doesn't list is
 
 ## The pre-duel stage
 
-Today the challenger picks a deck when making the challenge, and the opponent picks one when accepting. With the deck
-builder, a challenge records a **banlist** (its format), and choosing decks moves into a stage between accepting and
-rock-paper-scissors:
+A challenge records a **banlist** (its format) and whether decks must be premade. Choosing decks is a stage between
+accepting and rock-paper-scissors:
 
-1. The challenger makes the challenge and picks its banlist. TCG is the default.
-2. The opponent accepts. The duel is now **preparing** (a new status between `waiting` and `active`).
-3. Each player picks a deck: one of their own decks that's legal under the banlist, or a premade one. **Build one**
-   opens the builder for that banlist, then returns to the duel. Each player sees whether the other is ready, but not
-   their deck.
-4. When both have picked and pressed Ready, the server checks both decks with `checkDeck` and the duel starts with
-   rock-paper-scissors as it does now.
+1. The challenger makes the challenge and picks its banlist (TCG is the default), and **Any legal deck** or **Premade
+   decks only, with Side Deck swaps**. This applies to both players, guests and accounts alike.
+2. The opponent accepts. The duel is now **preparing** (between `waiting` and `active`).
+3. Each player chooses a deck (`pages/Prepare.tsx`): one of their own decks or a premade one, or under Any legal deck
+   also an empty deck or an uploaded `.ydk`. A deck that breaks the rules can still be chosen, and fixed for the duel.
+   Each player sees whether the other is ready, but not their deck.
+4. Each player presses **Ready**, which the server allows only for a deck that follows the banlist. When both are
+   ready, the duel starts with rock-paper-scissors.
 
-The duel's start event already records both deck lists, so after the start, a duel doesn't depend on the deck. Editing
-or deleting the deck later changes nothing. `matches` keeps each deck's name for the duel lists. It no longer
-references `decks`.
-
-The AI opponent keeps using premade decks.
+The duel's start event records both deck lists, so after the start a duel doesn't depend on any saved deck. Editing or
+deleting the deck later changes nothing. The AI opponent's duels skip the stage: the admin picks both decks and the
+duel starts at once.
 
 ### The duel's copy of each deck
 
-Picking a deck in the pre-duel stage copies it onto the match (`matches.prep0` / `prep1`: name, Main, Extra, Side,
-ready). Everything that happens before the duel starts changes that copy, never the saved deck, and the duel starts
-from it.
+Choosing a deck copies it onto the match (`matches.deck0` / `deck1`: name, Main, Extra, Side, and whether it's still a
+premade deck; `ready0` / `ready1`). Everything before the duel starts changes that copy, never the saved deck, and
+changing it takes back Ready. The copy is edited with the deck builder's editor (`decks/DeckEditor.tsx`) and saves as
+it changes.
 
-- **Side Deck swaps.** Before pressing Ready, a player can swap cards between their Side Deck and their Main or Extra
-  Deck for this duel only. Each swap is one card for one card, so the sizes don't change. The copy is checked with
-  `checkDeck` like any deck.
-- **Guests** build in the same place. A guest has no saved decks, so they start from a premade deck or an empty one, or
-  upload a `.ydk`, and edit the duel's copy with the same builder. **Download .ydk** saves what they built, so their
-  decks live on their own computer and they can upload one next time. Accounts get the same upload and download.
-
-The challenger also picks **Premade decks only** or **Any legal deck** for the challenge. This applies to both
-players, guests and accounts alike.
+- **Any legal deck.** The copy can be changed freely, with the search, as in the builder. A premade deck changed by
+  anything other than a Side Deck swap counts as the player's own, so the section sizes apply to it.
+- **Premade decks only.** Only premade decks are offered, and cards only move between the Side Deck and the Main or
+  Extra Deck: right-click a card to move it across. A change saves once every card swapped out has a card swapped in
+  for it, and the server refuses any change that isn't such a swap (`isSideSwap`).
+- **Guests** build in the same place. **Download .ydk** saves what they built, so their decks live on their own
+  computer and they can upload one next time. Accounts get the same upload and download.
 
 ## Build order
 
@@ -165,7 +162,7 @@ Each step is a working product on its own.
 2. **Banlists** (built). The `banlists` table, the four defaults from the card import, the banlist editor, and a banlist on
    each challenge that both decks are checked against.
 3. **`.ydk` import and export** (built) on the decks page and every deck page.
-4. **The pre-duel stage.** The `preparing` status, the duel's copy of each deck, Side Deck swaps, guests building,
+4. **The pre-duel stage** (built). The `preparing` status, the duel's copy of each deck, Side Deck swaps, guests building,
    Ready, and the Premade only switch.
 5. **Search terms** and the help menu.
 6. **Later, not in this plan:** best of 3 with siding between games, draft mode, and the challenge list and

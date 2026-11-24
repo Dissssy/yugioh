@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { HANDS, type AiRecord, type DuelUpdate, type JudgingView, type LogEntry, type ModelUsage, type PlayerView, type Seat } from '@yugioh/engine';
 import { loadCards } from '../cards.ts';
 import type { Db } from '../db/client.ts';
-import type { DuelDeck } from '../db/schema.ts';
+import type { DuelDeck } from '@yugioh/shared';
 import type { ActResult, Duels, OpponentModel } from '../duels.ts';
 import { usageOf } from '../judge/pricing.ts';
 import { movesFor, optionsFor, safeMove, type Move } from './moves.ts';

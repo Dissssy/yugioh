@@ -10,6 +10,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { createApp } from '../src/app.ts';
 import type { ModelCall } from '../src/judge/judge.ts';
 import type { DuelUpdate, PlayerView } from '@yugioh/engine';
+import type { DuelSummary } from '@yugioh/shared';
 import type { LoginClaims } from '../src/accounts.ts';
 import { connect, type Db } from '../src/db/client.ts';
 import { runMigrations } from '../src/db/migrate.ts';
@@ -185,4 +186,30 @@ export function seeded(seed: number) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/**
+ * Plays out the start of a duel through the API: `host` challenges, `guest` takes the seat (as a guest named
+ * `guestName` if signed out), each picks their deck, and both press Ready, so the duel starts. Returns the duel as the
+ * host sees it.
+ */
+export async function startDuelVia(
+  baseUrl: string,
+  host: Browser,
+  guest: Browser,
+  [deck0, deck1]: [number, number],
+  { banlistId, guestName }: { banlistId?: number; guestName?: string } = {},
+): Promise<DuelSummary> {
+  const ok = async <T>(res: Promise<{ status: number; body: T }>) => {
+    const { status, body } = await res;
+    if (status >= 300) throw new Error(`Starting the duel failed with ${status}: ${JSON.stringify(body)}`);
+    return body;
+  };
+  const post = (b: Browser, path: string, body: unknown, method = 'POST') => b.json<DuelSummary>(`${baseUrl}/api${path}`, { method, body: JSON.stringify(body) });
+  const duel = await ok(post(host, '/duels', { banlistId }));
+  await ok(post(guest, `/duels/${duel.id}/join`, guestName ? { guestName } : {}));
+  await ok(post(host, `/duels/${duel.id}/deck`, { deckId: deck0 }, 'PUT'));
+  await ok(post(guest, `/duels/${duel.id}/deck`, { deckId: deck1 }, 'PUT'));
+  await ok(post(guest, `/duels/${duel.id}/ready`, { ready: true }));
+  return ok(post(host, `/duels/${duel.id}/ready`, { ready: true }));
 }

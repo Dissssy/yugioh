@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { EffectSheet } from '@yugioh/engine';
-import type { Banlist, DuelOutcome, UserSettings } from '@yugioh/shared';
+import type { Banlist, DuelDeck, DuelOutcome, UserSettings } from '@yugioh/shared';
 import { boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accountStatus = pgEnum('account_status', ['pending', 'approved', 'rejected']);
@@ -96,14 +96,7 @@ export const decks = pgTable('decks', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** The deck a player brought to a duel, copied when they took their seat, so editing the deck later changes nothing. */
-export interface DuelDeck {
-  name: string;
-  main: number[];
-  extra: number[];
-}
-
-export const matchStatus = pgEnum('match_status', ['waiting', 'active', 'finished']);
+export const matchStatus = pgEnum('match_status', ['waiting', 'preparing', 'active', 'finished']);
 
 /** A duel between two seats. Seat keys are `user:<id>` or `guest:<id>`; only accounts create duels. */
 export const matches = pgTable('matches', {
@@ -123,8 +116,12 @@ export const matches = pgTable('matches', {
   result: jsonb('result').$type<DuelOutcome>(),
   /** The banlist both decks must follow, copied when the challenge was made. */
   banlist: jsonb('banlist').$type<Banlist>().notNull(),
-  deck0: jsonb('deck0').$type<DuelDeck>().notNull(),
+  premadeOnly: boolean('premade_only').notNull().default(false),
+  /** Each player's copy of their deck for this duel, chosen in the pre-duel stage; the duel starts from it. */
+  deck0: jsonb('deck0').$type<DuelDeck>(),
   deck1: jsonb('deck1').$type<DuelDeck>(),
+  ready0: boolean('ready0').notNull().default(false),
+  ready1: boolean('ready1').notNull().default(false),
 });
 
 /** The duel's append-only event log. The board is the fold of these events. */
