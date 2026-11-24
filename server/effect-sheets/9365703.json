@@ -44,6 +44,7 @@
                 "atk": {
                   "of": "self",
                   "stat": "atk",
+                  "filter": null,
                   "original": true,
                   "times": 2
                 },

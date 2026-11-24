@@ -190,11 +190,11 @@ function monsterContinuousOf(text: string): Continuous[] | null {
 /** A Normal Spell that only deals damage, gains LP or draws. */
 function spellStepOf(text: string): Step | null {
   let m = new RegExp(String.raw`^(?:Inflict ${N} (?:points of )?damage to your opponent(?:'s Life Points)?|Decrease your opponent's Life Points by ${N} points)\.$`).exec(text);
-  if (m) return { do: 'change_lp', player: 'opponent', amount: Number(m[1] ?? m[2]), kind: 'damage' };
+  if (m) return { do: 'change_lp', player: 'opponent', amount: Number(m[1] ?? m[2]), per: null, kind: 'damage' };
   m = new RegExp(String.raw`^(?:Increase your Life Points by ${N}(?: points)?|Gain ${N} (?:Life Points|LP))\.$`).exec(text);
-  if (m) return { do: 'change_lp', player: 'you', amount: Number(m[1] ?? m[2]), kind: 'gain' };
+  if (m) return { do: 'change_lp', player: 'you', amount: Number(m[1] ?? m[2]), per: null, kind: 'gain' };
   m = /^Draw (1|2|3) cards?\.$/.exec(text);
-  if (m) return { do: 'draw', player: 'you', count: Number(m[1]) };
+  if (m) return { do: 'draw', player: 'you', count: Number(m[1]), per: null };
   return null;
 }
 

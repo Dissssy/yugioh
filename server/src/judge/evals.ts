@@ -1003,6 +1003,42 @@ export const CASES: EvalCase[] = [
     activate: 'Magic Triangle of the Ice Barrier',
     legal: false,
   },
+  {
+    name: 'dewloren gains 500 atk for each card it returns to the hand',
+    board: [{ monsters: ['Dewloren, Tiger King of the Ice Barrier', 'Prior of the Ice Barrier', 'Speaker for the Ice Barriers', 'Axe Raider'] }, {}],
+    activate: 'Dewloren, Tiger King of the Ice Barrier',
+    picks: [['Prior of the Ice Barrier', 'Speaker for the Ice Barriers']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Prior of the Ice Barrier', '0:hand'), expectAt(b, 'Axe Raider', '0:monsters'), b.monster('Dewloren, Tiger King of the Ice Barrier')?.atk === 3000 ? null : `Dewloren has ${b.monster('Dewloren, Tiger King of the Ice Barrier')?.atk} ATK`),
+  },
+  {
+    name: 'terror of trishula banishes from the field and gy with 2 ice barrier synchro names',
+    board: [
+      { set: ['Terror of Trishula'], monsters: ['Brionac, Dragon of the Ice Barrier', 'Gungnir, Dragon of the Ice Barrier'] },
+      { monsters: ['Dark Blade'], gy: ['Axe Raider'], hand: ['Twister'] },
+    ],
+    activate: 'Terror of Trishula',
+    picks: [['Dark Blade'], ['Axe Raider']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dark Blade', '1:banished'), expectAt(b, 'Axe Raider', '1:banished'), expectAt(b, 'Twister', '1:hand')),
+  },
+  {
+    name: 'terror of trishula counts ice barrier synchro monsters by name',
+    board: [
+      { set: ['Terror of Trishula'], monsters: ['Brionac, Dragon of the Ice Barrier', 'Brionac, Dragon of the Ice Barrier'] },
+      { monsters: ['Dark Blade'], gy: ['Axe Raider'] },
+    ],
+    activate: 'Terror of Trishula',
+    picks: [['Dark Blade']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dark Blade', '1:banished'), expectAt(b, 'Axe Raider', '1:gy')),
+  },
+  {
+    name: 'terror of trishula needs an ice barrier synchro monster',
+    board: [{ set: ['Terror of Trishula'], monsters: ['Axe Raider'] }, { monsters: ['Dark Blade'] }],
+    activate: 'Terror of Trishula',
+    legal: false,
+  },
   // Starter deck cards the judge used to rule on, now scripted.
   {
     name: 'ganbara knight changes to defense position when attacked',
@@ -1086,6 +1122,35 @@ export const CASES: EvalCase[] = [
     board: [{ monsters: ['Axe Raider'], gy: ['Quillbolt Hedgehog'] }, {}],
     activate: 'Quillbolt Hedgehog',
     legal: false,
+  },
+  {
+    name: 'secret barrel deals 200 for each card in the opponent\'s hand and field',
+    board: [{ set: ['Secret Barrel'] }, { hand: ['Axe Raider', 'Dark Blade'], monsters: ['Axe Raider'] }],
+    activate: 'Secret Barrel',
+    legal: true,
+    check: (b) => (b.lp(1) === 7400 ? null : `LP is ${b.lp(1)}`),
+  },
+  {
+    name: 'card destruction has both players discard their hands and draw as many',
+    board: [{ hand: ['Card Destruction', 'Axe Raider', 'Dark Blade'] }, { hand: ['Twister'] }],
+    activate: 'Card Destruction',
+    legal: true,
+    check: (b) =>
+      all(expectAt(b, 'Axe Raider', '0:gy'), expectAt(b, 'Twister', '1:gy'), b.state.players[0].hand.length === 2 ? null : `player 0 holds ${b.state.players[0].hand.length}`, b.state.players[1].hand.length === 1 ? null : `player 1 holds ${b.state.players[1].hand.length}`),
+  },
+  {
+    name: 'reinforced space gives 300 atk for each xyz material',
+    board: [{ set: ['Reinforced Space'], xyz: [['Number 39: Utopia', 'Axe Raider', 'Dark Blade']] }, {}],
+    activate: 'Reinforced Space',
+    legal: true,
+    check: (b) => (b.monster('Number 39: Utopia')?.atk === 3100 ? null : `Utopia has ${b.monster('Number 39: Utopia')?.atk} ATK`),
+  },
+  {
+    name: 'junk warrior gains the total atk of level 2 or lower monsters you control',
+    board: [{ monsters: ['Junk Synchron', 'Speed Warrior', 'Quillbolt Hedgehog'], extra: ['Junk Warrior'] }, {}],
+    before: (id) => [[0, { type: 'extraSummon', card: id('Junk Warrior'), materials: [id('Junk Synchron'), id('Speed Warrior')], zone: 3, position: 'attack' }]],
+    legal: true,
+    check: (b) => (b.monster('Junk Warrior')?.atk === 3100 ? null : `Junk Warrior has ${b.monster('Junk Warrior')?.atk} ATK`),
   },
   // Control, Tokens, and effects used from the hand or GY.
   {

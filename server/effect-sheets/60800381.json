@@ -1,7 +1,7 @@
 {
   "code": 60800381,
   "textHash": "179e673f7f41611761e2a10a98f845dc8721790f1db896a4b543541d506d3187",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "trigger",
@@ -23,7 +23,57 @@
         "canMiss": false,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "gain_stats",
+                "cards": {
+                  "from": "self"
+                },
+                "atk": {
+                  "of": "sum",
+                  "stat": "atk",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": {
+                      "min": null,
+                      "max": 2
+                    },
+                    "atk": null,
+                    "def": null
+                  },
+                  "original": false,
+                  "times": 1
+                },
+                "def": null,
+                "until": "while_on_field"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

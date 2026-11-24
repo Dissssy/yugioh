@@ -26,7 +26,8 @@
               {
                 "do": "draw",
                 "player": "you",
-                "count": 2
+                "count": 2,
+                "per": null
               }
             ]
           }

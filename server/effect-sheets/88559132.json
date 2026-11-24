@@ -73,6 +73,7 @@
                 "atk": {
                   "of": "cost",
                   "stat": "atk",
+                  "filter": null,
                   "original": true,
                   "times": 1
                 },

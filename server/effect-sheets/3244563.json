@@ -55,6 +55,7 @@
                 },
                 "atk": 400,
                 "def": 400,
+                "per": null,
                 "levelDelta": 0,
                 "levelSet": null,
                 "until": "end_of_turn"

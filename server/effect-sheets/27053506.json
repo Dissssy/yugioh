@@ -1,7 +1,7 @@
 {
   "code": 27053506,
   "textHash": "f48c2d78e799d47d0bae4bfd8221996b7cfaf8666b66ba31671beb016332d419",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "activation",
@@ -14,7 +14,45 @@
       "effect": "Inflict 200 damage to your opponent for each card in their hand and for each card they control.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": 200,
+                "per": {
+                  "side": "opponent",
+                  "places": [
+                    "hand",
+                    "field"
+                  ],
+                  "kinds": [],
+                  "types": [],
+                  "races": [],
+                  "attributes": [],
+                  "named": null,
+                  "except": null,
+                  "extraDeck": null,
+                  "faceUp": null,
+                  "position": null,
+                  "level": null,
+                  "atk": null,
+                  "def": null
+                },
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

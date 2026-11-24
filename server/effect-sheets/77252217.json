@@ -33,7 +33,8 @@
               {
                 "do": "draw",
                 "player": "opponent",
-                "count": 1
+                "count": 1,
+                "per": null
               }
             ]
           }

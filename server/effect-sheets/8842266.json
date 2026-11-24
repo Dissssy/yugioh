@@ -27,6 +27,7 @@
                 "do": "change_lp",
                 "player": "you",
                 "amount": 1200,
+                "per": null,
                 "kind": "gain"
               }
             ]
@@ -39,6 +40,7 @@
                 "do": "change_lp",
                 "player": "opponent",
                 "amount": 800,
+                "per": null,
                 "kind": "damage"
               }
             ]

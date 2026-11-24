@@ -27,6 +27,7 @@
                 "do": "change_lp",
                 "player": "you",
                 "amount": 600,
+                "per": null,
                 "kind": "gain"
               }
             ]

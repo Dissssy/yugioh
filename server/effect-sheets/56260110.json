@@ -27,6 +27,7 @@
                 "do": "change_lp",
                 "player": "opponent",
                 "amount": 300,
+                "per": null,
                 "kind": "damage"
               }
             ]

@@ -21,6 +21,7 @@
             "do": "change_lp",
             "player": "you",
             "amount": 500,
+            "per": null,
             "kind": "cost"
           }
         ],

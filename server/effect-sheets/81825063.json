@@ -75,7 +75,8 @@
               "def": null
             },
             "min": 1,
-            "max": null
+            "max": null,
+            "distinct": false
           },
           {
             "if": "count",
@@ -100,7 +101,8 @@
               "def": null
             },
             "min": 1,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ],
         "cost": [],

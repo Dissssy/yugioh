@@ -193,12 +193,12 @@ const sheets: Record<number, EffectSheet> = {
     mandatory: true,
     from: 'graveyard',
     when: { event: 'destroyed_by_effect', self: true, filter: filter({ side: 'you', faceUp: true }), how: [], canMiss: false, by: 'opponent' },
-    ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1 }] }] }),
+    ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1, per: null }] }] }),
   }),
   31: sheet(31, {
     ...effect('condition'),
     ...scripted({
-      conditions: [{ if: 'count', filter: filter({ side: 'you', attributes: ['WATER'] }), min: 1, max: null }],
+      conditions: [{ if: 'count', filter: filter({ side: 'you', attributes: ['WATER'] }), min: 1, max: null, distinct: false }],
       options: [
         { label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }, { do: 'forbid', player: 'you', what: 'special_summon', filter: fromHand, wholeTurn: false }] },
       ],
@@ -284,7 +284,7 @@ const sheets: Record<number, EffectSheet> = {
     ...sheet(18, {
       ...effect('trigger'),
       when: { event: 'battle_destroying', self: true, filter: null, how: [], canMiss: true, by: null },
-      ...scripted({ cost: [detachSelf], options: [{ label: '', cost: [], steps: [{ do: 'change_lp', player: 'opponent', amount: 1000, kind: 'damage' }] }] }),
+      ...scripted({ cost: [detachSelf], options: [{ label: '', cost: [], steps: [{ do: 'change_lp', player: 'opponent', amount: 1000, per: null, kind: 'damage' }] }] }),
     }),
     materials: { summon: 'xyz', level: 3, count: 2 },
   },

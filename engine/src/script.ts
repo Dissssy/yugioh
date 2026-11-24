@@ -167,7 +167,7 @@ function zonesFreedBy(state: DuelState, cost: Step[], card: string): number {
  * need nothing here. `freed` is how many Monster Zones the cost frees first.
  */
 function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, freed = 0, optionalTargets = false): string | null {
-  if (step.do === 'change_lp' && step.kind === 'cost') return state.players[seat].lp < step.amount ? `You can't pay ${step.amount} LP.` : null;
+  if (step.do === 'change_lp' && step.kind === 'cost') return step.per === null && state.players[seat].lp < step.amount ? `You can't pay ${step.amount} LP.` : null;
   if (step.do === 'summon_token') {
     const player = step.player === 'you' ? seat : other(seat);
     if (freeMonsterZones(state, player) + (player === seat ? freed : 0) < step.count) return `There ${step.count === 1 ? 'is no free Monster Zone' : `aren't ${step.count} free Monster Zones`} for the Token${step.count === 1 ? '' : 's'}.`;
@@ -259,7 +259,15 @@ function optionProblem(state: DuelState, script: Script, option: Script['options
   const freed = zonesFreedBy(state, [...script.cost, ...option.cost], card);
   // "You can target ...; Special Summon it" (Freezing Chains of the Ice Barrier) still activates with no zone free.
   const optional = script.targets?.min === 0;
-  return option.steps.map((s) => stepProblem(state, s, seat, card, freed, optional)).find((p) => p) ?? null;
+  let skipping = false;
+  for (const s of option.steps) {
+    // Steps after an `only_if` that doesn't hold won't happen, so they need nothing.
+    if (s.do === 'only_if') skipping = s.conditions.some((c) => conditionProblem(state, c, seat, card));
+    if (skipping) continue;
+    const problem = stepProblem(state, s, seat, card, freed, optional);
+    if (problem) return problem;
+  }
+  return null;
 }
 
 /** The options of a script that can be picked now, by index. */
@@ -318,7 +326,7 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
     case 'before_battle_phase':
       return state.turnPlayer === seat && (state.phase === 'battle' || state.phase === 'main2' || state.phase === 'end') ? 'It can only be activated before you conduct your Battle Phase.' : null;
     case 'count': {
-      const n = cardsFitting(state, c.filter, seat, card).length;
+      const n = distinctCount(state, cardsFitting(state, c.filter, seat, card), c.distinct);
       if (n < c.min) return `It needs ${c.min === 1 ? 'a' : `at least ${c.min} of:`} ${describeFilter(c.filter)}.`;
       return c.max !== null && n > c.max ? `It needs ${c.max === 0 ? 'no' : `at most ${c.max} of:`} ${describeFilter(c.filter)}.` : null;
     }

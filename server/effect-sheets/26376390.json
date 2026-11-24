@@ -61,12 +61,14 @@
                 "atk": {
                   "of": "targets",
                   "stat": "atk",
+                  "filter": null,
                   "original": true,
                   "times": 1
                 },
                 "def": {
                   "of": "targets",
                   "stat": "def",
+                  "filter": null,
                   "original": true,
                   "times": 1
                 },

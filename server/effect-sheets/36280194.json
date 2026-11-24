@@ -39,7 +39,8 @@
               "def": null
             },
             "min": 5,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ],
         "cost": [],

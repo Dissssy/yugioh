@@ -115,6 +115,7 @@
                 },
                 "atk": 800,
                 "def": 0,
+                "per": null,
                 "levelDelta": 0,
                 "levelSet": null,
                 "until": "while_on_field"

@@ -129,7 +129,8 @@
               {
                 "do": "draw",
                 "player": "you",
-                "count": 1
+                "count": 1,
+                "per": null
               }
             ]
           }

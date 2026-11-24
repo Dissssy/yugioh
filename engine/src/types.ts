@@ -164,7 +164,8 @@ export interface Script {
 
 export type Condition =
   /** At least `min` and at most `max` (null: no bound) cards fit `filter`. */
-  | { if: 'count'; filter: CardFilter; min: number; max: number | null }
+  /** With `distinct`, cards with the same name count once ("Synchro Monsters you control with different names"). */
+  | { if: 'count'; filter: CardFilter; min: number; max: number | null; distinct: boolean }
   /** It is this player's turn ("during your Battle Phase" is this and a `phase`). */
   | { if: 'turn'; whose: 'you' | 'opponent' }
   /** This card is face-up in this battle position ("while in face-up Defense Position"). */
@@ -210,7 +211,8 @@ export type Step =
    * order), or on the bottom if `bottom` allows (Dark Tinker).
    */
   | { do: 'arrange_top'; count: number; bottom: boolean }
-  | { do: 'modify_stats'; cards: Selection; atk: number; def: number; levelDelta: number; levelSet: number | null; until: Until }
+  /** `per` multiplies `atk` and `def` (see `Per`); null for a flat amount. */
+  | { do: 'modify_stats'; cards: Selection; atk: number; def: number; per: Per | null; levelDelta: number; levelSet: number | null; until: Until }
   /**
    * ATK, DEF and/or Level "become" a value (null leaves that stat alone). Gains and losses still apply on top. A Level
    * read from a card with none (an Xyz Monster) changes nothing.
@@ -218,8 +220,10 @@ export type Step =
   | { do: 'set_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; level: StatValue | null; until: Until }
   /** ATK and/or DEF gain a value read when the step resolves ("it gains ATK equal to the Tributed monster's original ATK"). */
   | { do: 'gain_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
-  | { do: 'change_lp'; player: 'you' | 'opponent'; amount: number; kind: 'cost' | 'damage' | 'gain' }
-  | { do: 'draw'; player: 'you' | 'opponent'; count: number }
+  /** `per` multiplies `amount` ("200 damage for each card in their hand"). */
+  | { do: 'change_lp'; player: 'you' | 'opponent'; amount: number; per: Per | null; kind: 'cost' | 'damage' | 'gain' }
+  /** `per` multiplies `count`; `moved` counts only the moved cards the drawing player owns (Card Destruction). */
+  | { do: 'draw'; player: 'you' | 'opponent'; count: number; per: Per | null }
   | { do: 'extra_normal_summon' }
   /** Negates the attack being made: it ends without damage. */
   | { do: 'negate_attack' }
@@ -277,8 +281,9 @@ export type Step =
   /** "and if you do": the steps after this one happen only if the step before it did something. */
   | { do: 'if_done' }
   /**
-   * The steps after this one happen only if every condition holds now, as the effect resolves ("You must control a
-   * Tuner monster to activate and to resolve this effect": the same condition in the script's conditions and here).
+   * The steps after this one, up to the next `only_if`, happen only if every condition holds now, as the effect
+   * resolves ("You must control a Tuner monster to activate and to resolve this effect": the same condition in the
+   * script's conditions and here; "Apply these effects in sequence, depending on ...": one `only_if` per part).
    */
   | { do: 'only_if'; conditions: Condition[] };
 
@@ -391,14 +396,24 @@ export type Restriction = (typeof RESTRICTIONS)[number];
 export type Affected = 'self' | 'linked' | CardFilter;
 
 /**
+ * What an amount is multiplied by, counted when the step resolves: the cards that fit a filter (this card included),
+ * the cards the last `move` step of the effect moved ("for each card returned"), or, for `modify_stats`, each
+ * monster's own Xyz Materials ("for each Xyz Material attached to it").
+ */
+export type Per = CardFilter | 'moved' | 'materials';
+
+/**
  * A stat read from a card when the step resolves: `self`, the first target still there, the first card paid as the
  * cost, or the first card the last `move` step of the effect moved ("send 1 monster from your Deck to the GY, and if
  * you do, this card's Level becomes that monster's"). `original` is the printed value, else the current one (a card
  * off the field has only its printed one). `times` multiplies it ("double its original ATK" is 2).
  */
 export interface StatValue {
-  of: 'self' | 'targets' | 'cost' | 'moved';
+  /** `sum`: the total of the stat over the face-up cards that fit `filter` ("the total ATK of all Level 2 or lower monsters you control"). */
+  of: 'self' | 'targets' | 'cost' | 'moved' | 'sum';
   stat: 'atk' | 'def' | 'level';
+  /** For `sum`, the cards it adds up; else null. */
+  filter: CardFilter | null;
   original: boolean;
   times: number;
 }

@@ -41,6 +41,8 @@ import {
   type DuelState,
   type JudgeRecord,
   type Op,
+  type Per,
+  type Seat,
   type Selection,
   type StatValue,
   type Step,
@@ -166,12 +168,28 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
    * stats), the first card paid as the cost, or the first card the last move step moved.
    */
   const valueOf = (v: StatValue): number | null => {
+    if (v.of === 'sum') {
+      // Face-up monsters only: a face-down one has no ATK to add.
+      const cards = v.filter ? cardsFitting(state, { ...v.filter, faceUp: true }, seat, '') : [];
+      return Math.round(cards.reduce((total, id) => total + ((v.stat === 'level' ? levelNow(state, id) : statsOf(state, id)[v.stat]) ?? 0), 0) * v.times);
+    }
     const id = { self, cost: paid[0], moved: moved[0], targets: link.targets.find((t) => script.targets && fits(state, t, script.targets.filter, seat)) }[v.of];
     if (!id || !locate(state, id)) return null;
     const at = locate(state, id)!;
     const onField = at.zone === 'monsters' && !v.original;
     const base = v.stat === 'level' ? (onField ? levelNow(state, id) : levelOf(cardOf(state, id))) : onField ? statsOf(state, id)[v.stat] : cardOf(state, id)[v.stat];
     return base === null ? null : Math.round(base * v.times);
+  };
+
+  /**
+   * What a step's `per` multiplies its amount by now: the cards that fit (this card included), the cards the last move
+   * step moved (only those `owner` owns, for a draw), or `card`'s own Xyz Materials. 1 without a `per`.
+   */
+  const countOf = (per: Per | null, owner: Seat | null, card: string | null): number => {
+    if (per === null) return 1;
+    if (per === 'moved') return moved.filter((id) => owner === null || state.instances[id]!.owner === owner).length;
+    if (per === 'materials') return card ? materialsOf(state, card).length : 0;
+    return cardsFitting(state, per, seat, '').length;
   };
 
   /** Applies one step; returns a sentence on what happened, or null if it did nothing. */
@@ -251,13 +269,18 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
           const at = locate(state, id);
           return at?.zone === 'monsters' && state.players[at.seat].monsters[at.index]!.faceUp;
         });
-        for (const id of cards) {
-          apply({ op: 'modify_stats', card: id, atk: step.atk, def: step.def, atk_set: null, def_set: null, level_delta: step.levelDelta, level_set: step.levelSet, until: step.until });
-        }
-        if (!cards.length) return null;
         const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
-        const parts = [step.atk && `${signed(step.atk)} ATK`, step.def && `${signed(step.def)} DEF`, step.levelDelta && `${signed(step.levelDelta)} Level`, step.levelSet !== null && `Level ${step.levelSet}`].filter(Boolean);
-        return `${list(cards.map((id) => shown(id, before)))}: ${parts.join(', ')}${untilText[step.until] ? ` ${untilText[step.until]}` : ''}.`;
+        const said: string[] = [];
+        for (const id of cards) {
+          const times = countOf(step.per, null, id);
+          const atk = step.atk * times;
+          const def = step.def * times;
+          if (atk === 0 && def === 0 && step.levelDelta === 0 && step.levelSet === null) continue;
+          apply({ op: 'modify_stats', card: id, atk, def, atk_set: null, def_set: null, level_delta: step.levelDelta, level_set: step.levelSet, until: step.until });
+          const parts = [atk && `${signed(atk)} ATK`, def && `${signed(def)} DEF`, step.levelDelta && `${signed(step.levelDelta)} Level`, step.levelSet !== null && `Level ${step.levelSet}`].filter(Boolean);
+          said.push(`${shown(id, before)}: ${parts.join(', ')}${untilText[step.until] ? ` ${untilText[step.until]}` : ''}.`);
+        }
+        return said.length ? said.join(' ') : null;
       }
       case 'set_stats': {
         const cards = (await select(step.cards, 'apply this to')).filter((id) => {
@@ -345,14 +368,18 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       }
       case 'change_lp': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
-        apply({ op: 'change_lp', player, amount: step.amount, kind: step.kind });
+        const amount = step.amount * countOf(step.per, null, null);
+        if (amount === 0) return null;
+        apply({ op: 'change_lp', player, amount, kind: step.kind });
         const who = state.players[player].name;
-        return cost ? null : step.kind === 'gain' ? `${who} gained ${step.amount} LP.` : `${who} took ${step.amount} damage.`;
+        return cost ? null : step.kind === 'gain' ? `${who} gained ${amount} LP.` : `${who} took ${amount} damage.`;
       }
       case 'draw': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
-        apply({ op: 'draw', player, count: step.count });
-        return `${state.players[player].name} drew ${step.count} card${step.count === 1 ? '' : 's'}.`;
+        const count = step.count * countOf(step.per, player, null);
+        if (count === 0) return null;
+        apply({ op: 'draw', player, count });
+        return `${state.players[player].name} drew ${count} card${count === 1 ? '' : 's'}.`;
       }
       case 'negate_attack':
         if (!state.attack) return null;
@@ -476,17 +503,22 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     }
   };
 
-  /** Runs resolution steps in order, stopping at an `if_done` whose step before it did nothing. Returns what each said. */
+  /**
+   * Runs resolution steps in order, skipping the part after an `only_if` that doesn't hold and stopping at an `if_done`
+   * whose step before it did nothing. Returns what each said.
+   */
   const runSteps = async (steps: Step[]): Promise<string[]> => {
     const said: string[] = [];
     let last: string | null = null;
+    let skipping = false;
     for (const step of steps) {
-      if (step.do === 'if_done') {
-        if (last === null) break;
+      if (step.do === 'only_if') {
+        skipping = step.conditions.some((c) => conditionProblem(state, c, seat, self));
         continue;
       }
-      if (step.do === 'only_if') {
-        if (step.conditions.some((c) => conditionProblem(state, c, seat, self))) break;
+      if (skipping) continue;
+      if (step.do === 'if_done') {
+        if (last === null) break;
         continue;
       }
       last = await run(step, false);

@@ -140,7 +140,7 @@ const sheets: Record<number, EffectSheet> = {
       kind: 'trigger',
       mandatory: true,
       when: when({ event: 'battle_damage', self: true }),
-      script: script({ options: [{ label: '', cost: [], steps: [{ do: 'modify_stats', cards: { from: 'self' }, atk: 200, def: 0, levelDelta: 0, levelSet: null, until: 'while_on_field' }] }] }),
+      script: script({ options: [{ label: '', cost: [], steps: [{ do: 'modify_stats', cards: { from: 'self' }, atk: 200, def: 0, per: null, levelDelta: 0, levelSet: null, until: 'while_on_field' }] }] }),
     }),
   ),
   6: sheet(
@@ -159,8 +159,8 @@ const sheets: Record<number, EffectSheet> = {
               {
                 do: 'set_stats',
                 cards: { from: 'self' },
-                atk: { of: 'targets', stat: 'atk', original: true, times: 1 },
-                def: { of: 'targets', stat: 'def', original: true, times: 1 },
+                atk: { of: 'targets', stat: 'atk', original: true, times: 1, filter: null },
+                def: { of: 'targets', stat: 'def', original: true, times: 1, filter: null },
                 level: null,
                 until: 'while_on_field',
               },
@@ -184,7 +184,7 @@ const sheets: Record<number, EffectSheet> = {
           {
             label: '',
             cost: [],
-            steps: [{ do: 'set_stats', cards: { from: 'self' }, atk: { of: 'self', stat: 'atk', original: true, times: 2 }, def: null, level: null, until: 'end_of_battle_phase' }],
+            steps: [{ do: 'set_stats', cards: { from: 'self' }, atk: { of: 'self', stat: 'atk', original: true, times: 2, filter: null }, def: null, level: null, until: 'end_of_battle_phase' }],
           },
         ],
       }),
@@ -206,7 +206,7 @@ const sheets: Record<number, EffectSheet> = {
       kind: 'ignition',
       script: script({
         cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', places: ['hand'] }), min: 1, max: 1, rank: null, distinct: false }, to: 'graveyard' }],
-        options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1 }] }],
+        options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1, per: null }] }],
       }),
     }),
   ),

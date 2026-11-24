@@ -66,7 +66,8 @@
               "def": null
             },
             "min": 1,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ]
       },
@@ -108,7 +109,8 @@
               "def": null
             },
             "min": 1,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ],
         "cost": [],
@@ -170,7 +172,8 @@
               "def": null
             },
             "min": 1,
-            "max": null
+            "max": null,
+            "distinct": false
           }
         ],
         "cost": [
