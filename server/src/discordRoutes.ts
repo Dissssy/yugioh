@@ -53,10 +53,11 @@ export function discordRoutes(app: Express, config: Config, db: Db, discord: Dis
   const startSession = (res: Response, discordId: string, options: CookieOptions) =>
     res.cookie(SESSION_COOKIE, discordId, { ...options, maxAge: SESSION_MS });
 
-  /** The Activity asks for its client ID before it can ask Discord to sign the player in. */
+  // The Activity asks for its client ID before it can ask Discord to sign the player in, and for the site's own address,
+  // since links copied inside Discord must point at the website rather than Discord's proxy.
   app.get('/api/discord', (_req, res) => {
     if (!discord) return void res.status(404).json({ error: 'discord_off' });
-    res.json({ clientId: discord.clientId });
+    res.json({ clientId: discord.clientId, siteUrl: config.BASE_URL });
   });
 
   // Signs in someone in the Activity, from the code Discord's `authorize` gave it. Anyone can run Discord's login

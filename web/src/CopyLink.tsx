@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react';
+import { copyLink, siteLink } from './discord.ts';
 
 /** A button that copies a link to a page of this site, `path` from the root, and says so for a moment. */
 export function CopyLink({ path, label = 'Copy link', className = 'quiet' }: { path: string; label?: string; className?: string }) {
-  const [copied, setCopied] = useState(false);
+  const [done, setDone] = useState<'copied' | 'opened' | null>(null);
   useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
+    if (!done) return;
+    const timer = setTimeout(() => setDone(null), 2000);
     return () => clearTimeout(timer);
-  }, [copied]);
+  }, [done]);
   return (
     <button
       type="button"
       className={className}
       title="Copy a link anyone can open"
-      onClick={() => void navigator.clipboard.writeText(new URL(path, window.location.origin).href).then(() => setCopied(true))}
+      onClick={() => void copyLink(siteLink(path)).then((copied) => setDone(copied ? 'copied' : 'opened'))}
     >
-      {copied ? 'Link copied' : label}
+      {done === 'copied' ? 'Link copied' : done === 'opened' ? 'Opened in your browser' : label}
     </button>
   );
 }

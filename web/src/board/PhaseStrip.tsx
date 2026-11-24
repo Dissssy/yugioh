@@ -10,6 +10,8 @@ const phases: { phase: Phase; short: string; name: string }[] = [
   { phase: 'end', short: 'EP', name: 'End Phase' },
 ];
 
+export const phaseName = (phase: Phase) => phases.find((p) => p.phase === phase)!.name;
+
 /** Whose turn it is. */
 export function TurnLabel({ turn, label }: { turn: number; label: string }) {
   return (

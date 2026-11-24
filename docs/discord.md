@@ -2,7 +2,7 @@
 
 As of 2026-11-24. The site also runs as a Discord Activity: the same web app, opened by Discord inside a call or a DM and served through Discord's proxy. It is built for the app's testers only, so it never needs Discord's app verification.
 
-Built so far: signing in inside the Activity, Discord logins and account linking on the website, and the Tables. Planned next: a pop-out layout, share links that work from inside Discord, and live mini boards on the tables.
+Built so far: signing in inside the Activity, Discord logins and account linking on the website, the Tables, links that work from inside Discord, and a small view for Discord's pop-out. Planned next: live mini boards on the tables, and an easier setup guide for new testers.
 
 ## Who can play
 
@@ -22,6 +22,12 @@ Built so far: signing in inside the Activity, Discord logins and account linking
 Inside the Activity the home page shows **Tables** where the website shows "Your duels": every duel started in the server the Activity was opened in (or, in a DM, that DM). They are grouped as open seats (Sit down), duels being played (Watch, or Play for the two players) and duels finished in the last day (Replay). The list refreshes every 5 seconds. **New table** is the usual challenge form: a challenge made inside the Activity goes on that server's tables, with no link to send.
 
 Where the Activity was opened comes from Discord's answer about the instance at sign-in (`location.guild_id`, or `channel_id` in a DM). It is kept in a second signed cookie, `discord_place`, so it can't be made up. Duels store it in `matches.place`. `GET /api/tables` lists them and answers 404 outside the Activity.
+
+## Inside Discord's window
+
+- **Links.** Inside the Activity the page runs on Discord's proxy (`<client id>.discordsays.com`), whose addresses work only there. So Share and Copy link build links to the website (`siteUrl`, the server's `BASE_URL`, from `GET /api/discord`). If Discord's frame blocks the clipboard, the link opens in the player's browser instead.
+- **Pop-out and grid.** When Discord shrinks the Activity (its picture-in-picture pop-out while the player looks at another channel, or one tile of a grid), the duel page shows only whose turn it is, the phase and both players' LP. The board comes back at full size. The web app follows Discord's `ACTIVITY_LAYOUT_MODE_UPDATE` event.
+- A zoomed-in Discord zooms the Activity too, so the board often gets the compact layout there.
 
 ## Discord on the website, and linking
 

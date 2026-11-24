@@ -451,3 +451,10 @@ form.report-ruling textarea { width: 100%; box-sizing: border-box; font: inherit
 .duel.stacked.typing { grid-template-rows: minmax(0, 1fr); }
 .watch-note .dot { flex: none; }
 .watch-note { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.85em; }
+
+/* Discord's pop-out or grid tile (docs/discord.md): too small for the board, so only whose turn it is and the LP. */
+.duel.small-frame { display: grid; place-items: center; grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.duel.small-frame > :not(.small-frame-summary) { display: none; }
+.small-frame-summary { display: grid; gap: 4px; padding: 8px; text-align: center; font-size: clamp(13px, 8vmin, 22px); }
+.small-frame-summary p { margin: 0; }
+.small-frame-summary .active strong { color: var(--accent); }
