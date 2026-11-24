@@ -1574,6 +1574,20 @@ describe('activating effects', () => {
     expect(logFor(t.events, 0).at(-1)!.event).toMatchObject({ type: 'moved', card: 'a7' });
   });
 
+  it('keeps a Set card hidden from its owner\'s opponent when it is targeted and returned to the hand', () => {
+    const t = new Table(stacked([9, ...filler(39)], [6, ...filler(39, 2)]));
+    t.play(0, { type: 'endTurn', discard: [] });
+    t.play(1, { type: 'setSpellTrap', card: 'b0', zone: 0 }).play(1, { type: 'endTurn', discard: [] });
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 2 });
+    ops(t, [{ op: 'declare_targets', cards: ['b0'] }], 'activation');
+    ops(t, [{ op: 'move', card: 'b0', to: 'hand' }]);
+    const mine = logFor(t.events, 0).slice(-2);
+    expect(mine.map((e) => e.text)).toEqual(['Targeting a face-down card', "Yuma's card from the field to the hand"]);
+    expect(JSON.stringify(mine)).not.toContain('b0');
+    expect(JSON.stringify(logFor(t.events, 'none'))).not.toContain('Trap Hole');
+    expect(logFor(t.events, 1).slice(-2).map((e) => e.text)).toEqual(['Targeting Trap Hole', 'Trap Hole from the field to the hand']);
+  });
+
   it('modifies stats for battle and ends the modifier on time', () => {
     const t = new Table(stacked([5, 1, 1, 1, 1, ...filler(35)], filler(40, 2)));
     t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });

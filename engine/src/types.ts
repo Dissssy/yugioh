@@ -1043,6 +1043,7 @@ export type LogEvent =
           | 'attackDeclared'
           | 'judged'
           | 'moved'
+          | 'targeted'
           | 'deckShuffled'
           | 'appealed'
           | 'sheetUpdated'
@@ -1061,6 +1062,8 @@ export type LogEvent =
   | { type: 'escalated'; asked: number; outcome: EscalationRecord['outcome']; explanation: string }
   | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number }
   | (Omit<Extract<DuelEvent, { type: 'moved' }>, 'card'> & { card: string | null })
+  /** A target the viewer can't see (a Set card) is null. */
+  | { type: 'targeted'; cards: (string | null)[] }
   /** A judge decision. `card` is null when the player can't see it. Contest it by its log entry's `seq`. */
   | { type: 'judged'; stage: 'activation' | 'resolution'; player: Seat; card: string | null; legal: boolean; summary: string; failed: boolean }
   | { type: 'appealed'; judged: number; by: Seat; verdict: 'upheld' | 'overturned'; explanation: string }

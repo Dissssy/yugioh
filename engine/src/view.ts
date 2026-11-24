@@ -80,11 +80,12 @@ export function replaySteps(events: readonly DuelEvent[], from: Seat | 'both', q
   const steps: SeatStep[] = [{ entry: null, view: still(state) }];
   events.forEach((event, seq) => {
     if (seq === 0) return;
+    const before = state;
     state = evolve(state, event);
     const asker = event.type === 'asked' || event.type === 'escalated' ? event.record.player : null;
     if (asker !== null && questionsOf !== 'both' && questionsOf !== asker) return;
     // A question shown here is shown whatever the viewpoint, as its asker saw it.
-    const entry = entryFor(state, event, seq, state.turn, asker ?? sight);
+    const entry = entryFor(before, state, event, seq, asker ?? sight);
     if (entry) steps.push({ entry, view: still(state) });
   });
   return steps;
@@ -103,16 +104,20 @@ function startFor(state: DuelState, seat: Seat | null): StartView | null {
 export function logFor(events: readonly DuelEvent[], sight: Sight): LogEntry[] {
   let state = replay(events.slice(0, 1));
   return events.flatMap((event, seq) => {
+    const before = state;
     if (seq > 0) state = evolve(state, event);
-    const entry = entryFor(state, event, seq, state.turn, sight);
+    const entry = entryFor(before, state, event, seq, sight);
     return entry ? [entry] : [];
   });
 }
 
-/** One event as a log entry for what `sight` sees, or null for events it never sees. `state` is the state right after the event. */
-export function entryFor(state: DuelState, event: DuelEvent, seq: number, turn: number, sight: Sight): LogEntry | null {
-  const visible = visibleEvent(state, event, sight);
-  return visible && { seq, turn, event: visible, text: describe(state, visible) };
+/**
+ * One event as a log entry for what `sight` sees, or null for events it never sees. `before` and `after` are the states
+ * around the event: a card the event names is shown when the viewer could see it on either side of it.
+ */
+export function entryFor(before: DuelState, after: DuelState, event: DuelEvent, seq: number, sight: Sight): LogEntry | null {
+  const visible = visibleEvent(before, after, event, sight);
+  return visible && { seq, turn: after.turn, event: visible, text: describe(after, visible) };
 }
 
 /**
@@ -220,9 +225,6 @@ function reviewText(state: DuelState, event: DuelEvent): string {
   }
 }
 
-/** Places both players can see into. */
-const PUBLIC: Place[] = ['monsters', 'spellTraps', 'materials', 'graveyard', 'banished'];
-
 /** Whether a card is visible to `seat` where it is now; with `seat` null, whether it is visible to everyone. */
 export function visibleTo(state: DuelState, id: string, seat: Seat | null): boolean {
   const at = locate(state, id);
@@ -232,8 +234,10 @@ export function visibleTo(state: DuelState, id: string, seat: Seat | null): bool
   return at.zone !== 'deck' && at.seat === seat;
 }
 
-function visibleEvent(state: DuelState, event: DuelEvent, sight: Sight): LogEvent | null {
+function visibleEvent(before: DuelState, state: DuelState, event: DuelEvent, sight: Sight): LogEvent | null {
   const seat = seatOf(sight);
+  /** Whether the viewer saw the card just before the event or sees it right after (a Set card sent to the GY, say). */
+  const sees = (id: string) => sight === 'all' || visibleTo(before, id, seat) || visibleTo(state, id, seat);
   switch (event.type) {
     case 'duelStarted':
     case 'intent':
@@ -254,10 +258,12 @@ function visibleEvent(state: DuelState, event: DuelEvent, sight: Sight): LogEven
     case 'escalated':
       return knows(sight, event.record.player) ? { type: 'escalated', asked: event.record.asked, outcome: event.record.outcome, explanation: event.record.explanation } : null;
     case 'moved': {
-      // A card moving between places this player can't see (Deck to hand, say) stays anonymous.
-      const seen = knows(sight, event.owner) || PUBLIC.includes(event.from) || visibleTo(state, event.card, seat);
-      return { ...event, card: seen ? event.card : null };
+      // A card moving between places this player can't see (Deck to hand, or a Set card back to the hand) stays anonymous.
+      return { ...event, card: knows(sight, event.owner) || sees(event.card) ? event.card : null };
     }
+    case 'targeted':
+      // A face-down target stays face-down: the viewer learns only that a Set card was targeted.
+      return { ...event, cards: event.cards.map((id) => (sees(id) ? id : null)) };
     case 'judged': {
       const r = event.record;
       // A refused activation from the hand never revealed the card to the opponent, so they see nothing.
@@ -352,7 +358,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'effectActivated':
       return `${who(event.player)} activated ${name(event.card)}`;
     case 'targeted':
-      return `Targeting ${names(event.cards)}`;
+      return `Targeting ${event.cards.map((id) => (id ? name(id) : 'a face-down card')).join(', ')}`;
     case 'effectChosen':
       return `Chose: ${event.choice}`;
     case 'moved': {

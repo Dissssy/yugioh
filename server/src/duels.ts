@@ -742,13 +742,16 @@ export class Duels {
   private broadcast(before: DuelState, events: DuelEvent[], first: number, duel: LiveDuel) {
     const updateFor = (seat: Seat, sight: Sight): Extract<DuelUpdate, { type: 'steps' }> => {
       let state = before;
+      let lastSeen = false;
       const steps: SeatStep[] = events.flatMap((event, i) => {
+        const prior = state;
         state = evolve(state, event);
-        const entry = entryFor(state, event, first + i, state.turn, sight);
+        const entry = entryFor(prior, state, event, first + i, sight);
+        lastSeen = entry !== null;
         return entry ? [{ entry, view: viewFor(state, seat, sight) }] : [];
       });
       // A change nobody sees in the log (a pass) still changes what each player may do.
-      if (!entryFor(state, events.at(-1)!, first + events.length - 1, state.turn, sight)) steps.push({ entry: null, view: viewFor(state, seat, sight) });
+      if (!lastSeen) steps.push({ entry: null, view: viewFor(state, seat, sight) });
       for (const step of steps.slice(0, -1)) step.view.actions = [];
       return { type: 'steps', steps };
     };
