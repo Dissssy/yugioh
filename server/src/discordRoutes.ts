@@ -62,7 +62,8 @@ export function discordRoutes(app: Express, config: Config, db: Db, discord: Dis
 
   // Signs in someone in the Activity, from the code Discord's `authorize` gave it. Anyone can run Discord's login
   // against the app outside Discord, so only people Discord shows inside a running copy of the Activity get in, and
-  // only the app's testers can open it. Answers with the access token the Activity needs for Discord's `authenticate`.
+  // only members of a server the app was added to, and its testers, can open it. Answers with the access token the
+  // Activity needs for Discord's `authenticate`.
   const sessionBody = z.object({ code: z.string().min(1), instanceId: z.string().min(1) });
   app.post('/api/discord/session', async (req, res) => {
     if (!discord) return void res.status(404).json({ error: 'discord_off' });

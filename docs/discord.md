@@ -1,20 +1,20 @@
 # Playing in Discord
 
-As of 2026-11-24. The site also runs as a Discord Activity: the same web app, opened by Discord inside a call or a DM and served through Discord's proxy. It is built for the app's testers only, so it never needs Discord's app verification.
+As of 2026-11-24. The site also runs as a Discord Activity: the same web app, opened by Discord inside a call or a DM and served through Discord's proxy. It is built for people in the servers the app was added to and the app's testers, so it never needs Discord's app verification.
 
-Built so far: signing in inside the Activity, Discord logins and account linking on the website, open games with live mini boards, links that work from inside Discord, and a small view for Discord's pop-out. Planned next: an easier setup guide for new testers.
+Built so far: signing in inside the Activity, Discord logins and account linking on the website, open games with live mini boards, links that work from inside Discord, and a small view for Discord's pop-out. An invite message for new players is in the project files.
 
 ## Who can play
 
-- Until an Activity is verified, Discord shows it only to the app's owner, its developer team and its **App Testers** (up to 50, invited by email). Testers turn on Application Test Mode with the app's ID.
+- Until an Activity is verified, anyone in a server the app was added to can launch it there and join it. Elsewhere (DMs, group DMs, or a user install from the app's link) only the app's owner, its developer team and its **App Testers** (up to 50, added by Discord username, each needing a verified email to accept) can launch or join it; anyone else sees "this server doesn't have access to the activity". Testers don't need Application Test Mode, which also turns off when Discord restarts.
 - Unverified Activities launch only in servers with **fewer than 25 members**, and in DMs and group DMs. Testers aren't exempt.
 - Verification would make the Activity visible to everyone on Discord and needs Discord's review. It isn't planned (the card art belongs to Konami).
 
 ## How signing in works
 
 1. Discord opens the site with `frame_id`, `instance_id` and other values in the address. `web/src/discord.ts` sees `frame_id`, loads Discord's Embedded App SDK and asks Discord to `authorize` the player (scope `identify`; Discord asks only the first time).
-2. The web app sends the code and the instance ID to `POST /api/discord/session`. The server trades the code for an access token, reads who the player is, and then asks Discord, with the app's bot token, who is in that running instance (`GET /applications/{app}/activity-instances/{instance}`). Anyone can run Discord's login against the app outside Discord, so the server lets someone in only when Discord lists them inside a running copy of the Activity, which only testers can open.
-3. The account is found or created by Discord user ID (`users.discord_id`). Testers are trusted like approved players: a new account starts approved, and a pending one is approved. An account an admin rejected stays rejected.
+2. The web app sends the code and the instance ID to `POST /api/discord/session`. The server trades the code for an access token, reads who the player is, and then asks Discord, with the app's bot token, who is in that running instance (`GET /applications/{app}/activity-instances/{instance}`). Anyone can run Discord's login against the app outside Discord, so the server lets someone in only when Discord lists them inside a running copy of the Activity, which only members of a server the app was added to, and testers, can open.
+3. The account is found or created by Discord user ID (`users.discord_id`). Everyone who gets in this way is trusted like an approved player: a new account starts approved, and a pending one is approved. An account an admin rejected stays rejected.
 4. The server sets a signed `discord` cookie holding the account ID, marked `SameSite=None; Secure; Partitioned` as Discord's docs advise for iframes, so the API and the live duel streams work as they do on the website. The Activity signs in again each time it opens.
 
 ## Open games
@@ -56,7 +56,7 @@ In the [Discord Developer Portal](https://discord.com/developers/applications):
 4. **Activities → URL Mappings:** root mapping, prefix `/`, target `yugioh.p51.nl`.
 5. **Activities → Settings:** tick Enable Activities. Choose the supported platforms (web/desktop, iOS, Android). Enabling creates the "Launch" entry point command.
 6. **Installation:** under Installation Contexts tick Guild Install (and User Install for DMs), then use the install link to add the app to the server you'll play in.
-7. **App Testers:** invite the people who should play. Each accepts the email, then turns on Application Test Mode in Discord's Advanced settings with the app's ID.
+7. **App Testers:** add people who should also play in DMs, by Discord username. Each accepts Discord's email and can then add the app to their account with the install link. Playing in the server needs none of this.
 8. Add to the server's `.env` and restart the app:
 
    ```
