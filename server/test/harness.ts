@@ -64,7 +64,7 @@ export class FakeDiscord implements DiscordApi {
 
   async instance(instanceId: string) {
     const users = this.instances.get(instanceId);
-    return users ? { users, place: this.places.get(instanceId) ?? 'test-server' } : null;
+    return users ? { users, place: this.places.get(instanceId) ?? 'guild:test-server' } : null;
   }
 }
 

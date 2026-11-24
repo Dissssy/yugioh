@@ -15,7 +15,10 @@ export interface DiscordUser {
   username: string;
 }
 
-/** A running copy of the Activity: the Discord user IDs in it, and the server (or, in a DM, the channel) it runs in. */
+/**
+ * A running copy of the Activity: the Discord user IDs in it, and where it runs, as `guild:<server id>` or, in a DM or
+ * group DM, `dm:<channel id>`.
+ */
 export interface ActivityInstance {
   users: string[];
   place: string;
@@ -63,7 +66,8 @@ export function discordApi(config: DiscordConfig): DiscordApi {
       const path = `/applications/${config.clientId}/activity-instances/${encodeURIComponent(instanceId)}`;
       type Instance = { users: string[]; location: { guild_id?: string; channel_id: string } };
       const instance = await call<Instance>(path, { headers: { authorization: `Bot ${config.botToken}` } }, 404);
-      return instance && { users: instance.users, place: instance.location.guild_id ?? instance.location.channel_id };
+      const { guild_id: guild, channel_id: channel } = instance?.location ?? {};
+      return instance && { users: instance.users, place: guild ? `guild:${guild}` : `dm:${channel}` };
     },
   };
 }

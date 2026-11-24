@@ -1,7 +1,9 @@
 import type { Me } from '@yugioh/shared';
 import { Link } from 'react-router';
+import type { ReactNode } from 'react';
 import { inActivity } from '../discord.ts';
-import { Duels, NewChallenge, PlayClaude, Tables } from './Duels.tsx';
+import { ActivityHome } from './ActivityHome.tsx';
+import { Duels, NewChallenge, PlayClaude } from './Duels.tsx';
 import { Notice } from './Notice.tsx';
 
 export const formatDate = (iso: string) =>
@@ -39,6 +41,7 @@ export function Home({ me }: { me: Me }) {
             Your account hasn't been approved for this site.
           </Notice>
         );
+      if (inActivity) return <ActivityHome title={`Hi ${user.username}`} />;
       return (
         <Dashboard title={`Hi ${user.username}`}>
           <NewChallenge />
@@ -49,15 +52,15 @@ export function Home({ me }: { me: Me }) {
   }
 }
 
-/** Two columns: things to do on the left; on the right the viewer's duels, or the tables in the Discord Activity. */
-function Dashboard({ title, children }: { title: string; children: React.ReactNode }) {
+/** Two columns: things to do on the left; on the right the viewer's duels, or another list of duels. */
+export function Dashboard({ title, children, list = <Duels /> }: { title: string; children: ReactNode; list?: ReactNode }) {
   return (
     <div className="dashboard">
       <div className="dashboard-side">
         <h1>{title}</h1>
         {children}
       </div>
-      {inActivity ? <Tables /> : <Duels />}
+      {list}
     </div>
   );
 }

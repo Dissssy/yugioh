@@ -6,7 +6,7 @@ import { Router, type Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { HANDS, type Intent } from '@yugioh/engine';
-import { isAdmin, isSideSwap, SECTION_SIZE, type DuelDeckSave, type DuelPrep } from '@yugioh/shared';
+import { isAdmin, isSideSwap, SECTION_SIZE, type DuelDeckSave, type DuelPrep, type OpenGames } from '@yugioh/shared';
 import type { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
 import { defaultBanlist, toBanlist, visibleBanlist } from './banlistRoutes.ts';
@@ -99,18 +99,20 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const banlist = await (body.data.banlistId === undefined ? defaultBanlist(db) : visibleBanlist(db, body.data.banlistId, p.viewer.user.id));
     if (!banlist) return void res.status(404).json({ error: "That banlist doesn't exist." });
-    // A challenge made in the Discord Activity goes on the tables of the server (or DM) it was opened in.
+    // A challenge made in the Discord Activity is one of the open games of the server (or DM) it was opened in.
     const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), toBanlist(banlist), body.data.premadeOnly, placeOfRes(res));
     res.status(201).json(await duels.summarize((await duels.find(duelId))!, p.key, false));
   });
 
-  // The Discord Activity's tables (docs/discord.md): every duel started where the Activity was opened, to join or watch.
-  router.get('/tables', async (_req, res) => {
+  // The Discord Activity's open games (docs/discord.md): every duel started where the Activity was opened, to join or
+  // watch. A DM plays one game at a time, so the Activity there goes straight to it.
+  router.get('/open-games', async (_req, res) => {
     const viewer = viewerOf(res);
     const place = placeOfRes(res);
-    if (place === null) return void res.status(404).json({ error: 'Tables are only in the Discord Activity.' });
-    const rows = await duels.tables(place);
-    res.json(await Promise.all(rows.map((row) => duels.summarize(row, playerKey(viewer), mayJoin(viewer)))));
+    if (place === null) return void res.status(404).json({ error: 'Open games are only in the Discord Activity.' });
+    const rows = await duels.openGames(place);
+    const games = await Promise.all(rows.map((row) => duels.summarize(row, playerKey(viewer), mayJoin(viewer))));
+    res.json({ dm: place.startsWith('dm:'), games } satisfies OpenGames);
   });
 
   // Anyone holding the link may look at a duel; the random ID is what keeps it private.

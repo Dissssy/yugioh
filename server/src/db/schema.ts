@@ -131,7 +131,7 @@ export const matches = pgTable(
     deck1: jsonb('deck1').$type<DuelDeck>(),
     ready0: boolean('ready0').notNull().default(false),
     ready1: boolean('ready1').notNull().default(false),
-    /** The Discord server (or DM) whose tables show this duel, when it was started in the Activity (docs/discord.md). */
+    /** `guild:<id>` or `dm:<id>`: whose open games show this duel, when it was started in the Activity (docs/discord.md). */
     place: text('place'),
   },
   (t) => [index('matches_place').on(t.place, t.createdAt)],

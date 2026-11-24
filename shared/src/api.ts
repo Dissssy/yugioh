@@ -37,6 +37,12 @@ export type Me =
   | { kind: 'guest'; guest: { name: string } }
   | { kind: 'user'; user: User; settings: UserSettings; logins: Logins };
 
+/** The Discord Activity's open games where it was opened (docs/discord.md); `dm` when that is a DM, not a server. */
+export interface OpenGames {
+  dm: boolean;
+  games: DuelSummary[];
+}
+
 /** Which logins an account has: Auth0 on the website, Discord, or both once linked (docs/discord.md). */
 export interface Logins {
   auth0: boolean;
