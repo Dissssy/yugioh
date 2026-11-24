@@ -26,10 +26,11 @@ interface Hover {
   pinned: boolean;
 }
 
-/** A monster's ATK and DEF on the field now, which effects may have changed from the printed ones. */
+/** A monster's ATK, DEF and Level on the field now, which effects may have changed from the printed ones. */
 export interface Stats {
   atk: number;
   def: number;
+  level: number | null;
 }
 
 type Bind = (card: CardData | null, stats?: Stats | null) => {
@@ -38,13 +39,13 @@ type Bind = (card: CardData | null, stats?: Stats | null) => {
   onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
   /** Marks the element as showing this card (its passcode), for zooming in on whatever is under the pointer. */
   'data-zoom'?: number;
-  /** Its ATK and DEF now, as `atk/def`, read when its details show so they are always current. */
+  /** Its ATK, DEF and Level now, as `atk/def/level` (Level empty when it has none), read when its details show so they are always current. */
   'data-stats'?: string;
 };
 
 const statsOf = (el: HTMLElement): Stats | null => {
-  const [atk, def] = el.dataset.stats?.split('/').map(Number) ?? [];
-  return atk === undefined || def === undefined ? null : { atk, def };
+  const [atk, def, level] = el.dataset.stats?.split('/') ?? [];
+  return atk === undefined || def === undefined ? null : { atk: Number(atk), def: Number(def), level: level ? Number(level) : null };
 };
 
 const TooltipContext = createContext<Bind>(() => ({}));
@@ -88,7 +89,7 @@ export function CardTooltipProvider({
     (card, stats) => {
       if (!card) return {};
       known.current.set(card.code, card);
-      const marks = { 'data-zoom': card.code, 'data-stats': stats ? `${stats.atk}/${stats.def}` : undefined };
+      const marks = { 'data-zoom': card.code, 'data-stats': stats ? `${stats.atk}/${stats.def}/${stats.level ?? ''}` : undefined };
       if (suppressed) return marks;
       return {
         ...marks,

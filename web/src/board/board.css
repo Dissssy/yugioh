@@ -393,6 +393,9 @@ button.phase.go { border: 0; background: none; color: var(--fg); text-decoration
 .slot.material { position: relative; }
 .materials-chip { position: absolute; top: 2px; right: 2px; z-index: 3; min-width: 1.4em; padding: 0 5px; border-radius: 999px; font-size: 0.7em; font-weight: 700; text-align: center; background: var(--gold); color: #000; pointer-events: none; }
 .counters-chip { position: absolute; bottom: 2px; left: 2px; z-index: 3; min-width: 1.4em; padding: 0 5px; border-radius: 999px; font-size: 0.7em; font-weight: 700; text-align: center; background: #6b4fd8; color: #fff; pointer-events: none; }
+.level-chip { position: absolute; top: 2px; left: 2px; z-index: 3; min-width: 1.4em; padding: 0 5px; border-radius: 999px; font-size: 0.7em; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; color: #fff; pointer-events: none; white-space: nowrap; }
+.level-chip.up { background: #2f9e44; }
+.level-chip.down { background: var(--danger); }
 .stats-badge .up { color: #2f9e44; }
 .stats-badge .down { color: var(--danger); }
 .stats-now .up { color: #2f9e44; font-weight: 700; }

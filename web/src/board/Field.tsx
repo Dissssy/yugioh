@@ -169,6 +169,7 @@ function Zone({ row, index, card, seat, mine, turned, marks, zoneState, onZone, 
         />
       )}
       {card && <StatsBadge view={card} />}
+      {card && <LevelChip view={card} />}
       {!card && row === 's' && index === FIELD_ZONE && <span className="zone-label">Field</span>}
     </div>
   );
@@ -228,6 +229,18 @@ function StatsBadge({ view }: { view: FieldCardView }) {
   return (
     <span className="stats-badge" aria-label={`ATK ${view.stats.atk}, DEF ${view.stats.def}`}>
       <span className={tone(view.stats.atk, printed.atk)}>{view.stats.atk}</span> / <span className={tone(view.stats.def, printed.def)}>{view.stats.def}</span>
+    </span>
+  );
+}
+
+/** A face-up monster's Level when an effect has changed it, green when raised and red when lowered. */
+function LevelChip({ view }: { view: FieldCardView }) {
+  const printed = dataOf(view.card);
+  const level = view.stats?.level ?? null;
+  if (level === null || !printed || printed.level === null || level === printed.level) return null;
+  return (
+    <span className={`level-chip ${level > printed.level ? 'up' : 'down'}`} aria-label={`Level ${level}, printed ${printed.level}`}>
+      ★{level}
     </span>
   );
 }

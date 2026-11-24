@@ -2,10 +2,12 @@ import type { CardData } from '@yugioh/engine';
 import { CardImage, TextFace, TokenFace } from './Card.tsx';
 import type { Stats } from './CardTooltip.tsx';
 
-/** The full card: big image (drawn as text when `image` is false), stats and text. `stats` are its ATK and DEF on the field now, shown when an effect changed them. */
+/** The full card: big image (drawn as text when `image` is false), stats and text. `stats` are its ATK, DEF and Level on the field now, shown when an effect changed them. */
 export function CardDetail({ card, stats = null, image = true }: { card: CardData; stats?: Stats | null; image?: boolean }) {
   const changed = stats && (stats.atk !== card.atk || stats.def !== card.def);
   const tone = (now: number, was: number | null) => (was === null || now === was ? undefined : now > was ? 'up' : 'down');
+  const level = stats?.level ?? null;
+  const levelChanged = level !== null && level !== card.level;
   return (
     <div className="card-detail">
       {card.type === 'Token' ? (
@@ -22,6 +24,12 @@ export function CardDetail({ card, stats = null, image = true }: { card: CardDat
             ? `${card.attribute ?? ''} · ${card.type.includes('XYZ') ? 'Rank' : 'Level'} ${card.level ?? '?'} · ${card.race} · ${card.type}`
             : `${card.race} ${card.type}`}
         </p>
+        {levelChanged && (
+          <p className="stats-now">
+            Level <span className={tone(level, card.level)}>{level}</span>
+            <span className="muted small"> (printed {card.level ?? '?'})</span>
+          </p>
+        )}
         {card.kind === 'monster' &&
           (changed ? (
             <p className="stats-now">
