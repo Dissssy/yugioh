@@ -5,7 +5,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
-import { isAdmin, NO_BANLIST, type AdminDuels, type Me, type Rulings, type UserSettings } from '@yugioh/shared';
+import { isAdmin, NO_BANLIST, type AdminDuels, type ApiKey, type Me, type ReviewRequest, type Rulings, type UserSettings } from '@yugioh/shared';
 import { findUserBySub, listUsers, loginsOf, setRole, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import { duelCosts } from './costs.ts';
@@ -22,6 +22,7 @@ import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
 import { matchReport, reportText } from './matchReport.ts';
 import { Opponents } from './opponent/opponent.ts';
+import { accountOfKey, createApiKey, createReview, listApiKeys, listReviews, revokeApiKey, reviewBundle, updateReview } from './reviews.ts';
 import { editSheet, resolveReport, rulings } from './rulings.ts';
 import { username } from './usernames.ts';
 import { userKey, viewerOf, type Viewer } from './viewer.ts';
@@ -81,6 +82,16 @@ export function createApp(config: Config, db: Db, ai: Ai, discord: DiscordApi | 
 
   // Works out who is asking: a signed-in account, a guest, or nobody.
   app.use('/api', async (req, res, next) => {
+    // An admin API key (docs/review-api.md) works only on the admin API, as an admin and never as the super admin.
+    const bearer = /^Bearer (.+)$/.exec(req.get('authorization') ?? '')?.[1];
+    if (bearer !== undefined) {
+      if (!req.path.startsWith('/admin/')) return void res.status(403).json({ error: 'api_keys_are_admin_only' });
+      const row = await accountOfKey(db, bearer);
+      const user = row && toUser(row);
+      res.locals.viewer = user ? ({ kind: 'user', user: { ...user, role: isAdmin(user.role) ? 'admin' : user.role }, settings: settingsOf(row), logins: loginsOf(row) } satisfies Viewer) : { kind: 'anonymous' };
+      res.locals.place = null;
+      return next();
+    }
     res.locals.viewer = await resolveViewer(req, res);
     res.locals.place = placeOf(req);
     next();
@@ -262,6 +273,67 @@ export function createApp(config: Config, db: Db, ai: Ai, discord: DiscordApi | 
     if (!id.success) return void res.status(400).json({ error: 'bad_request' });
     if (!(await resolveReport(db, id.data))) return void res.status(404).json({ error: 'not_found' });
     res.status(204).end();
+  });
+
+  // Admin API keys, for tools such as the Claude thread that works the review queue.
+  app.get('/api/admin/keys', requireSuperAdmin, async (_req, res) => {
+    res.json((await listApiKeys(db)) satisfies ApiKey[]);
+  });
+
+  const keyBody = z.object({ name: z.string().trim().min(1).max(100) });
+  app.post('/api/admin/keys', requireSuperAdmin, async (req, res) => {
+    const body = keyBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'Name the key.' });
+    const v = viewer(res) as Extract<Viewer, { kind: 'user' }>;
+    res.status(201).json(await createApiKey(db, v.user.id, body.data.name));
+  });
+
+  app.delete('/api/admin/keys/:id', requireSuperAdmin, async (req, res) => {
+    const id = z.coerce.number().int().safeParse(req.params.id);
+    if (!id.success) return void res.status(400).json({ error: 'bad_request' });
+    if (!(await revokeApiKey(db, id.data))) return void res.status(404).json({ error: 'not_found' });
+    res.status(204).end();
+  });
+
+  // Review requests: an admin sends a duel to Claude, and a Claude thread claims it, fixes it and reports back.
+  const reviewStatus = z.enum(['open', 'claimed', 'fixed', 'wont_fix']);
+  const reviewBody = z.object({
+    matchId: z.string().min(1),
+    seq: z.number().int().positive().nullable().default(null),
+    code: z.number().int().nullable().default(null),
+    note: z.string().trim().min(1).max(2000),
+  });
+  app.post('/api/admin/reviews', requireAdmin, async (req, res) => {
+    const body = reviewBody.safeParse(req.body);
+    if (!body.success) return void res.status(400).json({ error: 'Give the duel and a note on what looks wrong.' });
+    const v = viewer(res) as Extract<Viewer, { kind: 'user' }>;
+    const review = await createReview(db, v.user.id, body.data);
+    if (!review) return void res.status(404).json({ error: 'There is no such duel, log entry or card.' });
+    res.status(201).json(review satisfies ReviewRequest);
+  });
+
+  app.get('/api/admin/reviews', requireAdmin, async (req, res) => {
+    const status = reviewStatus.optional().safeParse(req.query.status);
+    if (!status.success) return void res.status(400).json({ error: 'bad_request' });
+    res.json((await listReviews(db, status.data ?? null)) satisfies ReviewRequest[]);
+  });
+
+  app.get('/api/admin/reviews/:id/bundle', requireAdmin, async (req, res) => {
+    const id = z.coerce.number().int().safeParse(req.params.id);
+    if (!id.success) return void res.status(400).json({ error: 'bad_request' });
+    const bundle = await reviewBundle(db, id.data, config.GIT_SHA || null);
+    if (!bundle) return void res.status(404).json({ error: 'not_found' });
+    res.json(bundle);
+  });
+
+  const reviewChange = z.object({ status: reviewStatus, result: z.string().trim().min(1).max(4000).optional(), prUrl: z.url().optional() });
+  app.post('/api/admin/reviews/:id', requireAdmin, async (req, res) => {
+    const id = z.coerce.number().int().safeParse(req.params.id);
+    const body = reviewChange.safeParse(req.body);
+    if (!id.success || !body.success) return void res.status(400).json({ error: 'bad_request' });
+    const review = await updateReview(db, id.data, body.data);
+    if (!review) return void res.status(404).json({ error: 'not_found' });
+    res.json(review satisfies ReviewRequest);
   });
 
   // An admin request that fails says why, so the admin page can show it.

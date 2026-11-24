@@ -228,3 +228,44 @@ export const sheetReports = pgTable('sheet_reports', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
 });
+
+/**
+ * Admin API keys, for tools such as a Claude thread working the review queue (docs/review-api.md). Only the SHA-256 of
+ * the key is kept. A key acts as an admin of the account that made it, never as super admin, and only on /api/admin.
+ */
+export const apiKeys = pgTable('api_keys', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  hash: text('hash').notNull().unique(),
+  createdBy: integer('created_by')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+});
+
+export const reviewStatus = pgEnum('review_status', ['open', 'claimed', 'fixed', 'wont_fix']);
+
+/**
+ * Something an admin sent to Claude to look at again: a duel, a moment in it (`seq`), and maybe a card. A Claude thread
+ * claims it, fixes the cause in a pull request and reports back (docs/review-api.md).
+ */
+export const reviewRequests = pgTable('review_requests', {
+  id: serial('id').primaryKey(),
+  matchId: text('match_id')
+    .notNull()
+    .references(() => matches.id, { onDelete: 'cascade' }),
+  /** The log entry it is about, or null for the duel as a whole. */
+  seq: integer('seq'),
+  code: integer('code').references(() => cards.id, { onDelete: 'cascade' }),
+  note: text('note').notNull(),
+  sentBy: integer('sent_by')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  status: reviewStatus('status').notNull().default('open'),
+  /** Claude's finding, once it has one. */
+  result: text('result'),
+  prUrl: text('pr_url'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
