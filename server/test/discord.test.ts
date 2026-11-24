@@ -26,8 +26,8 @@ describe('signing in from the Discord Activity', () => {
   const yugi = { id: '1001', username: 'yugi' };
   const joey = { id: '1002', username: 'joey' };
 
-  it('tells the Activity its client ID', async () => {
-    expect((await new Browser().json(`${h.baseUrl}/api/discord`)).body).toEqual({ clientId: 'discord-client' });
+  it("tells the Activity its client ID and the site's address", async () => {
+    expect((await new Browser().json(`${h.baseUrl}/api/discord`)).body).toEqual({ clientId: 'discord-client', siteUrl: h.baseUrl });
   });
 
   it('signs in a tester inside a running instance as an approved account, with an iframe cookie', async () => {

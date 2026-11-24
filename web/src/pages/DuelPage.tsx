@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { api, errorText, loginHref } from '../api.ts';
 import { Board } from '../board/Board.tsx';
+import { CopyLink } from '../CopyLink.tsx';
+import { inActivity, siteLink } from '../discord.ts';
 import { Loading, Notice } from './Notice.tsx';
 import { Prepare } from './Prepare.tsx';
 
@@ -64,24 +66,23 @@ export function ReplayPage() {
 }
 
 function Waiting({ duel }: { duel: DuelSummary }) {
-  const link = window.location.href;
-  const [copied, setCopied] = useState(false);
+  const link = siteLink(`/duel/${duel.id}`);
   return (
     <section className="notice box">
       <p className="waiting-label" role="status">
         <span className="dot" /> Waiting for an opponent
       </p>
-      <h1>Send this link to your opponent</h1>
+      <h1>{inActivity ? 'Your table is open' : 'Send this link to your opponent'}</h1>
       <div className="notice-body">
-        <p>They can log in, or play as a guest without an account. Once they accept, you both choose your decks.</p>
+        <p>
+          {inActivity
+            ? 'Anyone here can sit down from the Tables, or you can send the link to someone on the website.'
+            : 'They can log in, or play as a guest without an account.'}{' '}
+          Once they accept, you both choose your decks.
+        </p>
         <div className="row">
           <input readOnly value={link} onFocus={(e) => e.target.select()} />
-          <button
-            className="primary"
-            onClick={() => void navigator.clipboard.writeText(link).then(() => setCopied(true))}
-          >
-            {copied ? 'Copied' : 'Copy link'}
-          </button>
+          <CopyLink path={`/duel/${duel.id}`} label="Copy link" className="primary" />
         </div>
         <p className="muted small">
           Both decks follow the <strong>{duel.banlist}</strong> banlist{duel.premadeOnly ? ', and must be premade decks' : ''}.

@@ -1,7 +1,6 @@
 import type { DuelOutcome, DuelPlayer, DuelStatus, DuelSummary } from '@yugioh/shared';
 import { Link } from 'react-router';
 import { CopyLink } from './CopyLink.tsx';
-import { inActivity } from './discord.ts';
 import { formatDate } from './pages/Home.tsx';
 
 const statusText: Record<DuelStatus, string> = { waiting: 'Waiting', preparing: 'Choosing decks', active: 'Live', finished: 'Finished' };
@@ -32,7 +31,7 @@ export function DuelCard({ duel }: { duel: DuelSummary }) {
         </span>
       </p>
       <div className="duel-card-actions">
-        {(duel.status === 'active' || finished) && !inActivity && <CopyLink path={path} label="Share" />}
+        {(duel.status === 'active' || finished) && <CopyLink path={path} label="Share" />}
         <Link className="duel-card-open" to={path} aria-label={`${finished ? 'Watch the replay of' : 'Open'} ${a.name} vs ${b?.name ?? 'an open seat'}`}>
           {openLabel(duel)}
         </Link>

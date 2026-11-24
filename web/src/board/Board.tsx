@@ -18,7 +18,7 @@ import { dropKey, ExtraMonsterZone, Field, type FieldProps, type Row } from './F
 import { OwnHand, ReadOnlyHand, type HandDrag } from './Hand.tsx';
 import { BoardLookProvider, useBoardSize, type CardMarks } from './look.ts';
 import { LpPlate } from './LpPlate.tsx';
-import { PhaseDial, PhaseStrip, TurnLabel } from './PhaseStrip.tsx';
+import { PhaseDial, PhaseStrip, phaseName, TurnLabel } from './PhaseStrip.tsx';
 import { PileViewer } from './PileViewer.tsx';
 import { ReportRuling } from './ReportRuling.tsx';
 import { StartPanel } from './StartPanel.tsx';
@@ -28,6 +28,7 @@ import { typing, useKeyboardNav } from './nav.ts';
 import { ReplayBar } from './ReplayBar.tsx';
 import { WatchBar } from './WatchBar.tsx';
 import { CopyLink } from '../CopyLink.tsx';
+import { useSmallFrame } from '../discord.ts';
 import { useDuel } from './useDuel.ts';
 import { useReplay } from './useReplay.ts';
 
@@ -115,6 +116,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
   const [moving, setMoving] = useState<string | null>(null);
   const [showKeys, setShowKeys] = useState(false);
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  const smallFrame = useSmallFrame();
   /** How many answers from the judge the log held when this player last asked, until the next one arrives. */
   const [awaiting, setAwaiting] = useState<number | null>(null);
   /** Set when an aimed attack ends on the attacker, so the click that follows doesn't open its menu. */
@@ -766,7 +768,21 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
               </>
             )}
           >
-            <div ref={setRoot} className={`duel${look.stacked ? ' stacked' : ''}${look.compact ? ' compact' : ''}${look.tight ? ' tight' : ''}${look.typing ? ' typing' : ''}${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
+            <div ref={setRoot} className={`duel${look.stacked ? ' stacked' : ''}${look.compact ? ' compact' : ''}${look.tight ? ' tight' : ''}${look.typing ? ' typing' : ''}${choosing || choice ? ' choosing' : ''}${drag ? ' dragging' : ''}${smallFrame ? ' small-frame' : ''}`} style={{ '--zone': `${look.zone}px` } as React.CSSProperties}>
+              {smallFrame && (
+                // Discord's pop-out or grid tile is too small for the board: just the score, until it's full size again.
+                <div className="small-frame-summary">
+                  <p>
+                    {turnLabel}
+                    {!view.start && <span className="muted"> · {phaseName(view.phase)}</span>}
+                  </p>
+                  {[foe, me].map((seat) => (
+                    <p key={seat} className={!view.start && view.turnPlayer === seat ? 'active' : undefined}>
+                      <span>{view.players[seat].name}</span> <strong>LP {view.players[seat].lp}</strong>
+                    </p>
+                  ))}
+                </div>
+              )}
               <div className="table" ref={setTable}>
                 {!ready ? (
                   <div className="duel-loading">Loading cards…</div>
