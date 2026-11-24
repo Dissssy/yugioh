@@ -37,6 +37,8 @@ export const useBanlists = () => useQuery({ queryKey: ['banlists'], queryFn: () 
 export const useBanlist = (id: number | null) =>
   useQuery({ queryKey: ['banlist', id], queryFn: () => api<BanlistDetail>(`/banlists/${id}`), enabled: id !== null });
 export const useDuels = () => useQuery({ queryKey: ['duels'], queryFn: () => api<DuelSummary[]>('/duels') });
+/** The duels started where the Discord Activity was opened (docs/discord.md), kept fresh while the page is open. */
+export const useTables = () => useQuery({ queryKey: ['tables'], queryFn: () => api<DuelSummary[]>('/tables'), refetchInterval: 5000 });
 
 /** The error message the server gave, or a generic one. */
 export function errorText(error: unknown): string {

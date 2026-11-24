@@ -6,7 +6,7 @@
 
 import { randomBytes, randomInt } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { and, desc, eq, or } from 'drizzle-orm';
+import { and, desc, eq, gt, ne, or } from 'drizzle-orm';
 import {
   cardOf,
   decide,
@@ -124,6 +124,8 @@ export interface OpponentModel {
 
 /** A random float in [0, 1) from the system's secure generator, for shuffles and response timing. */
 const secureRandom = () => randomInt(2 ** 47) / 2 ** 47;
+/** How long a finished duel stays on its server's tables. */
+const TABLES_FINISHED_MS = 24 * 60 * 60 * 1000;
 
 export class Duels {
   /** Called once for each AI seat of a duel that is loaded and still going, so the AI opponent can start playing it. */
@@ -145,9 +147,9 @@ export class Duels {
   }
 
   /** A challenge: the challenger takes seat 0 and waits for an opponent. Decks are chosen once both have sat down. */
-  async create(userId: number, seatKey: string, name: string, banlist: Banlist, premadeOnly: boolean): Promise<string> {
+  async create(userId: number, seatKey: string, name: string, banlist: Banlist, premadeOnly: boolean, place: string | null): Promise<string> {
     const id = randomBytes(12).toString('base64url');
-    await this.db.insert(matches).values({ id, createdBy: userId, seat0: seatKey, name0: name, banlist, premadeOnly });
+    await this.db.insert(matches).values({ id, createdBy: userId, seat0: seatKey, name0: name, banlist, premadeOnly, place });
     return id;
   }
 
@@ -171,6 +173,16 @@ export class Duels {
   /** The latest duels of everyone, for the admin. */
   async recent(): Promise<MatchRow[]> {
     return this.db.query.matches.findMany({ orderBy: [desc(matches.createdAt)], limit: 50 });
+  }
+
+  /** The tables of a Discord server or DM (docs/discord.md): its duels still going, and those finished in the last day. */
+  async tables(place: string, now = new Date()): Promise<MatchRow[]> {
+    const since = new Date(now.getTime() - TABLES_FINISHED_MS);
+    return this.db.query.matches.findMany({
+      where: and(eq(matches.place, place), or(ne(matches.status, 'finished'), gt(matches.finishedAt, since))),
+      orderBy: [desc(matches.createdAt)],
+      limit: 50,
+    });
   }
 
   /** Duels the player sits in. */

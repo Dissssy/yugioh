@@ -13,7 +13,7 @@ import { defaultBanlist, toBanlist, visibleBanlist } from './banlistRoutes.ts';
 import { deckForDuel } from './deckRoutes.ts';
 import { started, type Duels, type SeatClaim } from './duels.ts';
 import { createGuest } from './guests.ts';
-import { displayName, guestKey, guestName, playerKey, viewerOf, type Viewer } from './viewer.ts';
+import { displayName, guestKey, guestName, placeOfRes, playerKey, viewerOf, type Viewer } from './viewer.ts';
 
 const id = z.string();
 const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
@@ -99,8 +99,18 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const banlist = await (body.data.banlistId === undefined ? defaultBanlist(db) : visibleBanlist(db, body.data.banlistId, p.viewer.user.id));
     if (!banlist) return void res.status(404).json({ error: "That banlist doesn't exist." });
-    const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), toBanlist(banlist), body.data.premadeOnly);
+    // A challenge made in the Discord Activity goes on the tables of the server (or DM) it was opened in.
+    const duelId = await duels.create(p.viewer.user.id, p.key, displayName(p.viewer), toBanlist(banlist), body.data.premadeOnly, placeOfRes(res));
     res.status(201).json(await duels.summarize((await duels.find(duelId))!, p.key, false));
+  });
+
+  // The Discord Activity's tables (docs/discord.md): every duel started where the Activity was opened, to join or watch.
+  router.get('/tables', async (_req, res) => {
+    const viewer = viewerOf(res);
+    const place = placeOfRes(res);
+    if (place === null) return void res.status(404).json({ error: 'Tables are only in the Discord Activity.' });
+    const rows = await duels.tables(place);
+    res.json(await Promise.all(rows.map((row) => duels.summarize(row, playerKey(viewer), mayJoin(viewer)))));
   });
 
   // Anyone holding the link may look at a duel; the random ID is what keeps it private.

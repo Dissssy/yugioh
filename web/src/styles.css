@@ -305,3 +305,5 @@ button.link { color: var(--accent); cursor: pointer; padding: 0; }
 .logins dd { margin: 0; }
 .login { display: grid; justify-items: center; text-align: center; }
 .login .button { min-width: 16em; }
+.table-group { display: grid; gap: 6px; }
+.table-group h3 { margin: 4px 0 0; text-transform: uppercase; letter-spacing: 0.04em; }
