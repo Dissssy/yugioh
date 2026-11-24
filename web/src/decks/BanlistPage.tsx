@@ -9,6 +9,7 @@ import { Loading, Notice } from '../pages/Notice.tsx';
 import { useCatalog, type Catalog } from './catalog.ts';
 import { CardSearch } from './CardSearch.tsx';
 import { LimitBadge } from './DeckEditor.tsx';
+import { peekProps, usePeek, type Peek } from './interaction.ts';
 
 /** How long the list rests unchanged before it saves. */
 const SAVE_DELAY_MS = 700;
@@ -36,7 +37,7 @@ function Editor({ banlist, catalog, canCopy }: { banlist: BanlistDetail; catalog
   const [name, setName] = useState(banlist.name);
   const [shared, setShared] = useState(banlist.shared);
   const [limits, setLimits] = useState(banlist.limits);
-  const [shown, setShown] = useState<CatalogCard | null>(null);
+  const { shown, peek } = usePeek<CatalogCard>(null);
   const save = useAutosave(banlist.id, banlist.mine, { name: name.trim() || 'Untitled banlist', limits, shared });
   const current = { name, limits };
   const setLimit = (code: number, limit: number) =>
@@ -103,7 +104,7 @@ function Editor({ banlist, catalog, canCopy }: { banlist: BanlistDetail; catalog
               : 'Copy this list to make your own changes.'}
         </p>
         {[0, 1, 2].map((n) => (
-          <LimitGroup key={n} limit={n} cards={Object.entries(limits).flatMap(([c, l]) => (l === n ? (catalog.byCode.get(Number(c)) ?? []) : []))} onShow={setShown} />
+          <LimitGroup key={n} limit={n} cards={Object.entries(limits).flatMap(([c, l]) => (l === n ? (catalog.byCode.get(Number(c)) ?? []) : []))} peek={peek} />
         ))}
       </div>
 
@@ -111,8 +112,8 @@ function Editor({ banlist, catalog, canCopy }: { banlist: BanlistDetail; catalog
         catalog={catalog}
         blocker={noBlocker}
         badges={(card) => <LimitBadge limit={allowed(current, card.code)} />}
-        onShow={setShown}
-        onAct={banlist.mine ? step : setShown}
+        peek={peek}
+        onAct={banlist.mine ? step : peek.pin}
         filter={listed}
         actHint={banlist.mine ? 'Right-click to change its limit' : ''}
       />
@@ -120,7 +121,7 @@ function Editor({ banlist, catalog, canCopy }: { banlist: BanlistDetail; catalog
   );
 }
 
-function LimitGroup({ limit, cards, onShow }: { limit: number; cards: CatalogCard[]; onShow: (c: CatalogCard) => void }) {
+function LimitGroup({ limit, cards, peek }: { limit: number; cards: CatalogCard[]; peek: Peek<CatalogCard> }) {
   return (
     <div className="deck-section">
       <h2>
@@ -134,7 +135,7 @@ function LimitGroup({ limit, cards, onShow }: { limit: number; cards: CatalogCar
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((card) => (
               <li key={card.code}>
-                <button className="plain" onMouseEnter={() => onShow(card)} onFocus={() => onShow(card)} onClick={() => onShow(card)}>
+                <button className="plain" {...peekProps(peek, card)} onClick={() => peek.pin(card)}>
                   {card.name}
                 </button>
               </li>

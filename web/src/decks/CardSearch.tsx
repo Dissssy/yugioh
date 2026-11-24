@@ -2,7 +2,7 @@ import { matchesTerms, parseQuery, QUERY_FIELDS, setTerm, termValue, type Catalo
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CardFace, TextFace } from '../board/Card.tsx';
 import type { Catalog } from './catalog.ts';
-import { clicks, startDrag, useDropTarget, type Dragged } from './interaction.ts';
+import { clicks, peekProps, startDrag, useDropTarget, type Dragged, type Peek } from './interaction.ts';
 
 /** Results drawn at first, and added each time the list scrolls to its end. */
 const PAGE = 120;
@@ -28,14 +28,14 @@ const TYPE_WORDS = ['normal', 'effect', 'tuner', 'flip', 'ritual', 'fusion', 'sy
 
 /**
  * The card search (docs/deck-builder.md, Search): fuzzy text, `field:value` terms, kinds and a sort over every card. `blocker` says why a
- * card can't be used here; those cards are dimmed and listed last. Right-click (or a tap) calls `onAct`, and cards can
+ * card can't be used here; those cards are dimmed and listed last. Pointing at a card shows it and a click pins it (`peek`). Right-click (or a tap) calls `onAct`, and cards can
  * be dragged out; `onDrop` takes cards dragged back in.
  */
 export function CardSearch({
   catalog,
   blocker,
   badges,
-  onShow,
+  peek,
   onAct,
   onDrop,
   filter,
@@ -44,7 +44,7 @@ export function CardSearch({
   catalog: Catalog;
   blocker: (card: CatalogCard) => string | null;
   badges: (card: CatalogCard) => ReactNode;
-  onShow: (c: CatalogCard) => void;
+  peek: Peek<CatalogCard>;
   onAct: (c: CatalogCard) => void;
   onDrop?: (d: Dragged) => void;
   filter?: ExtraFilter;
@@ -143,9 +143,8 @@ export function CardSearch({
             className={`plain result${blocker ? ' blocked' : ''}`}
             draggable={!blocker && onDrop !== undefined}
             onDragStart={(e) => startDrag(e, { code: card.code, from: null })}
-            onMouseEnter={() => onShow(card)}
-            onFocus={() => onShow(card)}
-            {...clicks(() => onShow(card), () => (blocker ? onShow(card) : onAct(card)))}
+            {...peekProps(peek, card)}
+            {...clicks(() => peek.pin(card), () => (blocker ? peek.pin(card) : onAct(card)))}
             title={blocker ?? actHint}
           >
             <PoolFace card={card} />
