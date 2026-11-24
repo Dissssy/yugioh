@@ -287,13 +287,19 @@ describe('a challenge link played by a guest', () => {
         [{ type: 'chatted', player: 1, text: 'gg, Copycat never activated' }, 'Kaiba (guest): gg, Copycat never activated'],
       ]);
     }
+    // An emote is a chat message with its own text.
+    expect((await admin.json(`${url}/chat`, { method: 'POST', body: JSON.stringify({ emote: 'shrug' }) })).status).toBe(400);
+    expect((await admin.json(`${url}/chat`, { method: 'POST', body: JSON.stringify({ emote: 'goodGame' }) })).status).toBe(204);
+    const emote = await theirs.update();
+    expect(emote.type === 'steps' && emote.steps[0]!.entry).toMatchObject({ event: { type: 'chatted', player: 0, text: 'Good game!', emote: 'goodGame' }, text: 'Ethan: Good game!' });
+    await mine.update();
     mine.close();
     theirs.close();
     const again = new Stream(await admin.fetch(`${url}/stream`));
     const sync = await again.update();
     if (sync.type !== 'sync') throw new Error('expected sync');
-    expect(sync.log.at(-1)!.text).toBe('Kaiba (guest): gg, Copycat never activated');
-    expect(sync.log.at(-2)!.event.type).toBe('duelEnded');
+    expect(sync.log.at(-2)!.text).toBe('Kaiba (guest): gg, Copycat never activated');
+    expect(sync.log.at(-3)!.event.type).toBe('duelEnded');
     again.close();
   });
 
@@ -304,7 +310,7 @@ describe('a challenge link played by a guest', () => {
     expect(text).toContain(`Duel ${duel.id} (finished)`);
     expect(text).toMatch(/^#\d+ \d\d:\d\d:\d\d T1 \S.* Set .+ \[.+\] in zone 0$/m);
     expect(text).toMatch(/asked for \{"type":"surrender"\}$/m);
-    expect(text).toMatch(/Kaiba \(guest\): gg, Copycat never activated\n$/);
+    expect(text).toMatch(/Kaiba \(guest\): gg, Copycat never activated\n.*Ethan: Good game!\n$/);
     const { body } = await admin.json<{ events: { seq: number; event: { type: string } }[] }>(`${report}?format=json`);
     expect(body.events[0]!.event.type).toBe('duelStarted');
     expect(body.events.at(-1)!.event.type).toBe('chatted');

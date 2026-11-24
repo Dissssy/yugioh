@@ -31,6 +31,13 @@ const sounds = {
   answer: [0.6, 0, 880, 0, 0.05, 0.12, 0, 1, 0, 0, 0, 0, 0.08],
   /** A chat message from the opponent. */
   chat: [0.3, 0, 1200, 0, 0.02, 0.06, 0, 1, 0, 0, 300, 0.03],
+  // Each emote (EMOTES) has its own.
+  goodLuck: [0.5, 0, 523, 0.02, 0.1, 0.25, 0, 1, 0, 0, 262, 0.08, 0.08],
+  thinking: [0.4, 0, 330, 0.05, 0.3, 0.3, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0.3],
+  nicePlay: [0.5, 0, 659, 0.01, 0.08, 0.3, 1, 1, 0, 0, 330, 0.06, 0.06],
+  oops: [0.5, 0, 400, 0.01, 0.05, 0.25, 1, 1, -8],
+  thanks: [0.5, 0, 587, 0.02, 0.1, 0.25, 0, 1, 0, 0, 147, 0.1],
+  goodGame: [0.6, 0, 392, 0.02, 0.15, 0.4, 0, 1, 0, 0, 196, 0.1, 0.12],
   win: [0.7, 0, 392, 0.02, 0.25, 0.5, 0, 1, 0, 0, 196, 0.15, 0.15],
   lose: [0.6, 0, 220, 0.02, 0.2, 0.6, 1, 1, -1.5],
 } satisfies Record<string, number[]>;
@@ -40,10 +47,16 @@ export type Sound = keyof typeof sounds;
 /** How loud ZzFX plays at full volume; its own default, which leaves room for sounds that overlap. */
 const MASTER = 0.3;
 
-/** Plays a sound, unless muted. Browsers keep audio off until the page has been clicked or typed in. */
+/** On a phone, the sounds that also buzz: the ones saying the duel waits on you. */
+const buzz: Partial<Record<Sound, number[]>> = { yourTurn: [80, 60, 80], answer: [60] };
+
+/** Plays a sound, unless muted, and buzzes a phone for some. Browsers keep audio off until the page has been used. */
 export function play(sound: Sound) {
   const { volume, muted } = duelSettings();
-  if (muted || volume === 0 || ZZFX.audioContext.state !== 'running') return;
+  if (muted) return;
+  const pattern = buzz[sound];
+  if (pattern && 'vibrate' in navigator) navigator.vibrate(pattern);
+  if (volume === 0 || ZZFX.audioContext.state !== 'running') return;
   ZZFX.volume = MASTER * volume;
   ZZFX.play(...sounds[sound]);
 }
@@ -56,3 +69,12 @@ const unlock = () => {
   });
 };
 for (const type of ['pointerdown', 'keydown'] as const) window.addEventListener(type, unlock);
+
+/** Reads an emote out loud, when the player turned that on, at the sound volume. */
+export function say(text: string) {
+  const { volume, muted, speakEmotes } = duelSettings();
+  if (muted || !speakEmotes || volume === 0 || !('speechSynthesis' in window)) return;
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.volume = volume;
+  speechSynthesis.speak(utterance);
+}

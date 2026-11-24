@@ -10,6 +10,7 @@ import { and, desc, eq, gt, ne, or } from 'drizzle-orm';
 import {
   cardOf,
   decide,
+  EMOTES,
   isProcedure,
   procedureDone,
   scriptOf,
@@ -32,6 +33,7 @@ import {
   type SeatStep,
   type DuelState,
   type DuelUpdate,
+  type Emote,
   type EffectSheet,
   type FieldCardView,
   type Intent,
@@ -759,11 +761,12 @@ export class Duels {
   }
 
   /** A player's chat message. It joins the log in order with everything else, even while the judge is working. */
-  async chat(id: string, seatKey: string, text: string): Promise<ActResult> {
+  async chat(id: string, seatKey: string, message: { text: string } | { emote: Emote }): Promise<ActResult> {
     const duel = await this.load(id);
     const seat = await this.seatOf(id, seatKey);
     if (seat === null) return { ok: false, status: 403, error: "You're not playing in this duel." };
-    await this.commit(duel, [{ type: 'chatted', player: seat, text }]);
+    const said = 'emote' in message ? { text: EMOTES[message.emote], emote: message.emote } : { text: message.text };
+    await this.commit(duel, [{ type: 'chatted', player: seat, ...said }]);
     return { ok: true };
   }
 

@@ -9,10 +9,12 @@ export interface DuelSettings {
   muted: boolean;
   /** Desktop notifications (notify.tsx), once the browser allows them. */
   notify: boolean;
+  /** Emotes read out loud too (sound.ts). */
+  speakEmotes: boolean;
 }
 
 const KEY = 'duel-settings';
-const defaults: DuelSettings = { speed: 'normal', reduceMotion: false, volume: 0.6, muted: false, notify: false };
+const defaults: DuelSettings = { speed: 'normal', reduceMotion: false, volume: 0.6, muted: false, notify: false, speakEmotes: false };
 
 function load(): DuelSettings {
   try {

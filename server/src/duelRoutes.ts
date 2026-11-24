@@ -5,7 +5,7 @@ import { gzipSync } from 'node:zlib';
 import { Router, type Request, type Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { HANDS, type Intent } from '@yugioh/engine';
+import { EMOTES, HANDS, type Emote, type Intent } from '@yugioh/engine';
 import { isAdmin, isSideSwap, SECTION_SIZE, type DuelDeckSave, type DuelPrep, type OpenGames } from '@yugioh/shared';
 import type { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
@@ -40,7 +40,7 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
 ]);
 
 const answerBody = z.object({ prompt: z.string(), picks: z.array(z.string()).max(60) });
-const chatBody = z.object({ text: z.string().trim().min(1).max(300) });
+const chatBody = z.union([z.object({ text: z.string().trim().min(1).max(300) }), z.object({ emote: z.enum(Object.keys(EMOTES) as [Emote, ...Emote[]]) })]);
 const askBody = z.object({ text: z.string().trim().min(1).max(500), card: z.number().int().nullable().default(null) });
 const escalateBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
 const contestBody = z.object({ seq: z.number().int().min(0), note: z.string().max(500).default('') });
@@ -376,7 +376,7 @@ export function duelRoutes(db: Db, catalog: Catalog, duels: Duels, guestCookie: 
     if (!body.success) return void res.status(400).json({ error: 'bad_request' });
     const row = await duels.find(req.params.id);
     if (!row || !started(row)) return void res.status(404).json({ error: 'not_started' });
-    const result = await duels.chat(row.id, p.key, body.data.text);
+    const result = await duels.chat(row.id, p.key, body.data);
     if (!result.ok) return void res.status(result.status).json({ error: result.error });
     res.status(204).end();
   });

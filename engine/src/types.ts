@@ -974,7 +974,8 @@ export type DuelEvent =
   | { type: 'sheetUpdated'; code: number; sheet: EffectSheet | null }
   | { type: 'duelEnded'; result: DuelResult }
   /** A player's chat message. It changes nothing on the board and never reaches the judge. */
-  | { type: 'chatted'; player: Seat; text: string }
+  /** A chat message; an emote's text is the emote's own (EMOTES). */
+  | { type: 'chatted'; player: Seat; text: string; emote?: Emote }
   | { type: 'aiDecided'; record: AiRecord }
   | { type: 'asked'; record: AskRecord }
   | { type: 'escalated'; record: EscalationRecord };
@@ -1093,6 +1094,17 @@ export interface SeatStep {
   entry: LogEntry | null;
   view: PlayerView;
 }
+
+/** One-tap chat messages, each with its own sound on the site. */
+export const EMOTES = {
+  goodLuck: 'Good luck!',
+  thinking: 'Thinking…',
+  nicePlay: 'Nice play!',
+  oops: 'Oops!',
+  thanks: 'Thanks!',
+  goodGame: 'Good game!',
+} as const;
+export type Emote = keyof typeof EMOTES;
 
 export type DuelUpdate =
   | { type: 'sync'; view: PlayerView; log: LogEntry[]; judging: JudgingView | null }

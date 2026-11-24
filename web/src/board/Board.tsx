@@ -1,6 +1,6 @@
 import './board.css';
 import { useMutation } from '@tanstack/react-query';
-import { zonePick, type Intent, type LegalAction, type PlayerView, type Position, type Seat } from '@yugioh/engine';
+import { zonePick, type Emote, type Intent, type LegalAction, type PlayerView, type Position, type Seat } from '@yugioh/engine';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -16,7 +16,7 @@ import { dataOf, idOf, imageUrl, preloadImages } from './Card.tsx';
 import { CardTooltipProvider } from './CardTooltip.tsx';
 import { ChoiceBar, ChoiceProvider, pileKey, useBoardChoice, type PileKind } from './choice.tsx';
 import { awaitsAnswer, cueMs, playCue, soundOf } from './cues.ts';
-import { play as playSound } from '../sound.ts';
+import { play as playSound, say } from '../sound.ts';
 import { ChatInput, DuelLog, type Asking, type Contest, type Escalate } from './DuelLog.tsx';
 import { dropKey, ExtraMonsterZone, Field, type FieldProps, type Row } from './Field.tsx';
 import { OwnHand, ReadOnlyHand, type HandDrag } from './Hand.tsx';
@@ -160,7 +160,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
     mutationFn: (body: { prompt: string; picks: string[] }) => api(`/duels/${duelId}/answer`, { method: 'POST', body: JSON.stringify(body) }),
   });
   const chat = useMutation({
-    mutationFn: (text: string) => api(`/duels/${duelId}/chat`, { method: 'POST', body: JSON.stringify({ text }) }),
+    mutationFn: (message: { text: string } | { emote: Emote }) => api(`/duels/${duelId}/chat`, { method: 'POST', body: JSON.stringify(message) }),
   });
   const answers = shown?.log.filter((e) => e.event.type === 'asked').length ?? 0;
   const ask = useMutation({
@@ -194,13 +194,20 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
     if (sound) playSound(sound);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.seq]);
-  // A soft sound for each chat message from the opponent, as it arrives.
-  const theirChats = shown?.log.filter((e) => e.event.type === 'chatted' && e.event.player !== shown.view.you).length ?? null;
-  const chatsBefore = useRef(theirChats);
+  // Chat as it arrives: an emote plays its own sound (and is read out, if the player wants), the opponent's message a soft one.
+  const chats = shown?.log.filter((e) => e.event.type === 'chatted') ?? null;
+  const chatsBefore = useRef(chats?.length ?? null);
   useEffect(() => {
-    if (!readOnly && theirChats !== null && chatsBefore.current !== null && theirChats > chatsBefore.current) playSound('chat');
-    chatsBefore.current = theirChats;
-  }, [theirChats, readOnly]);
+    const latest = chats?.at(-1)?.event;
+    if (!replay && chats && chatsBefore.current !== null && chats.length > chatsBefore.current && latest?.type === 'chatted') {
+      if (latest.emote) {
+        playSound(latest.emote);
+        say(latest.text);
+      } else if (latest.player !== shown!.view.you || readOnly) playSound('chat');
+    }
+    chatsBefore.current = chats?.length ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chats?.length]);
   const needsAnswer = !readOnly && !!shown && !shown.cue && (choice !== null || awaitsAnswer(shown.view));
   useEffect(() => {
     if (needsAnswer) playSound('answer');
@@ -960,6 +967,11 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                     <label>
                       <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
                     </label>
+                    {'speechSynthesis' in window && (
+                      <label>
+                        <input type="checkbox" checked={settings.speakEmotes} onChange={(e) => updateSettings({ speakEmotes: e.target.checked })} /> Read emotes out loud
+                      </label>
+                    )}
                     <label>
                       Sound volume{' '}
                       <input
@@ -990,7 +1002,8 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                   <WatchBar from={watchFrom} setFrom={setWatchFrom} names={[view.players[0].name, view.players[1].name]} />
                 ) : (
                   <ChatInput
-                    send={chat.mutateAsync}
+                    send={(text) => chat.mutateAsync({ text })}
+                    emote={(emote) => chat.mutate({ emote })}
                     ask={(text, card) => ask.mutateAsync({ text, card })}
                     sending={chat.isPending || ask.isPending}
                     answering={awaiting !== null && answers <= awaiting}

@@ -1,4 +1,4 @@
-import type { CardData, LogEntry, LogEvent, Seat } from '@yugioh/engine';
+import { EMOTES, type CardData, type Emote, type LogEntry, type LogEvent, type Seat } from '@yugioh/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /** How close to its end the log counts as following along. */
@@ -103,7 +103,7 @@ export function DuelLog({
                       : e.event.type === 'appealed' || e.event.type === 'escalated'
                         ? 'appeal'
                         : e.event.type === 'chatted'
-                          ? 'chat'
+                          ? `chat${e.event.emote ? ' emote' : ''}`
                           : e.event.type === 'asked'
                             ? 'question'
                             : undefined
@@ -201,6 +201,7 @@ export interface Asking {
  */
 export function ChatInput({
   send,
+  emote,
   ask,
   sending,
   answering,
@@ -209,6 +210,8 @@ export function ChatInput({
   focus,
 }: {
   send: (text: string) => Promise<unknown>;
+  /** Sends an emote: a one-tap chat message with its own sound. */
+  emote: (emote: Emote) => void;
   ask: (text: string, card: number | null) => Promise<unknown>;
   sending: boolean;
   /** A question was sent and its answer hasn't arrived yet. */
@@ -249,6 +252,15 @@ export function ChatInput({
         )}
         {answering && <span className="muted small">The judge is answering…</span>}
       </span>
+      {!asking && (
+        <span className="emotes" role="group" aria-label="Emotes">
+          {(Object.entries(EMOTES) as [Emote, string][]).map(([key, text]) => (
+            <button key={key} type="button" className="quiet" disabled={sending} onClick={() => emote(key)}>
+              {text}
+            </button>
+          ))}
+        </span>
+      )}
       <input
         ref={input}
         aria-label={asking ? 'Question for the judge' : 'Chat message'}

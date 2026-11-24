@@ -242,7 +242,7 @@ class Opponent {
     await this.act(board, move);
     // Said after the move, since a chat message changes the board it decided on.
     if (failed) await this.sayOnce(`I couldn't decide on a move, so I picked: ${move.text}.`);
-    if (extras.missing) await this.c.duels.chat(this.c.id, this.c.seatKey, `${MISSING_PREFIX}${extras.missing}`.slice(0, 300));
+    if (extras.missing) await this.c.duels.chat(this.c.id, this.c.seatKey, { text: `${MISSING_PREFIX}${extras.missing}`.slice(0, 300) });
     if (extras.contest) await this.contest(extras.contest);
   }
 
@@ -287,7 +287,7 @@ class Opponent {
     this.again = true;
     if (result.status !== 422 || this.board() !== board) return;
     console.error(`AI opponent in duel ${this.c.id}: code offered "${move.text}" (${JSON.stringify(move.intent)}) but refused it: ${result.error}`);
-    void this.c.duels.chat(this.c.id, this.c.seatKey, `The game offered me "${move.text}" but then refused it (${result.error}). That looks like a bug.`);
+    void this.c.duels.chat(this.c.id, this.c.seatKey, { text: `The game offered me "${move.text}" but then refused it (${result.error}). That looks like a bug.` });
   }
 
   private async answer(view: PlayerView, judging: JudgingView, board: string) {
@@ -326,7 +326,7 @@ class Opponent {
   /** At the duel's limit of model calls, it says so and surrenders, so a duel never hangs on it. */
   private async withinLimit(board: string): Promise<boolean> {
     if (this.calls < this.c.model.calls) return true;
-    await this.c.duels.chat(this.c.id, this.c.seatKey, "I've used all the thinking I'm allowed for this duel, so I surrender.");
+    await this.c.duels.chat(this.c.id, this.c.seatKey, { text: "I've used all the thinking I'm allowed for this duel, so I surrender." });
     await this.act(board, { text: 'Surrender', intent: { type: 'surrender' } });
     return false;
   }
@@ -334,7 +334,7 @@ class Opponent {
   private async sayOnce(text: string) {
     if (this.failing) return;
     this.failing = true;
-    await this.c.duels.chat(this.c.id, this.c.seatKey, text);
+    await this.c.duels.chat(this.c.id, this.c.seatKey, { text });
   }
 
   /**

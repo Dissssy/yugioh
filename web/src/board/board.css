@@ -410,6 +410,9 @@ button.phase.go { border: 0; background: none; color: var(--fg); text-decoration
 .chat-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; flex-basis: 100%; }
 .chat-mode button { padding: 1px 8px; font-size: 0.85em; }
 .chat-mode button.on { border-color: var(--accent); }
+.emotes { display: flex; gap: 4px; flex-basis: 100%; overflow-x: auto; scrollbar-width: none; }
+.emotes button { padding: 1px 8px; font-size: 0.85em; white-space: nowrap; border-radius: 999px; }
+.duel-log li.chat.emote { font-weight: 700; }
 .duel-log li.question { color: var(--fg); border-left: 3px solid var(--accent); display: grid; gap: 2px; }
 .duel-log li.question q { font-style: italic; }
 .duel-log li.question button { justify-self: start; }
