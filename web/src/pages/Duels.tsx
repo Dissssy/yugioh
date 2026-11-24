@@ -34,6 +34,11 @@ export function Duels() {
   );
 }
 
+const DECK_RULES: [boolean, string, string][] = [
+  [false, 'Any legal deck', 'Your own decks, uploads or premade ones'],
+  [true, 'Premade decks only', 'Changed only by Side Deck swaps'],
+];
+
 export function NewChallenge() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -62,17 +67,17 @@ export function NewChallenge() {
           ))}
         </select>
       </label>
-      <fieldset className="field">
-        <legend className="small">Decks</legend>
-        <label className="switch">
-          <input type="radio" name="premade" checked={!premadeOnly} onChange={() => setPremadeOnly(false)} />
-          Any legal deck
-        </label>
-        <label className="switch">
-          <input type="radio" name="premade" checked={premadeOnly} onChange={() => setPremadeOnly(true)} />
-          Premade decks only, with Side Deck swaps
-        </label>
-      </fieldset>
+      <div className="field">
+        <span className="small">Decks</span>
+        <div className="options" role="radiogroup" aria-label="Decks">
+          {DECK_RULES.map(([premade, title, detail]) => (
+            <button key={title} role="radio" aria-checked={premadeOnly === premade} className={`option${premadeOnly === premade ? ' on' : ''}`} onClick={() => setPremadeOnly(premade)}>
+              <strong>{title}</strong>
+              <span className="small muted">{detail}</span>
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="actions">
         <button className="primary" onClick={() => create.mutate()} disabled={create.isPending || banlist === undefined}>
           Create challenge

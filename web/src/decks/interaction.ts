@@ -1,5 +1,5 @@
 import type { Section } from '@yugioh/shared';
-import { useState, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
+import { useMemo, useState, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
 
 /** What a drag carries: a card, and the section it came from when it was in the deck. */
 export interface Dragged {
@@ -54,3 +54,27 @@ export function useDropTarget(onDrop: (d: Dragged) => void) {
     },
   };
 }
+
+/** Showing cards beside the list: pointing at one shows it, clicking pins it, and the pinned card returns when the pointer leaves. */
+export interface Peek<T> {
+  hover: (card: T) => void;
+  leave: () => void;
+  pin: (card: T) => void;
+}
+
+/** The card shown, whether it is the pinned one, and the handlers that change it. */
+export function usePeek<T>(initial: T | null) {
+  const [pinned, setPinned] = useState(initial);
+  const [hovered, setHovered] = useState<T | null>(null);
+  const peek = useMemo<Peek<T>>(() => ({ hover: setHovered, leave: () => setHovered(null), pin: setPinned }), []);
+  const shown = hovered ?? pinned;
+  return { shown, isPinned: shown !== null && shown === pinned, peek };
+}
+
+/** A card's pointer and focus handlers for `peek`; clicks are left to `clicks`, which pins with its show. */
+export const peekProps = <T>(peek: Peek<T>, card: T) => ({
+  onMouseEnter: () => peek.hover(card),
+  onMouseLeave: peek.leave,
+  onFocus: () => peek.hover(card),
+  onBlur: peek.leave,
+});

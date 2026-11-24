@@ -286,4 +286,15 @@ button.who:hover, button.who[aria-expanded='true'] { background: color-mix(in sr
 .setting { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
 .setting legend { font-weight: 600; margin-bottom: 4px; padding: 0; }
 .setting label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
-fieldset.field { border: 0; padding: 0; margin: 0; display: grid; gap: 4px; }
+.search-panel { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; align-items: end; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.search-panel .wide { grid-column: span 2; }
+.search-panel select, .search-panel input { width: 100%; box-sizing: border-box; }
+.search-panel > button { justify-self: start; }
+.search-help { display: block; }
+.search-help p { margin: 0 0 8px; }
+.search-help dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 12px; margin: 0 0 8px; }
+.search-help dt, .search-help dd { margin: 0; }
+button.link { color: var(--accent); cursor: pointer; padding: 0; }
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.box button.option { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
+.box button.option.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }

@@ -16,7 +16,7 @@ import { useCallback, useState, type ReactNode } from 'react';
 import { CardDetail } from '../board/CardDetail.tsx';
 import type { Catalog } from './catalog.ts';
 import { CardSearch, PoolFace } from './CardSearch.tsx';
-import { clicks, startDrag, useDropTarget, type Dragged } from './interaction.ts';
+import { clicks, peekProps, startDrag, usePeek, useDropTarget, type Dragged, type Peek } from './interaction.ts';
 
 const KIND_ORDER = { monster: 0, spell: 1, trap: 2 } as const;
 /** Decks show monsters, then Spells, then Traps, each by name, so copies sit together. */
@@ -42,7 +42,7 @@ export function DeckEditor({
   swapOnly?: boolean;
   children: ReactNode;
 }) {
-  const [shown, setShown] = useState<CatalogCard | null>(() => catalog.byCode.get(list.main[0] ?? -1) ?? null);
+  const { shown, isPinned, peek } = usePeek<CatalogCard>(catalog.byCode.get(list.main[0] ?? -1) ?? null);
   const [tab, setTab] = useState<'deck' | 'search'>('deck');
   const blocker = useCallback((card: CatalogCard) => addBlocker(list, card.code, card, homeSection(card), banlist), [list, banlist]);
 
@@ -73,9 +73,9 @@ export function DeckEditor({
     <section className={`builder${swapOnly ? ' swap-only' : ''}`} data-tab={tab}>
       <aside className="box builder-detail">
         {shown ? (
-          <ShownCard card={shown} list={list} banlist={banlist} onAdd={add} onRemove={remove} swapOnly={swapOnly} />
+          <ShownCard card={shown} pinned={isPinned} list={list} banlist={banlist} onAdd={add} onRemove={remove} swapOnly={swapOnly} />
         ) : (
-          <p className="muted">Point at a card to see it here.</p>
+          <p className="muted">Point at a card to see it here, or click it to keep it here.</p>
         )}
       </aside>
 
@@ -93,7 +93,7 @@ export function DeckEditor({
             section={section}
             cards={list[section].flatMap((c) => catalog.byCode.get(c) ?? []).sort(deckOrder)}
             hint={swapOnly ? (section === 'side' ? 'Right-click to swap in' : 'Right-click to swap out') : 'Right-click to remove'}
-            onShow={setShown}
+            peek={peek}
             onAct={(card) => act(card, section)}
             onDrop={drop(section)}
           />
@@ -105,7 +105,7 @@ export function DeckEditor({
           catalog={catalog}
           blocker={blocker}
           badges={(card) => <DeckBadges card={card} list={list} banlist={banlist} />}
-          onShow={setShown}
+          peek={peek}
           onAct={(c) => add(c.code, homeSection(c))}
           onDrop={(d) => d.from && remove(d.code, d.from)}
           actHint="Right-click to add"
@@ -119,14 +119,14 @@ function DeckSection({
   section,
   cards,
   hint,
-  onShow,
+  peek,
   onAct,
   onDrop,
 }: {
   section: Section;
   cards: CatalogCard[];
   hint: string;
-  onShow: (c: CatalogCard) => void;
+  peek: Peek<CatalogCard>;
   onAct: (c: CatalogCard) => void;
   onDrop: (d: Dragged) => void;
 }) {
@@ -147,9 +147,8 @@ function DeckSection({
               title={hint}
               draggable
               onDragStart={(e) => startDrag(e, { code: card.code, from: section })}
-              onMouseEnter={() => onShow(card)}
-              onFocus={() => onShow(card)}
-              {...clicks(() => onShow(card), () => onAct(card))}
+              {...peekProps(peek, card)}
+              {...clicks(() => peek.pin(card), () => onAct(card))}
             >
               <PoolFace card={card} />
             </button>
@@ -184,6 +183,7 @@ export function LimitBadge({ limit }: { limit: number }) {
 /** The card being looked at, with how many copies each section has and, unless swapping, buttons to change that. */
 function ShownCard({
   card,
+  pinned,
   list,
   banlist,
   onAdd,
@@ -191,6 +191,7 @@ function ShownCard({
   swapOnly,
 }: {
   card: CatalogCard;
+  pinned: boolean;
   list: DeckList;
   banlist: Banlist;
   onAdd: (code: number, s: Section) => void;
@@ -220,6 +221,7 @@ function ShownCard({
         </div>
       )}
       <CardDetail card={card} image={card.inPool} />
+      {pinned && <p className="muted small">Pinned. Point at another card to compare.</p>}
       {card.archetype && <p className="muted small">Archetype: {card.archetype}</p>}
     </>
   );
