@@ -186,7 +186,7 @@ export async function judge(call: JudgeCall, deps: JudgeDeps): Promise<JudgeOutc
           const parsed = askPlayer.safeParse(c.input);
           const question = !parsed.success
             ? { error: 'Invalid input.' }
-            : (stage === 'activation' && activationPickProblem(scratch, sheetEffect, link, ops, parsed.data.cards, null)) || checkQuestion(scratch, parsed.data);
+            : (stage === 'activation' && activationPickProblem(scratch, sheetEffect, link, ops, parsed.data.cards, null)) || checkQuestion(scratch, parsed.data, link.card);
           if ('error' in question) {
             refused = reply(c.id, question.error, true);
             continue;
@@ -295,7 +295,7 @@ function activationPickProblem(
 }
 
 /** Checks an ask_player call: real options, sensible counts, and a prompt that names nothing the player can't see. */
-export function checkQuestion(state: DuelState, q: AskPlayer): Question | { error: string } {
+export function checkQuestion(state: DuelState, q: AskPlayer, source: string): Question | { error: string } {
   const p = q.player;
   if (q.cards.length === 0 && q.choices.length === 0) return { error: 'Give at least one card or choice.' };
   if (q.cards.length > 0 && q.choices.length > 0) return { error: 'Ask for cards or for choices, not both in one question.' };
@@ -314,7 +314,8 @@ export function checkQuestion(state: DuelState, q: AskPlayer): Question | { erro
     if (hidden && !field && !(at.zone === 'deck' && at.seat === p)) return { error: `Player ${p} can't see ${id}, so it can't be an option for them.` };
     cards.push({ id, place: at.zone, seat: at.seat, zone: field ? at.index : null, hidden: hidden && field });
   }
-  const leak = hiddenNameIn(state, q.prompt, [p]);
+  // The card's own text is public, so a prompt may name what it names ("add 1 "Genex Controller" from your Deck").
+  const leak = hiddenNameIn(state, q.prompt, [p], cardOf(state, source).text);
   if (leak) return { error: `The prompt names ${leak}, which player ${p} can't see.` };
   return { player: p, text: q.prompt, cards, choices: q.choices, zones: [], min: q.min, max: Math.min(q.max, count) };
 }

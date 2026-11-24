@@ -68,6 +68,7 @@
                   "original": true,
                   "times": 1
                 },
+                "level": null,
                 "until": "while_on_field"
               }
             ]

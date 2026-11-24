@@ -159,7 +159,7 @@ function zonesFreedBy(state: DuelState, cost: Step[], card: string): number {
  * Why a step couldn't do what it must on this board, or null. A `choose` with min 0 ("you can") and steps on targets
  * need nothing here. `freed` is how many Monster Zones the cost frees first.
  */
-function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, freed = 0): string | null {
+function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, freed = 0, optionalTargets = false): string | null {
   if (step.do === 'change_lp' && step.kind === 'cost') return state.players[seat].lp < step.amount ? `You can't pay ${step.amount} LP.` : null;
   if (step.do === 'summon_token') {
     const player = step.player === 'you' ? seat : other(seat);
@@ -177,7 +177,7 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, fre
   }
   if (!('cards' in step)) return null;
   const sel = step.cards;
-  if (step.do === 'special_summon' && freeMonsterZones(state, seat) + freed === 0) return 'You have no free Monster Zone to Special Summon into.';
+  if (step.do === 'special_summon' && !(optionalTargets && sel.from === 'targets') && freeMonsterZones(state, seat) + freed === 0) return 'You have no free Monster Zone to Special Summon into.';
   if (step.do === 'take_control' && freeMonsterZones(state, seat) + freed === 0) return 'You have no free Monster Zone to take control of a monster into.';
   if (step.do === 'special_summon' && sel.from === 'self') {
     const problem = specialSummonProblem(state, seat, card);
@@ -216,6 +216,8 @@ function selected(state: DuelState, sel: Selection, seat: Seat, card: string): s
       return cardsFitting(state, sel.filter, seat, card);
     case 'battling':
       return battling(state, sel.filter, seat, card);
+    case 'event':
+      return [];
   }
 }
 
@@ -243,7 +245,9 @@ function optionProblem(state: DuelState, script: Script, option: Script['options
     if (problem) return `The cost can't be paid: ${problem}`;
   }
   const freed = zonesFreedBy(state, [...script.cost, ...option.cost], card);
-  return option.steps.map((s) => stepProblem(state, s, seat, card, freed)).find((p) => p) ?? null;
+  // "You can target ...; Special Summon it" (Freezing Chains of the Ice Barrier) still activates with no zone free.
+  const optional = script.targets?.min === 0;
+  return option.steps.map((s) => stepProblem(state, s, seat, card, freed, optional)).find((p) => p) ?? null;
 }
 
 /** The options of a script that can be picked now, by index. */
@@ -336,6 +340,8 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
       if (battling && (!c.damageStep || a!.damageStep)) return null;
       return `It needs this card to be ${c.as === 'attacker' ? "attacking an opponent's monster" : 'the attack target'}${c.damageStep ? ' in the Damage Step' : ''}.`;
     }
+    case 'not_sent_this_turn':
+      return state.sentThisTurn.includes(card) ? "It can't be used the turn this card was sent to the GY." : null;
     case 'last_attack': {
       const at = locate(state, card);
       const attacks = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.attacks : null;

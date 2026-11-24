@@ -75,6 +75,7 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     forbidden: [],
     didThisTurn: [],
     properlySummoned: [],
+    sentThisTurn: [],
     pledges: [],
     lingering: [],
     chain: [],
@@ -214,6 +215,7 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         s.forbidden = s.forbidden.filter((f) => f.turn >= event.turn);
         s.pledges = [];
         s.didThisTurn = [];
+        s.sentThisTurn = [];
         s.lingering = s.lingering.filter((l) => l.untilTurn >= event.turn);
         return;
       case 'phaseChanged':
@@ -602,7 +604,7 @@ function removeFromPlay(state: DuelState, id: string, leaves = true): boolean {
     const next = state.turnPlayer === at.seat ? state.turn + 2 : state.turn + 1;
     for (const f of leaving) if (f.effect.apply === 'forbid_on_leaving') state.forbidden.push({ player: at.seat, what: f.effect.what, filter: null, turn: next });
     state.modifiers = state.modifiers.filter((m) => m.card !== id);
-    for (const m of card.materials) state.players[state.instances[m]!.owner].graveyard.push(m);
+    for (const m of card.materials) toGraveyard(state, m);
     // Cards linked to a monster go when it goes; a card that takes its monster with it (Birthright) does so.
     for (const c of tiedTo(state, id)) sendToGraveyard(state, c.id);
     if (card.linked && tie(state, id)?.destroyLinked && locate(state, card.linked)?.zone === 'monsters') sendToGraveyard(state, card.linked);
@@ -633,8 +635,14 @@ function sendToGraveyard(state: DuelState, id: string) {
   if (isToken(state, id)) return;
   const owner = state.players[state.instances[id]!.owner];
   if (banish) return void owner.banished.push(id);
-  owner.graveyard.push(id);
+  toGraveyard(state, id);
   if (at.zone === 'monsters' || at.zone === 'spellTraps') state.happened.push({ event: 'sent_to_graveyard', card: id, player: at.seat, group: state.resolvedLinks });
+}
+
+/** Puts a card in its owner's GY, noting the turn for "except the turn it was sent there". */
+function toGraveyard(state: DuelState, id: string) {
+  state.players[state.instances[id]!.owner].graveyard.push(id);
+  state.sentThisTurn.push(id);
 }
 
 /** Whether a continuous effect banishes this card on the field instead of letting it go to the GY (General Wayne). */

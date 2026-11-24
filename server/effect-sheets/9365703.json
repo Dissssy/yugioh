@@ -48,6 +48,7 @@
                   "times": 2
                 },
                 "def": null,
+                "level": null,
                 "until": "end_of_battle_phase"
               }
             ]

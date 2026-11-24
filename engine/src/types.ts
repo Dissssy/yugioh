@@ -182,7 +182,9 @@ export type Condition =
   /** This card is battling: attacking an opponent's monster, or the attack's target; during the Damage Step only if `damageStep`. */
   | { if: 'battling'; as: 'attacker' | 'target'; damageStep: boolean }
   /** This card attacked this turn, and its last attack was on a monster in this battle position (Twin-Sword Marauder). */
-  | { if: 'last_attack'; on: Position };
+  | { if: 'last_attack'; on: Position }
+  /** "except the turn it was sent there": this card wasn't sent to the GY this turn. */
+  | { if: 'not_sent_this_turn' };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
 /** A Token's printed stats ("Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)). */
@@ -209,8 +211,11 @@ export type Step =
    */
   | { do: 'arrange_top'; count: number; bottom: boolean }
   | { do: 'modify_stats'; cards: Selection; atk: number; def: number; levelDelta: number; levelSet: number | null; until: Until }
-  /** ATK and/or DEF "become" a value (null leaves that stat alone). Gains and losses still apply on top. */
-  | { do: 'set_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
+  /**
+   * ATK, DEF and/or Level "become" a value (null leaves that stat alone). Gains and losses still apply on top. A Level
+   * read from a card with none (an Xyz Monster) changes nothing.
+   */
+  | { do: 'set_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; level: StatValue | null; until: Until }
   /** ATK and/or DEF gain a value read when the step resolves ("it gains ATK equal to the Tributed monster's original ATK"). */
   | { do: 'gain_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
   | { do: 'change_lp'; player: 'you' | 'opponent'; amount: number; kind: 'cost' | 'damage' | 'gain' }
@@ -263,7 +268,9 @@ export type Step =
    * A lock an effect leaves behind: `player` can't activate cards that fit `filter`, until the End Phase of this turn or
    * of your next turn, and with `whileFaceUp` only as long as this card stays face-up on the field (Spellbreaker).
    */
-  | { do: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; whileFaceUp: boolean };
+  | { do: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; whileFaceUp: boolean }
+  /** "and if you do": the steps after this one happen only if the step before it did something. */
+  | { do: 'if_done' };
 
 export const LOCK_UNTIL = ['this_end_phase', 'your_next_end_phase'] as const;
 export type LockUntil = (typeof LOCK_UNTIL)[number];
@@ -374,12 +381,14 @@ export type Restriction = (typeof RESTRICTIONS)[number];
 export type Affected = 'self' | 'linked' | CardFilter;
 
 /**
- * A stat read from a card when the step resolves: `self`, the first target still there, or the first card paid as the
- * cost. `original` is the printed value, else the current one. `times` multiplies it ("double its original ATK" is 2).
+ * A stat read from a card when the step resolves: `self`, the first target still there, the first card paid as the
+ * cost, or the first card the last `move` step of the effect moved ("send 1 monster from your Deck to the GY, and if
+ * you do, this card's Level becomes that monster's"). `original` is the printed value, else the current one (a card
+ * off the field has only its printed one). `times` multiplies it ("double its original ATK" is 2).
  */
 export interface StatValue {
-  of: 'self' | 'targets' | 'cost';
-  stat: 'atk' | 'def';
+  of: 'self' | 'targets' | 'cost' | 'moved';
+  stat: 'atk' | 'def' | 'level';
   original: boolean;
   times: number;
 }
@@ -400,7 +409,12 @@ export type Selection =
    */
   | { from: 'random'; filter: CardFilter; min: number; count: number }
   /** The monster battling this card, if it fits ("At the start of the Damage Step, if this card attacks a face-up Defense Position monster: destroy that monster"). */
-  | { from: 'battling'; filter: CardFilter };
+  | { from: 'battling'; filter: CardFilter }
+  /**
+   * The card the event this effect answers happened to, without targeting it ("If a monster is Summoned: change that
+   * Summoned monster to Defense Position"). Nothing if the effect answers no event.
+   */
+  | { from: 'event' };
 
 /** Cards that fit a description such as "1 face-up Warrior monster your opponent controls". Empty lists and nulls don't restrict. */
 export interface CardFilter {
@@ -615,6 +629,8 @@ export interface DuelState {
    * these can be Special Summoned by other effects later, until they go back to the hand, Deck or Extra Deck.
    */
   properlySummoned: string[];
+  /** Cards that went to a GY this turn, for "except the turn it was sent there". */
+  sentThisTurn: string[];
   /** Damage each player takes in this turn's End Phase unless they Normal Summon a card with one of these names first. */
   pledges: { player: Seat; names: string[]; damage: number }[];
   /**

@@ -1,7 +1,7 @@
 {
   "code": 66853752,
   "textHash": "2d69a19e8701e29487e90a70594bfefe081a1355ad9bac0ade059981f8efa1ba",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "ignition",
@@ -14,7 +14,82 @@
       "effect": "Special Summon this card from your Graveyard. If you do, banish it when it leaves the field.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "graveyard",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": null,
+              "except": "Fishborg Launcher",
+              "extraDeck": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 1,
+            "max": null
+          },
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "graveyard",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [
+                "DARK",
+                "DIVINE",
+                "EARTH",
+                "FIRE",
+                "LIGHT",
+                "WIND"
+              ],
+              "named": null,
+              "except": null,
+              "extraDeck": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 0,
+            "max": 0
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "self"
+                },
+                "position": "choice",
+                "banishWhenLeaves": true
+              }
+            ]
+          }
+        ]
+      },
       "continuous": null,
       "status": "unverified"
     },

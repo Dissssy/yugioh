@@ -23,6 +23,8 @@ import {
   fusionZones,
   zonePick,
   isProcedure,
+  levelNow,
+  levelOf,
   locate,
   materialsOf,
   monsterZonesFor,
@@ -97,7 +99,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     ops.push(op);
   };
   const ask = async (q: Omit<AskPlayer, 'player'>, player = seat): Promise<string[]> => {
-    const question = checkQuestion(state, { player, ...q });
+    const question = checkQuestion(state, { player, ...q }, self);
     if ('error' in question) throw new Refused(`A question was refused: ${question.error}`);
     const picks = await deps.ask(question);
     transcript.push({ question: q.prompt, cards: q.cards, choices: q.choices, picks });
@@ -116,6 +118,10 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     if (sel.from === 'targets') return link.targets.filter((id) => movedHere.has(id) || (script.targets && fits(state, id, script.targets.filter, seat)));
     if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, self);
     if (sel.from === 'battling') return battling(state, sel.filter, seat, self);
+    if (sel.from === 'event') {
+      const cause = link.cause && link.cause.event !== 'phase' ? link.cause.card : null;
+      return cause && locate(state, cause) ? [cause] : [];
+    }
     if (sel.from === 'random') {
       const pool = cardsFitting(state, sel.filter, seat, self);
       const picked: string[] = [];
@@ -138,13 +144,16 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
   let moved: string[] = [];
   /** Whether a `cost_substitute` card already stood in for part of this cost. */
   let substituted = false;
-  /** A stat read when the step resolves: from this card, the first target still on the field (or in a pile, for original stats), or the first card paid as the cost. */
+  /**
+   * A stat read when the step resolves: from this card, the first target still on the field (or in a pile, for original
+   * stats), the first card paid as the cost, or the first card the last move step moved.
+   */
   const valueOf = (v: StatValue): number | null => {
-    const id = v.of === 'self' ? self : v.of === 'cost' ? paid[0] : link.targets.find((t) => script.targets && fits(state, t, script.targets.filter, seat));
+    const id = { self, cost: paid[0], moved: moved[0], targets: link.targets.find((t) => script.targets && fits(state, t, script.targets.filter, seat)) }[v.of];
     if (!id || !locate(state, id)) return null;
-    const printed = cardOf(state, id)[v.stat];
     const at = locate(state, id)!;
-    const base = v.original ? printed : at.zone === 'monsters' ? statsOf(state, id)[v.stat] : printed;
+    const onField = at.zone === 'monsters' && !v.original;
+    const base = v.stat === 'level' ? (onField ? levelNow(state, id) : levelOf(cardOf(state, id))) : onField ? statsOf(state, id)[v.stat] : cardOf(state, id)[v.stat];
     return base === null ? null : Math.round(base * v.times);
   };
 
@@ -240,11 +249,12 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         });
         const atk = step.atk && valueOf(step.atk);
         const def = step.def && valueOf(step.def);
+        const level = step.level && valueOf(step.level);
         // A stat read from a target that is gone can't be applied.
-        if ((step.atk && atk === null) || (step.def && def === null)) return null;
-        for (const id of cards) apply({ op: 'modify_stats', card: id, atk: 0, def: 0, atk_set: atk ?? null, def_set: def ?? null, level_delta: 0, level_set: null, until: step.until });
+        if ((step.atk && atk === null) || (step.def && def === null) || (step.level && level === null)) return null;
+        for (const id of cards) apply({ op: 'modify_stats', card: id, atk: 0, def: 0, atk_set: atk ?? null, def_set: def ?? null, level_delta: 0, level_set: level ?? null, until: step.until });
         if (!cards.length) return null;
-        const parts = [atk !== null && atk !== undefined && `ATK became ${atk}`, def !== null && def !== undefined && `DEF became ${def}`].filter(Boolean);
+        const parts = [atk != null && `ATK became ${atk}`, def != null && `DEF became ${def}`, level != null && `Level became ${level}`].filter(Boolean);
         return `${list(cards.map((id) => shown(id, before)))}: ${parts.join(', ')}${untilText[step.until] ? ` ${untilText[step.until]}` : ''}.`;
       }
       case 'gain_stats': {
@@ -430,21 +440,35 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         apply({ op: 'pledge_normal_summon', player: seat, cards: moved, damage: step.damage });
         return `${state.players[seat].name} takes ${step.damage} damage in the End Phase unless they Normal Summon the added monster, or a card with the same name, this turn.`;
       }
+      case 'if_done':
+        // Handled where the steps run.
+        return null;
       case 'extra_normal_summon':
         apply({ op: 'extra_normal_summon', player: seat });
         return `${state.players[seat].name} may conduct one more Normal Summon or Set this turn.`;
     }
   };
 
+  /** Runs resolution steps in order, stopping at an `if_done` whose step before it did nothing. Returns what each said. */
+  const runSteps = async (steps: Step[]): Promise<string[]> => {
+    const said: string[] = [];
+    let last: string | null = null;
+    for (const step of steps) {
+      if (step.do === 'if_done') {
+        if (last === null) break;
+        continue;
+      }
+      last = await run(step, false);
+      if (last) said.push(last);
+    }
+    return said;
+  };
+
   try {
     // A Summoning procedure doesn't start a chain: its cost and steps happen at once.
     if (isProcedure(state, self, link.effect)) {
       for (const step of script.cost) await run(step, true);
-      const said: string[] = [];
-      for (const step of script.options[0]!.steps) {
-        const line = await run(step, false);
-        if (line) said.push(line);
-      }
+      const said = await runSteps(script.options[0]!.steps);
       if (!locate(state, self) || locate(state, self)!.zone !== 'monsters') throw new Refused('The procedure made no Summon.');
       const how = paid.length ? ` by ${{ graveyard: 'sending', banished: 'banishing' }[locate(state, paid[0]!)!.zone as 'graveyard'] ?? 'using'} ${list(paid.map((id) => shown(id, call.state)))}` : '';
       return { record: record({ legal: true, summary: [`${name} was Special Summoned by its own procedure${how}.`, ...said.slice(1)].join(' '), error: null }), events };
@@ -465,26 +489,28 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       if (script.targets) {
         const used = new Set(ops.flatMap((o) => ('cards' in o ? o.cards : 'card' in o ? [o.card] : [])));
         // Legality is judged before the cost: only cards that fit then, and weren't used to pay it, can be targeted.
-        const options = targetable(before, script, seat, self, link.cause).filter((id) => !used.has(id) && fits(state, id, script.targets!.filter, seat));
+        // An optional target to Special Summon (Freezing Chains of the Ice Barrier) needs a free zone to be picked.
+        const summons = script.options.some((o) => o.steps.some((s) => s.do === 'special_summon' && s.cards.from === 'targets'));
+        const noZone = summons && script.targets.min === 0 && monsterZonesFor(state, seat, false).length === 0;
+        const options = noZone ? [] : targetable(before, script, seat, self, link.cause).filter((id) => !used.has(id) && fits(state, id, script.targets!.filter, seat));
         const max = Math.min(targetMax(before, script, self, paid.length + (substituted ? 1 : 0)), options.length);
         const min = script.targets.max === 'cost' ? max : script.targets.min;
         if (options.length < min) throw new Refused('No card left to target after the cost.');
         const count = min === max ? `${max}` : `${min} to ${max}`;
         // "Target that monster" leaves nothing to choose.
-        const targets = script.targets.event
+        // "You can target" with nothing to target targets nothing.
+        const targets = script.targets.event || max === 0
           ? options
           : await ask({ prompt: `${name}: choose ${count} ${describeFilter(script.targets.filter)} to target.`, cards: options, choices: [], min, max });
-        apply({ op: 'declare_targets', cards: targets });
-        summary += `, targeting ${list(targets.map((id) => shown(id, before)))}`;
+        if (targets.length) {
+          apply({ op: 'declare_targets', cards: targets });
+          summary += `, targeting ${list(targets.map((id) => shown(id, before)))}`;
+        }
       }
       return { record: record({ legal: true, summary: `${summary}.`, error: null }), events };
     }
     const option = script.options.find((o) => o.label === link.choice) ?? script.options[0]!;
-    const said: string[] = [];
-    for (const step of option.steps) {
-      const line = await run(step, false);
-      if (line) said.push(line);
-    }
+    const said = await runSteps(option.steps);
     if (said.length === 0) said.push(`${name} resolved, but there was nothing left for it to affect.`);
     if (script.unapplied) said.push(`Not applied in this version: ${script.unapplied}`);
     return { record: record({ legal: true, summary: said.join(' '), error: null }), events };

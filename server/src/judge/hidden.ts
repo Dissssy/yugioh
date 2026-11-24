@@ -2,9 +2,13 @@
 
 import { visibleTo, type DuelState, type Seat } from '@yugioh/engine';
 
-/** The first card name in `text` that one of `seats` can't see (and sees no other copy of), or null. */
-export function hiddenNameIn(state: DuelState, text: string, seats: Seat[]): string | null {
+/**
+ * The first card name in `text` that one of `seats` can't see (and sees no other copy of), or null. A name that
+ * `publicText` (the text of the card being used) contains reveals nothing: "add 1 "Genex Controller" from your Deck".
+ */
+export function hiddenNameIn(state: DuelState, text: string, seats: Seat[], publicText = ''): string | null {
   const lower = text.toLowerCase();
+  const known = publicText.toLowerCase();
   for (const seat of seats) {
     const seen = new Set<number>();
     const unseen = new Set<number>();
@@ -12,7 +16,7 @@ export function hiddenNameIn(state: DuelState, text: string, seats: Seat[]): str
     for (const code of unseen) {
       if (seen.has(code)) continue;
       const name = state.cards[code]!.name;
-      if (lower.includes(name.toLowerCase())) return name;
+      if (lower.includes(name.toLowerCase()) && !known.includes(name.toLowerCase())) return name;
     }
   }
   return null;

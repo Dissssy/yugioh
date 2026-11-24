@@ -161,6 +161,7 @@ const sheets: Record<number, EffectSheet> = {
                 cards: { from: 'self' },
                 atk: { of: 'targets', stat: 'atk', original: true, times: 1 },
                 def: { of: 'targets', stat: 'def', original: true, times: 1 },
+                level: null,
                 until: 'while_on_field',
               },
             ],
@@ -183,7 +184,7 @@ const sheets: Record<number, EffectSheet> = {
           {
             label: '',
             cost: [],
-            steps: [{ do: 'set_stats', cards: { from: 'self' }, atk: { of: 'self', stat: 'atk', original: true, times: 2 }, def: null, until: 'end_of_battle_phase' }],
+            steps: [{ do: 'set_stats', cards: { from: 'self' }, atk: { of: 'self', stat: 'atk', original: true, times: 2 }, def: null, level: null, until: 'end_of_battle_phase' }],
           },
         ],
       }),

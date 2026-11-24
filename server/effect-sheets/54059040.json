@@ -1,7 +1,7 @@
 {
   "code": 54059040,
   "textHash": "cbab136647a79e28f98dc91a4bee479dc007f03a5ae680646f3ea708e3efff9a",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "activation",
@@ -75,7 +75,53 @@
         "canMiss": false,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "you",
+              "place": "monsters",
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [
+                "WATER"
+              ],
+              "named": null,
+              "except": null,
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null
+            },
+            "min": 1,
+            "max": null
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "unapplied": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_position",
+                "cards": {
+                  "from": "event"
+                },
+                "position": "defense"
+              }
+            ]
+          }
+        ]
+      },
       "continuous": null,
       "status": "unverified"
     }
