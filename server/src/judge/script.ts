@@ -493,6 +493,17 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         if (cost) paid.push(...cards);
         return cost ? null : `${state.players[seat].name} revealed ${list(cards.map((id) => cardOf(state, id).name))}.`;
       }
+      case 'set_from_hand': {
+        const target = link.targets[0];
+        const where = step.player === 'you' ? seat : target ? locate(call.state, target)?.seat : undefined;
+        if (where === undefined) return null;
+        const options = state.players[where].hand.filter((id) => cardOf(state, id).kind !== 'monster');
+        if (!options.length) return null;
+        const [pick] = await ask({ prompt: `${name}: you can Set 1 Spell/Trap from your hand.`, cards: options, choices: [], min: 0, max: 1 }, where);
+        if (!pick) return null;
+        apply({ op: 'set_spell_trap', card: pick });
+        return `${state.players[where].name} Set a card.`;
+      }
       case 'if_done':
       case 'only_if':
         // Handled where the steps run.

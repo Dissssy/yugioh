@@ -87,7 +87,7 @@ export function spellTrapZonesFor(state: DuelState, seat: Seat, card: CardData):
 }
 
 /** Before a card goes to `zone`: a Field Spell already in the Field Zone is sent to the GY. */
-function clearFieldZone(run: Run, seat: Seat, zone: number) {
+export function clearFieldZone(run: Run, seat: Seat, zone: number) {
   const old = zone === FIELD_ZONE ? run.state.players[seat].spellTraps[FIELD_ZONE] : null;
   if (old) run.emit({ type: 'moved', card: old.id, owner: run.state.instances[old.id]!.owner, from: 'spellTraps', to: 'graveyard' });
 }

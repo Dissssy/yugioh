@@ -53,7 +53,8 @@
                     "stat": "def",
                     "order": "highest"
                   },
-                  "distinct": false
+                  "distinct": false,
+                  "includeSelf": false
                 }
               }
             ]

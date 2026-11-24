@@ -53,7 +53,8 @@
                     "stat": "atk",
                     "order": "lowest"
                   },
-                  "distinct": false
+                  "distinct": false,
+                  "includeSelf": false
                 }
               }
             ]

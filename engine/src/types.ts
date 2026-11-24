@@ -97,7 +97,7 @@ export interface When {
   /**
    * `summoned`: a monster is Summoned. `attack_declared`: a monster declares an attack (the event's card is the
    * attacker). `attacked`: a monster is targeted for an attack (the event's card is the target). `destroyed_by_battle`: a monster is destroyed by battle. `battle_damage`: a monster inflicts battle
-   * damage to its controller's opponent. `battle_destroying`: a monster destroys another by battle (the event's card is the one that destroyed it: "When this card destroys a monster by battle"). `activated`: a card or effect is activated (Counter Traps).
+   * damage to its controller's opponent; `direct_attack_damage` only by a direct attack. `battle_destroying`: a monster destroys another by battle (the event's card is the one that destroyed it: "When this card destroys a monster by battle"). `activated`: a card or effect is activated (Counter Traps).
    * `destroyed_by_effect`: a card on the field is destroyed by a card effect; the filter is checked against the card as
    * it was on the field, for its side and whether it was face-up. `damage_step_start`: the start of the Damage Step (the
    * event's card is the attacker). `damage_step_end`: the end of the Damage Step (with `self`, this card attacked or
@@ -113,6 +113,7 @@ export interface When {
     | 'destroyed_by_effect'
     | 'battle_destroying'
     | 'battle_damage'
+    | 'direct_attack_damage'
     | 'activated'
     | 'damage_step_start'
     | 'damage_step_end'
@@ -278,6 +279,11 @@ export type Step =
    * any number of "Ice Barrier" monsters in your hand"). Revealed cards count as paid for a `targets.max` of `cost`.
    */
   | { do: 'reveal'; cards: Selection }
+  /**
+   * "you can Set 1 Spell/Trap from your hand": the player picks one or none from their hand and Sets it. `targets_controller`:
+   * the controller of this effect's first target, as it was when targeted ("then, its controller can Set ...").
+   */
+  | { do: 'set_from_hand'; player: 'you' | 'targets_controller' }
   /** "and if you do": the steps after this one happen only if the step before it did something. */
   | { do: 'if_done' }
   /**
@@ -434,6 +440,8 @@ export type Selection =
       rank: { stat: 'atk' | 'def' | 'level'; order: 'lowest' | 'highest' } | null;
       /** The cards picked must have different names from each other ("3 "Ice Barrier" monsters with different names"). */
       distinct: boolean;
+      /** This card itself may be picked too, when it fits ("Select 1 monster on the field", Hane-Hane). */
+      includeSelf: boolean;
     }
   | { from: 'all'; filter: CardFilter }
   /**
@@ -555,7 +563,8 @@ export type Happening =
   | { event: 'attacked'; card: string; player: Seat; attacker: string; group: number }
   | { event: 'destroyed_by_battle'; card: string; player: Seat; group: number }
   | { event: 'battle_destroying'; card: string; player: Seat; target: string; group: number }
-  | { event: 'battle_damage'; card: string; player: Seat; amount: number; group: number }
+  /** `direct`: by a direct attack. */
+  | { event: 'battle_damage'; card: string; player: Seat; amount: number; direct: boolean; group: number }
   /** A card or effect was activated: chain link `link` (from 0). Only responses watch for it, never triggers. */
   | { event: 'activated'; card: string; player: Seat; link: number; group: number }
   /** `by`: the player whose card effect destroyed it; `player`: who controlled it; `faceUp`: whether it was face-up. */
@@ -813,7 +822,9 @@ export type Op =
   | { op: 'declare_targets'; cards: string[] }
   | { op: 'choose_effect'; choice: string }
   /** Shows cards in the activating player's hand to both players; they stay in the hand. */
-  | { op: 'reveal'; cards: string[] };
+  | { op: 'reveal'; cards: string[] }
+  /** Sets a Spell/Trap from its holder's hand in their first free Spell & Trap Zone (a Field Spell in the Field Zone). */
+  | { op: 'set_spell_trap'; card: string };
 
 /** The tokens one Messages API call used, as the API reported them; the server prices them. */
 export interface ModelUsage {

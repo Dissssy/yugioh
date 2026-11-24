@@ -142,7 +142,8 @@ describe('playing against Claude', () => {
       const events = await eventsOf(id);
       const records = events.flatMap((e) => (e.type === 'aiDecided' ? [e.record] : []));
       expect(records.length).toBeGreaterThan(10);
-      expect(records.every((r) => r.error === null && r.picks.length > 0)).toBe(true);
+      // A pick count that doesn't fit the question is an error; an optional question may get no pick ("you can Set 1 Spell/Trap").
+      expect(records.every((r) => r.error === null)).toBe(true);
       // Each seat stays within its calls; at the limit it surrenders.
       const log = reviewLog(events);
       for (const seat of [0, 1]) {

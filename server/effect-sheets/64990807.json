@@ -44,7 +44,8 @@
               "min": 3,
               "max": 3,
               "rank": null,
-              "distinct": true
+              "distinct": true,
+              "includeSelf": false
             }
           }
         ],
@@ -110,7 +111,8 @@
                   "min": 1,
                   "max": 1,
                   "rank": null,
-                  "distinct": false
+                  "distinct": false,
+                  "includeSelf": false
                 },
                 "position": "choice",
                 "banishWhenLeaves": false

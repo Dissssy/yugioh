@@ -59,7 +59,8 @@
                   "min": 1,
                   "max": 1,
                   "rank": null,
-                  "distinct": false
+                  "distinct": false,
+                  "includeSelf": false
                 },
                 "position": "choice",
                 "banishWhenLeaves": false

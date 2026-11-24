@@ -321,7 +321,7 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
       case 'battleDamage': {
         const p = s.players[event.player];
         p.lp = Math.max(0, p.lp - event.amount);
-        s.happened.push({ event: 'battle_damage', card: event.by, player: other(event.player), amount: event.amount, group });
+        s.happened.push({ event: 'battle_damage', card: event.by, player: other(event.player), amount: event.amount, direct: s.attack?.target === null, group });
         return;
       }
       case 'effectActivated': {

@@ -105,7 +105,7 @@ export function cardsFitting(state: DuelState, filter: CardFilter, seat: Seat, e
 
 /** The cards a `choose` selection may pick from: those that fit, narrowed to the ones tied for its rank. */
 export function chooseFrom(state: DuelState, selection: Extract<Selection, { from: 'choose' }>, seat: Seat, except: string): string[] {
-  const all = cardsFitting(state, selection.filter, seat, except);
+  const all = cardsFitting(state, selection.filter, seat, selection.includeSelf ? '' : except);
   const rank = selection.rank;
   if (!rank || all.length === 0) return all;
   const value = (id: string) => statsOf(state, id)[rank.stat] ?? 0;

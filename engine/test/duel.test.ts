@@ -208,7 +208,7 @@ const sheets: Record<number, EffectSheet> = {
   53: sheet(53, {
     ...effect('condition'),
     ...scripted({
-      cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', kinds: ['monster'], races: ['Warrior'] }), min: 1, max: 1, rank: null, distinct: false }, to: 'graveyard' }],
+      cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', kinds: ['monster'], races: ['Warrior'] }), min: 1, max: 1, rank: null, distinct: false, includeSelf: false }, to: 'graveyard' }],
       options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }] }],
     }),
   }),
@@ -1086,7 +1086,7 @@ describe('control and Tokens', () => {
   it('pays a cost only the picked effect has', () => {
     const t = new Table(stacked(filler(40), [3, ...filler(39, 2)]));
     t.push({ type: 'specialSummoned', player: 1, card: 'b0', zone: 0, position: 'attack' });
-    const tribute = { do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', faceUp: null }), min: 1, max: 1, rank: null, distinct: false }, to: 'graveyard' } as const;
+    const tribute = { do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', faceUp: null }), min: 1, max: 1, rank: null, distinct: false, includeSelf: false }, to: 'graveyard' } as const;
     const script: Script = {
       conditions: [],
       cost: [],

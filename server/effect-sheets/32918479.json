@@ -1,7 +1,7 @@
 {
   "code": 32918479,
   "textHash": "941ff4c958e846a88890750ef83c9f872b10e4c445cb04c49cb54098db782c50",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "trigger",
@@ -14,14 +14,33 @@
       "effect": "Draw 1 card.",
       "targets": null,
       "when": {
-        "event": "battle_damage",
+        "event": "direct_attack_damage",
         "self": true,
         "filter": null,
         "how": [],
         "canMiss": false,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "draw",
+                "player": "you",
+                "count": 1,
+                "per": null
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     },

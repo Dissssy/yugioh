@@ -72,7 +72,8 @@
                   "min": 1,
                   "max": 3,
                   "rank": null,
-                  "distinct": false
+                  "distinct": false,
+                  "includeSelf": false
                 },
                 "to": "banished"
               }

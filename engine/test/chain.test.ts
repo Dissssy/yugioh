@@ -205,7 +205,7 @@ const sheets: Record<number, EffectSheet> = {
     effect({
       kind: 'ignition',
       script: script({
-        cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', places: ['hand'] }), min: 1, max: 1, rank: null, distinct: false }, to: 'graveyard' }],
+        cost: [{ do: 'move', cards: { from: 'choose', filter: filter({ side: 'you', places: ['hand'] }), min: 1, max: 1, rank: null, distinct: false, includeSelf: false }, to: 'graveyard' }],
         options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1, per: null }] }],
       }),
     }),

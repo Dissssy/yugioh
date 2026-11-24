@@ -15,6 +15,7 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
     return whenMatches(state, when, { event: 'attacked', card: h.target, player: h.player === 0 ? 1 : 0, attacker: h.card, group: h.group }, card, seat);
   }
   if (h.event === 'phase') return when.event === 'end_phase' && h.phase === 'end';
+  if (when.event === 'direct_attack_damage') return h.event === 'battle_damage' && h.direct && whenMatches(state, { ...when, event: 'battle_damage' }, h, card, seat);
   if (when.event !== h.event) return false;
   // A destroyed card is checked as it was on the field: whose it was, and whether it was face-up.
   if (h.event === 'destroyed_by_effect') {

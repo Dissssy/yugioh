@@ -1,7 +1,7 @@
 // The judge's ops, checked against the board. Each op either becomes events or is refused with a reason the
 // model can act on. Nothing here decides what a card's text means; it only refuses what the board can't allow.
 
-import { cardOf, check, endIfLpGone, Illegal, Run } from './rules.ts';
+import { cardOf, check, clearFieldZone, endIfLpGone, Illegal, Run, spellTrapZonesFor } from './rules.ts';
 import { restriction, statsOf } from './continuous.ts';
 import { specialSummonForbidden, specialSummonProblem } from './script.ts';
 import { fusionMaterialsFit, fusionOf, fusionZones } from './fusion.ts';
@@ -113,6 +113,17 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(op.until === null || op.until === 'end_phase', 'until is "end_phase" or null.');
       check(monsterZonesFor(state, op.controller, false).includes(op.zone), `Monster Zone ${op.zone + 1} isn't an empty Main Monster Zone of that player.`);
       run.emit({ type: 'controlChanged', card: card.id, to: op.controller, zone: op.zone, until: op.until });
+      return;
+    }
+    case 'set_spell_trap': {
+      const at = locate(state, op.card);
+      check(at?.zone === 'hand', 'Only a card in the hand can be Set this way.');
+      const card = cardOf(state, op.card);
+      check(card.kind !== 'monster', 'Only Spells and Traps can be Set in the Spell & Trap Zone.');
+      const zone = spellTrapZonesFor(state, at!.seat, card)[0];
+      check(zone !== undefined, 'That player has no free Spell & Trap Zone.');
+      clearFieldZone(run, at!.seat, zone!);
+      run.emit({ type: 'spellTrapSet', player: at!.seat, card: op.card, zone: zone! });
       return;
     }
     case 'summon_token': {

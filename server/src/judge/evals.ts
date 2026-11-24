@@ -1152,6 +1152,58 @@ export const CASES: EvalCase[] = [
     legal: true,
     check: (b) => (b.monster('Junk Warrior')?.atk === 3100 ? null : `Junk Warrior has ${b.monster('Junk Warrior')?.atk} ATK`),
   },
+  {
+    name: 'swords of revealing light activates with no face-down monster',
+    board: [{ hand: ['Swords of Revealing Light'] }, { monsters: ['Axe Raider'] }],
+    activate: 'Swords of Revealing Light',
+    effect: 1,
+    legal: true,
+    check: (b) => expectAt(b, 'Swords of Revealing Light', '0:spellTraps'),
+  },
+  {
+    name: 'dust tornado lets you set a spell or trap from your hand',
+    board: [{ set: ['Dust Tornado'], hand: ['Trap Hole'] }, { set: ['Mirror Force'] }],
+    activate: 'Dust Tornado',
+    picks: [['Mirror Force'], ['Trap Hole']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Mirror Force', '1:gy'), expectAt(b, 'Trap Hole', '0:spellTraps'), b.state.players[0].spellTraps.some((c) => c && !c.faceUp) ? null : 'Trap Hole is not Set'),
+  },
+  {
+    name: 'wild tornado lets the destroyed card\'s controller set a card',
+    board: [{ set: ['Wild Tornado'] }, { faceUp: ['Freezing Chains of the Ice Barrier'], hand: ['Trap Hole'] }],
+    activate: 'Wild Tornado',
+    picks: [['Freezing Chains of the Ice Barrier'], ['Trap Hole']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Freezing Chains of the Ice Barrier', '1:gy'), expectAt(b, 'Trap Hole', '1:spellTraps')),
+  },
+  {
+    name: 'hane-hane can return itself when it is the only monster',
+    board: [{ setMonsters: ['Hane-Hane'] }, {}],
+    before: (id) => [[0, { type: 'flipSummon', card: id('Hane-Hane') }]],
+    picks: [['Hane-Hane']],
+    legal: true,
+    check: (b) => expectAt(b, 'Hane-Hane', '0:hand'),
+  },
+  {
+    name: 'majestic mech senku draws when it attacks directly',
+    board: [{ monsters: ['Majestic Mech - Senku'] }, {}],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Majestic Mech - Senku'), target: 'direct' }],
+    ],
+    legal: true,
+    check: (b) => (b.state.players[0].hand.length === 1 ? null : `hand has ${b.state.players[0].hand.length}`),
+  },
+  {
+    name: 'majestic mech senku does not draw for battle damage from attacking a monster',
+    board: [{ monsters: ['Majestic Mech - Senku'] }, { monsters: ['Sonic Chick'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Majestic Mech - Senku'), target: 0 }],
+    ],
+    legal: true,
+    check: (b) => (b.state.players[0].hand.length === 0 ? null : `hand has ${b.state.players[0].hand.length}`),
+  },
   // Control, Tokens, and effects used from the hand or GY.
   {
     name: 'crackdown takes control of a face-up monster for good',
