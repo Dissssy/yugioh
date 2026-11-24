@@ -136,7 +136,7 @@ export async function syncCards(db: Db, options: SyncOptions) {
   await buildPremadeDecks(db);
   await buildDefaultBanlists(db);
   await downloadPoolImages(db, options.imageDir, options.imageGapMs ?? 100, log);
-  // A new database starts with the effect sheets kept in the repository.
+  // Cards new to the database get their sheets from the repository (the server's start imports the rest).
   const imported = await importSheetFiles(db);
   if (imported) log(`Imported ${imported} effect sheets from server/effect-sheets/.`);
 }

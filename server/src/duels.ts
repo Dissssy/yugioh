@@ -390,14 +390,14 @@ export class Duels {
           escalating: new Set(),
           autoPass: null,
         };
-        // Sheets that changed while the duel wasn't loaded (a report, a fix) apply from here on.
+        // Sheets that changed while the duel wasn't loaded (a report, a fix) apply from here on. A card with no stored
+        // sheet keeps the one the duel has: sheets are never taken away, so a missing one is never news.
         if (!live.state.result) {
           const now = await loadSheets(this.db, live.state.cards);
-          const changed = Object.keys(live.state.cards)
-            .map(Number)
+          const changed = Object.values(now)
             // Compared as values: Postgres stores JSON with its keys in its own order, so the text of an unchanged sheet differs.
-            .filter((code) => !isDeepStrictEqual(now[code] ?? null, live.state.sheets[code] ?? null));
-          if (changed.length) await this.write(live, changed.map((code) => ({ type: 'sheetUpdated', code, sheet: now[code] ?? null })));
+            .filter((sheet) => !isDeepStrictEqual(sheet, live.state.sheets[sheet.code]));
+          if (changed.length) await this.write(live, changed.map((sheet) => ({ type: 'sheetUpdated', code: sheet.code, sheet })));
         }
         // Whatever the duel was doing when the server stopped (resolving a chain, waiting out a window) carries on.
         void this.enqueue(live, () => this.advance(live));

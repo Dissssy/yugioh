@@ -1,6 +1,6 @@
 # Review requests: sending rulings and duel problems to Claude
 
-Status, 2026-11-24: plan, not built.
+Status, 2026-11-24: plan. Ethan chose the site queue with an hourly check. The `RESET_SHEETS` replacement is built; the rest isn't.
 
 An admin who sees something wrong in a duel (a ruling, or a move that was never offered) sends it to Claude with one click. A Claude thread in this project picks it up with the full context, finds the cause, fixes it in a pull request, and reports back on the request. This replaces pasting logs into a thread and the thread borrowing Ethan's browser sign-in.
 
@@ -41,21 +41,22 @@ Needed in the cloud environment: `yugioh.p51.nl` on the network allowlist, and t
 
 Why not a webhook: the cloud environment can't receive an arbitrary HTTP webhook into a project thread, so a push would need a relay anyway. GitHub issues could be that relay, but they would put duel details on GitHub, need a GitHub token on the server, and still be too small for a bundle. Polling hourly is simple, and the request itself shows on the admin page.
 
-## Repo sheets vs. the database (`RESET_SHEETS`)
+## Repo sheets vs. the database (built)
 
-Today `RESET_SHEETS=true` wipes every stored sheet, revision and report at each start, so admin edits are lost on every deploy.
+`RESET_SHEETS=true` used to wipe every stored sheet, revision and report at each start, so admin edits were lost on every deploy. It also broke running duels: duel `tznEic2SgbY_udh7` loaded in the gap between the wipe and the reimport, saw no sheet for any of its 34 cards, and logged `sheetUpdated` with no sheet for each of them (#116 to #149), so no effect could be activated for the rest of the duel.
 
-Replace it: `effect_sheets` records the hash of the repo file each sheet was last imported from. At start, the card sync imports a repo file only when its hash differs from that record (a new revision, reason "imported from repo"). So:
+Now `effect_sheets.file_hash` records the hash of the repo file each sheet was last imported from. At start, before serving, the server imports a repo file only when its hash differs from that record. So:
 
 - a fix merged into the repo reaches the site on the next deploy;
 - an admin edit or a live hotfix survives restarts until the repo changes that card;
-- revisions and reports build up across deploys.
+- revisions and reports build up across deploys;
+- a duel never loses a sheet: `sheetUpdated` always carries one, and a card missing from the database keeps the duel's copy.
 
-`RESET_SHEETS` and `sheets:import -- --force` go away. The review loop moves live hotfixes into the repo, and `GET /api/admin/sheets?drifted=1` (sheets whose database copy differs from the image's repo file) lets a thread find any it missed.
+The review loop moves live hotfixes into the repo, and `GET /api/admin/sheets?drifted=1` (sheets whose database copy differs from the image's repo file) lets a thread find any it missed.
 
 ## Build order
 
-1. Fold the current admin edits into `server/effect-sheets/`, and replace `RESET_SHEETS` with the hash-based import.
+1. Replace `RESET_SHEETS` with the hash-based import (built), and fold the current admin edits into `server/effect-sheets/`.
 2. API keys and `/api/admin/sheets?drifted=1`.
 3. `review_requests`, Send to Claude, and the bundle.
 4. The scheduled task in this project.

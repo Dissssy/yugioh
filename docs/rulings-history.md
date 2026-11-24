@@ -9,7 +9,7 @@ Effect sheets are where the site's rulings live: a script is a fixed ruling that
 - `effect_sheets` holds each card's sheet; `sheet_revisions` keeps every version with a `reason` and a time; `sheet_reports` holds players' reports and overturned appeals on scripts ([effects.md](effects.md)).
 - `saveSheet` in `server/src/sheets.ts` is the one place sheets are written. The compiler, imports, reports, appeals and the admin all go through it.
 - The admin Rulings section lists cards with open reports or flagged scripts, with a JSON editor, Restore scripts and Mark scripts verified.
-- Missing: what changed between two versions, who changed it, a way back to an older version, and any history that outlives a database reset. `RESET_SHEETS=true` (how dev runs today) deletes every revision at each start.
+- Missing: what changed between two versions, who changed it, a way back to an older version, and any history that outlives a database reset. (`RESET_SHEETS` was removed on 2026-11-24: a start now imports only changed repository files, so revisions build up across deploys; see [review-api.md](review-api.md).)
 - Architecture layer 6 planned a separate store of "verified rulings" retrieved into judge prompts. It was never built; the appeal's `ruling` text only reaches `sheet_reports`. Step 4 below proposes putting such rulings into the sheet instead.
 
 ## 1. History and diff on the admin page
@@ -91,4 +91,3 @@ Turns evidence from finished duels into proposed sheet changes, which Ethan read
 | What Accept marks the effects | `verified`, since you read the diff | `unverified`, leaving verification separate |
 | How often it runs | Nightly with a cap of 10 cards, plus Tune now | Only when you press Tune now |
 | Rulings for judge-only effects | A `rulings` list on each sheet effect, replacing the planned separate rulings store | Build the separate store from architecture layer 6 |
-| When `RESET_SHEETS` goes off | At launch; until then the mirror keeps the history across resets | Now, so database history builds up during playtests |
