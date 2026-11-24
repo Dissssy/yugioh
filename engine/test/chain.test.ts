@@ -83,6 +83,7 @@ const filter = (f: Partial<CardFilter>): CardFilter => ({
   races: [],
   attributes: [],
   named: null,
+  except: null,
   extraDeck: null,
   faceUp: null,
   position: null,
@@ -694,7 +695,7 @@ describe('targets', () => {
     const state = structuredClone(t.state);
     state.players[0].monsters[0]!.summoned = { how: 'synchro', turn: 1, materials: ['a0', 'a2', 'a3'] };
     const destroyUpTo = script({ targets: { filter: filter({}), min: 1, max: 'non_tuner_materials', others: false, event: false } });
-    expect(targetMax(state, destroyUpTo, 'a1')).toBe(2);
+    expect(targetMax(state, destroyUpTo, 'a1', 0)).toBe(2);
   });
 });
 

@@ -29,6 +29,7 @@
             "LIGHT"
           ],
           "named": null,
+          "except": null,
           "extraDeck": null,
           "faceUp": true,
           "position": null,
@@ -71,6 +72,7 @@
             "DARK"
           ],
           "named": null,
+          "except": null,
           "extraDeck": null,
           "faceUp": true,
           "position": null,

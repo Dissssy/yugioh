@@ -29,6 +29,7 @@
             "FIRE"
           ],
           "named": null,
+          "except": null,
           "extraDeck": null,
           "faceUp": true,
           "position": null,
@@ -71,6 +72,7 @@
             "WATER"
           ],
           "named": null,
+          "except": null,
           "extraDeck": null,
           "faceUp": true,
           "position": null,

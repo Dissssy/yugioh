@@ -270,6 +270,7 @@ const anyCard = (side: CardFilter['side'], place: CardFilter['place'], kinds: Ca
   races: [],
   attributes: [],
   named: null,
+  except: null,
   extraDeck: null,
   faceUp: null,
   position: null,
@@ -319,6 +320,28 @@ describe('a scripted effect', () => {
     expect(legalActions(state, 0).some((a) => a.type === 'activate' && a.card === 'a0')).toBe(false);
     const d = decide(state, 0, { type: 'activate', card: 'a0', effect: 0, zone: 0 });
     expect(d).toEqual({ ok: false, error: 'There is no monster in your GY to target besides the cards paid as its cost.' });
+  });
+
+  it('targets exactly as many cards as the cost discarded, and discards no more than there are to target (Brionac)', async () => {
+    const brionac: Script = {
+      ...reincarnation,
+      cost: [{ do: 'move', cards: { from: 'choose', filter: anyCard('you', 'hand'), min: 1, max: 60, rank: null }, to: 'graveyard' }],
+      targets: { filter: anyCard('opponent', 'field'), min: 1, max: 'cost', others: true, event: false },
+    };
+    let state = board();
+    state = { ...state, sheets: { 3: { ...sheets[3]!, effects: [{ ...sheets[3]!.effects[0]!, script: brionac }] } } };
+    state = evolve(evolve(state, { type: 'monsterSet', player: 1, card: 'b0', zone: 0 }), { type: 'monsterSet', player: 1, card: 'b1', zone: 1 });
+    const d = decide(state, 0, { type: 'activate', card: 'a0', effect: 0, zone: 0 });
+    if (!d.ok) throw new Error(d.error);
+    const scratch = d.events.slice(1).reduce(evolve, state);
+    const answers = [['a1', 'a2'], ['b0', 'b1']];
+    const questions: Question[] = [];
+    const ask = async (q: Question) => (questions.push(q), answers.shift()!);
+    const checked = await rule({ stage: 'activation', state: scratch, link: scratch.chain.at(-1)! }, { model: null, ask, random: () => 0.5 });
+    expect(checked.record).toMatchObject({ legal: true, error: null });
+    // Four cards in hand, but only two to target; then both must be targeted.
+    expect(questions.map((q) => [q.min, q.max])).toEqual([[1, 2], [2, 2]]);
+    expect(checked.events).toContainEqual({ type: 'targeted', cards: ['b0', 'b1'] });
   });
 
   it("matches a face-down card only on what its zone shows", () => {

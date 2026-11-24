@@ -136,7 +136,7 @@ const effect = (kind: SheetEffect['kind'], opt: SheetEffect['opt'] = 'none'): Sh
   status: 'unverified',
 });
 /** Face-up monsters on the field that fit, for continuous effects. */
-const filter = (f: Partial<CardFilter>): CardFilter => ({ side: 'either', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, extraDeck: null, faceUp: true, position: null, level: null, atk: null, def: null, ...f });
+const filter = (f: Partial<CardFilter>): CardFilter => ({ side: 'either', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, except: null, extraDeck: null, faceUp: true, position: null, level: null, atk: null, def: null, ...f });
 const aura = (c: Partial<Extract<Continuous, { apply: 'stats' }>>): Continuous => ({ apply: 'stats', to: 'self', atk: 0, def: 0, per: null, levelDelta: 0, levelSet: null, while: [], ...c });
 const restrict = (c: Partial<Extract<Continuous, { apply: 'restrict' }>>): Continuous => ({ apply: 'restrict', to: 'self', others: false, cannot: [], by: null, compare: null, once: false, while: [], ...c });
 const battleChange = (c: Partial<Extract<Continuous, { apply: 'battle' }>>): Continuous => ({ apply: 'battle', to: 'self', attacks: 1, piercing: false, noDamageToYou: false, while: [], ...c });
@@ -520,7 +520,7 @@ describe('Extra Monster Zones', () => {
     const t = withJunkWarrior([4, 1, 1, 1, 1, 1, ...filler(34)], filler(40, 2), 3);
     const destroy = applyOp(t.state, { op: 'destroy', cards: ['ax0'] }, { player: 1, source: '', stage: 'resolution', random: () => 0 });
     expect(destroy.ok && replay([...t.events, ...destroy.events]).players[0].graveyard).toEqual(['ax0']);
-    const anyMonster = { side: 'opponent', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, extraDeck: null, faceUp: true, position: null, level: null, atk: { min: 2000, max: null }, def: null } as const;
+    const anyMonster = { side: 'opponent', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, except: null, extraDeck: null, faceUp: true, position: null, level: null, atk: { min: 2000, max: null }, def: null } as const;
     expect(cardsFitting(t.state, { ...anyMonster, kinds: [], types: [], races: [], attributes: [] }, 1, '')).toEqual(['ax0']);
     t.play(0, { type: 'setMonster', card: 'a1', tributes: [], zone: 4 });
     t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [t.state.players[1].hand[0]!] });
@@ -630,7 +630,7 @@ describe('Xyz Summons', () => {
     expect(t.state.players[0].graveyard).toEqual([]);
     expect(viewFor(t.state, 1).players[0].monsters[5]!.materials).toMatchObject([{ id: 'a0' }, { id: 'a1' }]);
     // An Xyz Monster has no Level, so it is never an Xyz Material itself, and a material is not on the field.
-    expect(cardsFitting(t.state, { side: 'you', place: 'field', kinds: [], types: [], races: [], attributes: [], named: null, extraDeck: null, faceUp: null, position: null, level: null, atk: null, def: null }, 0, '')).toEqual(['ax2']);
+    expect(cardsFitting(t.state, { side: 'you', place: 'field', kinds: [], types: [], races: [], attributes: [], named: null, except: null, extraDeck: null, faceUp: null, position: null, level: null, atk: null, def: null }, 0, '')).toEqual(['ax2']);
     op(t, { op: 'destroy', cards: ['ax2'] });
     expect(t.state.players[0].graveyard).toEqual(['a0', 'a1', 'ax2']);
   });

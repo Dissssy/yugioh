@@ -192,7 +192,9 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
             sel = { ...step.cards, min: Math.max(0, step.cards.min - 1), max: Math.max(0, step.cards.max - 1) };
           }
         }
-        const cards = await select(sel, verb);
+        // "Discard any number of cards, then target that many": no more than there are cards to target.
+        const limit = cost && script.targets?.max === 'cost' ? targetable(call.state, script, seat, self, link.cause).length - (substituted ? 1 : 0) : Infinity;
+        const cards = await select(sel, verb, limit);
         for (const id of cards) apply({ op: 'move', card: id, to: step.to });
         moved = cards;
         if (cost) paid.push(...cards);
@@ -464,13 +466,14 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         const used = new Set(ops.flatMap((o) => ('cards' in o ? o.cards : 'card' in o ? [o.card] : [])));
         // Legality is judged before the cost: only cards that fit then, and weren't used to pay it, can be targeted.
         const options = targetable(before, script, seat, self, link.cause).filter((id) => !used.has(id) && fits(state, id, script.targets!.filter, seat));
-        const max = Math.min(targetMax(before, script, self), options.length);
-        if (options.length < script.targets.min) throw new Refused('No card left to target after the cost.');
-        const count = script.targets.min === max ? `${max}` : `${script.targets.min} to ${max}`;
+        const max = Math.min(targetMax(before, script, self, paid.length + (substituted ? 1 : 0)), options.length);
+        const min = script.targets.max === 'cost' ? max : script.targets.min;
+        if (options.length < min) throw new Refused('No card left to target after the cost.');
+        const count = min === max ? `${max}` : `${min} to ${max}`;
         // "Target that monster" leaves nothing to choose.
         const targets = script.targets.event
           ? options
-          : await ask({ prompt: `${name}: choose ${count} ${describeFilter(script.targets.filter)} to target.`, cards: options, choices: [], min: script.targets.min, max });
+          : await ask({ prompt: `${name}: choose ${count} ${describeFilter(script.targets.filter)} to target.`, cards: options, choices: [], min, max });
         apply({ op: 'declare_targets', cards: targets });
         summary += `, targeting ${list(targets.map((id) => shown(id, before)))}`;
       }

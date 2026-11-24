@@ -26,6 +26,7 @@ export function identityFits(card: CardData, filter: CardFilter, name = card.nam
   if (!filter.types.every((t) => words.includes(t.toLowerCase()))) return false;
   if (filter.races.length && !filter.races.some((r) => r.toLowerCase() === card.race.toLowerCase())) return false;
   if (filter.named !== null && !name.toLowerCase().includes(filter.named.toLowerCase())) return false;
+  if (filter.except !== null && name.toLowerCase() === filter.except.toLowerCase()) return false;
   if (filter.attributes.length && !filter.attributes.some((a) => a.toUpperCase() === card.attribute)) return false;
   return filter.extraDeck === null || card.extraDeck === filter.extraDeck;
 }
@@ -272,9 +273,13 @@ export function costSubstitute(state: DuelState, seat: Seat, card: string): { ca
   return null;
 }
 
-/** The most cards a script may target: a number, or as many as the non-Tuners used for this card's Synchro Summon. */
-export function targetMax(state: DuelState, script: Script, card: string): number {
+/**
+ * The most cards a script may target: a number, as many as the non-Tuners used for this card's Synchro Summon, or as
+ * many as `paid`, the cards paid as its cost.
+ */
+export function targetMax(state: DuelState, script: Script, card: string, paid: number): number {
   const max = script.targets?.max ?? 0;
+  if (max === 'cost') return paid;
   if (max !== 'non_tuner_materials') return max;
   const at = locate(state, card);
   const materials = at?.zone === 'monsters' ? (state.players[at.seat].monsters[at.index]!.summoned?.materials ?? []) : [];
