@@ -38,6 +38,12 @@ export class FakeDiscord implements DiscordApi {
   clientId = 'discord-client';
   private codes = new Map<string, DiscordUser>();
   instances = new Map<string, string[]>();
+  /** Who logs in with Discord on the website next. Discord approves at once and sends them straight back. */
+  webUser: DiscordUser = { id: 'nobody', username: 'nobody' };
+
+  authorizeUrl(state: string, redirectUri: string) {
+    return `${redirectUri}?${new URLSearchParams({ code: this.codeFor(this.webUser), state })}`;
+  }
 
   /** A code Discord gave this user in the Activity. */
   codeFor(user: DiscordUser): string {

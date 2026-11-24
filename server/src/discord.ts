@@ -18,8 +18,13 @@ export interface DiscordUser {
 /** The calls the server makes to Discord. Tests replace them. */
 export interface DiscordApi {
   clientId: string;
-  /** Trades the code from the Activity's `authorize` for an access token. Null when Discord refuses the code. */
-  exchangeCode(code: string): Promise<string | null>;
+  /** Where the website sends someone to log in with Discord; Discord comes back to `redirectUri` with a code. */
+  authorizeUrl(state: string, redirectUri: string): string;
+  /**
+   * Trades a code for an access token: from the Activity's `authorize`, or with the `redirectUri` it was issued for
+   * from the website's login. Null when Discord refuses the code.
+   */
+  exchangeCode(code: string, redirectUri?: string): Promise<string | null>;
   user(accessToken: string): Promise<DiscordUser>;
   /** The Discord user IDs in a running Activity instance. Null when no such instance is running. */
   instanceUsers(instanceId: string): Promise<string[] | null>;
@@ -35,8 +40,13 @@ async function call<T>(path: string, init: RequestInit, missing?: number): Promi
 export function discordApi(config: DiscordConfig): DiscordApi {
   return {
     clientId: config.clientId,
-    async exchangeCode(code) {
+    authorizeUrl(state, redirectUri) {
+      const query = new URLSearchParams({ client_id: config.clientId, response_type: 'code', scope: 'identify', redirect_uri: redirectUri, state, prompt: 'none' });
+      return `https://discord.com/oauth2/authorize?${query}`;
+    },
+    async exchangeCode(code, redirectUri) {
       const body = new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, grant_type: 'authorization_code', code });
+      if (redirectUri) body.set('redirect_uri', redirectUri);
       const token = await call<{ access_token: string }>('/oauth2/token', { method: 'POST', body }, 400);
       return token?.access_token ?? null;
     },

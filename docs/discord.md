@@ -2,7 +2,7 @@
 
 As of 2026-11-24. The site also runs as a Discord Activity: the same web app, opened by Discord inside a call or a DM and served through Discord's proxy. It is built for the app's testers only, so it never needs Discord's app verification.
 
-Built so far: signing in inside the Activity (step 1). Planned next: "Log in with Discord" and account linking on the website, a Tables page per server, live mini boards on the tables, and a pop-out layout.
+Built so far: signing in inside the Activity, and Discord logins and account linking on the website. Planned next: a Tables page per server, live mini boards on the tables, and a pop-out layout.
 
 ## Who can play
 
@@ -17,6 +17,13 @@ Built so far: signing in inside the Activity (step 1). Planned next: "Log in wit
 3. The account is found or created by Discord user ID (`users.discord_id`). Testers are trusted like approved players: a new account starts approved, and a pending one is approved. An account an admin rejected stays rejected.
 4. The server sets a signed `discord` cookie holding the account ID, marked `SameSite=None; Secure; Partitioned` as Discord's docs advise for iframes, so the API and the live duel streams work as they do on the website. The Activity signs in again each time it opens.
 
+## Discord on the website, and linking
+
+- The website's **Log in** page offers the usual login (Auth0) and **Log in with Discord**. A Discord login on the website is an ordinary Discord OAuth login (`/auth/discord/login` → `/auth/discord/callback`), and a new account from it starts **pending**, like any website signup. Only the Activity approves on its own.
+- The account page lists both logins and can add the missing one. Adding Discord sends an Auth0 account through Discord's login. Adding the website login sends a Discord account through Auth0's login, which comes back to `/auth/link/finish`. The Activity can't show Auth0's login, so this is done on the website.
+- If the added login already has its own account, the two become one (`linkAccounts` in `server/src/accounts.ts`). The Auth0 account stays, unless only the Discord account is approved. The other account's decks, banlists, duels and ruling reports move over, and it is deleted. Two accounts that dueled each other can't be joined, and neither can one that is already linked to a different login.
+- The `discord` cookie holds the Discord user ID, not the account ID, so it keeps working after accounts are joined. On the website it is `SameSite=Lax`. Log out ends both logins.
+
 Inside the Activity there is no Log out: closing the Activity is leaving. Guests don't exist there, since everyone has signed in with Discord.
 
 ## Networking
@@ -28,7 +35,7 @@ Discord serves the Activity from `https://<client id>.discordsays.com` and forwa
 In the [Discord Developer Portal](https://discord.com/developers/applications):
 
 1. **Create the app.** New Application. Optionally create a developer team first (Teams) and make it the owner.
-2. **OAuth2:** add a redirect, `https://127.0.0.1` (a placeholder; the Activity doesn't use it). Copy the **Client ID** and **Client Secret**.
+2. **OAuth2:** add the redirect `https://yugioh.p51.nl/auth/discord/callback`, for Log in with Discord on the website (add `http://localhost:5173/auth/discord/callback` too for local work). The Activity itself needs no redirect. Copy the **Client ID** and **Client Secret**.
 3. **Bot:** Reset Token and copy the **bot token**. The server uses it only to check activity instances; the bot never joins a server.
 4. **Activities → URL Mappings:** root mapping, prefix `/`, target `yugioh.p51.nl`.
 5. **Activities → Settings:** tick Enable Activities. Choose the supported platforms (web/desktop, iOS, Android). Enabling creates the "Launch" entry point command.
@@ -42,7 +49,7 @@ In the [Discord Developer Portal](https://discord.com/developers/applications):
    DISCORD_BOT_TOKEN=
    ```
 
-   Set all three or none. Without them the Activity can't sign anyone in and the rest of the site is unaffected.
+   Set all three or none. Without them the Activity and Log in with Discord are off, and the rest of the site is unaffected.
 
 To launch: join a voice channel (or a DM call) in Discord, open the Activities (rocket) button, and pick the app.
 

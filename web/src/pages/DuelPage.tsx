@@ -123,7 +123,7 @@ function Join({ duel, me }: { duel: DuelSummary; me: Me }) {
           </button>
           {asGuest && (
             <span className="muted small">
-              or <a href={loginHref(window.location.pathname)}>log in</a> to play with your account
+              or <Link to={loginHref(window.location.pathname)}>log in</Link> to play with your account
             </span>
           )}
         </div>

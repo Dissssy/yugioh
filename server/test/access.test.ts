@@ -107,7 +107,7 @@ describe('accounts and approval', () => {
 
   it('gives each account a random username and keeps its email private', async () => {
     const self = await me(player);
-    expect(self).toEqual({ kind: 'user', user: expect.not.objectContaining({ email: expect.anything() }), settings: expect.anything() });
+    expect(self).toEqual({ kind: 'user', user: expect.not.objectContaining({ email: expect.anything() }), settings: expect.anything(), logins: { auth0: true, discord: false } });
     const user = (self as Extract<Me, { kind: 'user' }>).user;
     expect(user.username).toMatch(/^[A-Za-z]+_[A-Za-z]+_\d{1,4}$/);
     // Logging in again keeps the username.

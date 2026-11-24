@@ -8,7 +8,7 @@ As of 2026-11-18. This is the website shell that sits outside the duel engine: l
 | --- | --- |
 | Anonymous | See public pages, the premade decks, and any duel they have the link to. Can accept an open challenge as a guest. |
 | Guest | Someone who accepted a challenge link without logging in, under a name they chose. Sees and plays their duels and can accept other challenge links, like an account. Can't create challenges or build decks. |
-| Pending account | Logged in through Auth0, waiting for the admin. Can look but not play. |
+| Pending account | Logged in on the website (Auth0 or Discord), waiting for the admin. Can look but not play. |
 | Discord tester | Signed in inside the Discord Activity ([discord.md](discord.md)). Approved automatically, since only the app's testers can open it. |
 | Approved account | Everything, including creating challenges. |
 | Admin | Approves or rejects players, reads every duel's full log and costs, and edits rulings. Made an admin by the super admin, and only once approved. |

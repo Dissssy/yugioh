@@ -298,3 +298,10 @@ button.link { color: var(--accent); cursor: pointer; padding: 0; }
 .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
 .box button.option { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
 .box button.option.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
+
+/* Account page: the account's logins (docs/discord.md). */
+.logins { display: grid; grid-template-columns: max-content 1fr; gap: 10px 20px; align-items: center; margin: 0; }
+.logins dt { font-weight: 600; }
+.logins dd { margin: 0; }
+.login { display: grid; justify-items: center; text-align: center; }
+.login .button { min-width: 16em; }

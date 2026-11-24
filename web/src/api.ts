@@ -45,4 +45,8 @@ export function errorText(error: unknown): string {
 }
 
 /** Logging in brings the visitor back to the page they were on, such as a challenge link. */
-export const loginHref = (returnTo: string) => `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
+export const loginHref = (returnTo: string) => `/login?returnTo=${encodeURIComponent(returnTo)}`;
+
+/** Whether this server can log people in with Discord (docs/discord.md). */
+export const useDiscordLogin = () =>
+  useQuery({ queryKey: ['discord'], queryFn: () => api<{ clientId: string }>('/discord').then(() => true, () => false), staleTime: Infinity });
