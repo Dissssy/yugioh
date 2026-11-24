@@ -173,18 +173,18 @@ const sheets: Record<number, EffectSheet> = {
   27: sheet(27, {
     ...effect('activation'),
     speed: 3,
-    when: { event: 'activated', self: false, filter: filter({ places: [], kinds: ['trap'], faceUp: null }), how: [], canMiss: false, by: null },
+    when: { event: 'activated', self: false, filter: filter({ places: [], kinds: ['trap'], faceUp: null }), how: [], canMiss: false, by: null, targeting: null },
   }),
   28: sheet(28, {
     ...effect('trigger'),
     mandatory: true,
-    when: { event: 'damage_step_start', self: true, filter: null, how: [], canMiss: false, by: null },
+    when: { event: 'damage_step_start', self: true, filter: null, how: [], canMiss: false, by: null, targeting: null },
     ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'battling', filter: filter({ side: 'opponent', position: 'defense' }) } }] }] }),
   }),
   29: sheet(29, {
     ...effect('trigger'),
     mandatory: true,
-    when: { event: 'end_phase', self: false, filter: null, how: [], canMiss: false, by: null },
+    when: { event: 'end_phase', self: false, filter: null, how: [], canMiss: false, by: null, targeting: null },
     ...scripted({ conditions: [{ if: 'summoned_this_turn', how: [] }], options: [{ label: '', cost: [], steps: [{ do: 'move', cards: { from: 'self' }, to: 'graveyard' }] }] }),
   }),
   // Not Frequency Magician's real effect: a draw when the opponent's effect destroys it, to test that event.
@@ -192,7 +192,7 @@ const sheets: Record<number, EffectSheet> = {
     ...effect('trigger'),
     mandatory: true,
     from: 'graveyard',
-    when: { event: 'destroyed_by_effect', self: true, filter: filter({ side: 'you', faceUp: true }), how: [], canMiss: false, by: 'opponent' },
+    when: { event: 'destroyed_by_effect', self: true, filter: filter({ side: 'you', faceUp: true }), how: [], canMiss: false, by: 'opponent', targeting: null },
     ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'draw', player: 'you', count: 1, per: null }] }] }),
   }),
   31: sheet(31, {
@@ -253,7 +253,7 @@ const sheets: Record<number, EffectSheet> = {
   50: sheet(50, {
     ...effect('trigger'),
     from: 'graveyard',
-    when: { event: 'sent_to_graveyard', self: true, filter: null, how: [], canMiss: false, by: null },
+    when: { event: 'sent_to_graveyard', self: true, filter: null, how: [], canMiss: false, by: null, targeting: null },
     ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'arrange_top', count: 1, bottom: true }] }] }),
   }),
   34: sheet(34, { ...effect('ignition', 'hard'), from: 'graveyard', ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'special_summon', cards: { from: 'self' }, position: 'choice', banishWhenLeaves: false }] }] }) }),
@@ -274,7 +274,7 @@ const sheets: Record<number, EffectSheet> = {
       {
         ...effect('trigger'),
         mandatory: true,
-        when: { event: 'attacked', self: true, filter: null, how: [], canMiss: false, by: null },
+        when: { event: 'attacked', self: true, filter: null, how: [], canMiss: false, by: null, targeting: null },
         ...scripted({ conditions: [{ if: 'materials', min: null, max: 0 }], options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'self' } }] }] }),
       },
     ),
@@ -283,7 +283,7 @@ const sheets: Record<number, EffectSheet> = {
   18: {
     ...sheet(18, {
       ...effect('trigger'),
-      when: { event: 'battle_destroying', self: true, filter: null, how: [], canMiss: true, by: null },
+      when: { event: 'battle_destroying', self: true, filter: null, how: [], canMiss: true, by: null, targeting: null },
       ...scripted({ cost: [detachSelf], options: [{ label: '', cost: [], steps: [{ do: 'change_lp', player: 'opponent', amount: 1000, per: null, kind: 'damage' }] }] }),
     }),
     materials: { summon: 'xyz', level: 3, count: 2 },
@@ -573,7 +573,7 @@ describe('Synchro Summons', () => {
   });
 
   it('is a Special Summon for triggers: "Synchro Summoned" and "Special Summoned" fire, "Normal Summoned" does not', () => {
-    const trigger = (how: SummonKind[]) => ({ ...effect('trigger'), when: { event: 'summoned', self: true, filter: null, how, canMiss: false, by: null } as const });
+    const trigger = (how: SummonKind[]) => ({ ...effect('trigger'), when: { event: 'summoned', self: true, filter: null, how, canMiss: false, by: null, targeting: null } as const });
     const t = board([13, 14]);
     const before = { ...t.state, sheets: { ...t.state.sheets, 7: { ...t.state.sheets[7]!, effects: [trigger(['synchro']), trigger(['special']), trigger(['normal'])] } } };
     const events = decide(before, 0, { type: 'extraSummon', card: 'ax0', materials: ['a0', 'a1'], zone: 0, position: 'attack' });

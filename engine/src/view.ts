@@ -6,6 +6,7 @@ import { statsOf } from './continuous.ts';
 import { describeFilter, describeGrant } from './script.ts';
 import { evolve, locate, replay, summonName } from './state.ts';
 import type { CardView, DuelEvent, DuelState, FieldCard, FieldCardView, Hand, LogEntry, LogEvent, Phase, Place, PlayerView, Seat, SeatStep, Sight, StartView } from './types.ts';
+import { PHASE_NAMES } from './types.ts';
 
 /** Whether `sight` sees the hidden cards `owner` holds. */
 const knows = (sight: Sight, owner: Seat) => sight === 'all' || sight === owner;
@@ -155,7 +156,7 @@ function reviewText(state: DuelState, event: DuelEvent): string {
     case 'moved':
       return `${label(event.card)} moved from ${who(event.owner)}'s ${event.from} to ${event.to}`;
     case 'phaseChanged':
-      return phaseNames[event.phase];
+      return PHASE_NAMES[event.phase];
     case 'flipped':
       return `${label(event.card)} was flipped face-up`;
     case 'linkResolved':
@@ -294,15 +295,6 @@ function visibleEvent(before: DuelState, state: DuelState, event: DuelEvent, sig
   }
 }
 
-const phaseNames: Record<Phase, string> = {
-  draw: 'Draw Phase',
-  standby: 'Standby Phase',
-  main1: 'Main Phase 1',
-  battle: 'Battle Phase',
-  main2: 'Main Phase 2',
-  end: 'End Phase',
-};
-
 /** One line for the duel log, written so it reveals nothing hidden from either player. */
 function describe(state: DuelState, event: LogEvent): string | null {
   const who = (seat: Seat) => state.players[seat].name;
@@ -320,7 +312,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'turnStarted':
       return `Turn ${event.turn}: ${who(event.player)}`;
     case 'phaseChanged':
-      return event.phase === 'battle' || event.phase === 'main2' ? phaseNames[event.phase] : null;
+      return event.phase === 'battle' || event.phase === 'main2' ? PHASE_NAMES[event.phase] : null;
     case 'drew':
       return `${who(event.player)} drew ${event.count === 1 ? 'a card' : `${event.count} cards`}`;
     case 'tributed':

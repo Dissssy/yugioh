@@ -6,6 +6,7 @@ import { levelNow, nameOf, statsOf } from './continuous.ts';
 import { fusionMonsters } from './fusion.ts';
 import { levelOf, locate, monsterZonesFor, other, summonMatches, summonName } from './state.ts';
 import type { CardData, CardFilter, Condition, DuelState, Grant, Happening, Range, Restriction, Script, Seat, Selection, Step } from './types.ts';
+import { PHASE_NAMES } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
 export function scriptOf(state: DuelState, card: string, effect: number): Script | null {
@@ -337,7 +338,6 @@ export function targetable(state: DuelState, script: Script, seat: Seat, card: s
   return script.targets.event ? fitting.filter((id) => cause && cause.event !== 'phase' && id === cause.card) : fitting;
 }
 
-const phaseNames = { draw: 'Draw Phase', standby: 'Standby Phase', main1: 'Main Phase 1', battle: 'Battle Phase', main2: 'Main Phase 2', end: 'End Phase' };
 
 /** Why a condition doesn't hold for player `seat` and their card `card`, or null if it does. */
 export function conditionProblem(state: DuelState, c: Condition, seat: Seat, card: string): string | null {
@@ -350,7 +350,7 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
       return c.max !== null && n > c.max ? `It needs ${c.max === 0 ? 'no' : `at most ${c.max} of:`} ${describeFilter(c.filter)}.` : null;
     }
     case 'phase':
-      return c.phases.includes(state.phase) ? null : `It can only be activated during the ${c.phases.map((p) => phaseNames[p]).join(' or ')}.`;
+      return c.phases.includes(state.phase) ? null : `It can only be activated during the ${c.phases.map((p) => PHASE_NAMES[p]).join(' or ')}.`;
     case 'turn':
       return (state.turnPlayer === seat) === (c.whose === 'you') ? null : `It only applies during ${c.whose === 'you' ? 'your' : "your opponent's"} turn.`;
     case 'position': {

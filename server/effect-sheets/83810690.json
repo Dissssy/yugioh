@@ -21,7 +21,8 @@
           "synchro"
         ],
         "canMiss": true,
-        "by": null
+        "by": null,
+        "targeting": null
       },
       "script": {
         "conditions": [],

@@ -7,6 +7,7 @@ import { fits, scriptProblem } from './script.ts';
 import { flipNegatedByBattle, lockProblem, negated, taxedBy } from './continuous.ts';
 import { locate, summonMatches, summonName } from './state.ts';
 import type { DuelEvent, DuelState, Happening, Seat, When } from './types.ts';
+import { PHASE_NAMES } from './types.ts';
 
 /** Whether an event is the one an effect of `card` (controlled by `seat`) waits for. */
 export function whenMatches(state: DuelState, when: When, h: Happening, card: string, seat: Seat): boolean {
@@ -15,6 +16,7 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
     return whenMatches(state, when, { event: 'attacked', card: h.target, player: h.player === 0 ? 1 : 0, attacker: h.card, group: h.group }, card, seat);
   }
   if (h.event === 'phase') return when.event === 'end_phase' && h.phase === 'end';
+  if (h.event === 'activated' && when.targeting && !(state.chain[h.link]?.targets ?? []).some((id) => fits(state, id, when.targeting!, seat))) return false;
   if (when.event === 'direct_attack_damage') return h.event === 'battle_damage' && h.direct && whenMatches(state, { ...when, event: 'battle_damage' }, h, card, seat);
   if (when.event !== h.event) return false;
   // A destroyed card is checked as it was on the field: whose it was, and whether it was face-up.
@@ -33,7 +35,7 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
 }
 
 /** Every FLIP effect waits for its own card to be flipped face-up, and never misses the timing. */
-const FLIP: When = { event: 'flipped', self: true, filter: null, how: [], canMiss: false, by: null };
+const FLIP: When = { event: 'flipped', self: true, filter: null, how: [], canMiss: false, by: null, targeting: null };
 
 /** A trigger that fired and isn't on the chain yet. */
 export interface PendingTrigger {
@@ -161,7 +163,7 @@ export function describeCause(state: DuelState, cause: Happening | null): string
     case 'attack_declared':
       return `${name(cause.card)}'s attack${cause.target ? ` on ${locate(state, cause.target)?.zone === 'monsters' && !isFaceDown(state, cause.target) ? name(cause.target) : 'a face-down monster'}` : ' directly'}`;
     case 'phase':
-      return `the start of ${state.players[cause.player].name}'s ${cause.phase === 'battle' ? 'Battle Phase' : 'End Phase'}`;
+      return `the start of ${state.players[cause.player].name}'s ${PHASE_NAMES[cause.phase]}`;
     case 'attacked':
       return `the attack on ${isFaceDown(state, cause.card) ? 'a face-down monster' : name(cause.card)}`;
     case 'destroyed_by_battle':

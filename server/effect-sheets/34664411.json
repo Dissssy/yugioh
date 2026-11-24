@@ -117,7 +117,8 @@
         },
         "how": [],
         "canMiss": false,
-        "by": "opponent"
+        "by": "opponent",
+        "targeting": null
       },
       "script": {
         "conditions": [],

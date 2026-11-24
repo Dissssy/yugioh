@@ -2,7 +2,7 @@ import { get } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { addBlocker, deckProblems, isSideSwap, matchesTerms, NO_BANLIST, parseQuery, parseYdk, setTerm, termValue, toYdk, type BanlistDetail, type BanlistSummary, type CatalogCard, type DeckDetail, type DeckList, type DeckSave, type DeckSummary, type DuelDeck, type DuelSummary, type RuleCard } from '@yugioh/shared';
 import { eq } from 'drizzle-orm';
-import { syncCards } from '../src/cards.ts';
+import { syncCards, toCardData } from '../src/cards.ts';
 import { users } from '../src/db/schema.ts';
 import { ADMIN_EMAIL, Browser, startHarness, type Harness } from './harness.ts';
 
@@ -77,6 +77,14 @@ const save = (deck: Partial<DeckSave> = {}): DeckSave => ({
   ...deck,
 });
 const post = (b: Browser, path: string, body: unknown, method = 'POST') => b.json<never>(`${h.baseUrl}/api${path}`, { method, body: JSON.stringify(body) });
+
+describe('card data', () => {
+  it('takes the type line from typeline, so Extra Deck Effect Monsters say "Effect"', () => {
+    const row = { id: 1, name: 'Brionac', type: 'Synchro Monster', frameType: 'synchro', text: '', textHash: '', atk: 2300, def: 1400, level: 6, race: 'Sea Serpent', attribute: 'WATER', archetype: null, raw: { typeline: ['Sea Serpent', 'Synchro', 'Effect'] }, updatedAt: new Date() };
+    expect(toCardData(row).type).toBe('Synchro Effect Monster');
+    expect(toCardData({ ...row, type: 'Trap Card', frameType: 'trap', raw: {} }).type).toBe('Trap Card');
+  });
+});
 
 describe('the card catalog', () => {
   it('lists every card, gzipped, with whether it is in the game, and revalidates', async () => {

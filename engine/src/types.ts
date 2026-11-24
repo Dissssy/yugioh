@@ -133,6 +133,11 @@ export interface When {
   canMiss: boolean;
   /** For `destroyed_by_effect`: whose card effect it must be ("by your opponent's card effect"); null for anyone's. */
   by: 'you' | 'opponent' | null;
+  /**
+   * For `activated`: the activation must target a card that fits this ("that targets an "Ice Barrier" Synchro Monster
+   * you control", Terror of Trishula); null for any activation.
+   */
+  targeting: CardFilter | null;
 }
 
 /**
@@ -528,6 +533,14 @@ export const HANDS = ['rock', 'paper', 'scissors'] as const;
 export type Hand = (typeof HANDS)[number];
 
 export type Phase = 'draw' | 'standby' | 'main1' | 'battle' | 'main2' | 'end';
+export const PHASE_NAMES: Record<Phase, string> = {
+  draw: 'Draw Phase',
+  standby: 'Standby Phase',
+  main1: 'Main Phase 1',
+  battle: 'Battle Phase',
+  main2: 'Main Phase 2',
+  end: 'End Phase',
+};
 export type Position = 'attack' | 'defense';
 
 /** A change to a face-up monster's stats. Every modifier ends when the card leaves the field. */
@@ -589,15 +602,15 @@ export type Happening =
   | { event: 'damage_step_start'; card: string; player: Seat; target: string | null; group: number }
   /** The Damage Step of `card`'s attack ends, after its damage calculation; `target` as for its start. */
   | { event: 'damage_step_end'; card: string; player: Seat; target: string | null; group: number }
-  | { event: 'phase'; phase: 'battle' | 'end'; player: Seat; group: number }
+  | { event: 'phase'; phase: 'standby' | 'battle' | 'end'; player: Seat; group: number }
   /** A card left the field for the GY, by any means; `player` controlled it. */
   | { event: 'sent_to_graveyard'; card: string; player: Seat; group: number }
   /** A face-down monster turned face-up: Flip Summoned, attacked, or changed to a position by an effect. */
   | { event: 'flipped'; card: string; player: Seat; group: number };
 
 /** What happens once a sequence of triggers, responses and chains is over. */
-/** `damage_step`: the attack's Damage Step starts; `damage`: its damage calculation. */
-export type Then = { do: 'open' } | { do: 'damage_step' } | { do: 'damage' } | { do: 'endTurn'; discard: string[] };
+/** `main1`: the Standby Phase is over and Main Phase 1 starts. `damage_step`: the attack's Damage Step starts; `damage`: its damage calculation. */
+export type Then = { do: 'open' } | { do: 'main1' } | { do: 'damage_step' } | { do: 'damage' } | { do: 'endTurn'; discard: string[] };
 
 /**
  * Where the duel is: deciding who goes first, or in the timing of effects (docs/chains.md).
