@@ -169,6 +169,9 @@ describe('a card effect the judge rules on', () => {
     expect(verdict.event).toEqual({ type: 'appealed', judged: rulings[1]!.seq, by: 0, verdict: 'upheld', explanation: 'The player chose the damage option.' });
     expect(verdict.text).toBe('Appeal upheld the ruling: The player chose the damage option.');
     expect((await contest('again')).status).toBe(409);
+    // The other player can't send the same ruling to a second appeal either.
+    const theirContest = await guest.json(`${h.baseUrl}/api/duels/${duel.id}/contest`, { method: 'POST', body: JSON.stringify({ seq: rulings[1]!.seq, note: 'me too' }) });
+    expect(theirContest.status).toBe(409);
     mine.close();
     theirs.close();
   });

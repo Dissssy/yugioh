@@ -185,7 +185,7 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
     }
     case 'targeted':
       for (const id of e.cards) {
-        const el = card(id);
+        const el = id && card(id);
         if (el) glow(el, { scale: [1, 1.1, 1], filter: ['brightness(1)', 'brightness(1.6)', 'brightness(1)'] }, { duration: s });
       }
       return;

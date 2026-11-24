@@ -13,6 +13,7 @@ export const cardFilter = z.object({
   races: z.array(z.string()),
   attributes: z.array(z.string()),
   named: z.string().nullable(),
+  except: z.string().nullable(),
   extraDeck: z.boolean().nullable(),
   faceUp: z.boolean().nullable(),
   position: z.enum(['attack', 'defense']).nullable(),

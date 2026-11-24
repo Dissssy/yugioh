@@ -136,7 +136,7 @@ const effect = (kind: SheetEffect['kind'], opt: SheetEffect['opt'] = 'none'): Sh
   status: 'unverified',
 });
 /** Face-up monsters on the field that fit, for continuous effects. */
-const filter = (f: Partial<CardFilter>): CardFilter => ({ side: 'either', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, extraDeck: null, faceUp: true, position: null, level: null, atk: null, def: null, ...f });
+const filter = (f: Partial<CardFilter>): CardFilter => ({ side: 'either', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, except: null, extraDeck: null, faceUp: true, position: null, level: null, atk: null, def: null, ...f });
 const aura = (c: Partial<Extract<Continuous, { apply: 'stats' }>>): Continuous => ({ apply: 'stats', to: 'self', atk: 0, def: 0, per: null, levelDelta: 0, levelSet: null, while: [], ...c });
 const restrict = (c: Partial<Extract<Continuous, { apply: 'restrict' }>>): Continuous => ({ apply: 'restrict', to: 'self', others: false, cannot: [], by: null, compare: null, once: false, while: [], ...c });
 const battleChange = (c: Partial<Extract<Continuous, { apply: 'battle' }>>): Continuous => ({ apply: 'battle', to: 'self', attacks: 1, piercing: false, noDamageToYou: false, while: [], ...c });
@@ -520,7 +520,7 @@ describe('Extra Monster Zones', () => {
     const t = withJunkWarrior([4, 1, 1, 1, 1, 1, ...filler(34)], filler(40, 2), 3);
     const destroy = applyOp(t.state, { op: 'destroy', cards: ['ax0'] }, { player: 1, source: '', stage: 'resolution', random: () => 0 });
     expect(destroy.ok && replay([...t.events, ...destroy.events]).players[0].graveyard).toEqual(['ax0']);
-    const anyMonster = { side: 'opponent', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, extraDeck: null, faceUp: true, position: null, level: null, atk: { min: 2000, max: null }, def: null } as const;
+    const anyMonster = { side: 'opponent', place: 'monsters', kinds: [], types: [], races: [], attributes: [], named: null, except: null, extraDeck: null, faceUp: true, position: null, level: null, atk: { min: 2000, max: null }, def: null } as const;
     expect(cardsFitting(t.state, { ...anyMonster, kinds: [], types: [], races: [], attributes: [] }, 1, '')).toEqual(['ax0']);
     t.play(0, { type: 'setMonster', card: 'a1', tributes: [], zone: 4 });
     t.play(0, { type: 'endTurn', discard: [] }).play(1, { type: 'endTurn', discard: [t.state.players[1].hand[0]!] });
@@ -630,7 +630,7 @@ describe('Xyz Summons', () => {
     expect(t.state.players[0].graveyard).toEqual([]);
     expect(viewFor(t.state, 1).players[0].monsters[5]!.materials).toMatchObject([{ id: 'a0' }, { id: 'a1' }]);
     // An Xyz Monster has no Level, so it is never an Xyz Material itself, and a material is not on the field.
-    expect(cardsFitting(t.state, { side: 'you', place: 'field', kinds: [], types: [], races: [], attributes: [], named: null, extraDeck: null, faceUp: null, position: null, level: null, atk: null, def: null }, 0, '')).toEqual(['ax2']);
+    expect(cardsFitting(t.state, { side: 'you', place: 'field', kinds: [], types: [], races: [], attributes: [], named: null, except: null, extraDeck: null, faceUp: null, position: null, level: null, atk: null, def: null }, 0, '')).toEqual(['ax2']);
     op(t, { op: 'destroy', cards: ['ax2'] });
     expect(t.state.players[0].graveyard).toEqual(['a0', 'a1', 'ax2']);
   });
@@ -1572,6 +1572,20 @@ describe('activating effects', () => {
     expect(theirs.at(-1)!.event).toMatchObject({ type: 'moved', card: null, from: 'deck', to: 'hand' });
     expect(JSON.stringify(theirs)).not.toContain('a7');
     expect(logFor(t.events, 0).at(-1)!.event).toMatchObject({ type: 'moved', card: 'a7' });
+  });
+
+  it('keeps a Set card hidden from its owner\'s opponent when it is targeted and returned to the hand', () => {
+    const t = new Table(stacked([9, ...filler(39)], [6, ...filler(39, 2)]));
+    t.play(0, { type: 'endTurn', discard: [] });
+    t.play(1, { type: 'setSpellTrap', card: 'b0', zone: 0 }).play(1, { type: 'endTurn', discard: [] });
+    t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 2 });
+    ops(t, [{ op: 'declare_targets', cards: ['b0'] }], 'activation');
+    ops(t, [{ op: 'move', card: 'b0', to: 'hand' }]);
+    const mine = logFor(t.events, 0).slice(-2);
+    expect(mine.map((e) => e.text)).toEqual(['Targeting a face-down card', "Yuma's card from the field to the hand"]);
+    expect(JSON.stringify(mine)).not.toContain('b0');
+    expect(JSON.stringify(logFor(t.events, 'none'))).not.toContain('Trap Hole');
+    expect(logFor(t.events, 1).slice(-2).map((e) => e.text)).toEqual(['Targeting Trap Hole', 'Trap Hole from the field to the hand']);
   });
 
   it('modifies stats for battle and ends the modifier on time', () => {

@@ -145,11 +145,13 @@ export interface Script {
   cost: Step[];
   /**
    * Chosen by the activating player on activation, after the cost; null if the effect doesn't target. `max` may be
-   * `non_tuner_materials`: the non-Tuner monsters used for this card's Synchro Summon (Junk Destroyer). `others`: this
+   * `non_tuner_materials`: the non-Tuner monsters used for this card's Synchro Summon (Junk Destroyer); or `cost`:
+   * exactly as many as the cards paid as the cost ("discard any number of cards, then target that many", Brionac), and
+   * the cost can't take more cards than there are to target. `others`: this
    * card itself can't be a target. `event`: only the card the effect's `when` event happened to may be targeted
    * ("Target that monster").
    */
-  targets: { filter: CardFilter; min: number; max: number | 'non_tuner_materials'; others: boolean; event: boolean } | null;
+  targets: { filter: CardFilter; min: number; max: number | 'non_tuner_materials' | 'cost'; others: boolean; event: boolean } | null;
   /**
    * What the effect does. One option, or several when the text says "activate 1 of these effects" (picked on
    * activation by `label`). An option's own `cost` is paid after the script's, once it is picked ("Tribute 1 monster,
@@ -413,6 +415,8 @@ export interface CardFilter {
   races: string[];
   /** Text the card's name must contain: "Ice Barrier" for an "Ice Barrier" monster; null for any name. */
   named: string | null;
+  /** A card's exact name that doesn't fit, for "except \"Prior of the Ice Barrier\""; null for none. */
+  except: string | null;
   attributes: string[];
   /** A monster that belongs in the Extra Deck (Fusion, Synchro, Xyz); null for either. */
   extraDeck: boolean | null;
@@ -1043,6 +1047,7 @@ export type LogEvent =
           | 'attackDeclared'
           | 'judged'
           | 'moved'
+          | 'targeted'
           | 'deckShuffled'
           | 'appealed'
           | 'sheetUpdated'
@@ -1061,6 +1066,8 @@ export type LogEvent =
   | { type: 'escalated'; asked: number; outcome: EscalationRecord['outcome']; explanation: string }
   | { type: 'monsterSet' | 'spellTrapSet'; player: Seat; card: string | null; zone: number }
   | (Omit<Extract<DuelEvent, { type: 'moved' }>, 'card'> & { card: string | null })
+  /** A target the viewer can't see (a Set card) is null. */
+  | { type: 'targeted'; cards: (string | null)[] }
   /** A judge decision. `card` is null when the player can't see it. Contest it by its log entry's `seq`. */
   | { type: 'judged'; stage: 'activation' | 'resolution'; player: Seat; card: string | null; legal: boolean; summary: string; failed: boolean }
   | { type: 'appealed'; judged: number; by: Seat; verdict: 'upheld' | 'overturned'; explanation: string }

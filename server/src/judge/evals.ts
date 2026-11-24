@@ -776,6 +776,51 @@ export const CASES: EvalCase[] = [
       ),
   },
   {
+    // A live duel (uLlJseNWA9MktARS, turn 11): the judge returned a card from the opponent's GY instead of the target.
+    name: 'brionac returns exactly the targeted cards, as many as it discarded',
+    board: [{ monsters: ['Brionac, Dragon of the Ice Barrier'], hand: ['Dark Blade', 'Twister'] }, { set: ['Sakuretsu Armor', 'Scrap-Iron Scarecrow'], gy: ['Axe Raider'] }],
+    activate: 'Brionac, Dragon of the Ice Barrier',
+    picks: [['Dark Blade'], ['Scrap-Iron Scarecrow']],
+    legal: true,
+    check: (b) =>
+      all(
+        expectAt(b, 'Scrap-Iron Scarecrow', '1:hand'),
+        expectAt(b, 'Sakuretsu Armor', '1:spellTraps'),
+        expectAt(b, 'Axe Raider', '1:gy'),
+        expectAt(b, 'Dark Blade', '0:gy'),
+        expectAt(b, 'Twister', '0:hand'),
+      ),
+  },
+  {
+    name: 'brionac with no card to discard',
+    board: [{ monsters: ['Brionac, Dragon of the Ice Barrier'] }, { set: ['Sakuretsu Armor'] }],
+    activate: 'Brionac, Dragon of the Ice Barrier',
+    legal: false,
+  },
+  {
+    // A live duel (uLlJseNWA9MktARS, turn 3): the judge said Speaker for the Ice Barriers isn't an "Ice Barrier" monster.
+    name: 'prior of the ice barrier tributes itself to revive an ice barrier monster',
+    board: [{ monsters: ['Prior of the Ice Barrier'], gy: ['Speaker for the Ice Barriers'] }, {}],
+    activate: 'Prior of the Ice Barrier',
+    effect: 1,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Speaker for the Ice Barriers', '0:monsters'), expectAt(b, 'Prior of the Ice Barrier', '0:gy')),
+  },
+  {
+    name: 'prior of the ice barrier cannot revive another prior',
+    board: [{ monsters: ['Prior of the Ice Barrier'], gy: ['Prior of the Ice Barrier'] }, {}],
+    activate: 'Prior of the Ice Barrier',
+    effect: 1,
+    legal: false,
+  },
+  {
+    name: 'medallion of the ice barrier adds an ice barrier monster',
+    board: [{ hand: ['Medallion of the Ice Barrier'], deck: ['Axe Raider', 'Speaker for the Ice Barriers'] }, {}],
+    activate: 'Medallion of the Ice Barrier',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Speaker for the Ice Barriers', '0:hand'), expectAt(b, 'Axe Raider', '0:deck')),
+  },
+  {
     name: 'medium of the ice barrier when the opponent controls 4 more cards',
     board: [{ hand: ['Medium of the Ice Barrier'] }, { monsters: ['Axe Raider', 'Dark Blade'], set: ['Trap Hole', 'Twister'] }],
     activate: 'Medium of the Ice Barrier',

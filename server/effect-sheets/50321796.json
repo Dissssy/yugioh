@@ -14,7 +14,75 @@
       "effect": "Return the targeted cards your opponent controls to the hand.",
       "targets": "the same number of cards your opponent controls as cards discarded",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "place": "hand",
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              },
+              "min": 1,
+              "max": 60,
+              "rank": null
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "field",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": "cost",
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "targets"
+                },
+                "to": "hand"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

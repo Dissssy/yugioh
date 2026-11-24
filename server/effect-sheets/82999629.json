@@ -56,6 +56,7 @@
             "WATER"
           ],
           "named": null,
+          "except": null,
           "extraDeck": null,
           "faceUp": true,
           "position": null,

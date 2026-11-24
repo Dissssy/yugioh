@@ -48,6 +48,7 @@
                     ],
                     "attributes": [],
                     "named": null,
+                    "except": null,
                     "extraDeck": null,
                     "faceUp": null,
                     "position": null,

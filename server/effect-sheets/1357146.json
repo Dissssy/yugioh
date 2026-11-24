@@ -70,6 +70,7 @@
                 "races": [],
                 "attributes": [],
                 "named": "Frog",
+                "except": null,
                 "extraDeck": null,
                 "faceUp": null,
                 "position": null,
