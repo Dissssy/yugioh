@@ -1,7 +1,7 @@
 {
   "code": 73048641,
   "textHash": "28daa9a65803e3723e8b9362ffe4348de6b33de6d6a5a77061d66d2c991d76e2",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "activation",
@@ -14,7 +14,73 @@
       "effect": "Target 1 face-up monster on the field; it cannot be destroyed by battle this turn, also its ATK is halved until the end of this turn.",
       "targets": "1 face-up monster on the field",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "places": [
+              "monsters"
+            ],
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "grant",
+                "cards": {
+                  "from": "targets"
+                },
+                "effect": {
+                  "apply": "restrict",
+                  "cannot": [
+                    "be_destroyed_by_battle"
+                  ]
+                }
+              },
+              {
+                "do": "gain_stats",
+                "cards": {
+                  "from": "targets"
+                },
+                "atk": {
+                  "of": "targets",
+                  "stat": "atk",
+                  "filter": null,
+                  "original": false,
+                  "times": -0.5
+                },
+                "def": null,
+                "until": "end_of_turn"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

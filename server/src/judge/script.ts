@@ -13,6 +13,7 @@ import {
   specialSummonProblem,
   cardsFitting,
   describeFilter,
+  describeGrant,
   detachFrom,
   evolve,
   feasibleOptions,
@@ -469,8 +470,8 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       }
       case 'forbid': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
-        apply({ op: 'forbid', player, what: step.what, filter: step.filter });
-        const what = { battle_phase: 'conduct their Battle Phase', declare_attack: 'declare an attack', special_summon: `Special Summon ${step.filter ? `a ${describeFilter(step.filter, true)}` : 'monsters'}` }[step.what];
+        apply({ op: 'forbid', player, what: step.what, filter: step.filter, except: step.others ? self : null });
+        const what = { battle_phase: 'conduct their Battle Phase', declare_attack: `declare an attack${step.others ? ` with monsters other than ${name}` : ''}`, special_summon: `Special Summon ${step.filter ? `a ${describeFilter(step.filter, true)}` : 'monsters'}` }[step.what];
         return `${state.players[player].name} can't ${what} this turn.`;
       }
       case 'lock': {
@@ -504,6 +505,18 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         apply({ op: 'set_spell_trap', card: pick });
         return `${state.players[where].name} Set a card.`;
       }
+      case 'grant': {
+        const cards = (await select(step.cards, 'give this to')).filter((id) => {
+          const at = locate(state, id);
+          return at?.zone === 'monsters' && state.players[at.seat].monsters[at.index]!.faceUp;
+        });
+        for (const id of cards) apply({ op: 'grant', card: id, effect: step.effect });
+        return cards.length ? `${list(cards.map((id) => shown(id, before)))} ${describeGrant(step.effect)} this turn.` : null;
+      }
+      case 'no_battle_damage':
+        if (!state.attack) return null;
+        apply({ op: 'no_battle_damage', player: seat });
+        return `${state.players[seat].name} takes no battle damage from this battle.`;
       case 'if_done':
       case 'only_if':
         // Handled where the steps run.

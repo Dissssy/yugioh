@@ -58,11 +58,28 @@ export function continuousOnField(state: DuelState): InForce<Continuous>[] {
   );
 }
 
-/** The continuous effects that apply to cards and players now: those whose `while` conditions hold. */
+/**
+ * The continuous effects that apply to cards and players now: those whose `while` conditions hold, and the abilities
+ * `grant` steps gave monsters this turn.
+ */
 export function inForce(state: DuelState): InForce[] {
-  return continuousOnField(state).filter(
+  const own = continuousOnField(state).filter(
     (f): f is InForce => 'while' in f.effect && f.effect.while.every((w) => !conditionProblem(state, w, f.seat, f.source)),
   );
+  return [...own, ...granted(state)];
+}
+
+/** The abilities granted to face-up monsters this turn, each as a continuous effect on the monster itself. */
+function granted(state: DuelState): InForce[] {
+  return state.granted.flatMap(({ card, effect: g }): InForce[] => {
+    const at = locate(state, card);
+    if (at?.zone !== 'monsters' || !state.players[at.seat].monsters[at.index]!.faceUp) return [];
+    const effect: Applied =
+      g.apply === 'restrict'
+        ? { apply: 'restrict', to: 'self', others: false, cannot: g.cannot, by: null, compare: null, once: false, while: [] }
+        : { apply: 'battle', to: 'self', attacks: g.attacks, piercing: g.piercing, noDamageToYou: false, direct: g.direct, while: [] };
+    return [{ source: card, seat: at.seat, index: -1, effect }];
+  });
 }
 
 /** The face-up monsters a `force_position` effect in force holds in another position than they are in, with that position. */
@@ -145,6 +162,8 @@ function battleOn(state: DuelState, id: string): Battle[] {
 export const attacksAllowed = (state: DuelState, id: string) => Math.max(1, ...battleOn(state, id).map((b) => b.attacks));
 /** Whether a monster attacking a Defense Position monster inflicts piercing battle damage. */
 export const piercing = (state: DuelState, id: string) => battleOn(state, id).some((b) => b.piercing);
+/** Whether a monster can attack directly while the opponent controls monsters (Rapid Warrior). */
+export const attacksDirectly = (state: DuelState, id: string) => battleOn(state, id).some((b) => b.direct);
 /** Whether its controller takes no battle damage from attacks involving this monster (Fortress Warrior). */
 export const shieldsBattleDamage = (state: DuelState, id: string) => battleOn(state, id).some((b) => b.noDamageToYou);
 

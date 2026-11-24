@@ -36,7 +36,7 @@ export function applyOp(state: DuelState, op: Op, ctx: OpContext): OpResult {
 }
 
 /** The ops that change a card already in play, and so can't touch a card unaffected by the effect. */
-const AFFECTING = ['move', 'modify_stats', 'change_position', 'take_control', 'negate_effects', 'add_counters', 'remove_counters', 'detach', 'link'];
+const AFFECTING = ['move', 'modify_stats', 'grant', 'change_position', 'take_control', 'negate_effects', 'add_counters', 'remove_counters', 'detach', 'link'];
 
 /**
  * The op without the cards it can't touch: those unaffected by this effect (Freezing Chains of the Ice Barrier) and,
@@ -287,7 +287,17 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       return;
     case 'forbid':
       check(op.what === 'special_summon' || op.filter === null, 'Only a Special Summon ban takes a filter.');
-      run.emit({ type: 'forbidden', player: op.player, what: op.what, filter: op.filter });
+      run.emit({ type: 'forbidden', player: op.player, what: op.what, filter: op.filter, except: op.except });
+      return;
+    case 'grant': {
+      const { at, card } = onField(state, op.card);
+      check(at.zone === 'monsters' && card.faceUp, 'Only a face-up monster can be given an ability.');
+      run.emit({ type: 'granted', card: op.card, effect: op.effect });
+      return;
+    }
+    case 'no_battle_damage':
+      check(state.attack, 'No attack is being made.');
+      run.emit({ type: 'battleDamageZeroed', player: op.player });
       return;
     case 'detach': {
       const at = known(state, op.card);

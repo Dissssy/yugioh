@@ -20,4 +20,5 @@ export const cardFilter = z.object({
   level: range,
   atk: range,
   def: range,
+  original: z.boolean(),
 }) satisfies z.ZodType<CardFilter>;

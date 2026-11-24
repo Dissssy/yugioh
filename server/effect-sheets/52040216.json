@@ -38,7 +38,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "levelDelta": 0,
         "levelSet": null,

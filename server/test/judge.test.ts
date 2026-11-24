@@ -277,6 +277,7 @@ const anyCard = (side: CardFilter['side'], place: CardFilter['places'][number], 
   level: null,
   atk: null,
   def: null,
+  original: false,
 });
 /** Monster Reincarnation as a script: discard 1 card, then target 1 monster in your GY; add it to your hand. */
 const reincarnation: Script = {

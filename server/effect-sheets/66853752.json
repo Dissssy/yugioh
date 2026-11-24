@@ -36,7 +36,8 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 1,
             "max": null,
@@ -69,7 +70,8 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 0,
             "max": 0,
@@ -131,7 +133,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "onlyForTuner": null
       },

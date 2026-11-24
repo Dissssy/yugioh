@@ -41,7 +41,8 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 4,
             "max": null,
@@ -75,7 +76,8 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "count": 1

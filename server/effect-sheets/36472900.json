@@ -41,7 +41,8 @@
             "min": 1900,
             "max": null
           },
-          "def": null
+          "def": null,
+          "original": false
         },
         "compare": null,
         "once": false,

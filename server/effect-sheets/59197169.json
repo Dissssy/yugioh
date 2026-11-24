@@ -65,7 +65,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "atk": 200,
         "def": 200,
@@ -110,7 +111,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "atk": -200,
         "def": -200,

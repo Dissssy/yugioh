@@ -64,7 +64,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "position": "defense",
         "while": []
@@ -105,7 +106,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "others": false,
         "cannot": [

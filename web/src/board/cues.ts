@@ -47,6 +47,8 @@ const baseMs: Record<LogEvent['type'], number> = {
   statsModified: 400,
   normalSummonGranted: 300,
   forbidden: 300,
+  granted: 300,
+  battleDamageZeroed: 300,
   linked: 400,
   activationNegated: 500,
   effectsNegated: 300,

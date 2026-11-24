@@ -46,7 +46,8 @@
               "max": 2
             },
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 2,
           "max": 2,

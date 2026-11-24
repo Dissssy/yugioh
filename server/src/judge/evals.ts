@@ -1204,6 +1204,64 @@ export const CASES: EvalCase[] = [
     legal: true,
     check: (b) => (b.state.players[0].hand.length === 0 ? null : `hand has ${b.state.players[0].hand.length}`),
   },
+  {
+    name: 'rapid warrior can attack directly and stops the other monsters attacking',
+    board: [{ monsters: ['Rapid Warrior', 'Axe Raider'] }, { monsters: ['Sonic Chick'] }],
+    activate: 'Rapid Warrior',
+    legal: true,
+    check: (b) => {
+      const rapid = b.where('Rapid Warrior').length ? b.state.players[0].monsters.find((m) => m && cardOf(b.state, m.id).name === 'Rapid Warrior')!.id : null;
+      return all(
+        b.state.granted.some((g) => g.card === rapid && g.effect.apply === 'battle' && g.effect.direct) ? null : 'no direct attack granted',
+        b.state.forbidden.some((f) => f.player === 0 && f.what === 'declare_attack' && f.except === rapid) ? null : 'no attack ban on the other monsters',
+      );
+    },
+  },
+  {
+    name: 'half shut halves atk and protects from battle destruction',
+    board: [{ hand: ['Half Shut'], monsters: ['Axe Raider'] }, {}],
+    activate: 'Half Shut',
+    picks: [['Axe Raider']],
+    legal: true,
+    check: (b) =>
+      all(
+        b.monster('Axe Raider')?.atk === 850 ? null : `Axe Raider has ${b.monster('Axe Raider')?.atk} ATK`,
+        b.state.granted.some((g) => g.effect.apply === 'restrict' && g.effect.cannot.includes('be_destroyed_by_battle')) ? null : 'no battle protection',
+      ),
+  },
+  {
+    name: 'miniaturize lowers the level and atk of a monster with more than 1000 original atk',
+    board: [{ set: ['Miniaturize'] }, { monsters: ['Axe Raider'] }],
+    activate: 'Miniaturize',
+    picks: [['Axe Raider']],
+    legal: true,
+    check: (b) => all(b.monster('Axe Raider')?.atk === 700 ? null : `Axe Raider has ${b.monster('Axe Raider')?.atk} ATK`, b.monster('Axe Raider')?.level === 3 ? null : `Axe Raider is Level ${b.monster('Axe Raider')?.level}`),
+  },
+  {
+    name: 'miniaturize needs a monster with more than 1000 original atk',
+    board: [{ set: ['Miniaturize'] }, { monsters: ['Sonic Chick'] }],
+    activate: 'Miniaturize',
+    legal: false,
+  },
+  {
+    name: 'defense draw zeroes the battle damage and draws at damage calculation',
+    board: [{ monsters: ['Axe Raider'] }, { set: ['Defense Draw'], deck: ['Sonic Chick'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Axe Raider'), target: 'direct' }],
+    ],
+    seat: 1,
+    activate: 'Defense Draw',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Sonic Chick', '1:hand'), b.state.attack?.noDamageTo.includes(1) || b.state.players[1].lp === 8000 ? null : `player 1 has ${b.state.players[1].lp} LP`),
+  },
+  {
+    name: 'defense draw waits for damage calculation',
+    board: [{ monsters: ['Axe Raider'] }, { set: ['Defense Draw'], deck: ['Sonic Chick'] }],
+    seat: 1,
+    activate: 'Defense Draw',
+    legal: false,
+  },
   // Control, Tokens, and effects used from the hand or GY.
   {
     name: 'crackdown takes control of a face-up monster for good',

@@ -73,6 +73,7 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     normalSummonLimit: 1,
     modifiers: [],
     forbidden: [],
+    granted: [],
     didThisTurn: [],
     properlySummoned: [],
     sentThisTurn: [],
@@ -213,6 +214,7 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         s.modifiers = s.modifiers.filter((m) => m.until !== 'end_of_turn');
         // Bans for this turn and later ones ("skip the Battle Phase of your next turn") stay.
         s.forbidden = s.forbidden.filter((f) => f.turn >= event.turn);
+        s.granted = [];
         s.pledges = [];
         s.didThisTurn = [];
         s.sentThisTurn = [];
@@ -297,7 +299,7 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         const attacker = onField(s, event.attacker);
         const on = event.target ? onField(s, event.target).position : null;
         attacker.attacks = { turn: s.turn, count: attacker.attacks?.turn === s.turn ? attacker.attacks.count + 1 : 1, on };
-        s.attack = { attacker: event.attacker, target: event.target, replaced: {}, damageStep: false };
+        s.attack = { attacker: event.attacker, target: event.target, replaced: {}, damageStep: false, noDamageTo: [] };
         s.didThisTurn.push({ player: event.player, what: 'declare_attack', card: event.attacker });
         s.happened.push({ event: 'attack_declared', card: event.attacker, player: event.player, target: event.target, group });
         if (event.target) s.happened.push({ event: 'attacked', card: event.target, player: other(event.player), attacker: event.attacker, group });
@@ -465,7 +467,13 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         s.pledges.push({ player: event.player, names: event.names, damage: event.damage });
         return;
       case 'forbidden':
-        s.forbidden.push({ player: event.player, what: event.what, filter: event.filter, turn: s.turn });
+        s.forbidden.push({ player: event.player, what: event.what, filter: event.filter, except: event.except, turn: s.turn });
+        return;
+      case 'granted':
+        s.granted.push({ card: event.card, effect: event.effect });
+        return;
+      case 'battleDamageZeroed':
+        s.attack!.noDamageTo.push(event.player);
         return;
       case 'procedureUsed':
         s.properlySummoned.push(event.card);
@@ -604,8 +612,9 @@ function removeFromPlay(state: DuelState, id: string, leaves = true): boolean {
     if (!leaves) return false;
     // "If this face-up card leaves the field, skip the Battle Phase of your next turn" (Moulinglacia).
     const next = state.turnPlayer === at.seat ? state.turn + 2 : state.turn + 1;
-    for (const f of leaving) if (f.effect.apply === 'forbid_on_leaving') state.forbidden.push({ player: at.seat, what: f.effect.what, filter: null, turn: next });
+    for (const f of leaving) if (f.effect.apply === 'forbid_on_leaving') state.forbidden.push({ player: at.seat, what: f.effect.what, filter: null, except: null, turn: next });
     state.modifiers = state.modifiers.filter((m) => m.card !== id);
+    state.granted = state.granted.filter((g) => g.card !== id);
     for (const m of card.materials) toGraveyard(state, m);
     // Cards linked to a monster go when it goes; a card that takes its monster with it (Birthright) does so.
     for (const c of tiedTo(state, id)) sendToGraveyard(state, c.id);

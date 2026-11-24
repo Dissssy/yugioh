@@ -59,7 +59,8 @@
                       "max": 4
                     },
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "max": 1,

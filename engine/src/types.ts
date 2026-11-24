@@ -186,7 +186,9 @@ export type Condition =
   /** This card attacked this turn, and its last attack was on a monster in this battle position (Twin-Sword Marauder). */
   | { if: 'last_attack'; on: Position }
   /** "except the turn it was sent there": this card wasn't sent to the GY this turn. */
-  | { if: 'not_sent_this_turn' };
+  | { if: 'not_sent_this_turn' }
+  /** "at damage calculation": an attack is in its Damage Step, before its damage is calculated. */
+  | { if: 'damage_calculation' };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
 /** A Token's printed stats ("Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)). */
@@ -261,9 +263,10 @@ export type Step =
    * For the rest of this turn, that player can't declare attacks, can't conduct their Battle Phase, or can't Special
    * Summon the monsters that fit `filter` (null for any monster). `filter` is null for the others. With `wholeTurn`
    * ("the turn you activate this card") the ban covers the whole turn, so the effect can't be used once the player
-   * already did that this turn.
+   * already did that this turn. With `others`, this card itself is exempt ("Other monsters cannot attack during the
+   * turn you activate this effect", Rapid Warrior).
    */
-  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null; wholeTurn: boolean }
+  | { do: 'forbid'; player: 'you' | 'opponent'; what: Forbidden; filter: CardFilter | null; wholeTurn: boolean; others: boolean }
   /**
    * "During the End Phase of this turn, take `damage` damage if you did not Normal Summon the added monster, or a card
    * with the same name": about the cards the step before it moved (Where Arf Thou?).
@@ -284,6 +287,14 @@ export type Step =
    * the controller of this effect's first target, as it was when targeted ("then, its controller can Set ...").
    */
   | { do: 'set_from_hand'; player: 'you' | 'targets_controller' }
+  /**
+   * For the rest of this turn, while they stay face-up on the field, the selected monsters gain an ability: they can't
+   * do some things ("it cannot be destroyed by battle this turn", Half Shut), or attack differently ("it can attack your
+   * opponent directly this turn", Rapid Warrior).
+   */
+  | { do: 'grant'; cards: Selection; effect: Grant }
+  /** "Make the battle damage you take from this battle 0": for the attack being made (Defense Draw). */
+  | { do: 'no_battle_damage' }
   /** "and if you do": the steps after this one happen only if the step before it did something. */
   | { do: 'if_done' }
   /**
@@ -292,6 +303,9 @@ export type Step =
    * script's conditions and here; "Apply these effects in sequence, depending on ...": one `only_if` per part).
    */
   | { do: 'only_if'; conditions: Condition[] };
+
+/** What a `grant` step gives a monster for the turn: a `restrict` or a `battle` continuous effect on itself. */
+export type Grant = { apply: 'restrict'; cannot: Restriction[] } | { apply: 'battle'; attacks: number; piercing: boolean; direct: boolean };
 
 export const LOCK_UNTIL = ['this_end_phase', 'your_next_end_phase'] as const;
 export type LockUntil = (typeof LOCK_UNTIL)[number];
@@ -312,8 +326,8 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  *   controls with ATK greater than or equal to this card's DEF"). `once`: once per turn, only the first time it would
  *   apply (Fortress Warrior's "Once per turn, this card cannot be destroyed by battle").
  * - `battle`: the cards in `to` can attack `attacks` times each Battle Phase, inflict piercing battle damage when they
- *   attack a Defense Position monster (`piercing`), and their controller takes no battle damage from attacks involving
- *   them (`noDamageToYou`).
+ *   attack a Defense Position monster (`piercing`), their controller takes no battle damage from attacks involving
+ *   them (`noDamageToYou`), and they can attack directly while the opponent controls monsters (`direct`).
  * - `lock`: `player` can't activate cards that fit `filter` ("you" is this card's controller; null: any card), or can
  *   activate no more than `perTurn` of them each turn, or can activate them only once they were Set on an earlier turn
  *   (`setFirst`); or can't Tribute Summon (`tribute_summon`, `filter` null).
@@ -348,7 +362,7 @@ export type Continuous =
       once: boolean;
       while: Condition[];
     }
-  | { apply: 'battle'; to: Affected; attacks: number; piercing: boolean; noDamageToYou: boolean; while: Condition[] }
+  | { apply: 'battle'; to: Affected; attacks: number; piercing: boolean; noDamageToYou: boolean; direct: boolean; while: Condition[] }
   /** The face-up monsters in `to` are kept in this battle position: any that isn't is changed to it (Dragon Capture Jar). */
   | { apply: 'force_position'; to: Affected; position: Position; while: Condition[] }
   | {
@@ -483,10 +497,12 @@ export interface CardFilter {
   extraDeck: boolean | null;
   faceUp: boolean | null;
   position: Position | null;
-  /** Current values for a face-up monster, printed ones elsewhere. A card without the stat never fits a range on it. */
+  /** Current values for a face-up monster (printed ones with `original`), printed ones elsewhere. A card without the stat never fits a range on it. */
   level: Range | null;
   atk: Range | null;
   def: Range | null;
+  /** The ranges read printed values even on the field ("with more than 1000 original ATK"). */
+  original: boolean;
 }
 
 export interface Range {
@@ -669,7 +685,10 @@ export interface DuelState {
   normalSummonLimit: number;
   modifiers: Modifier[];
   /** What resolved effects stopped each player doing this turn; they lapse when the turn ends. */
-  forbidden: { player: Seat; what: Forbidden; filter: CardFilter | null; turn: number }[];
+  /** `except`: a monster the ban doesn't cover (the card that made it, for `others`). */
+  forbidden: { player: Seat; what: Forbidden; filter: CardFilter | null; except: string | null; turn: number }[];
+  /** Abilities `grant` steps gave monsters this turn; each lapses when the turn ends or its monster leaves the field. */
+  granted: { card: string; effect: Grant }[];
   /** What each player did this turn that a `forbid` can ban: Special Summons (with the monster), Battle Phases and attacks. */
   didThisTurn: { player: Seat; what: Forbidden; card: string | null }[];
   /**
@@ -695,9 +714,9 @@ export interface DuelState {
   /** The attack being made, from its declaration until damage is done. */
   /**
    * `replaced`: for each monster that would be destroyed in this battle, the materials detached instead (empty: none).
-   * `damageStep`: the attack has entered the Damage Step.
+   * `damageStep`: the attack has entered the Damage Step. `noDamageTo`: players who take no battle damage from it.
    */
-  attack: { attacker: string; target: string | null; replaced: Record<string, string[]>; damageStep: boolean } | null;
+  attack: { attacker: string; target: string | null; replaced: Record<string, string[]>; damageStep: boolean; noDamageTo: Seat[] } | null;
   /** Effects used this turn by each player, for once-per-turn clauses and "only activate 1 ... each turn". */
   usedThisTurn: { player: Seat; card: string; code: number; effect: number }[];
   /**
@@ -798,7 +817,11 @@ export type Op =
   | { op: 'negate_attack' }
   /** Detaches this Xyz Material: it goes to its owner's GY. */
   | { op: 'detach'; card: string }
-  | { op: 'forbid'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  | { op: 'forbid'; player: Seat; what: Forbidden; filter: CardFilter | null; except: string | null }
+  /** Gives this face-up monster an ability for the rest of the turn (see the `grant` step). */
+  | { op: 'grant'; card: string; effect: Grant }
+  /** `player` takes no battle damage from the attack being made. */
+  | { op: 'no_battle_damage'; player: Seat }
   /** `player` takes `damage` in this turn's End Phase unless they Normal Summon a card with the name of one of `cards`. */
   | { op: 'pledge_normal_summon'; player: Seat; cards: string[]; damage: number }
   /** See the `lock` step; `player` is relative to the effect's controller. */
@@ -1003,7 +1026,9 @@ export type DuelEvent =
   | { type: 'destroyed'; cards: string[]; by: Seat }
   | { type: 'lpChanged'; player: Seat; amount: number; kind: 'damage' | 'cost' | 'gain' }
   | { type: 'statsModified'; modifier: Modifier }
-  | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null }
+  | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null; except: string | null }
+  | { type: 'granted'; card: string; effect: Grant }
+  | { type: 'battleDamageZeroed'; player: Seat }
   | { type: 'pledged'; player: Seat; names: string[]; damage: number }
   /** A `cost_substitute` effect was used (its card is banished by a `moved` event before this). */
   | { type: 'substituted'; player: Seat; card: string; effect: number }

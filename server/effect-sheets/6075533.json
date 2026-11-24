@@ -38,7 +38,8 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 1,
             "max": null,
@@ -72,7 +73,8 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "max": 1,
@@ -107,7 +109,8 @@
                       "position": null,
                       "level": null,
                       "atk": null,
-                      "def": null
+                      "def": null,
+                      "original": false
                     },
                     "min": 2,
                     "max": null,
@@ -131,7 +134,8 @@
                       "position": null,
                       "level": null,
                       "atk": null,
-                      "def": null
+                      "def": null,
+                      "original": false
                     },
                     "min": 1,
                     "max": null,
@@ -159,7 +163,8 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "max": 1,
@@ -194,7 +199,8 @@
                       "position": null,
                       "level": null,
                       "atk": null,
-                      "def": null
+                      "def": null,
+                      "original": false
                     },
                     "min": 3,
                     "max": null,
@@ -218,7 +224,8 @@
                       "position": null,
                       "level": null,
                       "atk": null,
-                      "def": null
+                      "def": null,
+                      "original": false
                     },
                     "min": 1,
                     "max": null,
@@ -246,7 +253,8 @@
                     "position": null,
                     "level": null,
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "count": 1
@@ -288,7 +296,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "how": [],
         "canMiss": false,

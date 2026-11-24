@@ -38,7 +38,8 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 1,
             "max": null,
@@ -82,9 +83,11 @@
                   "position": null,
                   "level": null,
                   "atk": null,
-                  "def": null
+                  "def": null,
+                  "original": false
                 },
-                "wholeTurn": false
+                "wholeTurn": false,
+                "others": false
               }
             ]
           }

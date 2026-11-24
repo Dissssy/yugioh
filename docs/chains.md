@@ -36,7 +36,7 @@ A window opens after a Normal or Flip Summon, an attack declaration, every activ
 
 **The timing floor.** A window where the player has nothing to activate closes by itself after `RESPONSE_FLOOR_MS` (default 2000) plus up to half again at random, so how fast a window closes reveals nothing about a hand or a Set card. Meanwhile that player sees the question with a greyed-out Pass button, since the window closes for them. A player who does hold a response gets the window until they act or pass. The player whose own action opened the window gets no floor. Tests set the floor to 0.
 
-**Replays.** If the attack target leaves the field before the Damage Step, or a monster appears for a direct attack, the attack ends and the attacker may attack again. Once the Damage Step has started (its triggers, such as Zubaba Knight's, go first), a target that leaves just ends the attack.
+**Replays.** If the attack target leaves the field before the Damage Step, or a monster appears for a direct attack, the attack ends and the attacker may attack again. Once the Damage Step has started (its triggers, such as Zubaba Knight's, go first), a target that leaves just ends the attack. The Damage Step's start opens a response window before damage calculation, in which only Counter Traps and effects made for the Damage Step (one that changes ATK or DEF, answers a Damage Step event, or has a `damage_calculation` or Damage Step `battling` condition) can be activated.
 
 ## Effect sheets
 

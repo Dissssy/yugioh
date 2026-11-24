@@ -2,7 +2,7 @@
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
 import { fits, identityFits, scriptOf, scriptProblem, specialSummonForbidden } from './script.ts';
-import { attacksAllowed, continuousOnField, inForce, type InForce, type Restrict, levelNow, lockProblem, nameOf, negated, synchroMaterialRules, piercing, replacement, restricted, restriction, shieldsBattleDamage, statsOf, tributeSummonLocked } from './continuous.ts';
+import { attacksAllowed, attacksDirectly, continuousOnField, inForce, type InForce, type Restrict, levelNow, lockProblem, nameOf, negated, synchroMaterialRules, piercing, replacement, restricted, restriction, shieldsBattleDamage, statsOf, tributeSummonLocked } from './continuous.ts';
 import { evolve, isToken, locate, monsterZoneFree, monsterZonesFor, onField, other } from './state.ts';
 import {
   HAND_LIMIT,
@@ -268,8 +268,8 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
     if (state.phase === 'main1' && state.turn > 1 && !forbidden(state, seat, 'battle_phase')) actions.push({ type: 'enterBattle' });
     if (state.phase === 'battle') {
       const targets = attackTargets(state, seat);
-      const direct = state.players[other(seat)].monsters.every((m) => m === null);
       for (const m of ownMonsters(state, seat)) {
+        const direct = canAttackDirectly(state, seat, m.id);
         if (canAttack(state, m) && (direct || targets.length > 0)) actions.push({ type: 'attack', attacker: m.id, targets, direct });
       }
       actions.push({ type: 'enterMain2' });
@@ -456,6 +456,7 @@ function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
     if (effect.speed < minSpeed) {
       return no(minSpeed === 3 ? 'Only a Counter Trap can respond to a Counter Trap.' : `A Spell Speed ${effect.speed} effect can't be activated in response to Spell Speed ${minSpeed}.`);
     }
+    if (state.attack?.damageStep && !damageStepEffect(state, id, index)) return no('In the Damage Step, only Counter Traps and effects that change ATK or DEF can be activated.');
     if (!onceOk(state, id, card.code, index, effect.opt)) return no('Once per turn: it was already used this turn.');
     const ruling = ruledIllegal(state, seat, id, index);
     if (ruling) return no(`The judge refused it on this board: ${ruling.summary}`);
@@ -542,7 +543,6 @@ export function blockedEffects(state: DuelState, seat: Seat, actions: LegalActio
 export function blockedAttacks(state: DuelState, seat: Seat): Blocked[] {
   if (state.result || state.step.at !== 'open' || state.turnPlayer !== seat || state.phase !== 'battle') return [];
   const targets = attackTargets(state, seat);
-  const direct = state.players[other(seat)].monsters.every((m) => m === null);
   return ownMonsters(state, seat).flatMap((m): Blocked[] => {
     const reason = !m.faceUp
       ? 'A face-down monster can\'t attack.'
@@ -550,15 +550,28 @@ export function blockedAttacks(state: DuelState, seat: Seat): Blocked[] {
         ? 'Only a monster in Attack Position can attack.'
         : !attackLeft(state, m)
           ? 'It already attacked this turn.'
-          : forbidden(state, seat, 'declare_attack')
+          : forbidden(state, seat, 'declare_attack', m.id)
             ? "An effect stopped you declaring attacks this turn."
             : restricted(state, m.id, 'attack')
               ? "A card's effect stops it attacking."
-              : !direct && targets.length === 0
+              : !canAttackDirectly(state, seat, m.id) && targets.length === 0
                 ? "None of your opponent's monsters can be attacked."
                 : null;
     return reason ? [{ card: m.id, effect: null, text: null, reason }] : [];
   });
+}
+
+/**
+ * Whether an effect can be activated in the Damage Step: a Counter Trap, one that answers a Damage Step event, one
+ * that says when in the Damage Step it is used ("at damage calculation"), or one that changes ATK or DEF.
+ */
+function damageStepEffect(state: DuelState, id: string, index: number): boolean {
+  const effect = state.sheets[cardOf(state, id).code]!.effects[index]!;
+  if (effect.speed === 3 || effect.when?.event === 'damage_step_start' || effect.when?.event === 'damage_step_end') return true;
+  const script = scriptOf(state, id, index);
+  if (!script) return false;
+  if (script.conditions.some((c) => c.if === 'damage_calculation' || (c.if === 'battling' && c.damageStep))) return true;
+  return script.options.some((o) => o.steps.some((s) => s.do === 'modify_stats' || s.do === 'gain_stats' || s.do === 'set_stats'));
 }
 
 /** The activation a response window answers: the chain's last link, while players may respond to it. */
@@ -604,13 +617,17 @@ function canChangePosition(state: DuelState, m: FieldCard) {
   return m.faceUp && notJustPlaced(state, m) && positionUnchanged(state, m) && m.attacks?.turn !== state.turn && !restricted(state, m.id, 'change_position');
 }
 
-/** Whether a resolved effect stopped the player doing this for the rest of the turn. */
-const forbidden = (state: DuelState, seat: Seat, what: Forbidden) => state.forbidden.some((f) => f.player === seat && f.what === what && f.turn === state.turn);
+/** Whether a resolved effect stopped the player doing this for the rest of the turn; `card` is the monster to attack with. */
+const forbidden = (state: DuelState, seat: Seat, what: Forbidden, card: string | null = null) =>
+  state.forbidden.some((f) => f.player === seat && f.what === what && f.turn === state.turn && (card === null || f.except !== card));
 
 function canAttack(state: DuelState, m: FieldCard) {
   const seat = locate(state, m.id)!.seat;
-  return m.faceUp && m.position === 'attack' && attackLeft(state, m) && !restricted(state, m.id, 'attack') && !forbidden(state, seat, 'declare_attack');
+  return m.faceUp && m.position === 'attack' && attackLeft(state, m) && !restricted(state, m.id, 'attack') && !forbidden(state, seat, 'declare_attack', m.id);
 }
+
+/** Whether this monster can attack the opponent directly: they control no monster, or an effect lets it anyway (Rapid Warrior). */
+const canAttackDirectly = (state: DuelState, seat: Seat, id: string) => state.players[other(seat)].monsters.every((m) => m === null) || attacksDirectly(state, id);
 
 /** Whether a monster has an attack left this turn: most have one, some more (Hayabusa Knight). */
 const attackLeft = (state: DuelState, m: FieldCard) => m.attacks?.turn !== state.turn || m.attacks.count < attacksAllowed(state, m.id);
@@ -795,7 +812,7 @@ function attack(run: Run, seat: Seat, attackerId: string, target: number | 'dire
   check(canAttack(state, attacker), "That monster can't attack now.");
   const foeMonsters = state.players[other(seat)].monsters;
   if (target === 'direct') {
-    check(foeMonsters.every((m) => m === null), "You can't attack directly while your opponent controls a monster.");
+    check(canAttackDirectly(state, seat, attacker.id), "You can't attack directly while your opponent controls a monster.");
   } else {
     check(foeMonsters[target], 'There is no monster in that zone.');
     check(attackTargets(state, seat).includes(target), "That monster can't be targeted for an attack.");
@@ -840,12 +857,13 @@ function damageStep(run: Run) {
   // An attack an effect negated is already over.
   if (!state.attack) return run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
   const { attacker, target } = state.attack;
-  const foeMonsters = state.players[other(state.turnPlayer)].monsters;
   if (!stillAttacking(state, attacker)) run.emit({ type: 'attackEnded', replay: false });
-  else if (target === null ? foeMonsters.some((m) => m !== null) : !targetStands(state, target)) run.emit({ type: 'attackEnded', replay: true });
+  else if (target === null ? !canAttackDirectly(state, state.turnPlayer, attacker) : !targetStands(state, target)) run.emit({ type: 'attackEnded', replay: true });
   else {
     run.emit({ type: 'damageStepStarted' });
-    return run.emit({ type: 'checkpoint', cause: null, then: { do: 'damage' } });
+    // Players get a window before damage calculation (Defense Draw), as do triggers at its start.
+    const start = run.state.happened.find((h) => h.event === 'damage_step_start')!;
+    return run.emit({ type: 'checkpoint', cause: start, then: { do: 'damage' } });
   }
   run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
 }
@@ -861,7 +879,9 @@ function damage(run: Run) {
   if (!state.attack) return run.emit({ type: 'checkpoint', cause: null, then: { do: 'open' } });
   const { attacker: attackerId, target } = state.attack;
   if (!stillAttacking(state, attackerId) || (target !== null && !targetStands(state, target))) run.emit({ type: 'attackEnded', replay: false });
-  else if (target === null) run.emit({ type: 'battleDamage', player: foe, amount: statsOf(state, attackerId).atk, by: attackerId });
+  else if (target === null) {
+    if (!state.attack.noDamageTo.includes(foe)) run.emit({ type: 'battleDamage', player: foe, amount: statsOf(state, attackerId).atk, by: attackerId });
+  }
   else {
     if (!onField(state, target).faceUp) run.emit({ type: 'flipped', card: target });
     const result = battle(run.state, attackerId, target);
@@ -894,7 +914,7 @@ function battle(state: DuelState, attackerId: string, target: string): { destroy
   const stats = statsOf(state, target);
   const result = (destroyed: string[], damage: Damage | null) => {
     const protections = destroyed.map((id) => restriction(state, id, 'be_destroyed_by_battle', id === attackerId ? target : attackerId));
-    const shielded = damage && shieldsBattleDamage(state, damage.player === seat ? attackerId : target);
+    const shielded = damage && (state.attack!.noDamageTo.includes(damage.player) || shieldsBattleDamage(state, damage.player === seat ? attackerId : target));
     return {
       destroyed: destroyed.filter((_, i) => !protections[i]),
       damage: shielded ? null : damage,

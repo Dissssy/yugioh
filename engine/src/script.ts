@@ -5,7 +5,7 @@ import { cardOf } from './rules.ts';
 import { levelNow, nameOf, statsOf } from './continuous.ts';
 import { fusionMonsters } from './fusion.ts';
 import { levelOf, locate, monsterZonesFor, other, summonMatches, summonName } from './state.ts';
-import type { CardData, CardFilter, Condition, DuelState, Happening, Range, Script, Seat, Selection, Step } from './types.ts';
+import type { CardData, CardFilter, Condition, DuelState, Grant, Happening, Range, Restriction, Script, Seat, Selection, Step } from './types.ts';
 
 /** The script of a card's effect, if it has one that hasn't been flagged. */
 export function scriptOf(state: DuelState, card: string, effect: number): Script | null {
@@ -31,6 +31,23 @@ export function identityFits(card: CardData, filter: CardFilter, name = card.nam
   return filter.extraDeck === null || card.extraDeck === filter.extraDeck;
 }
 
+/** What a restriction stops, worded after "can't". */
+const RESTRICTION_TEXT: Record<Restriction, string> = {
+  attack: 'attack',
+  change_position: 'change its battle position',
+  be_attacked: 'be attacked',
+  be_destroyed_by_battle: 'be destroyed by battle',
+  be_destroyed_by_effect: 'be destroyed by card effects',
+  be_affected: 'be affected by card effects',
+  activate_effects: 'activate its effects',
+};
+
+/** What a `grant` gives, worded after the monster's name: "can't be destroyed by battle", "can attack directly". */
+export function describeGrant(g: Grant): string {
+  if (g.apply === 'restrict') return `can't ${g.cannot.map((c) => RESTRICTION_TEXT[c]).join(' or ')}`;
+  return [g.direct && 'can attack directly', g.attacks > 1 && `can attack ${g.attacks} times`, g.piercing && 'inflicts piercing battle damage'].filter(Boolean).join(' and ');
+}
+
 /** Whether a card fits a filter, for the effect of player `seat`. A face-down card shows only whether it is a monster or a Spell/Trap. */
 export function fits(state: DuelState, id: string, filter: CardFilter, seat: Seat): boolean {
   const at = locate(state, id);
@@ -53,7 +70,7 @@ export function fits(state: DuelState, id: string, filter: CardFilter, seat: Sea
   if (!identityFits(card, filter, field ? nameOf(state, id) : card.name)) return false;
   // Current stats on the field, printed ones elsewhere. ATK and DEF are only worked out when the filter asks, since an
   // effect that counts monsters by Level (Tenshin) changes ATK itself.
-  const monster = at.zone === 'monsters';
+  const monster = at.zone === 'monsters' && !filter.original;
   if (filter.level && !inRange(monster ? levelNow(state, id) : levelOf(card), filter.level)) return false;
   if (!filter.atk && !filter.def) return true;
   const stats = monster ? statsOf(state, id) : { atk: card.atk, def: card.def };
@@ -130,7 +147,7 @@ export function describeFilter(f: CardFilter, they = false): string {
   const range = (name: string, r: Range | null) =>
     !r ? [] : r.min !== null && r.max !== null ? (r.min === r.max ? [`${name} ${r.min}`] : [`${name} ${r.min} to ${r.max}`]) : r.max !== null ? [`${name} ${r.max} or less`] : r.min !== null ? [`${name} ${r.min} or more`] : [];
   const stats = [...range('Level', f.level), ...range('ATK', f.atk), ...range('DEF', f.def)];
-  if (stats.length) words.push(`with ${stats.join(' and ')}`);
+  if (stats.length) words.push(`with ${f.original ? 'original ' : ''}${stats.join(' and ')}`);
   if (!f.places.length) return words.join(' ');
   const [you, your] = they ? ['they control', 'their'] : ['you control', 'your'];
   const pileNames = { hand: 'hand', deck: 'Deck', extra: 'Extra Deck', graveyard: 'GY', banished: 'banished cards' } as const;
@@ -173,13 +190,15 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, fre
     if (freeMonsterZones(state, player) + (player === seat ? freed : 0) < step.count) return `There ${step.count === 1 ? 'is no free Monster Zone' : `aren't ${step.count} free Monster Zones`} for the Token${step.count === 1 ? '' : 's'}.`;
     return specialSummonForbidden(state, seat, null) ? "An effect stops you Special Summoning this turn." : null;
   }
-  if (step.do === 'negate_attack') return state.attack ? null : 'No attack is being made.';
+  if (step.do === 'negate_attack' || step.do === 'no_battle_damage') return state.attack ? null : 'No attack is being made.';
   if (step.do === 'fusion_summon') return fusionMonsters(state, seat, step.from).length > 0 ? null : 'No Fusion Monster in your Extra Deck can be Fusion Summoned with your monsters.';
   if (step.do === 'negate_activation') return state.chain.length > 0 ? null : 'There is no activation to negate.';
   if (step.do === 'detach') return detachFrom(state, step, seat, card).length > 0 ? null : `No ${step.cards.from === 'self' ? 'this card has' : 'monster here has'} ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`;
   if (step.do === 'forbid' && step.wholeTurn) {
     const player = step.player === 'you' ? seat : other(seat);
-    const did = state.didThisTurn.find((d) => d.player === player && d.what === step.what && (!step.filter || (d.card !== null && locate(state, d.card) && fits(state, d.card, step.filter, seat))));
+    const did = state.didThisTurn.find(
+      (d) => d.player === player && d.what === step.what && !(step.others && d.card === card) && (!step.filter || (d.card !== null && locate(state, d.card) && fits(state, d.card, step.filter, seat))),
+    );
     if (did) return { declare_attack: 'You already declared an attack this turn.', battle_phase: 'You already conducted your Battle Phase this turn.', special_summon: `You already Special Summoned ${step.filter ? `a ${describeFilter(step.filter, true)}` : 'a monster'} this turn.` }[step.what];
   }
   if (!('cards' in step)) return null;
@@ -362,6 +381,8 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
     }
     case 'not_sent_this_turn':
       return state.sentThisTurn.includes(card) ? "It can't be used the turn this card was sent to the GY." : null;
+    case 'damage_calculation':
+      return state.attack?.damageStep ? null : 'It can only be used at damage calculation.';
     case 'last_attack': {
       const at = locate(state, card);
       const attacks = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.attacks : null;

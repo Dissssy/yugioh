@@ -61,7 +61,8 @@
                       "max": 2
                     },
                     "atk": null,
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "original": false,
                   "times": 1

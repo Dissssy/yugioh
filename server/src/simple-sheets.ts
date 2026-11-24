@@ -99,6 +99,7 @@ const monsters = (overrides: Partial<CardFilter>): CardFilter => ({
   level: null,
   atk: null,
   def: null,
+  original: false,
   ...overrides,
 });
 
@@ -147,7 +148,7 @@ function equipOf(text: string): { target: CardFilter; continuous: Continuous } |
     return filter && { target: monsters(filter), continuous: stats('linked', atk, def) };
   }
   if (/^If the equipped monster attacks a Defense Position monster, inflict piercing battle damage to your opponent\.$/.test(text)) {
-    return { target: monsters({}), continuous: { apply: 'battle', to: 'linked', attacks: 1, piercing: true, noDamageToYou: false, while: [] } };
+    return { target: monsters({}), continuous: { apply: 'battle', to: 'linked', attacks: 1, piercing: true, noDamageToYou: false, direct: false, while: [] } };
   }
   return null;
 }
@@ -182,7 +183,7 @@ function fieldStatsOf(text: string): Continuous[] | null {
 
 function monsterContinuousOf(text: string): Continuous[] | null {
   if (/^If this card attacks a Defense Position monster, inflict piercing battle damage(?: to your opponent)?\.$/.test(text)) {
-    return [{ apply: 'battle', to: 'self', attacks: 1, piercing: true, noDamageToYou: false, while: [] }];
+    return [{ apply: 'battle', to: 'self', attacks: 1, piercing: true, noDamageToYou: false, direct: false, while: [] }];
   }
   return allMonstersStats(text);
 }

@@ -39,7 +39,8 @@
               "max": 4
             },
             "atk": null,
-            "def": null
+            "def": null,
+            "original": false
           },
           "min": 0,
           "max": 1,
@@ -99,7 +100,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "others": false,
         "cannot": [
@@ -121,7 +123,8 @@
           "position": null,
           "level": null,
           "atk": null,
-          "def": null
+          "def": null,
+          "original": false
         },
         "compare": null,
         "once": false,
@@ -146,7 +149,8 @@
               "position": null,
               "level": null,
               "atk": null,
-              "def": null
+              "def": null,
+              "original": false
             },
             "min": 3,
             "max": null,

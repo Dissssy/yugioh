@@ -1,7 +1,7 @@
 {
   "code": 24268052,
   "textHash": "bd543380b879547903c1379a343dc91f6e2524127de8033e6df24bb81c98003c",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "activation",
@@ -14,7 +14,40 @@
       "effect": "Make the battle damage you take from this battle 0, and if you do, draw 1 card.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "turn",
+            "whose": "opponent"
+          },
+          {
+            "if": "damage_calculation"
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "no_battle_damage"
+              },
+              {
+                "do": "if_done"
+              },
+              {
+                "do": "draw",
+                "player": "you",
+                "count": 1,
+                "per": null
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

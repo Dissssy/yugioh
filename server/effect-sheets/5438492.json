@@ -59,7 +59,8 @@
                       "min": null,
                       "max": 1500
                     },
-                    "def": null
+                    "def": null,
+                    "original": false
                   },
                   "min": 1,
                   "max": 1,

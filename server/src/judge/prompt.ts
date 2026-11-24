@@ -1,6 +1,6 @@
 // What the judge reads: a fixed rules reference (cached), then per request the board and the effect at hand.
 
-import { cardOf, describeFilter, levelOf, FIELD_ZONE, MONSTER_ZONES, summonName, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Happening, type Seat } from '@yugioh/engine';
+import { cardOf, describeFilter, describeGrant, levelOf, FIELD_ZONE, MONSTER_ZONES, summonName, statsOf, type CardData, type ChainLink, type DuelState, type FieldCard, type Happening, type Seat } from '@yugioh/engine';
 
 export const RULES = `You are the judge in an online Yu-Gi-Oh! duel. Code runs every generic rule: turns, phases, summons, battle, damage, LP, zones, once-per-turn counting. Your only job is to apply one card effect at a time exactly as its text says, using tools. Every tool call is checked by code against the board; a refused call comes back as an error that you can correct.
 
@@ -91,9 +91,11 @@ export function describeState(state: DuelState, activating: string | null = null
     lines.push(`  Extra Deck: ${pile(p.extra)}`);
   }
   for (const f of state.forbidden) {
-    const what = { battle_phase: 'conduct their Battle Phase', declare_attack: 'declare an attack', special_summon: `Special Summon ${f.filter ? `a ${describeFilter(f.filter, true)}` : 'monsters'}` }[f.what];
+    const what = { battle_phase: 'conduct their Battle Phase', declare_attack: `declare an attack${f.except ? ` with monsters other than ${label(f.except)}` : ''}`, special_summon: `Special Summon ${f.filter ? `a ${describeFilter(f.filter, true)}` : 'monsters'}` }[f.what];
     lines.push('', `This turn, player ${f.player} can't ${what}.`);
   }
+  for (const g of state.granted) lines.push('', `This turn, ${label(g.card)} ${describeGrant(g.effect)}.`);
+  if (state.attack?.noDamageTo.length) lines.push('', `Player ${state.attack.noDamageTo.join(' and ')} takes no battle damage from this battle.`);
   if (state.modifiers.length) {
     lines.push('', 'Active stat changes:');
     for (const m of state.modifiers) {
