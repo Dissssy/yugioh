@@ -10,6 +10,7 @@ export function LpPlate({
   cue,
   active,
   target = null,
+  online,
 }: {
   seat: Seat;
   name: string;
@@ -18,6 +19,8 @@ export function LpPlate({
   active: boolean;
   /** Whether an aimed direct attack may land here ('open') or is over it now ('over'). */
   target?: 'open' | 'over' | null;
+  /** Whether the player has the duel open; left out where it isn't shown (a replay, or your own plate). */
+  online?: boolean;
 }) {
   const value = useMotionValue(lp);
   const shown = useTransform(value, (v) => Math.round(v));
@@ -35,6 +38,7 @@ export function LpPlate({
       data-drop={`lp:${seat}`}
       title={name}
     >
+      {online !== undefined && <span className={`presence${online ? ' on' : ''}`} title={online ? 'Has the duel open' : 'Away from the duel'} aria-label={online ? 'Online' : 'Away'} />}
       <span className="lp-name">{name}</span>
       <span className="lp">
         <span className="lp-label">LP </span>

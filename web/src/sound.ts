@@ -29,6 +29,8 @@ const sounds = {
   yourTurn: [0.6, 0, 523, 0.01, 0.12, 0.35, 0, 1, 0, 0, 262, 0.12],
   /** The duel waits on the player's answer: a response, a trigger, a pick. */
   answer: [0.6, 0, 880, 0, 0.05, 0.12, 0, 1, 0, 0, 0, 0, 0.08],
+  /** A chat message from the opponent. */
+  chat: [0.3, 0, 1200, 0, 0.02, 0.06, 0, 1, 0, 0, 300, 0.03],
   win: [0.7, 0, 392, 0.02, 0.25, 0.5, 0, 1, 0, 0, 196, 0.15, 0.15],
   lose: [0.6, 0, 220, 0.02, 0.2, 0.6, 1, 1, -1.5],
 } satisfies Record<string, number[]>;

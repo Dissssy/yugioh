@@ -1098,7 +1098,9 @@ export type DuelUpdate =
   | { type: 'sync'; view: PlayerView; log: LogEntry[]; judging: JudgingView | null }
   | { type: 'steps'; steps: SeatStep[] }
   /** The judge started, asked a player something, got an answer, or finished (null). */
-  | { type: 'judging'; judging: JudgingView | null };
+  | { type: 'judging'; judging: JudgingView | null }
+  /** Which players have the duel open now. Sent after the sync and whenever it changes. */
+  | { type: 'presence'; online: Seat[] };
 
 /** The judge at work on an effect. Nothing it does reaches the board until it finishes. */
 export interface JudgingView {

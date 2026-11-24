@@ -213,8 +213,12 @@ export class Stream {
       if (update.type !== 'judging') return update.type === 'sync' ? update.view : update.steps.at(-1)!.view;
     }
   }
-  update(): Promise<DuelUpdate> {
-    return this.message<DuelUpdate>();
+  /** The next update that changes the duel or the judge's work; who has the duel open is skipped. */
+  async update(): Promise<Exclude<DuelUpdate, { type: 'presence' }>> {
+    for (;;) {
+      const update = await this.message<DuelUpdate>();
+      if (update.type !== 'presence') return update;
+    }
   }
   /** The next message, for streams other than a duel's. */
   async message<T>(): Promise<T> {

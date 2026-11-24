@@ -99,6 +99,8 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
   const live = useDuel(replay ? null : duelId, pace, watching === 'live' ? watchFrom : null);
   const played = useReplay(replay ? duelId : null, pace);
   const { shown, connected, judging } = replay ? { shown: played.shown, connected: true, judging: null } : live;
+  /** Whether a player has the duel open, shown live but not in a replay. */
+  const onlineOf = (seat: Seat) => (replay ? undefined : live.online.includes(seat));
   const controls = played.controls;
   const [mode, setMode] = useReducer((_: Mode, next: Mode) => next, idle);
   /** The open pile viewer, by `pileKey`. */
@@ -192,6 +194,13 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
     if (sound) playSound(sound);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.seq]);
+  // A soft sound for each chat message from the opponent, as it arrives.
+  const theirChats = shown?.log.filter((e) => e.event.type === 'chatted' && e.event.player !== shown.view.you).length ?? null;
+  const chatsBefore = useRef(theirChats);
+  useEffect(() => {
+    if (!readOnly && theirChats !== null && chatsBefore.current !== null && theirChats > chatsBefore.current) playSound('chat');
+    chatsBefore.current = theirChats;
+  }, [theirChats, readOnly]);
   const needsAnswer = !readOnly && !!shown && !shown.cue && (choice !== null || awaitsAnswer(shown.view));
   useEffect(() => {
     if (needsAnswer) playSound('answer');
@@ -819,7 +828,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                 ) : (
                   <>
                     <div className="hand-row foe-row">
-                      <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={!view.start && view.turnPlayer === foe} target={lpTarget()} />
+                      <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={!view.start && view.turnPlayer === foe} target={lpTarget()} online={onlineOf(foe)} />
                       <ReadOnlyHand seat={foe} name={view.players[foe].name} cards={view.players[foe].hand} side="top" />
                     </div>
                     <Field {...foeField} />
@@ -840,7 +849,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                     />
                     <Field {...myField} />
                     <div className="hand-row own-row">
-                      <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={!view.start && view.turnPlayer === me} />
+                      <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={!view.start && view.turnPlayer === me} online={watching === 'live' ? onlineOf(me) : undefined} />
                       {watching === 'live' ? (
                         <ReadOnlyHand seat={me} name={view.players[me].name} cards={view.players[me].hand} side="bottom" />
                       ) : (
@@ -974,7 +983,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                 {chat.isError && <p className="error">{errorText(chat.error)}</p>}
                 {ask.isError && <p className="error">{errorText(ask.error)}</p>}
                 {escalateQuestion.isError && <p className="error">{errorText(escalateQuestion.error)}</p>}
-                <DuelLog log={log} onHighlight={setHighlight} contest={readOnly ? never : contest} escalate={readOnly ? never : escalate} />
+                <DuelLog log={log} you={readOnly ? null : me} onHighlight={setHighlight} contest={readOnly ? never : contest} escalate={readOnly ? never : escalate} />
                 {controls ? (
                   <ReplayBar controls={controls} names={[view.players[0].name, view.players[1].name]} />
                 ) : watching === 'live' ? (

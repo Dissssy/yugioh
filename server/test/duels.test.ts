@@ -147,6 +147,8 @@ describe('a challenge link played by a guest', () => {
     // Anyone holding the link watches, seeing only what both players can: no hands, no Deck list, nothing to do.
     const watching = new Stream(await late.fetch(`${h.baseUrl}/api/duels/${duel.id}/stream?from=1`));
     const view = await watching.next();
+    // Neither player has the duel open, and a spectator doesn't count.
+    expect(await watching.message()).toEqual({ type: 'presence', online: [] });
     watching.close();
     expect(view.you).toBe(1);
     expect(view.deckList).toEqual([]);
@@ -176,6 +178,11 @@ describe('a challenge link played by a guest', () => {
     let b = await theirs.next();
     expect(a.you).toBe(0);
     expect(b.you).toBe(1);
+    // Both players have it open now.
+    let presence: DuelUpdate;
+    do presence = await mine.message<DuelUpdate>();
+    while (presence.type === 'presence' && presence.online.length < 2);
+    expect(presence).toEqual({ type: 'presence', online: [0, 1] });
     expect(a.players[0].name).toBe('Ethan');
     expect(a.players[1].name).toBe('Kaiba (guest)');
 

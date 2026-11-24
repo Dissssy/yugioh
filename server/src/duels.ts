@@ -811,9 +811,15 @@ export class Duels {
   async watch(id: string, seat: Seat, sight: Sight, send: (update: DuelUpdate) => void): Promise<() => void> {
     const duel = await this.load(id);
     const listener = { seat, sight, send };
+    const before = online(duel);
     duel.listeners.add(listener);
     send(syncFor(duel, seat, sight));
-    return () => duel.listeners.delete(listener);
+    this.presenceChanged(duel, before, listener);
+    return () => {
+      const before = online(duel);
+      duel.listeners.delete(listener);
+      this.presenceChanged(duel, before, null);
+    };
   }
 
   /**
@@ -846,11 +852,22 @@ export class Duels {
     }
   }
 
+  /** Tells everyone following the duel who has it open, when that changed; and the new listener in any case. */
+  private presenceChanged(duel: LiveDuel, before: Seat[], joined: Listener | null) {
+    const now = online(duel);
+    const update: DuelUpdate = { type: 'presence', online: now };
+    if (isDeepStrictEqual(now, before)) joined?.send(update);
+    else for (const l of duel.listeners) l.send(update);
+  }
+
   private broadcastJudging(duel: LiveDuel) {
     for (const l of duel.listeners) l.send({ type: 'judging', judging: judgingFor(duel, l.sight) });
     this.onChange?.(duel.id);
   }
 }
+
+/** The players following their duel live, in seat order. */
+const online = (duel: LiveDuel): Seat[] => ([0, 1] as const).filter((seat) => [...duel.listeners].some((l) => l.sight === seat));
 
 /** A record for an effect nobody could rule on: an activation is refused, an effect does nothing. */
 function notRuled(state: DuelState, stage: 'activation' | 'resolution', player: Seat, card: string, effect: number, error: string): JudgeRecord {

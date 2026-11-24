@@ -160,7 +160,7 @@ class Opponent {
     } else if (update.type === 'steps') {
       for (const step of update.steps) if (step.entry) this.log.push(step.entry);
       this.view = update.steps.at(-1)!.view;
-    } else {
+    } else if (update.type === 'judging') {
       this.judging = update.judging;
     }
     if (this.board() !== before) this.changedAt = Date.now();
