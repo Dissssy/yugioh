@@ -1,4 +1,5 @@
 import type { Me } from '@yugioh/shared';
+import { Link } from 'react-router';
 import { Duels, NewChallenge, PlayClaude } from './Duels.tsx';
 import { Notice } from './Notice.tsx';
 
@@ -70,7 +71,7 @@ function Welcome() {
       </div>
       <h1>Yu-Gi-Oh Duels</h1>
       <p className="lead">Duel your friends online. The rules are handled for you, so you can just play.</p>
-      <a className="button primary big" href="/auth/login">Log in or sign up</a>
+      <Link className="button primary big" to="/login">Log in or sign up</Link>
       <p className="muted small">
         This site is invite-only. New accounts need the admin's approval. Got a challenge link? Open it to play as a guest.
       </p>

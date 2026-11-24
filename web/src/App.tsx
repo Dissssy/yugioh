@@ -9,6 +9,7 @@ import { DecksPage } from './decks/DecksPage.tsx';
 import { DeckPage } from './pages/DeckPage.tsx';
 import { DuelPage, ReplayPage } from './pages/DuelPage.tsx';
 import { Home } from './pages/Home.tsx';
+import { Login } from './pages/Login.tsx';
 import { Loading, Notice } from './pages/Notice.tsx';
 
 export function App() {
@@ -36,7 +37,7 @@ export function App() {
           {user ? (
             <AccountMenu user={user} />
           ) : (
-            me.data && <a className="nav-link" href={loginHref(location.pathname)}>Log in</a>
+            me.data && location.pathname !== '/login' && <Link className="nav-link" to={loginHref(location.pathname)}>Log in</Link>
           )}
         </nav>
       </header>
@@ -48,6 +49,7 @@ export function App() {
         ) : (
           <Routes>
             <Route path="/" element={<Home me={me.data} />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/account" element={<Account me={me.data} />} />
             <Route path="/admin" element={<Admin me={me.data} />} />
             <Route path="/duel/:id" element={<DuelPage me={me.data} />} />

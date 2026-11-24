@@ -6,13 +6,15 @@ import { auth } from 'express-openid-connect';
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
 import { isAdmin, NO_BANLIST, type AdminDuels, type Me, type Rulings, type UserSettings } from '@yugioh/shared';
-import { findUserBySub, listUsers, setRole, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
+import { findUserBySub, listUsers, loginsOf, setRole, setStatus, setUsername, settingsOf, syncUser, toUser, updateSettings, type LoginClaims } from './accounts.ts';
 import type { Config } from './config.ts';
 import { duelCosts } from './costs.ts';
 import { banlistRoutes } from './banlistRoutes.ts';
 import { Catalog } from './catalog.ts';
 import type { Db } from './db/client.ts';
 import { deckForDuel, deckRoutes } from './deckRoutes.ts';
+import type { DiscordApi } from './discord.ts';
+import { discordRoutes, endDiscordSession, safeReturnTo } from './discordRoutes.ts';
 import { duelRoutes, type GuestCookie } from './duelRoutes.ts';
 import { Duels, type Ai } from './duels.ts';
 import { adoptGuest, findGuestByToken } from './guests.ts';
@@ -27,11 +29,16 @@ const GUEST_COOKIE = 'guest';
 const GUEST_COOKIE_MS = 365 * 24 * 60 * 60 * 1000;
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
-export function createApp(config: Config, db: Db, ai: Ai, random?: () => number) {
+export function createApp(config: Config, db: Db, ai: Ai, discord: DiscordApi | null, random?: () => number) {
   const app = express();
   app.set('trust proxy', 'loopback, linklocal, uniquelocal');
   const secure = config.BASE_URL.startsWith('https:');
 
+  // Logging out also ends a Discord login. Auth0's logout below then finishes it, or just goes home without one.
+  app.get('/auth/logout', (_req, res, next) => {
+    endDiscordSession(res);
+    next();
+  });
   app.use(
     auth({
       authRequired: false,
@@ -51,12 +58,18 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
   );
   // Login returns to the page that sent the visitor, such as a challenge link. Only paths on this site.
   app.get('/auth/login', (req, res) => {
-    const to = req.query.returnTo;
-    const returnTo = typeof to === 'string' && /^\/(?![/\\])/.test(to) ? to : '/';
-    res.oidc.login({ returnTo });
+    res.oidc.login({ returnTo: safeReturnTo(req.query.returnTo) });
   });
   app.use(cookieParser(config.SESSION_SECRET));
   app.use(express.json());
+
+  // Linking a Discord account to an Auth0 login lands here after the Auth0 login (see discordRoutes.ts).
+  app.get('/auth/link/finish', async (req, res) => {
+    if (!req.oidc.isAuthenticated()) return void res.redirect('/account');
+    const claims = req.oidc.idTokenClaims as unknown as LoginClaims;
+    const row = (await findUserBySub(db, claims.sub)) ?? (await syncUser(db, claims, config.ADMIN_EMAIL));
+    await discordLogins.finishAuth0Link(req, res, row.id);
+  });
 
   const guestCookie: GuestCookie = {
     set: (res, token) =>
@@ -75,17 +88,31 @@ export function createApp(config: Config, db: Db, ai: Ai, random?: () => number)
     const guest = typeof token === 'string' ? await findGuestByToken(db, token) : undefined;
     if (token !== undefined && !guest) guestCookie.clear(res);
 
-    if (req.oidc.isAuthenticated()) {
-      const claims = req.oidc.idTokenClaims as unknown as LoginClaims;
-      const row = (await findUserBySub(db, claims.sub)) ?? (await syncUser(db, claims, config.ADMIN_EMAIL));
+    const row = await accountOf(req, res);
+    if (row) {
       const user = toUser(row);
       // A guest who signs in to an approved account keeps playing their duels as that account.
       if (guest && user.status === 'approved' && (await adoptGuest(db, guest.id, userKey(user.id)))) guestCookie.clear(res);
-      return { kind: 'user', user, settings: settingsOf(row) };
+      return { kind: 'user', user, settings: settingsOf(row), logins: loginsOf(row) };
     }
     if (guest) return { kind: 'guest', guest: { name: guest.name }, guestId: guest.id };
     return { kind: 'anonymous' };
   }
+
+  /** The account signed in through Auth0 or, failing that, through Discord. */
+  async function accountOf(req: Request, res: Response) {
+    if (req.oidc.isAuthenticated()) {
+      const claims = req.oidc.idTokenClaims as unknown as LoginClaims;
+      return (await findUserBySub(db, claims.sub)) ?? (await syncUser(db, claims, config.ADMIN_EMAIL));
+    }
+    const discordId = discordLogins.discordIdOf(req);
+    if (discordId === null) return null;
+    const row = await discordLogins.findAccount(discordId);
+    if (!row) endDiscordSession(res);
+    return row ?? null;
+  }
+
+  const discordLogins = discordRoutes(app, config, db, discord);
 
   const viewer = viewerOf;
 

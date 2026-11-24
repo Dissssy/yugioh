@@ -35,7 +35,13 @@ export interface AdminUser extends User {
 export type Me =
   | { kind: 'anonymous' }
   | { kind: 'guest'; guest: { name: string } }
-  | { kind: 'user'; user: User; settings: UserSettings };
+  | { kind: 'user'; user: User; settings: UserSettings; logins: Logins };
+
+/** Which logins an account has: Auth0 on the website, Discord, or both once linked (docs/discord.md). */
+export interface Logins {
+  auth0: boolean;
+  discord: boolean;
+}
 
 /**
  * A decklist to pick from: a premade deck, or one of the viewer's own (docs/deck-builder.md). `problems` is what keeps

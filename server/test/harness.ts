@@ -12,6 +12,7 @@ import type { ModelCall } from '../src/judge/judge.ts';
 import type { DuelUpdate, PlayerView } from '@yugioh/engine';
 import type { DuelSummary } from '@yugioh/shared';
 import type { LoginClaims } from '../src/accounts.ts';
+import type { DiscordApi, DiscordUser } from '../src/discord.ts';
 import { connect, type Db } from '../src/db/client.ts';
 import { runMigrations } from '../src/db/migrate.ts';
 
@@ -27,7 +28,41 @@ export interface Harness {
   setIdentity(claims: LoginClaims): void;
   /** Stands in for Claude, for both the judge and appeals. Unset, any model call fails the test. */
   setModel(model: ModelCall): void;
+  /** Stands in for Discord's API, for the Activity's sign-in. */
+  discord: FakeDiscord;
   close(): Promise<void>;
+}
+
+/** Discord as the server sees it: codes the Activity got from `authorize`, and who is in which running instance. */
+export class FakeDiscord implements DiscordApi {
+  clientId = 'discord-client';
+  private codes = new Map<string, DiscordUser>();
+  instances = new Map<string, string[]>();
+  /** Who logs in with Discord on the website next. Discord approves at once and sends them straight back. */
+  webUser: DiscordUser = { id: 'nobody', username: 'nobody' };
+
+  authorizeUrl(state: string, redirectUri: string) {
+    return `${redirectUri}?${new URLSearchParams({ code: this.codeFor(this.webUser), state })}`;
+  }
+
+  /** A code Discord gave this user in the Activity. */
+  codeFor(user: DiscordUser): string {
+    const code = `code-${this.codes.size}`;
+    this.codes.set(code, user);
+    return code;
+  }
+
+  async exchangeCode(code: string) {
+    return this.codes.has(code) ? `token:${code}` : null;
+  }
+
+  async user(accessToken: string) {
+    return this.codes.get(accessToken.slice('token:'.length))!;
+  }
+
+  async instanceUsers(instanceId: string) {
+    return this.instances.get(instanceId) ?? null;
+  }
 }
 
 export async function startHarness(): Promise<Harness> {
@@ -52,8 +87,9 @@ export async function startHarness(): Promise<Harness> {
   const baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
   let model: ModelCall = () => Promise.reject(new Error('No model set for this test'));
   const call = (params: Anthropic.MessageCreateParamsNonStreaming) => model(params);
+  const discord = new FakeDiscord();
   const ai = { judge: call, appeal: call, judgeCalls: 300, appeals: 10, questions: 20, opponent: { call, model: 'claude-haiku-5-5', calls: 400, paceMs: 0 } };
-  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10, QUESTIONS_PER_DUEL: 20, AI_OPPONENT_MODEL: 'claude-haiku-5-5', AI_CALLS_PER_DUEL: 400, RESPONSE_FLOOR_MS: 0, RESET_SHEETS: false }, db, ai, seeded(1)));
+  server.on('request', createApp({ ...fakeConfig(baseUrl, oidc.issuer.url!), CARD_IMAGE_DIR: imageDir, JUDGE_CALLS_PER_DUEL: 300, APPEALS_PER_DUEL: 10, QUESTIONS_PER_DUEL: 20, AI_OPPONENT_MODEL: 'claude-haiku-5-5', AI_CALLS_PER_DUEL: 400, RESPONSE_FLOOR_MS: 0, RESET_SHEETS: false }, db, ai, discord, seeded(1)));
 
   return {
     db,
@@ -62,6 +98,7 @@ export async function startHarness(): Promise<Harness> {
     imageDir,
     setIdentity: (claims) => void (identity = claims),
     setModel: (m) => void (model = m),
+    discord,
     async close() {
       server.closeAllConnections();
       await new Promise((r) => server.close(r));

@@ -13,6 +13,7 @@ import {
 import type { User } from '@yugioh/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { inActivity } from './discord.ts';
 
 /** The account's name in the top bar, opening a menu with the account page and logging out. */
 export function AccountMenu({ user }: { user: User }) {
@@ -43,7 +44,8 @@ export function AccountMenu({ user }: { user: User }) {
             </div>
             {user.status === 'approved' && <Link role="menuitem" to="/decks" onClick={close}>Decks and banlists</Link>}
             <Link role="menuitem" to="/account" onClick={close}>Account and settings</Link>
-            <a role="menuitem" href="/auth/logout">Log out</a>
+            {/* In the Discord Activity, Discord is the login: closing the Activity is logging out. */}
+            {!inActivity && <a role="menuitem" href="/auth/logout">Log out</a>}
           </div>
         </FloatingFocusManager>
       )}
