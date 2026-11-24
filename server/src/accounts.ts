@@ -59,31 +59,22 @@ export async function syncUser(db: Db, claims: LoginClaims, adminEmail: string):
 }
 
 /**
- * Creates or finds the account for someone signing in from the Discord Activity. Only the app's testers can open the
- * Activity, so they are trusted like approved players: a new account starts approved, and a pending one is approved.
- * An account an admin rejected stays rejected.
+ * Finds or creates the account for a Discord login. With `approve` (the Activity opened in a trusted server) a new
+ * account starts approved and a pending one is approved; otherwise a new account starts pending, like any website
+ * signup. An account an admin rejected stays rejected.
  */
-export async function syncDiscordUser(db: Db, discordId: string): Promise<UserRow> {
+export async function syncDiscordUser(db: Db, discordId: string, approve: boolean): Promise<UserRow> {
   return withRandomUsername((username) =>
     db
       .insert(users)
-      .values({ discordId, username, status: 'approved' })
+      .values({ discordId, username, status: approve ? 'approved' : 'pending' })
       .onConflictDoUpdate({
         target: users.discordId,
-        set: { status: sql`case when ${users.status} = 'pending' then 'approved'::account_status else ${users.status} end` },
+        set: approve
+          ? { status: sql`case when ${users.status} = 'pending' then 'approved'::account_status else ${users.status} end` }
+          : // A no-op update, so the existing row comes back.
+            { discordId },
       })
-      .returning(),
-  );
-}
-
-/** Finds or creates the account for a Discord login on the website. A new one starts pending, like any website signup. */
-export async function syncWebDiscordUser(db: Db, discordId: string): Promise<UserRow> {
-  return withRandomUsername((username) =>
-    db
-      .insert(users)
-      .values({ discordId, username })
-      // A no-op update, so the existing row comes back.
-      .onConflictDoUpdate({ target: users.discordId, set: { discordId } })
       .returning(),
   );
 }

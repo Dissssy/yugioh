@@ -30,7 +30,7 @@ describe('signing in from the Discord Activity', () => {
     expect((await new Browser().json(`${h.baseUrl}/api/discord`)).body).toEqual({ clientId: 'discord-client', siteUrl: h.baseUrl });
   });
 
-  it('signs in a tester inside a running instance as an approved account, with an iframe cookie', async () => {
+  it('signs in someone inside a running instance in a trusted server as an approved account, with an iframe cookie', async () => {
     h.discord.instances.set('call-1', [yugi.id, joey.id]);
     const browser = new Browser();
     const raw = await browser.fetch(`${h.baseUrl}/api/discord/session`, {
@@ -46,6 +46,21 @@ describe('signing in from the Discord Activity', () => {
     expect(cookie).toMatch(/Secure/);
 
     expect(await me(browser)).toMatchObject({ kind: 'user', user: { status: 'approved', role: 'player' } });
+  });
+
+  it('leaves someone who opens it outside a trusted server waiting for approval, and approves them once they open it in one', async () => {
+    const mai = { id: '1003', username: 'mai' };
+    h.discord.instances.set('elsewhere', [mai.id]);
+    h.discord.places.set('elsewhere', 'guild:someone-elses-server');
+    h.discord.instances.set('mai-dm', [mai.id]);
+    h.discord.places.set('mai-dm', 'dm:42');
+    expect(await me((await openActivity(mai, 'elsewhere')).browser)).toMatchObject({ user: { status: 'pending' } });
+    expect(await me((await openActivity(mai, 'mai-dm')).browser)).toMatchObject({ user: { status: 'pending' } });
+
+    h.discord.instances.set('call-1', [yugi.id, joey.id, mai.id]);
+    expect(await me((await openActivity(mai, 'call-1')).browser)).toMatchObject({ user: { status: 'approved' } });
+    // Approved stays approved anywhere.
+    expect(await me((await openActivity(mai, 'mai-dm')).browser)).toMatchObject({ user: { status: 'approved' } });
   });
 
   it('gives the same Discord user the same account every time', async () => {

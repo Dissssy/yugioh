@@ -141,6 +141,7 @@ function fakeConfig(baseUrl: string, issuer: string) {
     AUTH0_CLIENT_ID: 'testclient',
     AUTH0_CLIENT_SECRET: 'test-client-secret',
     ADMIN_EMAIL,
+    DISCORD_TRUSTED_SERVERS: ['test-server'],
   };
 }
 
