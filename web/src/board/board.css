@@ -176,6 +176,9 @@ main:has(.duel) { max-width: none; padding: 0; }
 .strip-middle { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .strip-prompt { grid-column: 6 / 8; display: flex; align-items: center; padding: 0 10px; min-width: 0; }
 .strip-prompt > * { flex-wrap: wrap; }
+/* The row is about one zone tall: a question with several answers packs tight, and what still doesn't fit lies over the zones below, never under them. */
+.strip-prompt { position: relative; z-index: 4; }
+.strip-prompt .judge-choice { gap: 4px 8px; }
 .zone.extra-zone { border-style: solid; border-color: color-mix(in srgb, var(--fg) 22%, transparent); }
 /* The phase dial: the phases on a strip that scrolls to keep the current one under the notch, fading to each side. */
 .phase-dial { --dial-item: calc(var(--zone) / 3); display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }

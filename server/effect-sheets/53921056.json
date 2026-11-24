@@ -21,7 +21,49 @@
         "canMiss": false,
         "by": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "place": "graveyard",
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Ice Barrier",
+                    "except": "General Gantala of the Ice Barrier",
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

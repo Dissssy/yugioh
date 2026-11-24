@@ -14,7 +14,74 @@
       "effect": "Target the same number of cards your opponent controls as cards discarded; destroy them.",
       "targets": "the same number of cards your opponent controls (as cards discarded)",
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "place": "hand",
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null
+              },
+              "min": 1,
+              "max": 2,
+              "rank": null
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "place": "field",
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null
+          },
+          "min": 1,
+          "max": "cost",
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

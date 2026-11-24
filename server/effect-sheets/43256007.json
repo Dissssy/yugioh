@@ -45,6 +45,7 @@
                     "races": [],
                     "attributes": [],
                     "named": "Ice Barrier",
+                    "except": null,
                     "extraDeck": null,
                     "faceUp": null,
                     "position": null,

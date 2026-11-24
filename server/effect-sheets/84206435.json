@@ -14,7 +14,48 @@
       "effect": "Add 1 \"Ice Barrier\" monster from your Deck to your hand.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "place": "deck",
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Ice Barrier",
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null
+                },
+                "to": "hand"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     }

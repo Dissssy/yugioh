@@ -547,10 +547,10 @@ export class Duels {
     const seen = event?.type === 'judged' && logFor(duel.events.slice(0, seq + 1), seat).at(-1)?.seq === seq;
     if (!seen) return { ok: false, status: 404, error: 'There is no such ruling.' };
     if (duel.events.some((e, i) => e.type === 'rolledBack' && i > seq && e.to <= seq)) return { ok: false, status: 409, error: 'A rewind undid that ruling.' };
-    const key = `${seq}:${seat}`;
-    const appeals = duel.events.filter((e) => e.type === 'appealed');
-    if (duel.appealing.has(key) || appeals.some((e) => e.appeal.judged === seq && e.appeal.by === seat)) {
-      return { ok: false, status: 409, error: 'You already contested this ruling.' };
+    // One appeal per ruling, whoever asks: a second would look at the same board and the same ruling again.
+    const key = `${seq}`;
+    if (duel.appealing.has(key) || duel.events.some((e) => e.type === 'appealed' && e.appeal.judged === seq)) {
+      return { ok: false, status: 409, error: 'This ruling was already contested.' };
     }
     if (!escalated && this.appealsUsed(duel) >= this.ai.appeals) return { ok: false, status: 429, error: 'This duel has used all its appeals.' };
     duel.appealing.add(key);
@@ -742,13 +742,16 @@ export class Duels {
   private broadcast(before: DuelState, events: DuelEvent[], first: number, duel: LiveDuel) {
     const updateFor = (seat: Seat, sight: Sight): Extract<DuelUpdate, { type: 'steps' }> => {
       let state = before;
+      let lastSeen = false;
       const steps: SeatStep[] = events.flatMap((event, i) => {
+        const prior = state;
         state = evolve(state, event);
-        const entry = entryFor(state, event, first + i, state.turn, sight);
+        const entry = entryFor(prior, state, event, first + i, sight);
+        lastSeen = entry !== null;
         return entry ? [{ entry, view: viewFor(state, seat, sight) }] : [];
       });
       // A change nobody sees in the log (a pass) still changes what each player may do.
-      if (!entryFor(state, events.at(-1)!, first + events.length - 1, state.turn, sight)) steps.push({ entry: null, view: viewFor(state, seat, sight) });
+      if (!lastSeen) steps.push({ entry: null, view: viewFor(state, seat, sight) });
       for (const step of steps.slice(0, -1)) step.view.actions = [];
       return { type: 'steps', steps };
     };

@@ -92,6 +92,7 @@ const monsters = (overrides: Partial<CardFilter>): CardFilter => ({
   races: [],
   attributes: [],
   named: null,
+  except: null,
   extraDeck: null,
   faceUp: true,
   position: null,
