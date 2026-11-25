@@ -335,7 +335,9 @@ export type Step =
    */
   | { do: 'allow_tribute'; cards: Selection }
   /** The activating player Normal Summons or Sets 1 monster from their hand now, on top of their usual one (Ultimate Offering). */
-  | { do: 'normal_summon' };
+  | { do: 'normal_summon' }
+  /** The activating player looks at the selected cards; only they see them, and the cards stay where they are ("Select and see 1 card in your opponent's hand"). */
+  | { do: 'look'; cards: Selection };
 
 export const SHIELDS = ['battle_damage', 'battle_destruction'] as const;
 /** What a `shield` step keeps from a player for the turn: battle damage, or their monsters being destroyed by battle. */
@@ -439,7 +441,7 @@ export type Continuous =
    */
   | { apply: 'win_with_hand'; names: string[] };
 
-export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle', 'be_destroyed_by_effect', 'be_affected', 'activate_effects'] as const;
+export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle', 'be_destroyed_by_effect', 'be_affected', 'activate_effects', 'be_targeted'] as const;
 /**
  * What a restricted card can't do: declare an attack, change its battle position, be targeted for an attack, be
  * destroyed by battle or by an effect, be affected by activated effects ("unaffected by"), or activate its effects.
@@ -517,7 +519,9 @@ export type Selection =
    */
   | { from: 'event' }
   /** The cards the last `move` or `special_summon` step of this effect moved or Summoned ("Special Summon ..., its ATK becomes 3300"). */
-  | { from: 'moved' };
+  | { from: 'moved' }
+  /** The top `count` cards of that player's Deck ("See the top 5 cards of your opponent's Deck"). */
+  | { from: 'deck_top'; player: 'you' | 'opponent'; count: number };
 
 export const FILTER_PLACES = ['field', 'monsters', 'spellTraps', 'hand', 'deck', 'extra', 'graveyard', 'banished'] as const;
 export type FilterPlace = (typeof FILTER_PLACES)[number];
@@ -923,7 +927,9 @@ export type Op =
   /** `player` may Tribute this monster of their opponent's this turn, and must if they Tribute (see the `allow_tribute` step). */
   | { op: 'allow_tribute'; player: Seat; card: string }
   /** `player` Normal Summons (`set`: Sets) this monster from their hand now with these tributes, into `zone`, outside their usual Normal Summon. */
-  | { op: 'normal_summon'; player: Seat; card: string; tributes: string[]; zone: number; set: boolean };
+  | { op: 'normal_summon'; player: Seat; card: string; tributes: string[]; zone: number; set: boolean }
+  /** The effect's controller looks at these cards; only they see them. */
+  | { op: 'look'; cards: string[] };
 
 /** The tokens one Messages API call used, as the API reported them; the server prices them. */
 export interface ModelUsage {
@@ -1111,6 +1117,8 @@ export type DuelEvent =
   | { type: 'shielded'; player: Seat; what: Shield[] }
   | { type: 'statChangesReversed' }
   | { type: 'tributeAllowed'; player: Seat; card: string }
+  /** `player` looked at these cards; only they learn which cards they are. */
+  | { type: 'looked'; player: Seat; cards: string[] }
   | { type: 'pledged'; player: Seat; names: string[]; damage: number }
   /** A `cost_substitute` effect was used (its card is banished by a `moved` event before this). */
   | { type: 'substituted'; player: Seat; card: string; effect: number }
@@ -1236,8 +1244,11 @@ export type LogEvent =
           | 'aiDecided'
           | 'asked'
           | 'escalated'
+          | 'looked'
       }
     >
+  /** Cards a player looked at: named only in that player's log. */
+  | { type: 'looked'; player: Seat; cards: string[] | null; count: number }
   /** A question to the judge and its answer; only the asker's log has it. */
   | { type: 'asked'; player: Seat; question: string; card: number | null; answer: string; verdict: AskRecord['verdict']; failed: boolean }
   /** The appeal model's look at an escalated question; only the asker's log has it. */

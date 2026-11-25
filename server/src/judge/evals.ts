@@ -1517,6 +1517,41 @@ export const CASES: EvalCase[] = [
     check: (b) => all(expectAt(b, 'Celtic Guardian', '0:hand'), expectAt(b, 'Wall of Illusion', '1:monsters')),
   },
   {
+    name: 'just desserts burns 500 for each monster the opponent controls',
+    board: [{ set: ['Just Desserts'] }, { monsters: ['Celtic Guardian', 'Blue-Eyes White Dragon'] }],
+    activate: 'Just Desserts',
+    legal: true,
+    check: (b) => (b.state.players[1].lp === 7000 ? null : `the opponent has ${b.state.players[1].lp} LP`),
+  },
+  {
+    name: 'the flute of summoning dragon needs lord of d. on the field',
+    board: [{ set: ['The Flute of Summoning Dragon'], hand: ['Blue-Eyes White Dragon'] }, {}],
+    activate: 'The Flute of Summoning Dragon',
+    legal: false,
+  },
+  {
+    name: 'the flute of summoning dragon summons dragons from the hand while lord of d. is out',
+    board: [{ set: ['The Flute of Summoning Dragon'], hand: ['Blue-Eyes White Dragon'], monsters: ['Lord of D.'] }, {}],
+    activate: 'The Flute of Summoning Dragon',
+    legal: true,
+    check: (b) => expectAt(b, 'Blue-Eyes White Dragon', '0:monsters'),
+  },
+  {
+    name: 'lord of d. keeps dragons on the field from being targeted',
+    board: [{ set: ['Reinforcements'] }, { monsters: ['Lord of D.', 'Blue-Eyes White Dragon'] }],
+    activate: 'Reinforcements',
+    // Blue-Eyes isn't offered as a target; Lord of D. is the only one.
+    legal: true,
+    check: (b) => all(b.monster('Lord of D.')?.atk === 1700 ? null : 'Lord of D. did not gain 500 ATK', b.monster('Blue-Eyes White Dragon')?.atk === 3000 ? null : 'Blue-Eyes changed'),
+  },
+  {
+    name: 'ancient telescope looks at the top five cards of the opponent deck',
+    board: [{ set: ['Ancient Telescope'] }, { deck: ['Celtic Guardian'] }],
+    activate: 'Ancient Telescope',
+    legal: true,
+    check: (b) => expectAt(b, 'Ancient Telescope', '0:gy'),
+  },
+  {
     name: 'waboku shields its player from battle damage and destruction by battle this turn',
     board: [{ set: ['Waboku'] }, {}],
     activate: 'Waboku',

@@ -54,6 +54,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   shielded: 300,
   statChangesReversed: 300,
   tributeAllowed: 300,
+  looked: 300,
   linked: 400,
   activationNegated: 500,
   effectsNegated: 300,

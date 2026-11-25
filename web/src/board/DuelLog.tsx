@@ -8,7 +8,7 @@ const END_SLOP_PX = 24;
 export function cardsOf(event: LogEvent): string[] {
   const ids: (string | null)[] = [];
   if ('card' in event && event.type !== 'asked') ids.push(event.card);
-  if ('cards' in event) ids.push(...event.cards);
+  if ('cards' in event) ids.push(...(event.cards ?? []));
   if (event.type === 'attackDeclared') ids.push(event.attacker, event.target);
   return ids.filter((id): id is string => id !== null);
 }

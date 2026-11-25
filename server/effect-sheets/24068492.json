@@ -1,0 +1,92 @@
+{
+  "code": 24068492,
+  "textHash": "7896693c48bd75a32bd7f5a82a8aa89911fdd70a82aded4124e0ff8ac95f4a1b",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Any time you could activate a Normal Trap",
+      "cost": "",
+      "effect": "Inflict 500 damage to your opponent for each monster they control.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "opponent",
+              "places": [
+                "monsters"
+              ],
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": null,
+              "except": null,
+              "extraDeck": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null,
+              "original": false
+            },
+            "min": 1,
+            "max": null,
+            "distinct": false
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": 500,
+                "per": {
+                  "side": "opponent",
+                  "places": [
+                    "monsters"
+                  ],
+                  "kinds": [
+                    "monster"
+                  ],
+                  "types": [],
+                  "races": [],
+                  "attributes": [],
+                  "named": null,
+                  "except": null,
+                  "extraDeck": null,
+                  "faceUp": null,
+                  "position": null,
+                  "level": null,
+                  "atk": null,
+                  "def": null,
+                  "original": false
+                },
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -1,0 +1,57 @@
+{
+  "code": 17985575,
+  "textHash": "bb0ac27d523ba9cc45a73e91de3c6098e6e8b6879539020d99d6ef8377cd4f1c",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "Neither player can target Dragon monsters on the field with card effects.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": {
+          "side": "either",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [
+            "Dragon"
+          ],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "others": false,
+        "cannot": [
+          "be_targeted"
+        ],
+        "by": null,
+        "compare": null,
+        "once": false,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

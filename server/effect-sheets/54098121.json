@@ -1,0 +1,55 @@
+{
+  "code": 54098121,
+  "textHash": "e2aa5f017aa8ebee92ba1632c128057a067ffeda56b3e520f72f31f685c6240f",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "Each time a monster is Normal Summoned or Flip Summoned",
+      "cost": "",
+      "effect": "Gain 500 Life Points.",
+      "targets": null,
+      "when": {
+        "event": "summoned",
+        "self": false,
+        "filter": null,
+        "how": [
+          "normal",
+          "flip"
+        ],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "you",
+                "amount": 500,
+                "per": null,
+                "kind": "gain"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

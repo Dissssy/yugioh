@@ -163,3 +163,24 @@ Known differences from the official rulings:
   Set card".
 
 New eval cases cover Waboku, Reverse Trap, Soul Exchange, Last Will, Ultimate Offering and Wall of Illusion.
+
+### Starter Deck: Kaiba (SDK)
+
+50 cards: 26 Normal Monsters, 2 written by code, 22 scripted, none left to the judge. 12 of its cards were already in
+the pool from Starter Deck: Yugi. It is a premade deck, "Starter Deck: Kaiba (2002)", the opponent for Yugi's.
+
+Built for it:
+
+- **`look`** (Ancient Telescope, The Inexperienced Spy): the player looks at the selected cards. Only their log names
+  the cards (event `looked`); the other player's log gives only how many.
+- **The `deck_top` selection**: the top n cards of a player's Deck.
+- **The `be_targeted` restriction** (Lord of D.): the cards it covers are never offered as targets, and the op that
+  declares targets refuses them.
+
+Known differences from the official rulings:
+
+- The Inexperienced Spy shows a random card from the opponent's hand. In paper the player picks one of the face-down
+  cards, which is the same thing.
+
+New eval cases cover Just Desserts, The Flute of Summoning Dragon (with and without Lord of D.), Lord of D. and Ancient
+Telescope.

@@ -1,0 +1,45 @@
+{
+  "code": 17092736,
+  "textHash": "a83711b9ae0e777b2305ee78c697bb35e5a8bbfa3b11f99a581591f058bc4261",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "See the top 5 cards of your opponent's Deck, then return them in the same order.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "look",
+                "cards": {
+                  "from": "deck_top",
+                  "player": "opponent",
+                  "count": 5
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

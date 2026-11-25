@@ -221,6 +221,8 @@ function reviewText(state: DuelState, event: DuelEvent): string {
       return `${who(event.player)} may detach Xyz Material from ${label(event.card)} instead of it being destroyed`;
     case 'rollbackOffered':
       return `Rewind offered to before the overturned ruling: ${event.offer.explanation}`;
+    case 'looked':
+      return `${who(event.player)} looked at ${event.cards.map(label).join(', ')}`;
     default:
       return describe(state, event)!;
   }
@@ -286,6 +288,8 @@ function visibleEvent(before: DuelState, state: DuelState, event: DuelEvent, sig
     case 'monsterSet':
     case 'spellTrapSet':
       return knows(sight, event.player) ? event : { ...event, card: null };
+    case 'looked':
+      return { type: 'looked', player: event.player, cards: knows(sight, event.player) ? event.cards : null, count: event.cards.length };
     case 'attackDeclared': {
       const at = event.target === null ? null : locate(state, event.target);
       return { ...event, targetZone: at?.zone === 'monsters' ? at.index : null };
@@ -357,6 +361,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `Chose: ${event.choice}`;
     case 'revealed':
       return `${who(event.player)} revealed ${names(event.cards)}`;
+    case 'looked':
+      return event.cards ? `${who(event.player)} looked at ${names(event.cards)}` : `${who(event.player)} looked at ${event.count} card${event.count === 1 ? '' : 's'}`;
     case 'moved': {
       const to = { hand: 'to the hand', deck_top: 'on top of the Deck', deck_bottom: 'to the bottom of the Deck', deck_shuffled: 'into the Deck', graveyard: 'to the GY', banished: 'banished' }[event.to];
       const from = { deck: 'Deck', hand: 'hand', monsters: 'field', spellTraps: 'field', materials: 'Xyz Materials', graveyard: 'GY', banished: 'banished cards', extra: 'Extra Deck' }[event.from];

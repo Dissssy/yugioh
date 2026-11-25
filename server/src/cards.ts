@@ -26,6 +26,7 @@ export const PREMADE_DECKS = [
   { slug: 'duelist-toolbox', name: 'Starter Deck: Duelist Toolbox', set: 'Starter Deck: Duelist Toolbox' },
   { slug: 'freezing-chains', name: 'Structure Deck: Freezing Chains', set: 'Structure Deck: Freezing Chains' },
   { slug: 'yugi-2002', name: 'Starter Deck: Yugi (2002)', set: 'Starter Deck: Yugi' },
+  { slug: 'kaiba-2002', name: 'Starter Deck: Kaiba (2002)', set: 'Starter Deck: Kaiba' },
 ] as const;
 
 /**
@@ -44,7 +45,7 @@ export interface CardSet {
  * The card pool grows down the set list, oldest first: every card printed in the sets up to and including this one
  * (by list code) is in the pool, along with the premade decks' cards. Pool cards get effect sheets and images.
  */
-export const POOL_THROUGH = 'SDY';
+export const POOL_THROUGH = 'SDK';
 
 /**
  * Cards that need no written sheet (Normal Monsters, and cards `simpleSheet` covers) join the pool ahead of their set
