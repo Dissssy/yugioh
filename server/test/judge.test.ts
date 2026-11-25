@@ -190,21 +190,26 @@ describe('the judge loop', () => {
     expect(events).toEqual([]);
   });
 
-  it('offers a face-down card on the field without letting the asking player see what it is', async () => {
+  it("offers a face-down card on the field or in the opponent's hand without letting the asking player see what it is", async () => {
     const { state, link } = activated();
     const set = evolve(state, { type: 'monsterSet', player: 1, card: 'b0', zone: 2 });
-    const { model } = scripted([
-      [{ name: 'ask_player', input: { player: 0, prompt: 'Pick one.', cards: ['b0', 'b1'], choices: [], min: 1, max: 1 } }],
-      [{ name: 'ask_player', input: { player: 0, prompt: 'Pick one.', cards: ['b0', 'a9'], choices: [], min: 1, max: 1 } }],
+    const { model, sent } = scripted([
+      // b5 is in the opponent's Deck, which can never be an option.
+      [{ name: 'ask_player', input: { player: 0, prompt: 'Pick one.', cards: ['b0', 'b5'], choices: [], min: 1, max: 1 } }],
+      [{ name: 'ask_player', input: { player: 0, prompt: 'Pick one.', cards: ['b3', 'b0', 'a9', 'b2'], choices: [], min: 1, max: 1 } }],
       [{ name: 'finish', input: { legal: false, summary: 'No.' } }],
     ]);
     const d = deps(model, [['b0']]);
     await judge({ stage: 'activation', state: set, link }, d);
+    expect(results(sent[1]!)[0]!.content).toMatch(/can't see b5/);
+    // Hidden cards in the hand come last, in hand order (b0 left the hand, so b2 is its second card).
     expect(d.questions).toEqual([
       expect.objectContaining({
         cards: [
           { id: 'b0', place: 'monsters', seat: 1, zone: 2, hidden: true },
           { id: 'a9', place: 'graveyard', seat: 0, zone: null, hidden: false },
+          { id: 'b2', place: 'hand', seat: 1, zone: 1, hidden: true },
+          { id: 'b3', place: 'hand', seat: 1, zone: 2, hidden: true },
         ],
       }),
     ]);
@@ -214,13 +219,13 @@ describe('the judge loop', () => {
     const { state, link } = activated();
     const { model, sent } = scripted([
       [{ name: 'ask_player', input: { player: 1, prompt: 'Yusei holds Axe Raider. Pick one.', cards: ['a9'], choices: [], min: 1, max: 1 } }],
-      [{ name: 'ask_player', input: { player: 1, prompt: 'Pick one.', cards: ['a1'], choices: [], min: 1, max: 1 } }],
+      [{ name: 'ask_player', input: { player: 1, prompt: 'Pick one.', cards: ['a5'], choices: [], min: 1, max: 1 } }],
       [{ name: 'finish', input: { legal: false, summary: 'Yusei has no Axe Raider to discard.' } }],
       [{ name: 'finish', input: { legal: false, summary: 'Not now.' } }],
     ]);
     const { record, events } = await judge({ stage: 'activation', state, link }, deps(model));
     expect(results(sent[1]!)[0]!.content).toMatch(/names Axe Raider/);
-    expect(results(sent[2]!)[0]!.content).toMatch(/can't see a1/);
+    expect(results(sent[2]!)[0]!.content).toMatch(/can't see a5/);
     expect(results(sent[3]!)[0]!.content).toMatch(/names Axe Raider/);
     expect(record).toMatchObject({ legal: false, summary: 'Not now.' });
     expect(events).toEqual([]);

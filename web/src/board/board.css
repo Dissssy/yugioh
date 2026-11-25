@@ -139,6 +139,7 @@ main:has(.duel) { max-width: none; padding: 0; }
 .hand.own .hand-card { cursor: grab; }
 .hand.own .hand-card:active { cursor: grabbing; }
 .hand-card.held { z-index: 10; pointer-events: none; }
+.hand.foe .hand-card.pickable, .hand.foe .hand-card.picked { cursor: pointer; }
 
 /* Life Points */
 .lp-plate {

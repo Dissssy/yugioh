@@ -145,7 +145,7 @@ export function describeStats(m: FieldCardView): string {
 export function optionsFor(prompt: NonNullable<JudgingView['prompt']>, you: Seat): { text: string; pick: string }[] {
   return [
     ...prompt.cards.map((c) => ({
-      text: `${'id' in c.card ? c.card.card.name : 'a face-down card'} (${c.seat === you ? 'your' : "your opponent's"} ${PLACES[c.place]}${c.zone !== null ? `, ${zoneName(c.zone)}` : ''})`,
+      text: `${'id' in c.card ? c.card.card.name : 'a face-down card'} (${c.seat === you ? 'your' : "your opponent's"} ${PLACES[c.place]}${c.zone === null ? '' : c.place === 'hand' ? `, card ${c.zone + 1}` : `, ${zoneName(c.zone)}`})`,
       pick: c.pick,
     })),
     ...prompt.choices.map((choice) => ({ text: choice, pick: choice })),

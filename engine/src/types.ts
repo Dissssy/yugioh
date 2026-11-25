@@ -1319,8 +1319,9 @@ export interface PromptView {
   id: string;
   text: string;
   /**
-   * Cards to pick from, answered by `pick`: the card's ID, or for a face-down card on the field (which the asked
-   * player may not identify) a key for this question only. `zone` is the zone index of a card on the field.
+   * Cards to pick from, answered by `pick`: the card's ID, or for a card the asked player may not identify (face-down
+   * on the field, or in the opponent's hand) a key for this question only. `zone` is the zone index of a card on the
+   * field, or the place in the hand of such a card in a hand.
    */
   cards: { pick: string; card: CardView; place: Place; seat: Seat; zone: number | null }[];
   /** Picks that aren't cards, such as "Gain 1200 LP". */

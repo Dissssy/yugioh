@@ -36,12 +36,15 @@ export const PROMPT_VERSION = createHash('sha256').update(RULES).update(JSON.str
 /** One Messages API call; the real one is `client.messages.create`, tests script it. */
 export type ModelCall = (params: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
 
-/** A card a player may pick: `hidden` when it is face-down on the field and the player may not know what it is. */
+/**
+ * A card a player may pick: `hidden` when the player may not know what it is (face-down on the field, or in the
+ * opponent's hand), and is offered by where it is instead.
+ */
 export interface QuestionCard {
   id: string;
   place: Place;
   seat: Seat;
-  /** The zone index of a card on the field, else null. */
+  /** The zone index of a card on the field, the place in the hand of a hidden card in a hand, else null. */
   zone: number | null;
   hidden: boolean;
 }
@@ -308,12 +311,17 @@ export function checkQuestion(state: DuelState, q: AskPlayer, source: string): Q
     const at = state.instances[id] ? locate(state, id) : null;
     if (!at) return { error: `There is no card ${id}.` };
     // A player may pick from what they can see, from their own Deck when an effect lets them search it, and any card
-    // on the field: a face-down one is offered as a face-down card, without its identity.
+    // on the field or in a hand: one they can't see is offered by where it is, without its identity ("select 1 card
+    // in your opponent's hand").
     const field = at.zone === 'monsters' || at.zone === 'spellTraps';
     const hidden = !visibleTo(state, id, p);
-    if (hidden && !field && !(at.zone === 'deck' && at.seat === p)) return { error: `Player ${p} can't see ${id}, so it can't be an option for them.` };
-    cards.push({ id, place: at.zone, seat: at.seat, zone: field ? at.index : null, hidden: hidden && field });
+    if (hidden && !field && at.zone !== 'hand' && !(at.zone === 'deck' && at.seat === p)) return { error: `Player ${p} can't see ${id}, so it can't be an option for them.` };
+    const zone = field ? at.index : hidden && at.zone === 'hand' ? state.players[at.seat].hand.indexOf(id) : null;
+    cards.push({ id, place: at.zone, seat: at.seat, zone, hidden: hidden && zone !== null });
   }
+  // Hidden cards in a hand go in hand order, so the order of the options says nothing about which is which.
+  const inHand = (c: QuestionCard) => c.hidden && c.place === 'hand';
+  cards.splice(0, cards.length, ...cards.filter((c) => !inHand(c)), ...cards.filter(inHand).sort((a, b) => a.seat - b.seat || a.zone! - b.zone!));
   // The card's own text is public, so a prompt may name what it names ("add 1 "Genex Controller" from your Deck").
   const leak = hiddenNameIn(state, q.prompt, [p], cardOf(state, source).text);
   if (leak) return { error: `The prompt names ${leak}, which player ${p} can't see.` };
