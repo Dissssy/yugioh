@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { dropCentre } from './aim.tsx';
 import { CardFace, dataOf, idOf } from './Card.tsx';
 import { useCardHover } from './CardTooltip.tsx';
-import { useChoice } from './choice.tsx';
+import { handSlot, useChoice } from './choice.tsx';
 import { CARD_ASPECT, CARD_HEIGHT_IN_ZONE, useBoardLook, type CardMarks } from './look.ts';
 
 const spring = { type: 'spring', stiffness: 420, damping: 32 } as const;
@@ -263,6 +263,7 @@ function HandCard({
 export function ReadOnlyHand({ seat, name, cards, side }: { seat: Seat; name: string; cards: CardView[]; side: 'top' | 'bottom' }) {
   const { zone } = useBoardLook();
   const hover = useCardHover();
+  const choice = useChoice();
   const count = cards.length;
   /** The top hand fans downward, toward the table. */
   const flip = side === 'top' ? -1 : 1;
@@ -270,16 +271,31 @@ export function ReadOnlyHand({ seat, name, cards, side }: { seat: Seat; name: st
     <div className={`hand ${side === 'top' ? 'foe' : 'watched'}`} data-hand={seat} aria-label={`${name}'s hand, ${count} cards`}>
       {Array.from({ length: count }, (_, i) => {
         const place = fan(i, count, zone, null);
+        const slot = handSlot(seat, i);
+        // The judge can offer these cards unseen ("select 1 card in your opponent's hand"): picked by their place.
+        const picking = choice?.state(null, slot) ?? null;
         return (
-          <motion.div key={i} layout className="hand-card" style={{ marginLeft: place.marginLeft }} transition={spring}>
+          <motion.div
+            key={i}
+            layout
+            className={`hand-card${picking ? ` slot ${picking}` : ''}`}
+            style={{ marginLeft: place.marginLeft }}
+            transition={spring}
+            onClick={picking ? () => choice!.toggle(null, slot) : undefined}
+            role={picking ? 'button' : undefined}
+            aria-label={picking ? `Card ${i + 1} in ${name}'s hand` : undefined}
+            aria-pressed={picking ? picking === 'picked' : undefined}
+            data-pick={picking ? '' : undefined}
+          >
             <motion.div animate={{ rotate: flip * place.rotate, y: flip * place.y }} transition={spring}>
               <div
                 className="fx"
                 data-hand-index={`${seat}:${i}`}
                 {...hover(dataOf(cards[i]!))}
-                // Face up only in a replay with every card shown, where it can be looked at by keyboard too.
-                data-nav={dataOf(cards[i]!) ? `${seat}:hand:${i}` : undefined}
-                tabIndex={dataOf(cards[i]!) ? -1 : undefined}
+                // Face up only in a replay with every card shown, where it can be looked at by keyboard too; and while
+                // the judge offers it, so it can be picked by keyboard.
+                data-nav={dataOf(cards[i]!) || picking ? slot : undefined}
+                tabIndex={dataOf(cards[i]!) || picking ? -1 : undefined}
               >
                 <CardFace card={dataOf(cards[i]!)} />
               </div>

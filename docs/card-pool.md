@@ -176,11 +176,9 @@ Built for it:
 - **The `deck_top` selection**: the top n cards of a player's Deck.
 - **The `be_targeted` restriction** (Lord of D.): the cards it covers are never offered as targets, and the op that
   declares targets refuses them.
+- **Picking cards you can't see** (The Inexperienced Spy): a `choose` over the opponent's hand offers its cards
+  face-down, in hand order. The player clicks one of the card backs in the opponent's hand, and the server matches the
+  pick by a key made for that question only, so the pick never tells them which card is which.
 
-Known differences from the official rulings:
-
-- The Inexperienced Spy shows a random card from the opponent's hand. In paper the player picks one of the face-down
-  cards, which is the same thing.
-
-New eval cases cover Just Desserts, The Flute of Summoning Dragon (with and without Lord of D.), Lord of D. and Ancient
-Telescope.
+New eval cases cover Just Desserts, The Flute of Summoning Dragon (with and without Lord of D.), Lord of D., Ancient
+Telescope and The Inexperienced Spy.

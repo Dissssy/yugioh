@@ -1552,6 +1552,15 @@ export const CASES: EvalCase[] = [
     check: (b) => expectAt(b, 'Ancient Telescope', '0:gy'),
   },
   {
+    name: 'the inexperienced spy picks a card in the opponent hand without seeing it',
+    board: [{ hand: ['The Inexperienced Spy'] }, { hand: ['Celtic Guardian', 'Dark Magician'] }],
+    activate: 'The Inexperienced Spy',
+    // The cards are offered face-down; the case picks one by name, as code knows which is which.
+    picks: [['Dark Magician']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Dark Magician', '1:hand'), expectAt(b, 'Celtic Guardian', '1:hand')),
+  },
+  {
     name: 'waboku shields its player from battle damage and destruction by battle this turn',
     board: [{ set: ['Waboku'] }, {}],
     activate: 'Waboku',

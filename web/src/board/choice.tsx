@@ -8,11 +8,15 @@ export const pileKey = (seat: Seat, place: PileKind) => `${seat}:${place}`;
 
 type Option = PromptView['cards'][number];
 
+/** The slot of the card at this place in a hand the player can't see. */
+export const handSlot = (seat: Seat, index: number) => `${seat}:hand:${index}`;
+
 /**
- * Where an option shows on the board. A card on the field is found by its zone (`dropKey`), since a face-down one
- * the player can't see has no ID; any other card by its ID.
+ * Where an option shows on the board. A card on the field is found by its zone (`dropKey`), and a card in a hand the
+ * player can't see by its place there, since a card they can't see has no ID; any other card by its ID.
  */
-const slotOf = (o: Option) => (o.zone === null ? null : dropKey(o.seat, o.place === 'monsters' ? 'm' : 's', o.zone));
+const slotOf = (o: Option) =>
+  o.zone === null ? null : o.place === 'hand' ? handSlot(o.seat, o.zone) : dropKey(o.seat, o.place === 'monsters' ? 'm' : 's', o.zone);
 const pileOf = (o: Option): string | null => (o.zone === null && o.place !== 'hand' && o.place !== 'materials' ? pileKey(o.seat, o.place as PileKind) : null);
 
 /**
