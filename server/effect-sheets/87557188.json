@@ -1,0 +1,62 @@
+{
+  "code": 87557188,
+  "textHash": "95e253e0bab6a090e086a335fbeeb1f294a25b221c6ecd8f25f7df9bb3386cb0",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "flip",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card is flipped face-up",
+      "cost": "",
+      "effect": "Reveal all face-down cards on the field (Flip Effects are not activated), then return them to their original positions.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "reveal",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "either",
+                    "places": [
+                      "field"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": false,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

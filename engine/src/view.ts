@@ -417,6 +417,12 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `${name(event.card)} ${describeGrant(event.effect)} this turn`;
     case 'battleDamageZeroed':
       return `${who(event.player)} takes no battle damage from this battle`;
+    case 'shielded':
+      return `${who(event.player)} ${event.what.map((w) => (w === 'battle_damage' ? 'takes no battle damage' : "can't have monsters destroyed by battle")).join(' and ')} this turn`;
+    case 'statChangesReversed':
+      return 'ATK and DEF gains and losses are reversed until the End Phase';
+    case 'tributeAllowed':
+      return `${who(event.player)} may Tribute ${name(event.card)} this turn`;
     case 'substituted':
       return `${who(event.player)} banished ${name(event.card)} from the GY instead of 1 card of the cost`;
     case 'pledged':

@@ -284,7 +284,9 @@ export function statsOf(state: DuelState, id: string): { atk: number; def: numbe
     atkDelta += f.effect.atk * n;
     defDelta += f.effect.def * n;
   }
-  return { atk: Math.max(0, atk + atkDelta), def: Math.max(0, def + defDelta), level: levelNow(state, id) };
+  // Reverse Trap: additions subtract and subtractions add until the End Phase.
+  const sign = state.statsReversed ? -1 : 1;
+  return { atk: Math.max(0, atk + sign * atkDelta), def: Math.max(0, def + sign * defDelta), level: levelNow(state, id) };
 }
 
 /** A card's name now: one a continuous effect of its own gives it while it is on the field (Dupe Frog), else the printed one. */

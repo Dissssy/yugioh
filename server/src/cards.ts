@@ -25,6 +25,7 @@ export const PREMADE_DECKS = [
   { slug: 'dawn-of-the-xyz', name: 'Starter Deck: Dawn of the Xyz', set: 'Starter Deck: Dawn of the Xyz' },
   { slug: 'duelist-toolbox', name: 'Starter Deck: Duelist Toolbox', set: 'Starter Deck: Duelist Toolbox' },
   { slug: 'freezing-chains', name: 'Structure Deck: Freezing Chains', set: 'Structure Deck: Freezing Chains' },
+  { slug: 'yugi-2002', name: 'Starter Deck: Yugi (2002)', set: 'Starter Deck: Yugi' },
 ] as const;
 
 /**
@@ -43,7 +44,7 @@ export interface CardSet {
  * The card pool grows down the set list, oldest first: every card printed in the sets up to and including this one
  * (by list code) is in the pool, along with the premade decks' cards. Pool cards get effect sheets and images.
  */
-export const POOL_THROUGH = 'FMR';
+export const POOL_THROUGH = 'SDY';
 
 /**
  * Cards that need no written sheet (Normal Monsters, and cards `simpleSheet` covers) join the pool ahead of their set
@@ -195,6 +196,20 @@ async function upsertCards(db: Tx, all: ApiCard[]) {
 const isExtraDeck = (frameType: string) => /^(fusion|synchro|xyz|link)/.test(frameType);
 
 /** One copy of a card per printing in the set, in set-number order. */
+/**
+ * The set codes of a card's copies in a premade deck. YGOPRODeck lists a deck's reprints in other regions under the
+ * same set name (SDY-006 and SDY-E005 are the same Dark Magician), so only the card's largest family of codes counts.
+ */
+function copiesIn(card: ApiCard, set: string): string[] {
+  const families = new Map<string, string[]>();
+  for (const s of card.card_sets ?? []) {
+    if (s.set_name !== set) continue;
+    const family = s.set_code.replace(/\d+$/, '');
+    families.set(family, [...(families.get(family) ?? []), s.set_code]);
+  }
+  return [...families.values()].reduce<string[]>((best, codes) => (codes.length > best.length ? codes : best), []);
+}
+
 async function buildPremadeDecks(db: Db) {
   for (const deck of PREMADE_DECKS) {
     const rows = await db
@@ -203,7 +218,7 @@ async function buildPremadeDecks(db: Db) {
       .where(sql`${cards.raw}->'card_sets' @> ${JSON.stringify([{ set_name: deck.set }])}::jsonb`);
     const printings = rows
       .map((r) => r.raw as ApiCard)
-      .flatMap((c) => (c.card_sets ?? []).filter((s) => s.set_name === deck.set).map((s) => ({ code: s.set_code, card: c })))
+      .flatMap((c) => copiesIn(c, deck.set).map((code) => ({ code, card: c })))
       .sort((a, b) => a.code.localeCompare(b.code));
     if (printings.length === 0) throw new Error(`No cards found for set "${deck.set}"`);
     const main = printings.filter((p) => !isExtraDeck(p.card.frameType)).map((p) => p.card.id);

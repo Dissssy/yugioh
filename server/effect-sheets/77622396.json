@@ -1,0 +1,40 @@
+{
+  "code": 77622396,
+  "textHash": "0333d8ef487704f82d4628a4778b79e1ac38f75ed1efa2c50b5b929908be3544",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Any time you could activate a Normal Trap",
+      "cost": "",
+      "effect": "Until the End Phase, all effects that add or subtract ATK or DEF are reversed.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "reverse_stat_changes"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

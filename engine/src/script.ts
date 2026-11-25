@@ -1,7 +1,7 @@
 // Structured effects (see Script in types.ts): which cards fit a filter, and whether an activation is legal now.
 // Code decides these exactly, so an activation a script rules out is never offered.
 
-import { cardOf } from './rules.ts';
+import { cardOf, summonPlan } from './rules.ts';
 import { levelNow, nameOf, statsOf } from './continuous.ts';
 import { fusionMonsters } from './fusion.ts';
 import { levelOf, locate, monsterZonesFor, other, summonMatches, summonName } from './state.ts';
@@ -193,6 +193,7 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, fre
     return specialSummonForbidden(state, seat, null) ? "An effect stops you Special Summoning this turn." : null;
   }
   if (step.do === 'negate_attack' || step.do === 'no_battle_damage') return state.attack ? null : 'No attack is being made.';
+  if (step.do === 'normal_summon') return state.players[seat].hand.some((id) => summonPlan(state, seat, id)) ? null : 'You have no monster in your hand you could Normal Summon or Set now.';
   if (step.do === 'fusion_summon') return fusionMonsters(state, seat, step.from).length > 0 ? null : 'No Fusion Monster in your Extra Deck can be Fusion Summoned with your monsters.';
   if (step.do === 'negate_activation') return state.chain.length > 0 ? null : 'There is no activation to negate.';
   if (step.do === 'detach') return detachFrom(state, step, seat, card).length > 0 ? null : `No ${step.cards.from === 'self' ? 'this card has' : 'monster here has'} ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`;
@@ -392,6 +393,8 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
       return state.sentThisTurn.includes(card) ? "It can't be used the turn this card was sent to the GY." : null;
     case 'damage_calculation':
       return state.attack?.damageStep ? null : 'It can only be used at damage calculation.';
+    case 'monster_sent_this_turn':
+      return state.monsterSentThisTurn.includes(seat) ? null : 'No monster on your field was sent to your GY this turn.';
     case 'last_attack': {
       const at = locate(state, card);
       const attacks = at?.zone === 'monsters' ? state.players[at.seat].monsters[at.index]!.attacks : null;

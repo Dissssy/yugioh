@@ -30,8 +30,10 @@ import {
   levelOf,
   locate,
   materialsOf,
+  monsterZoneFree,
   monsterZonesFor,
   scriptOf,
+  summonPlan,
   statsOf,
   targetable,
   targetMax,
@@ -543,6 +545,40 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         });
         for (const id of cards) apply({ op: 'grant', card: id, effect: step.effect });
         return cards.length ? `${list(cards.map((id) => shown(id, before)))} ${describeGrant(step.effect)} this turn.` : null;
+      }
+      case 'shield':
+        apply({ op: 'shield', player: seat, what: step.what });
+        return `${state.players[seat].name} ${step.what.map((w) => (w === 'battle_damage' ? 'takes no battle damage' : "can't have monsters destroyed by battle")).join(' and ')} this turn.`;
+      case 'reverse_stat_changes':
+        apply({ op: 'reverse_stat_changes' });
+        return 'ATK and DEF gains and losses are reversed until the End Phase.';
+      case 'allow_tribute': {
+        const allowed = (await select(step.cards, 'allow as a tribute')).filter((id) => {
+          const at = locate(state, id);
+          return at?.zone === 'monsters' && at.seat !== seat;
+        });
+        for (const id of allowed) apply({ op: 'allow_tribute', player: seat, card: id });
+        return allowed.length ? `${state.players[seat].name} may Tribute ${list(allowed.map((id) => shown(id, before)))} this turn, and must if they Tribute.` : null;
+      }
+      case 'normal_summon': {
+        const options = state.players[seat].hand.filter((id) => summonPlan(state, seat, id));
+        if (!options.length) return null;
+        const [card] = await ask({ prompt: `${name}: choose a monster to Normal Summon or Set now.`, cards: options, choices: [], min: 1, max: 1 });
+        const monster = cardOf(state, card!).name;
+        const plan = summonPlan(state, seat, card!)!;
+        const [how] = await ask({ prompt: `${name}: Normal Summon ${monster}, or Set it?`, cards: [], choices: ['Normal Summon', 'Set'], min: 1, max: 1 });
+        const tributes = plan.tributes ? await ask({ prompt: `${name}: choose ${plan.tributes} monster${plan.tributes === 1 ? '' : 's'} to Tribute for ${monster}.`, cards: plan.tributeFrom, choices: [], min: plan.tributes, max: plan.tributes }) : [];
+        const mine = state.players[seat].monsters;
+        const zones = plan.zones.filter((i) => monsterZoneFree(state, seat, i) || tributes.includes(mine[i]?.id ?? ''));
+        let zone = zones[0];
+        if (zones.length > 1) {
+          const picks = await deps.ask({ player: seat, text: `${monster}: choose a Monster Zone for it.`, cards: [], choices: [], zones, min: 1, max: 1 });
+          transcript.push({ question: 'Monster Zone', picks });
+          zone = zones.find((z) => zonePick(z) === picks[0]);
+        }
+        if (zone === undefined) throw new Refused('No Monster Zone was picked.');
+        apply({ op: 'normal_summon', player: seat, card: card!, tributes, zone, set: how === 'Set' });
+        return `${state.players[seat].name} ${how === 'Set' ? 'Set a monster' : `Normal Summoned ${monster}`}.`;
       }
       case 'no_battle_damage':
         if (!state.attack) return null;

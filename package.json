@@ -23,6 +23,7 @@
     "sheets:export": "npm run sheets:export -w server --",
     "sheets:todo": "npm run sheets:todo -w server --",
     "sheets:check": "npm run sheets:check -w server --",
+    "sheets:status": "npm run sheets:status -w server --",
     "judge:eval": "npm run judge:eval -w server --",
     "duel:report": "npm run duel:report -w server --"
   },

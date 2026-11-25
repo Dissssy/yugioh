@@ -16,6 +16,7 @@
     "sheets:export": "node --env-file-if-exists=../.env src/sheets.ts export",
     "sheets:todo": "node --env-file-if-exists=../.env src/sheets.ts todo",
     "sheets:check": "node --env-file-if-exists=../.env src/sheets.ts check",
+    "sheets:status": "node --env-file-if-exists=../.env src/set-status.ts",
     "judge:eval": "node --env-file-if-exists=../.env src/judge/evals.ts",
     "duel:report": "node --env-file-if-exists=../.env src/matchReport.ts"
   },

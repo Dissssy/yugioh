@@ -1,7 +1,7 @@
 // The judge's ops, checked against the board. Each op either becomes events or is refused with a reason the
 // model can act on. Nothing here decides what a card's text means; it only refuses what the board can't allow.
 
-import { cardOf, check, clearFieldZone, endIfLpGone, Illegal, Run, spellTrapZonesFor } from './rules.ts';
+import { cardOf, check, clearFieldZone, endIfLpGone, Illegal, normalSummonNow, Run, spellTrapZonesFor } from './rules.ts';
 import { restriction, statsOf } from './continuous.ts';
 import { specialSummonForbidden, specialSummonProblem } from './script.ts';
 import { fusionMaterialsFit, fusionOf, fusionZones } from './fusion.ts';
@@ -300,6 +300,22 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'granted', card: op.card, effect: op.effect });
       return;
     }
+    case 'shield':
+      check(op.what.length > 0, 'Name what the shield keeps from the player.');
+      run.emit({ type: 'shielded', player: op.player, what: op.what });
+      return;
+    case 'reverse_stat_changes':
+      run.emit({ type: 'statChangesReversed' });
+      return;
+    case 'allow_tribute': {
+      const at = locate(state, op.card);
+      check(at?.zone === 'monsters' && at.seat === other(op.player), "Only a monster the player's opponent controls can be allowed as a tribute.");
+      run.emit({ type: 'tributeAllowed', player: op.player, card: op.card });
+      return;
+    }
+    case 'normal_summon':
+      normalSummonNow(run, op.player, op.card, op.tributes, op.zone, op.set);
+      return;
     case 'no_battle_damage':
       check(state.attack, 'No attack is being made.');
       run.emit({ type: 'battleDamageZeroed', player: op.player });

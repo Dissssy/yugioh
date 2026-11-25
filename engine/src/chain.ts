@@ -34,8 +34,9 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
     return !f || ((f.side === 'either' || mine === (f.side === 'you')) && (f.faceUp === null || f.faceUp === h.faceUp));
   }
   if (h.event === 'summoned' && !summonMatches(h.how, when.how)) return false;
-  // "If this card attacked or was attacked": either monster in the battle.
-  if (h.event === 'damage_step_end' && when.self) return h.card === card || h.target === card;
+  // "If this card attacked or was attacked": either monster in the battle. The filter is about the attacker ("if this
+  // card is attacked by a monster": an opponent's monster still on the field).
+  if (h.event === 'damage_step_end' && when.self) return (h.card === card || h.target === card) && (!when.filter || fits(state, h.card, when.filter, seat));
   if (when.self && h.card !== card) return false;
   return !when.filter || fits(state, h.card, when.filter, seat);
 }
