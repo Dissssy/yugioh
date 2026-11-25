@@ -1262,6 +1262,123 @@ export const CASES: EvalCase[] = [
     activate: 'Defense Draw',
     legal: false,
   },
+  {
+    name: "aqua spirit changes the position of an opponent's monster in their standby phase and locks it",
+    board: [{ monsters: ['Aqua Spirit'] }, { monsters: ['Axe Raider'] }],
+    before: () => [[0, { type: 'endTurn', discard: [] }]],
+    activate: 'Aqua Spirit',
+    effect: 1,
+    picks: [['Axe Raider']],
+    legal: true,
+    check: (b) =>
+      all(
+        b.monster('Axe Raider')?.position === 'defense' ? null : 'Axe Raider is not in Defense Position',
+        b.state.granted.some((g) => g.effect.apply === 'restrict' && g.effect.cannot.includes('change_position')) ? null : 'no position lock',
+      ),
+  },
+  {
+    name: 'aqua spirit waits for the standby phase',
+    board: [{ monsters: ['Aqua Spirit'] }, { monsters: ['Axe Raider'] }],
+    activate: 'Aqua Spirit',
+    effect: 1,
+    legal: false,
+  },
+  {
+    name: 'terror of trishula negates an effect that targets an ice barrier synchro monster',
+    board: [{ monsters: ['Brionac, Dragon of the Ice Barrier'], gy: ['Terror of Trishula'] }, { set: ['Half Shut'] }],
+    before: (id) => [
+      [0, { type: 'endTurn', discard: [] }],
+      [1, { type: 'activate', card: id('Half Shut'), effect: 0, zone: null }],
+    ],
+    activate: 'Terror of Trishula',
+    effect: 1,
+    picks: [['Brionac, Dragon of the Ice Barrier']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Terror of Trishula', '0:banished'), b.state.chain.some((l) => l.negated) ? null : 'Half Shut is not negated'),
+  },
+  {
+    name: 'winds over the ice barrier tributes two ice barrier monsters to summon two with different names from the deck',
+    board: [{ hand: ['Winds Over the Ice Barrier'], monsters: ['Prior of the Ice Barrier', 'Cryomancer of the Ice Barrier'], deck: ['Zuijin of the Ice Barrier', 'Zuijin of the Ice Barrier', 'Strategist of the Ice Barrier'] }, {}],
+    activate: 'Winds Over the Ice Barrier',
+    picks: [['Prior of the Ice Barrier', 'Cryomancer of the Ice Barrier'], ['Zuijin of the Ice Barrier'], ['Strategist of the Ice Barrier'], ['Attack'], ['Attack']],
+    legal: true,
+    check: (b) =>
+      all(
+        expectAt(b, 'Prior of the Ice Barrier', '0:gy'),
+        expectAt(b, 'Cryomancer of the Ice Barrier', '0:gy'),
+        expectAt(b, 'Strategist of the Ice Barrier', '0:monsters'),
+        b.where('Zuijin of the Ice Barrier').filter((w) => w === '0:monsters').length === 1 ? null : 'not exactly one Zuijin was summoned',
+      ),
+  },
+  {
+    name: 'winds over the ice barrier needs an ice barrier monster in the deck',
+    board: [{ hand: ['Winds Over the Ice Barrier'], monsters: ['Prior of the Ice Barrier'] }, {}],
+    activate: 'Winds Over the Ice Barrier',
+    legal: false,
+  },
+  {
+    name: 'trishula zero brings out trishula at 3300 atk when the opponent destroys it',
+    board: [{ monsters: ['Trishula, Zero Dragon of the Ice Barrier'], extra: ['Trishula, Dragon of the Ice Barrier'] }, { monsters: ['Axe Raider'], set: ['Mirror Force'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Trishula, Zero Dragon of the Ice Barrier'), target: 0 }],
+      [1, { type: 'activate', card: id('Mirror Force'), effect: 0, zone: null }],
+    ],
+    activate: 'Trishula, Zero Dragon of the Ice Barrier',
+    effect: 2,
+    picks: [['Trishula, Dragon of the Ice Barrier'], ['Attack']],
+    legal: true,
+    check: (b) =>
+      all(
+        b.monster('Trishula, Dragon of the Ice Barrier')?.atk === 3300 ? null : `Trishula has ${b.monster('Trishula, Dragon of the Ice Barrier')?.atk} ATK`,
+        b.monster('Axe Raider')?.atk === 850 ? null : `Axe Raider has ${b.monster('Axe Raider')?.atk} ATK`,
+        b.monster('Axe Raider')?.effectsNegated ? null : "Axe Raider's effects are not negated",
+      ),
+  },
+  {
+    name: 'armed ninja reveals a set spell and destroys it',
+    board: [{ setMonsters: ['Armed Ninja'] }, { set: ['Half Shut'] }],
+    // Half Shut could answer the chain, so its holder passes.
+    before: (id) => [
+      [0, { type: 'flipSummon', card: id('Armed Ninja') }],
+      [1, { type: 'pass' }],
+    ],
+    picks: [['Half Shut']],
+    legal: true,
+    check: (b) => expectAt(b, 'Half Shut', '1:gy'),
+  },
+  {
+    name: 'armed ninja leaves a set trap where it is',
+    board: [{ setMonsters: ['Armed Ninja'] }, { set: ['Raigeki Break'] }],
+    before: (id) => [[0, { type: 'flipSummon', card: id('Armed Ninja') }]],
+    picks: [['Raigeki Break']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Raigeki Break', '1:spellTraps'), b.state.players[1].spellTraps.some((c) => c && !c.faceUp) ? null : 'Raigeki Break is no longer Set'),
+  },
+  {
+    name: 'reaper of the cards reveals a set trap and destroys it',
+    board: [{ setMonsters: ['Reaper of the Cards'] }, { set: ['Raigeki Break'] }],
+    before: (id) => [[0, { type: 'flipSummon', card: id('Reaper of the Cards') }]],
+    picks: [['Raigeki Break']],
+    legal: true,
+    check: (b) => expectAt(b, 'Raigeki Break', '1:gy'),
+  },
+  {
+    name: 'acid trap hole destroys a face-down monster with 2000 or less def',
+    board: [{ set: ['Acid Trap Hole'] }, { setMonsters: ['Axe Raider'] }],
+    activate: 'Acid Trap Hole',
+    picks: [['Axe Raider']],
+    legal: true,
+    check: (b) => expectAt(b, 'Axe Raider', '1:gy'),
+  },
+  {
+    name: 'acid trap hole returns a monster with more than 2000 def face-down',
+    board: [{ set: ['Acid Trap Hole'] }, { setMonsters: ['Ryu-Ran'] }],
+    activate: 'Acid Trap Hole',
+    picks: [['Ryu-Ran']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Ryu-Ran', '1:monsters'), b.state.players[1].monsters.some((m) => m && !m.faceUp && m.position === 'defense') ? null : 'Ryu-Ran is not face-down'),
+  },
   // Control, Tokens, and effects used from the hand or GY.
   {
     name: 'crackdown takes control of a face-up monster for good',
@@ -1511,7 +1628,7 @@ export async function runCase(c: EvalCase, board: DuelState, model: ModelCall | 
   if (!intent.ok) return { name: c.name, passed: !c.legal, detail: `code refused the activation: ${intent.error}`, records: [] };
   let scratch = intent.events.slice(1).reduce(evolve, state);
   const procedure = isProcedure(state, id, c.effect ?? 0);
-  const link = procedure ? { player: seat, card: id, effect: c.effect ?? 0, targets: [], choice: null, cause: null, negated: false, setAgain: false, taxed: false } : scratch.chain.at(-1)!;
+  const link = procedure ? { player: seat, card: id, effect: c.effect ?? 0, targets: [], choice: null, paid: [], cause: null, negated: false, setAgain: false, taxed: false } : scratch.chain.at(-1)!;
   const checked = await rule({ stage: 'activation', state: scratch, link }, deps);
   const records = [checked.record];
   const result = (passed: boolean, detail: string): EvalResult => ({ name: c.name, passed, detail, records });

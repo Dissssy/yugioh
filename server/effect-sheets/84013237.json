@@ -19,7 +19,8 @@
         "filter": null,
         "how": [],
         "canMiss": false,
-        "by": null
+        "by": null,
+        "targeting": null
       },
       "script": {
         "conditions": [],
@@ -65,7 +66,8 @@
         "filter": null,
         "how": [],
         "canMiss": false,
-        "by": null
+        "by": null,
+        "targeting": null
       },
       "script": {
         "conditions": [

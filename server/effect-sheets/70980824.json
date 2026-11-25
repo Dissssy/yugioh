@@ -1,7 +1,7 @@
 {
   "code": 70980824,
   "textHash": "4251febf60a9fe6cd56ff455a64f9142ab9a91cc0541fed81549b2c42ae865f0",
-  "model": "claude-opus-5-5",
+  "model": "claude-code",
   "effects": [
     {
       "kind": "condition",
@@ -36,7 +36,8 @@
           "synchro"
         ],
         "canMiss": true,
-        "by": null
+        "by": null,
+        "targeting": null
       },
       "script": {
         "conditions": [],
@@ -92,19 +93,176 @@
       "mandatory": false,
       "from": "graveyard",
       "opt": "hard",
-      "window": "If this Synchro Summoned card in its owner's control is destroyed by an opponent's card (by battle or by card effect; only destruction by an opponent's card effect is detected as an event, destruction by battle does not fire this)",
+      "window": "If this Synchro Summoned card in its owner's control is destroyed by an opponent's card",
       "cost": "",
       "effect": "You can Special Summon 1 \"Trishula, Dragon of the Ice Barrier\" from your Extra Deck or GY, its ATK becomes 3300, then halve the ATK of any face-up monsters your opponent currently controls, also negate their effects.",
       "targets": null,
       "when": {
-        "event": "destroyed_by_effect",
+        "event": "destroyed",
         "self": true,
         "filter": null,
         "how": [],
         "canMiss": false,
-        "by": "opponent"
+        "by": "opponent",
+        "targeting": null
       },
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "extra",
+                      "graveyard"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Trishula, Dragon of the Ice Barrier",
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              },
+              {
+                "do": "if_done"
+              },
+              {
+                "do": "set_stats",
+                "cards": {
+                  "from": "moved"
+                },
+                "atk": 3300,
+                "def": null,
+                "level": null,
+                "until": "while_on_field"
+              },
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "count",
+                    "filter": {
+                      "side": "opponent",
+                      "places": [
+                        "monsters"
+                      ],
+                      "kinds": [
+                        "monster"
+                      ],
+                      "types": [],
+                      "races": [],
+                      "attributes": [],
+                      "named": null,
+                      "except": null,
+                      "extraDeck": null,
+                      "faceUp": true,
+                      "position": null,
+                      "level": null,
+                      "atk": null,
+                      "def": null,
+                      "original": false
+                    },
+                    "min": 1,
+                    "max": null,
+                    "distinct": false
+                  }
+                ]
+              },
+              {
+                "do": "gain_stats",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": true,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  }
+                },
+                "atk": {
+                  "of": "each",
+                  "stat": "atk",
+                  "filter": null,
+                  "original": false,
+                  "times": -0.5
+                },
+                "def": null,
+                "until": "while_on_field"
+              },
+              {
+                "do": "negate_effects",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": true,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": "Only if it was Synchro Summoned and was in its owner's control: code doesn't check this."
+      },
       "continuous": null,
       "status": "unverified"
     }

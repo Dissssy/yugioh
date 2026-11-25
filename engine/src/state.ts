@@ -313,6 +313,15 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         s.attack = null;
         return;
       }
+      case 'turnedFaceDown': {
+        const card = onField(s, event.card);
+        Object.assign(card, { faceUp: false, position: 'defense', positionChangedTurn: s.turn, counters: {}, effectsNegated: false });
+        s.modifiers = s.modifiers.filter((m) => m.card !== event.card);
+        s.granted = s.granted.filter((g) => g.card !== event.card);
+        // Equip Spells and the like can't stay with a face-down monster.
+        for (const c of tiedTo(s, event.card)) sendToGraveyard(s, c.id);
+        return;
+      }
       case 'flipped':
         onField(s, event.card).faceUp = true;
         s.happened.push({ event: 'flipped', card: event.card, player: locate(s, event.card)!.seat, group });
@@ -332,7 +341,7 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
           const at = locate(s, event.card);
           if (at?.zone === 'spellTraps') Object.assign(onField(s, event.card), { faceUp: true, activatedTurn: s.turn });
         }
-        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, cause: event.cause, negated: false, setAgain: false, taxed: false });
+        s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, paid: [], cause: event.cause, negated: false, setAgain: false, taxed: false });
         s.usedThisTurn.push({ player: event.player, card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
         const step = s.step;
         // A trigger joins the chain with the others; any other activation hands the opponent priority.
@@ -348,6 +357,9 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         return;
       case 'effectChosen':
         s.chain.at(-1)!.choice = event.choice;
+        return;
+      case 'costPaid':
+        s.chain.at(-1)!.paid = event.cards;
         return;
       case 'moved': {
         if (event.to === 'graveyard') return sendToGraveyard(s, event.card);
