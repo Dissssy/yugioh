@@ -1480,7 +1480,7 @@ describe('activating effects', () => {
     expect(t.refuse(0, { type: 'activate', card: 'a0', effect: 0, zone: null })).toMatch(/Spell & Trap Zone/);
     t.play(0, { type: 'activate', card: 'a0', effect: 0, zone: 2 });
     expect(t.state.players[0].spellTraps[2]).toMatchObject({ id: 'a0', faceUp: true });
-    expect(t.state.chain).toEqual([{ player: 0, card: 'a0', effect: 0, targets: [], choice: null, cause: null, negated: false, setAgain: false, taxed: false }]);
+    expect(t.state.chain).toEqual([{ player: 0, card: 'a0', effect: 0, targets: [], choice: null, paid: [], cause: null, negated: false, setAgain: false, taxed: false }]);
     expect(legalActions(t.state, 0)).toEqual([{ type: 'surrender' }]);
     expect(t.refuse(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 0 })).toMatch(/resolve/);
     resolve(t);
@@ -1557,7 +1557,8 @@ describe('activating effects', () => {
     expect(refused({ op: 'change_lp', player: 0, amount: 9000, kind: 'cost' })).toMatch(/more than/);
     expect(refused({ op: 'modify_stats', card: 'a1', atk: 500, def: 0, atk_set: null, def_set: null, level_delta: 0, level_set: null, until: 'end_of_turn' })).toMatch(/not on the field/);
     expect(refused({ op: 'declare_targets', cards: ['a1'] })).toMatch(/activated/);
-    expect(refused({ op: 'special_summon', card: 'ax0', controller: 0, position: 'attack', zone: 0, banish_when_leaves: false })).toMatch(/Extra Deck/);
+    // An effect may Special Summon an Extra Deck monster straight from the Extra Deck (Trishula, Zero Dragon of the Ice Barrier).
+    expect(applyOp(t.state, { op: 'special_summon', card: 'ax0', controller: 0, position: 'attack', zone: 0, banish_when_leaves: false }, ctx).ok).toBe(true);
     expect(refused({ op: 'special_summon', card: 'a6', controller: 0, position: 'attack', zone: 5, banish_when_leaves: false })).toMatch(/isn't an empty Main Monster Zone/);
   });
 

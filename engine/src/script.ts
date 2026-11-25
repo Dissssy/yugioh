@@ -103,7 +103,8 @@ function mustBeProperlySummoned(state: DuelState, id: string): boolean {
 export function specialSummonProblem(state: DuelState, seat: Seat, id: string): string | null {
   const card = state.cards[state.instances[id]!.code]!;
   if (specialSummonForbidden(state, seat, id)) return `An effect stops you Special Summoning ${card.name} this turn.`;
-  if (mustBeProperlySummoned(state, id) && !state.properlySummoned.includes(id)) {
+  // From the Extra Deck, an effect that says so may Special Summon it directly (Trishula, Zero Dragon of the Ice Barrier).
+  if (mustBeProperlySummoned(state, id) && !state.properlySummoned.includes(id) && locate(state, id)?.zone !== 'extra') {
     return `${card.name} must first be ${card.extraDeck ? `${card.type.startsWith('XYZ') ? 'Xyz' : card.type.startsWith('Fusion') ? 'Fusion' : 'Synchro'} Summoned` : 'Special Summoned by its own procedure'} before an effect can Special Summon it.`;
   }
   return null;
@@ -249,6 +250,7 @@ function selected(state: DuelState, sel: Selection, seat: Seat, card: string): s
     case 'battling':
       return battling(state, sel.filter, seat, card);
     case 'event':
+    case 'moved':
       return [];
   }
 }
@@ -340,8 +342,15 @@ export function targetable(state: DuelState, script: Script, seat: Seat, card: s
 
 
 /** Why a condition doesn't hold for player `seat` and their card `card`, or null if it does. */
-export function conditionProblem(state: DuelState, c: Condition, seat: Seat, card: string): string | null {
+/** Why a condition doesn't hold now, or null. `targets` are the effect's targets while it resolves; null before they are chosen. */
+export function conditionProblem(state: DuelState, c: Condition, seat: Seat, card: string, targets: string[] | null = null): string | null {
   switch (c.if) {
+    case 'targets': {
+      if (targets === null) return null;
+      const there = targets.filter((id) => locate(state, id));
+      const fitting = (id: string) => (onFieldCard(state, id)?.faceUp === false ? identityFits(cardOf(state, id), c.filter) : fits(state, id, c.filter, seat));
+      return there.length > 0 && there.every(fitting) ? null : `It needs its target to be a ${describeFilter(c.filter)}.`;
+    }
     case 'before_battle_phase':
       return state.turnPlayer === seat && (state.phase === 'battle' || state.phase === 'main2' || state.phase === 'end') ? 'It can only be activated before you conduct your Battle Phase.' : null;
     case 'count': {

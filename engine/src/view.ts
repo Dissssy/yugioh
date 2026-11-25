@@ -327,6 +327,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `${who(event.player)} Flip Summoned ${name(event.card)}`;
     case 'positionChanged':
       return `${who(event.player)} changed ${name(event.card)} to ${event.position} position`;
+    case 'turnedFaceDown':
+      return `${name(event.card)} was turned face-down`;
     case 'attackDeclared':
       // A face-down target is flipped by the very next event, so naming it here reveals nothing early.
       return `${name(event.attacker)} attacked ${event.target ? name(event.target) : 'directly'}`;
@@ -395,6 +397,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'damageStepStarted':
     case 'replacementOffered':
     case 'rollbackOffered':
+    case 'costPaid':
       return null;
     case 'rollbackAnswered':
       return `${who(event.player)} ${event.accept ? 'accepted' : 'declined'} the rewind`;

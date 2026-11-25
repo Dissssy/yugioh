@@ -14,7 +14,91 @@
       "effect": "Special Summon from your Deck that many Level 4 or lower \"Ice Barrier\" monsters with different names from each other.",
       "targets": null,
       "when": null,
-      "script": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "places": [
+                  "monsters"
+                ],
+                "kinds": [
+                  "monster"
+                ],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": "Ice Barrier",
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null,
+                "original": false
+              },
+              "min": 1,
+              "max": 5,
+              "rank": null,
+              "distinct": false,
+              "includeSelf": false
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "deck"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Ice Barrier",
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": {
+                      "min": null,
+                      "max": 4
+                    },
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": "cost",
+                  "rank": null,
+                  "distinct": true,
+                  "includeSelf": false
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
       "continuous": null,
       "status": "unverified"
     },

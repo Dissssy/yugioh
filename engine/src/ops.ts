@@ -36,7 +36,7 @@ export function applyOp(state: DuelState, op: Op, ctx: OpContext): OpResult {
 }
 
 /** The ops that change a card already in play, and so can't touch a card unaffected by the effect. */
-const AFFECTING = ['move', 'modify_stats', 'grant', 'change_position', 'take_control', 'negate_effects', 'add_counters', 'remove_counters', 'detach', 'link'];
+const AFFECTING = ['move', 'modify_stats', 'grant', 'change_position', 'turn_face_down', 'take_control', 'negate_effects', 'add_counters', 'remove_counters', 'detach', 'link'];
 
 /**
  * The op without the cards it can't touch: those unaffected by this effect (Freezing Chains of the Ice Barrier) and,
@@ -95,7 +95,6 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       check(card.kind === 'monster', `${card.name} is not a monster.`);
       check(at.zone !== 'monsters', `${card.name} is already on the field.`);
       check(at.zone !== 'spellTraps', `${card.name} is in a Spell & Trap Zone.`);
-      check(at.zone !== 'extra', 'Monsters in the Extra Deck are Summoned by their own procedures, not by this op.');
       const problem = specialSummonProblem(state, ctx.player, op.card);
       check(!problem, problem ?? '');
       const free = monsterZonesFor(state, op.controller, false);
@@ -188,6 +187,12 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'positionChanged', player: at.seat, card: op.card, position: op.position });
       // A face-down monster changed to a position by an effect turns face-up, as when attacked.
       if (!card.faceUp) run.emit({ type: 'flipped', card: op.card });
+      return;
+    }
+    case 'turn_face_down': {
+      const { at, card } = onField(state, op.card);
+      check(at.zone === 'monsters' && card.faceUp, 'Only a face-up monster can be turned face-down.');
+      run.emit({ type: 'turnedFaceDown', card: op.card });
       return;
     }
     case 'draw': {
@@ -317,8 +322,16 @@ function apply(run: Run, op: Op, ctx: OpContext) {
     }
     case 'reveal':
       check(op.cards.length > 0 && new Set(op.cards).size === op.cards.length, 'Reveal at least one card, each once.');
-      for (const id of op.cards) check(state.players[ctx.player].hand.includes(id), 'Only cards in the hand can be revealed.');
+      for (const id of op.cards) {
+        const at = known(state, id);
+        const set = (at.zone === 'monsters' || at.zone === 'spellTraps') && !state.players[at.seat][at.zone][at.index]!.faceUp;
+        check(set || state.players[ctx.player].hand.includes(id), 'Only cards in your hand, or Set cards on the field, can be revealed.');
+      }
       run.emit({ type: 'revealed', player: ctx.player, cards: op.cards });
+      return;
+    case 'declare_paid':
+      check(ctx.stage === 'activation', 'The cost is paid when the effect is activated.');
+      run.emit({ type: 'costPaid', cards: op.cards });
       return;
     case 'choose_effect':
       check(ctx.stage === 'activation', 'The effect is chosen when the card is activated, not when it resolves.');
