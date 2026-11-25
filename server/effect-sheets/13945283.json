@@ -1,0 +1,72 @@
+{
+  "code": 13945283,
+  "textHash": "1ee281270327972a8e84eeba52c1d5e3e7a5c635c9dd002e039b175b5eb0ed15",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "At the end of the Damage Step, if this card was attacked by an opponent's monster that is still on the field",
+      "cost": "",
+      "effect": "Return the attacking monster to the hand.",
+      "targets": null,
+      "when": {
+        "event": "damage_step_end",
+        "self": true,
+        "filter": {
+          "side": "opponent",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "event"
+                },
+                "to": "hand"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

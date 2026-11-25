@@ -1,8 +1,7 @@
 # The card pool
 
-Status, 2026-11-23. The pool is the set of cards the site supports, on the way to deckbuilding. It grows down the
-list of English TCG sets by release date, oldest first, one set per pull request, each stacked on the one before.
-Ethan chose to go set by set through Metal Raiders first, so each step brings only a little engine work.
+Status, 2026-11-25. The pool is the set of cards the site supports, and players build decks from it. It grows down
+the list of English TCG sets by release date, oldest first, one set at a time, each by the process below.
 
 ## The set list
 
@@ -37,6 +36,32 @@ game. `npm run sheets:todo <dir>` writes the pool cards that still need a sheet 
 hash) and the instructions (`instructions.md`: the file format and the same prompt the compile uses). The thread writes
 `server/effect-sheets/<code>.json` for each, with `"model": "claude-code"`, and `npm run sheets:check` validates every
 pool sheet (schema, text hash, speed, kinds, Extra Deck materials) and exits non-zero on a problem.
+
+## Adding a set
+
+Ethan's rule (2026-11-24): a set is merged only when every card in it is ready for play, so the site never offers a
+card that a test duel then shows to be broken. All the work for one set goes into one pull request (or a stack that
+merges together), and it stays a draft until the last step is done.
+
+1. **Sort.** Set `POOL_THROUGH` to the set and run `npm run sheets:generate`, then `npm run sheets:status -- <code>`.
+   Normal Monsters need nothing, and code writes the sheets of the simple cards (`generated`). Every other new card
+   shows as `missing`.
+2. **Draft.** `npm run sheets:todo <dir>` lists the missing cards with the instructions. Write each card's sheet in
+   the thread (`"model": "claude-code"`), scripting all the existing vocabulary allows. Note every effect it doesn't,
+   and what it would need: that is the set's gap list. Such an effect keeps `script: null` (the judge rules on it)
+   for now.
+3. **Engine.** Close the gaps as generic vocabulary (engine types, sheet schema, compile prompt, the judge's script
+   runner), quickest first. For anything that stays with the judge, make sure the judge's tools can carry out what
+   the card does, and add eval cases for each new mechanic and each card the judge keeps.
+4. **Finish.** Script the gap cards with the new vocabulary. A Starter or Structure Deck also goes into
+   `PREMADE_DECKS`. Regenerate the test fixture (`server/scripts/fixture.ts`).
+5. **Done when** `npm run sheets:status -- <code>` shows nothing `missing` or `inert`, `npm run sheets:check` is clean,
+   typecheck and tests pass, and the set's section below lists every card still `judged`, with the reason. Then the
+   pull request is marked ready.
+
+`sheets:status` sorts each card of the set as `normal`, `generated`, `scripted`, `judged` (an effect has no script,
+so the judge rules on it), `inert` (a continuous effect with nothing filled in: it does nothing) or `missing` (no
+current sheet), and marks the cards that are new to the pool.
 
 ## New cards per year
 
@@ -108,3 +133,33 @@ vocabulary yet, and Special Summon procedures only start from the hand, not the 
 gain is also left to the judge, and the Harpie's Pet Dragon count matches any card whose name contains "Harpie Lady".
 
 The compile used to drop Flip effects' scripts; `flip` is now a scripted kind.
+
+### Starter Deck: Yugi (SDY)
+
+The first set done by the process above. 50 cards: 25 Normal Monsters, 2 written by code, 23 scripted, none left to
+the judge. It is also a premade deck, "Starter Deck: Yugi (2002)". YGOPRODeck lists the deck's European reprints
+(SDY-E001 ...) under the same set, so a premade deck now counts each card's copies within one family of set codes.
+
+Built for it:
+
+- **`shield`** (Waboku): for the rest of the turn the player takes no battle damage and/or their monsters can't be
+  destroyed by battle, whichever monsters they control.
+- **`reverse_stat_changes`** (Reverse Trap): until the End Phase, every ATK/DEF addition subtracts and every
+  subtraction adds.
+- **`allow_tribute`** (Soul Exchange): the player may Tribute that opponent's monster this turn, and must when they
+  Tribute.
+- **`normal_summon`** (Ultimate Offering): Normal Summon or Set a monster from the hand right away, on top of the usual
+  one. Ultimate Offering has two quick effects, one for each window its text gives.
+- **`monster_sent_this_turn`** (Last Will): a monster of the player's went from their field to their GY this turn.
+- A `damage_step_end` trigger's filter now checks the attacker (Wall of Illusion: "attacked by a monster").
+
+Known differences from the official rulings:
+
+- Last Will Special Summons as it resolves, not at any time later in the turn.
+- Reverse Trap also reverses a halving that a `gain_stats` step made (Half Shut), which it shouldn't.
+- Wall of Illusion triggers at the end of the Damage Step, so it doesn't return the attacker if Wall was destroyed in
+  that battle. The engine has no "after damage calculation" timing yet.
+- De-Spell can target a face-up Trap (it is revealed and not destroyed). A filter can't say "a face-up Spell, or a
+  Set card".
+
+New eval cases cover Waboku, Reverse Trap, Soul Exchange, Last Will, Ultimate Offering and Wall of Illusion.

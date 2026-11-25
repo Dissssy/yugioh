@@ -77,6 +77,10 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     didThisTurn: [],
     properlySummoned: [],
     sentThisTurn: [],
+    monsterSentThisTurn: [],
+    shields: [],
+    statsReversed: false,
+    tributable: [],
     pledges: [],
     lingering: [],
     chain: [],
@@ -215,10 +219,15 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         s.pledges = [];
         s.didThisTurn = [];
         s.sentThisTurn = [];
+        s.monsterSentThisTurn = [];
+        s.shields = [];
+        s.statsReversed = false;
+        s.tributable = [];
         s.lingering = s.lingering.filter((l) => l.untilTurn >= event.turn);
         return;
       case 'phaseChanged':
         s.phase = event.phase;
+        if (event.phase === 'end') s.statsReversed = false;
         if (event.phase === 'battle') s.didThisTurn.push({ player: s.turnPlayer, what: 'battle_phase', card: null });
         s.modifiers = s.modifiers.filter(
           (m) =>
@@ -484,6 +493,15 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
       case 'battleDamageZeroed':
         s.attack!.noDamageTo.push(event.player);
         return;
+      case 'shielded':
+        for (const what of event.what) s.shields.push({ player: event.player, what });
+        return;
+      case 'statChangesReversed':
+        s.statsReversed = true;
+        return;
+      case 'tributeAllowed':
+        s.tributable.push({ player: event.player, card: event.card });
+        return;
       case 'procedureUsed':
         s.properlySummoned.push(event.card);
         s.usedThisTurn.push({ player: event.player, card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
@@ -656,6 +674,7 @@ function sendToGraveyard(state: DuelState, id: string) {
   const owner = state.players[state.instances[id]!.owner];
   if (banish) return void owner.banished.push(id);
   toGraveyard(state, id);
+  if (at.zone === 'monsters' && state.instances[id]!.owner === at.seat) state.monsterSentThisTurn.push(at.seat);
   if (at.zone === 'monsters' || at.zone === 'spellTraps') state.happened.push({ event: 'sent_to_graveyard', card: id, player: at.seat, group: state.resolvedLinks });
 }
 

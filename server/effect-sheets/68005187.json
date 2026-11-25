@@ -1,0 +1,81 @@
+{
+  "code": 68005187,
+  "textHash": "be62ae7b85cf975fabfa06bc5c3c74301f00c3cee734f15576fee22b6ce678ef",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase, before your Battle Phase",
+      "cost": "",
+      "effect": "This turn, if you Tribute a monster, you must Tribute the target, as if you controlled it. You cannot conduct your Battle Phase this turn.",
+      "targets": "1 monster your opponent controls",
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "before_battle_phase"
+          }
+        ],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "places": [
+              "monsters"
+            ],
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "allow_tribute",
+                "cards": {
+                  "from": "targets"
+                }
+              },
+              {
+                "do": "forbid",
+                "player": "you",
+                "what": "battle_phase",
+                "filter": null,
+                "wholeTurn": true,
+                "others": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

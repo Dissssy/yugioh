@@ -1614,4 +1614,50 @@ describe('activating effects', () => {
     t.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 1 });
     expect(t.refuse(0, { type: 'normalSummon', card: 'a2', tributes: [], zone: 2 })).toMatch(/already/);
   });
+
+  it('shields a player from battle damage and their monsters from destruction by battle for the turn (Waboku)', () => {
+    const t = new Table(stacked(filler(40), filler(40, 2)));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).play(0, { type: 'endTurn', discard: [] });
+    ops(t, [{ op: 'shield', player: 0, what: ['battle_damage', 'battle_destruction'] }]);
+    t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 }).play(1, { type: 'enterBattle' }).play(1, { type: 'attack', attacker: 'b0', target: 0 });
+    expect(t.state.players[0].monsters[0]?.id).toBe('a0');
+    expect(t.state.players[0].lp).toBe(8000);
+    t.play(1, { type: 'endTurn', discard: [] });
+    expect(t.state.shields).toEqual([]);
+  });
+
+  it('reverses ATK/DEF gains and losses until the End Phase (Reverse Trap)', () => {
+    const t = new Table(stacked(filler(40), filler(40, 2)));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    ops(t, [
+      { op: 'modify_stats', card: 'a0', atk: 700, def: -500, atk_set: null, def_set: null, level_delta: 0, level_set: null, until: 'while_on_field' },
+      { op: 'reverse_stat_changes' },
+    ]);
+    expect(viewFor(t.state, 1).players[0].monsters[0]!.stats).toMatchObject({ atk: 1000, def: 1650 });
+    t.play(0, { type: 'endTurn', discard: [] });
+    expect(viewFor(t.state, 1).players[0].monsters[0]!.stats).toMatchObject({ atk: 2400, def: 650 });
+  });
+
+  it("lets a player Tribute an opponent's monster an effect allows, and makes them (Soul Exchange)", () => {
+    const t = new Table(stacked([1, 3, ...filler(38)], filler(40, 2)));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).play(0, { type: 'endTurn', discard: [] });
+    t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 }).play(1, { type: 'endTurn', discard: [] });
+    ops(t, [{ op: 'allow_tribute', player: 0, card: 'b0' }]);
+    expect(legalActions(t.state, 0)).toContainEqual(expect.objectContaining({ type: 'normalSummon', card: 'a1', tributeFrom: ['a0', 'b0'] }));
+    expect(t.refuse(0, { type: 'normalSummon', card: 'a1', tributes: ['a0'], zone: 1 })).toMatch(/must Tribute Dark Blade/);
+    t.play(0, { type: 'normalSummon', card: 'a1', tributes: ['b0'], zone: 1 });
+    expect(t.state.players[1].graveyard).toEqual(['b0']);
+    expect(t.state.players[0].monsters.map((m) => m?.id ?? null).slice(0, 2)).toEqual(['a0', 'a1']);
+  });
+
+  it('Normal Summons a monster at once on top of the usual one (Ultimate Offering), and notes a monster sent from the field (Last Will)', () => {
+    const t = new Table(stacked(filler(40), filler(40, 2)));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    ops(t, [{ op: 'normal_summon', player: 0, card: 'a1', tributes: [], zone: 1, set: true }]);
+    expect(t.state.players[0].monsters[1]).toMatchObject({ id: 'a1', faceUp: false });
+    expect(t.refuse(0, { type: 'normalSummon', card: 'a2', tributes: [], zone: 2 })).toMatch(/already/);
+    expect(t.state.monsterSentThisTurn).toEqual([]);
+    ops(t, [{ op: 'destroy', cards: ['a0'] }]);
+    expect(t.state.monsterSentThisTurn).toEqual([0]);
+  });
 });

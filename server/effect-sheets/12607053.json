@@ -1,0 +1,44 @@
+{
+  "code": 12607053,
+  "textHash": "77648f739c90dce1359cc7cf391f8afacbf38c1793001caefd8dbdbf8b5f3b03",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Any time you could activate a Normal Trap",
+      "cost": "",
+      "effect": "You take no battle damage from your opponent's monsters this turn. Your monsters cannot be destroyed by battle this turn.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "shield",
+                "what": [
+                  "battle_damage",
+                  "battle_destruction"
+                ]
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

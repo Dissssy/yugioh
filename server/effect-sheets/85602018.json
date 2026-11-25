@@ -1,0 +1,78 @@
+{
+  "code": 85602018,
+  "textHash": "f78f1afc4f7136addf4f89b0dc0a8a6307be0c37e110d28cb5f9cc9138511a60",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase, if a monster you controlled was sent to your Graveyard this turn",
+      "cost": "",
+      "effect": "You can Special Summon 1 monster with 1500 or less ATK from your Deck, then shuffle your Deck.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "monster_sent_this_turn"
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "deck"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": {
+                      "min": null,
+                      "max": 1500
+                    },
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 0,
+                  "max": 1,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

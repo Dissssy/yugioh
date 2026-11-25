@@ -1,0 +1,137 @@
+{
+  "code": 80604092,
+  "textHash": "0ad785ea9c89e9a12c272d7a2079d20e35fdf682dc84ab271077fc2a9e7bd04c",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Any time you could activate a Normal Trap",
+      "cost": "",
+      "effect": "Activate this Continuous Trap; it stays on the field.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": []
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "quick",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "During your Main Phase or your opponent's Battle Phase",
+      "cost": "",
+      "effect": "Pay 500 Life Points; immediately after this effect resolves, Normal Summon/Set 1 monster.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "turn",
+            "whose": "you"
+          },
+          {
+            "if": "phase",
+            "phases": [
+              "main1",
+              "main2"
+            ]
+          }
+        ],
+        "cost": [
+          {
+            "do": "change_lp",
+            "player": "you",
+            "amount": 500,
+            "per": null,
+            "kind": "cost"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "normal_summon"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "quick",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "During your Main Phase or your opponent's Battle Phase",
+      "cost": "",
+      "effect": "Pay 500 Life Points; immediately after this effect resolves, Normal Summon/Set 1 monster.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "turn",
+            "whose": "opponent"
+          },
+          {
+            "if": "phase",
+            "phases": [
+              "battle"
+            ]
+          }
+        ],
+        "cost": [
+          {
+            "do": "change_lp",
+            "player": "you",
+            "amount": 500,
+            "per": null,
+            "kind": "cost"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "normal_summon"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

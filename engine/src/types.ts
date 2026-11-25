@@ -198,6 +198,8 @@ export type Condition =
   | { if: 'not_sent_this_turn' }
   /** "at damage calculation": an attack is in its Damage Step, before its damage is calculated. */
   | { if: 'damage_calculation' }
+  /** "If a monster on your side of the field was sent to your Graveyard this turn" (Last Will). */
+  | { if: 'monster_sent_this_turn' }
   /**
    * Every target of the effect still there fits `filter`, a Set card by what it is ("destroy it if it is a Spell Card",
    * after revealing it; "destroy it if its DEF is 2000 or less"). Only an `only_if` can check it: targets are chosen
@@ -322,7 +324,22 @@ export type Step =
    * resolves ("You must control a Tuner monster to activate and to resolve this effect": the same condition in the
    * script's conditions and here; "Apply these effects in sequence, depending on ...": one `only_if` per part).
    */
-  | { do: 'only_if'; conditions: Condition[] };
+  | { do: 'only_if'; conditions: Condition[] }
+  /** For the rest of this turn, the activating player takes no battle damage, or their monsters can't be destroyed by battle (Waboku). */
+  | { do: 'shield'; what: Shield[] }
+  /** Until the End Phase, every effect that adds to or subtracts from ATK or DEF does the opposite (Reverse Trap). */
+  | { do: 'reverse_stat_changes' }
+  /**
+   * This turn, the activating player can Tribute the selected monster of their opponent's as if they controlled it,
+   * and when they Tribute, they must Tribute it (Soul Exchange).
+   */
+  | { do: 'allow_tribute'; cards: Selection }
+  /** The activating player Normal Summons or Sets 1 monster from their hand now, on top of their usual one (Ultimate Offering). */
+  | { do: 'normal_summon' };
+
+export const SHIELDS = ['battle_damage', 'battle_destruction'] as const;
+/** What a `shield` step keeps from a player for the turn: battle damage, or their monsters being destroyed by battle. */
+export type Shield = (typeof SHIELDS)[number];
 
 /** What a `grant` step gives a monster for the turn: a `restrict` or a `battle` continuous effect on itself. */
 export type Grant = { apply: 'restrict'; cannot: Restriction[] } | { apply: 'battle'; attacks: number; piercing: boolean; direct: boolean };
@@ -739,6 +756,14 @@ export interface DuelState {
   properlySummoned: string[];
   /** Cards that went to a GY this turn, for "except the turn it was sent there". */
   sentThisTurn: string[];
+  /** Players a monster of whose went from their field to their GY this turn (Last Will). */
+  monsterSentThisTurn: Seat[];
+  /** What `shield` steps keep from each player this turn. */
+  shields: { player: Seat; what: Shield }[];
+  /** Whether ATK/DEF additions and subtractions are reversed until the End Phase (Reverse Trap). */
+  statsReversed: boolean;
+  /** Opponent's monsters each player may, and when Tributing must, Tribute this turn (Soul Exchange). */
+  tributable: { player: Seat; card: string }[];
   /** Damage each player takes in this turn's End Phase unless they Normal Summon a card with one of these names first. */
   pledges: { player: Seat; names: string[]; damage: number }[];
   /**
@@ -892,7 +917,13 @@ export type Op =
   /** Turns a face-up monster to face-down Defense Position ("return it face-down"). */
   | { op: 'turn_face_down'; card: string }
   /** Sets a Spell/Trap from its holder's hand in their first free Spell & Trap Zone (a Field Spell in the Field Zone). */
-  | { op: 'set_spell_trap'; card: string };
+  | { op: 'set_spell_trap'; card: string }
+  | { op: 'shield'; player: Seat; what: Shield[] }
+  | { op: 'reverse_stat_changes' }
+  /** `player` may Tribute this monster of their opponent's this turn, and must if they Tribute (see the `allow_tribute` step). */
+  | { op: 'allow_tribute'; player: Seat; card: string }
+  /** `player` Normal Summons (`set`: Sets) this monster from their hand now with these tributes, into `zone`, outside their usual Normal Summon. */
+  | { op: 'normal_summon'; player: Seat; card: string; tributes: string[]; zone: number; set: boolean };
 
 /** The tokens one Messages API call used, as the API reported them; the server prices them. */
 export interface ModelUsage {
@@ -1077,6 +1108,9 @@ export type DuelEvent =
   | { type: 'forbidden'; player: Seat; what: Forbidden; filter: CardFilter | null; except: string | null }
   | { type: 'granted'; card: string; effect: Grant }
   | { type: 'battleDamageZeroed'; player: Seat }
+  | { type: 'shielded'; player: Seat; what: Shield[] }
+  | { type: 'statChangesReversed' }
+  | { type: 'tributeAllowed'; player: Seat; card: string }
   | { type: 'pledged'; player: Seat; names: string[]; damage: number }
   /** A `cost_substitute` effect was used (its card is banished by a `moved` event before this). */
   | { type: 'substituted'; player: Seat; card: string; effect: number }

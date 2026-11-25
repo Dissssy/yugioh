@@ -17,6 +17,7 @@ import {
   type EffectSheet,
   type DuelState,
   type Hand,
+  type Shield,
   type FieldCard,
   type Forbidden,
   type Happening,
@@ -74,6 +75,61 @@ const isMainPhase = (state: DuelState) => state.phase === 'main1' || state.phase
 const ownMonsters = (state: DuelState, seat: Seat) =>
   state.players[seat].monsters.filter((c): c is FieldCard => c !== null);
 const isZone = (i: number, count: number) => Number.isInteger(i) && i >= 0 && i < count;
+
+/** Opponent's monsters an effect lets this player Tribute this turn (Soul Exchange); when they Tribute, they must Tribute these. */
+function allowedTributes(state: DuelState, seat: Seat): string[] {
+  return state.tributable.filter((t) => t.player === seat && locate(state, t.card)?.zone === 'monsters' && locate(state, t.card)!.seat === other(seat)).map((t) => t.card);
+}
+
+/**
+ * How this monster in the player's hand could be Normal Summoned or Set now, whether or not a Normal Summon is left:
+ * the tributes it needs, the monsters that may be tributes, and the zones it may go to. Null if it can't be.
+ */
+export function summonPlan(state: DuelState, seat: Seat, id: string): { tributes: number; tributeFrom: string[]; zones: number[] } | null {
+  const card = cardOf(state, id);
+  if (card.kind !== 'monster' || card.extraDeck || !canNormalSummon(state, card)) return null;
+  const p = state.players[seat];
+  const tributes = tributesFor(card);
+  const tributeFrom = tributes > 0 ? [...ownMonsters(state, seat).map((m) => m.id), ...allowedTributes(state, seat)] : [];
+  // A tribute leaves its zone free for the monster it makes way for; a Main Deck monster never goes to an Extra Monster Zone.
+  const zones = [...Array(MONSTER_ZONES).keys()].filter((i) => monsterZoneFree(state, seat, i) || (tributes > 0 && tributeFrom.includes(p.monsters[i]?.id ?? '')));
+  return tributeFrom.length >= tributes && zones.length > 0 ? { tributes, tributeFrom, zones } : null;
+}
+
+/** Checks the tributes for Normal Summoning or Setting this monster, and Tributes them. */
+function tribute(run: Run, seat: Seat, card: CardData, tributes: string[], setting: boolean) {
+  const state = run.state;
+  const needed = tributesFor(card);
+  check(setting || needed === 0 || !tributeSummonLocked(state, seat), "An effect stops you Tribute Summoning.");
+  check(new Set(tributes).size === tributes.length, 'Each tribute must be a different monster.');
+  check(tributes.length === needed, `${card.name} needs ${needed} tribute${needed === 1 ? '' : 's'}.`);
+  const allowed = allowedTributes(state, seat);
+  for (const id of tributes) {
+    const at = locate(state, id);
+    check((at?.zone === 'monsters' && at.seat === seat) || allowed.includes(id), 'Tributes must be monsters you control.');
+  }
+  if (needed > 0) for (const id of allowed.slice(0, needed)) check(tributes.includes(id), `You must Tribute ${cardOf(state, id).name}.`);
+  if (needed > 0) run.emit({ type: 'tributed', player: seat, cards: tributes });
+}
+
+/** A Normal Summon or Set from the hand, after its tributes. */
+function summonFromHand(run: Run, seat: Seat, id: string, tributes: string[], zone: number, set: boolean, extra: { card: string; effect: number } | null) {
+  const card = cardOf(run.state, id);
+  check(run.state.players[seat].hand.includes(id), 'That card is not in your hand.');
+  check(card.kind === 'monster' && !card.extraDeck, 'Only Main Deck monsters can be Normal Summoned or Set.');
+  check(canNormalSummon(run.state, card), `${card.name} cannot be Normal Summoned or Set.`);
+  tribute(run, seat, card, tributes, set);
+  check(isZone(zone, MONSTER_ZONES), 'Choose one of your Main Monster Zones.');
+  check(monsterZoneFree(run.state, seat, zone), 'That Monster Zone is not empty.');
+  if (set) run.emit({ type: 'monsterSet', player: seat, card: id, zone });
+  else run.emit({ type: 'normalSummoned', player: seat, card: id, zone, extra });
+}
+
+/** Ultimate Offering: Normal Summons or Sets a monster from the hand at once, on top of the player's usual one. */
+export function normalSummonNow(run: Run, seat: Seat, id: string, tributes: string[], zone: number, set: boolean) {
+  run.emit({ type: 'normalSummonGranted', player: seat });
+  summonFromHand(run, seat, id, tributes, zone, set, null);
+}
 const freeZones = (zones: (FieldCard | null)[]) => zones.flatMap((z, i) => (z ? [] : [i]));
 
 const isFieldSpell = (card: CardData) => card.kind === 'spell' && card.race === 'Field';
@@ -250,19 +306,14 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
     const p = state.players[seat];
     actions.push(...usable(state, seat));
     if (isMainPhase(state)) {
-      const monsters = ownMonsters(state, seat);
       for (const id of p.hand) {
         const card = cardOf(state, id);
         if (card.kind === 'monster') {
-          const tributes = tributesFor(card);
-          const tributeFrom = tributes > 0 ? monsters.map((m) => m.id) : [];
-          // A tribute leaves its zone free for the monster it makes way for; a Main Deck monster never goes to an Extra Monster Zone.
-          const zones = [...Array(MONSTER_ZONES).keys()].filter((i) => monsterZoneFree(state, seat, i) || (tributes > 0 && tributeFrom.includes(p.monsters[i]?.id ?? '')));
-          const fits = tributes > 0 ? monsters.length >= tributes && zones.length > 0 : zones.length > 0;
-          if (!card.extraDeck && canNormalSummon(state, card) && fits) {
+          const plan = summonPlan(state, seat, id);
+          if (plan) {
             const fresh = !normalSummonUsed(state);
-            if ((fresh || extraNormalSummon(state, seat, id)) && (tributes === 0 || !tributeSummonLocked(state, seat))) actions.push({ type: 'normalSummon', card: id, tributes, tributeFrom, zones });
-            if (fresh) actions.push({ type: 'setMonster', card: id, tributes, tributeFrom, zones });
+            if ((fresh || extraNormalSummon(state, seat, id)) && (plan.tributes === 0 || !tributeSummonLocked(state, seat))) actions.push({ type: 'normalSummon', card: id, ...plan });
+            if (fresh) actions.push({ type: 'setMonster', card: id, ...plan });
           }
         } else if (spellTrapZonesFor(state, seat, card).length > 0) {
           actions.push({ type: 'setSpellTrap', card: id, zones: spellTrapZonesFor(state, seat, card) });
@@ -272,7 +323,7 @@ export function legalActions(state: DuelState, seat: Seat): LegalAction[] {
         const action = extraSummonAction(state, seat, id);
         if (action) actions.push(action);
       }
-      for (const m of monsters) {
+      for (const m of ownMonsters(state, seat)) {
         if (canFlipSummon(state, m)) actions.push({ type: 'flipSummon', card: m.id });
         else if (canChangePosition(state, m)) actions.push({ type: 'changePosition', card: m.id });
       }
@@ -717,23 +768,7 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
       check(p.hand.includes(intent.card), 'That card is not in your hand.');
       const extra = intent.type === 'normalSummon' ? extraNormalSummon(state, seat, intent.card) : null;
       check(!normalSummonUsed(state) || extra !== null, 'You already used your Normal Summons and Sets this turn.');
-      const card = cardOf(state, intent.card);
-      check(card.kind === 'monster' && !card.extraDeck, 'Only Main Deck monsters can be Normal Summoned or Set.');
-      check(canNormalSummon(state, card), `${card.name} cannot be Normal Summoned or Set.`);
-      const needed = tributesFor(card);
-      check(intent.type === 'setMonster' || needed === 0 || !tributeSummonLocked(state, seat), "An effect stops you Tribute Summoning.");
-      const tributes = new Set(intent.tributes);
-      check(tributes.size === intent.tributes.length, 'Each tribute must be a different monster.');
-      check(tributes.size === needed, `${card.name} needs ${needed} tribute${needed === 1 ? '' : 's'}.`);
-      for (const id of tributes) {
-        const at = locate(state, id);
-        check(at?.zone === 'monsters' && at.seat === seat, 'Tributes must be monsters you control.');
-      }
-      if (needed > 0) run.emit({ type: 'tributed', player: seat, cards: [...tributes] });
-      check(isZone(intent.zone, MONSTER_ZONES), 'Choose one of your Main Monster Zones.');
-      check(monsterZoneFree(run.state, seat, intent.zone), 'That Monster Zone is not empty.');
-      if (intent.type === 'normalSummon') run.emit({ type: 'normalSummoned', player: seat, card: intent.card, zone: intent.zone, extra });
-      else run.emit({ type: 'monsterSet', player: seat, card: intent.card, zone: intent.zone });
+      summonFromHand(run, seat, intent.card, intent.tributes, intent.zone, intent.type === 'setMonster', extra);
       if (intent.type === 'normalSummon') run.emit({ type: 'checkpoint', cause: run.state.happened.at(-1)!, then: { do: 'open' } });
       return;
     }
@@ -895,7 +930,7 @@ function damage(run: Run) {
   const { attacker: attackerId, target } = state.attack;
   if (!stillAttacking(state, attackerId) || (target !== null && !targetStands(state, target))) run.emit({ type: 'attackEnded', replay: false });
   else if (target === null) {
-    if (!state.attack.noDamageTo.includes(foe)) run.emit({ type: 'battleDamage', player: foe, amount: statsOf(state, attackerId).atk, by: attackerId });
+    if (!state.attack.noDamageTo.includes(foe) && !shielded(state, foe, 'battle_damage')) run.emit({ type: 'battleDamage', player: foe, amount: statsOf(state, attackerId).atk, by: attackerId });
   }
   else {
     if (!onField(state, target).faceUp) run.emit({ type: 'flipped', card: target });
@@ -917,6 +952,9 @@ function damage(run: Run) {
 
 type Damage = { player: Seat; amount: number; by: string };
 
+/** Whether a `shield` step keeps this from the player this turn (Waboku). */
+const shielded = (state: DuelState, player: Seat, what: Shield) => state.shields.some((s) => s.player === player && s.what === what);
+
 /**
  * Damage calculation between an attacker and a face-up target: the monsters destroyed (not those an effect protects,
  * Sonic Chick), the battle damage dealt (piercing, or none to a player whose monster shields them), and the
@@ -929,10 +967,12 @@ function battle(state: DuelState, attackerId: string, target: string): { destroy
   const stats = statsOf(state, target);
   const result = (destroyed: string[], damage: Damage | null) => {
     const protections = destroyed.map((id) => restriction(state, id, 'be_destroyed_by_battle', id === attackerId ? target : attackerId));
-    const shielded = damage && (state.attack!.noDamageTo.includes(damage.player) || shieldsBattleDamage(state, damage.player === seat ? attackerId : target));
+    const kept = (id: string) => shielded(state, locate(state, id)!.seat, 'battle_destruction');
+    const noDamage =
+      damage && (state.attack!.noDamageTo.includes(damage.player) || shielded(state, damage.player, 'battle_damage') || shieldsBattleDamage(state, damage.player === seat ? attackerId : target));
     return {
-      destroyed: destroyed.filter((_, i) => !protections[i]),
-      damage: shielded ? null : damage,
+      destroyed: destroyed.filter((id, i) => !protections[i] && !kept(id)),
+      damage: noDamage ? null : damage,
       protectedOnce: protections.filter((f) => f !== null && f.effect.once) as InForce<Restrict>[],
     };
   };

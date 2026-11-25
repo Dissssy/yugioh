@@ -1506,6 +1506,60 @@ export const CASES: EvalCase[] = [
         b.monster('Celtic Guardian')?.position === 'attack' ? null : 'Celtic Guardian changed position',
       ),
   },
+  {
+    name: 'wall of illusion returns the monster that attacked it to the hand',
+    board: [{ monsters: ['Celtic Guardian'] }, { defense: ['Wall of Illusion'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Celtic Guardian'), target: 0 }],
+    ],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Celtic Guardian', '0:hand'), expectAt(b, 'Wall of Illusion', '1:monsters')),
+  },
+  {
+    name: 'waboku shields its player from battle damage and destruction by battle this turn',
+    board: [{ set: ['Waboku'] }, {}],
+    activate: 'Waboku',
+    legal: true,
+    check: (b) => (b.state.shields.length === 2 && b.state.shields.every((s) => s.player === 0) ? null : `shields: ${JSON.stringify(b.state.shields)}`),
+  },
+  {
+    name: 'reverse trap reverses atk and def changes',
+    board: [{ set: ['Reverse Trap'], monsters: ['Masaki the Legendary Swordsman'] }, {}],
+    activate: 'Reverse Trap',
+    legal: true,
+    check: (b) => (b.state.statsReversed ? null : 'stat changes are not reversed'),
+  },
+  {
+    name: "soul exchange lets its player tribute the opponent's monster and skips their battle phase",
+    board: [{ set: ['Soul Exchange'], hand: ['Summoned Skull'] }, { monsters: ['Celtic Guardian'] }],
+    activate: 'Soul Exchange',
+    legal: true,
+    check: (b) =>
+      all(
+        b.state.tributable.length === 1 && cardOf(b.state, b.state.tributable[0]!.card).name === 'Celtic Guardian' ? null : 'Celtic Guardian is not allowed as a tribute',
+        b.state.forbidden.some((f) => f.player === 0 && f.what === 'battle_phase') ? null : 'the Battle Phase is not forbidden',
+      ),
+  },
+  {
+    name: 'last will needs a monster of yours sent from the field to the gy this turn',
+    board: [{ set: ['Last Will'], deck: ['Celtic Guardian'] }, {}],
+    activate: 'Last Will',
+    legal: false,
+  },
+  {
+    name: 'ultimate offering pays 500 lp and normal summons a monster on top of the usual one',
+    board: [{ faceUp: ['Ultimate Offering'], hand: ['Celtic Guardian'] }, {}],
+    activate: 'Ultimate Offering',
+    effect: 1,
+    legal: true,
+    check: (b) =>
+      all(
+        expectAt(b, 'Celtic Guardian', '0:monsters'),
+        b.state.players[0].lp === 7500 ? null : `LP is ${b.state.players[0].lp}`,
+        b.state.normalSummons === 1 && b.state.normalSummonLimit === 2 ? null : 'the usual Normal Summon was used up',
+      ),
+  },
 ];
 
 /** Builds a case's board: every listed card is put in place from its owner's Deck. */

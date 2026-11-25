@@ -1,0 +1,105 @@
+{
+  "code": 19159413,
+  "textHash": "ab2df8f9112ee2d577bc0c23a41f404c22afeaed9eae35589631745f5fb4f547",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Reveal the target if it is Set, then destroy it if it is a Spell.",
+      "targets": "1 face-up Spell, or 1 Set Spell/Trap, on the field",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "places": [
+              "spellTraps"
+            ],
+            "kinds": [
+              "spell",
+              "trap"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "reveal",
+                "cards": {
+                  "from": "targets"
+                }
+              },
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "targets",
+                    "filter": {
+                      "side": "either",
+                      "places": [
+                        "spellTraps"
+                      ],
+                      "kinds": [
+                        "spell"
+                      ],
+                      "types": [],
+                      "races": [],
+                      "attributes": [],
+                      "named": null,
+                      "except": null,
+                      "extraDeck": null,
+                      "faceUp": null,
+                      "position": null,
+                      "level": null,
+                      "atk": null,
+                      "def": null,
+                      "original": false
+                    }
+                  }
+                ]
+              },
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}
