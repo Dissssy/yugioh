@@ -2,7 +2,7 @@
 // model can act on. Nothing here decides what a card's text means; it only refuses what the board can't allow.
 
 import { cardOf, check, clearFieldZone, endIfLpGone, Illegal, normalSummonNow, Run, spellTrapZonesFor } from './rules.ts';
-import { restriction, statsOf } from './continuous.ts';
+import { restricted, restriction, statsOf } from './continuous.ts';
 import { specialSummonForbidden, specialSummonProblem } from './script.ts';
 import { fusionMaterialsFit, fusionOf, fusionZones } from './fusion.ts';
 import { locate, monsterZonesFor, other } from './state.ts';
@@ -313,6 +313,10 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'tributeAllowed', player: op.player, card: op.card });
       return;
     }
+    case 'look':
+      check(op.cards.length > 0 && op.cards.every((id) => locate(state, id)), 'Name the cards to look at.');
+      run.emit({ type: 'looked', player: ctx.player, cards: op.cards });
+      return;
     case 'normal_summon':
       normalSummonNow(run, op.player, op.card, op.tributes, op.zone, op.set);
       return;
@@ -329,6 +333,7 @@ function apply(run: Run, op: Op, ctx: OpContext) {
     case 'declare_targets': {
       check(ctx.stage === 'activation', 'Targets are chosen when the effect is activated, not when it resolves.');
       check(new Set(op.cards).size === op.cards.length, 'Each target may be named once.');
+      for (const id of op.cards) check(!restricted(state, id, 'be_targeted', ctx.source), `${cardOf(state, id).name} can't be targeted.`);
       for (const id of op.cards) {
         const at = known(state, id);
         check(at.zone !== 'deck' && at.zone !== 'hand' && at.zone !== 'extra' && at.zone !== 'materials', 'Only cards on the field, in a GY or banished can be targeted.');

@@ -1,0 +1,64 @@
+{
+  "code": 81820689,
+  "textHash": "68253816eb04f5288ed2a2090f80519103829b7e6e15b56b5ce455d0c843ca7a",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Select and see 1 card in your opponent's hand.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "look",
+                "cards": {
+                  "from": "random",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "hand"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "count": 1
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

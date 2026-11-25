@@ -2,7 +2,7 @@
 // Code decides these exactly, so an activation a script rules out is never offered.
 
 import { cardOf, summonPlan } from './rules.ts';
-import { levelNow, nameOf, statsOf } from './continuous.ts';
+import { levelNow, nameOf, restricted, statsOf } from './continuous.ts';
 import { fusionMonsters } from './fusion.ts';
 import { levelOf, locate, monsterZonesFor, other, summonMatches, summonName } from './state.ts';
 import type { CardData, CardFilter, Condition, DuelState, Grant, Happening, Range, Restriction, Script, Seat, Selection, Step } from './types.ts';
@@ -41,6 +41,7 @@ const RESTRICTION_TEXT: Record<Restriction, string> = {
   be_destroyed_by_effect: 'be destroyed by card effects',
   be_affected: 'be affected by card effects',
   activate_effects: 'activate its effects',
+  be_targeted: 'be targeted by card effects',
 };
 
 /** What a `grant` gives, worded after the monster's name: "can't be destroyed by battle", "can attack directly". */
@@ -253,7 +254,14 @@ function selected(state: DuelState, sel: Selection, seat: Seat, card: string): s
     case 'event':
     case 'moved':
       return [];
+    case 'deck_top':
+      return deckTop(state, sel, seat);
   }
+}
+
+/** The top cards of a player's Deck that a `deck_top` selection picks. */
+export function deckTop(state: DuelState, sel: Extract<Selection, { from: 'deck_top' }>, seat: Seat): string[] {
+  return state.players[sel.player === 'you' ? seat : other(seat)].deck.slice(0, sel.count);
 }
 
 const onFieldCard = (state: DuelState, id: string) => {
@@ -337,7 +345,9 @@ export function targetMax(state: DuelState, script: Script, card: string, paid: 
 export function targetable(state: DuelState, script: Script, seat: Seat, card: string, cause: Happening | null): string[] {
   if (!script.targets) return [];
   const summoned = script.options.some((o) => o.steps.some((s) => s.do === 'special_summon' && s.cards.from === 'targets'));
-  const fitting = cardsFitting(state, script.targets.filter, seat, script.targets.others ? card : '').filter((id) => !summoned || !specialSummonProblem(state, seat, id));
+  const fitting = cardsFitting(state, script.targets.filter, seat, script.targets.others ? card : '').filter(
+    (id) => (!summoned || !specialSummonProblem(state, seat, id)) && !restricted(state, id, 'be_targeted', card),
+  );
   return script.targets.event ? fitting.filter((id) => cause && cause.event !== 'phase' && id === cause.card) : fitting;
 }
 

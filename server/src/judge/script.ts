@@ -12,6 +12,7 @@ import {
   chooseFrom,
   specialSummonProblem,
   cardsFitting,
+  deckTop,
   describeFilter,
   describeGrant,
   detachFrom,
@@ -126,6 +127,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, self);
     if (sel.from === 'battling') return battling(state, sel.filter, seat, self);
     if (sel.from === 'moved') return moved.filter((id) => locate(state, id));
+    if (sel.from === 'deck_top') return deckTop(state, sel, seat);
     if (sel.from === 'event') {
       const cause = link.cause && link.cause.event !== 'phase' ? link.cause.card : null;
       return cause && locate(state, cause) ? [cause] : [];
@@ -559,6 +561,12 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         });
         for (const id of allowed) apply({ op: 'allow_tribute', player: seat, card: id });
         return allowed.length ? `${state.players[seat].name} may Tribute ${list(allowed.map((id) => shown(id, before)))} this turn, and must if they Tribute.` : null;
+      }
+      case 'look': {
+        const cards = await select(step.cards, 'look at');
+        if (!cards.length) return null;
+        apply({ op: 'look', cards });
+        return `${state.players[seat].name} looked at ${cards.length} card${cards.length === 1 ? '' : 's'}.`;
       }
       case 'normal_summon': {
         const options = state.players[seat].hand.filter((id) => summonPlan(state, seat, id));

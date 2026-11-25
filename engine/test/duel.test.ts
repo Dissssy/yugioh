@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   decide,
+  deckTop,
   legalActions,
   replay,
   startDuel,
@@ -114,6 +115,7 @@ const cards: Record<number, CardData> = {
   64: monster(64, 'Left Arm of the Forbidden One', 1, 200, 300),
   65: { ...spell(65, 'Dragon Capture Jar'), type: 'Trap Card', kind: 'trap', race: 'Continuous' },
   66: { ...monster(66, 'Blue-Eyes White Dragon', 8, 3000, 2500), race: 'Dragon' },
+  67: { ...monster(67, 'Lord of D.', 4, 1200, 1100), type: 'Effect Monster', race: 'Spellcaster' },
 };
 
 function spell(code: number, name: string): CardData {
@@ -293,6 +295,7 @@ const sheets: Record<number, EffectSheet> = {
   58: sheet(58, { ...effect('activation'), ...scripted({ options: [{ label: '', cost: [], steps: [{ do: 'fusion_summon', from: ['hand', 'field'] }] }] }) }),
   59: { ...sheet(59), materials: { summon: 'fusion', materials: ['Axe Raider', 'Dark Blade'] } },
   65: sheet(65, effect('activation'), continuous({ apply: 'force_position', to: filter({ races: ['Dragon'] }), position: 'defense', while: [] })),
+  67: sheet(67, continuous(restrict({ to: filter({ races: ['Dragon'] }), cannot: ['be_targeted'] }))),
   60: sheet(60, continuous({ apply: 'win_with_hand', names: [60, 61, 62, 63, 64].map((c) => cards[c]!.name) })),
 };
 
@@ -1613,6 +1616,17 @@ describe('activating effects', () => {
     ops(t, [{ op: 'extra_normal_summon', player: 0 }]);
     t.play(0, { type: 'normalSummon', card: 'a1', tributes: [], zone: 1 });
     expect(t.refuse(0, { type: 'normalSummon', card: 'a2', tributes: [], zone: 2 })).toMatch(/already/);
+  });
+
+  it("looks at the top of the opponent's Deck privately, and keeps targeted-proof monsters from being targeted", () => {
+    const t = new Table(stacked([67, 66, ...filler(38)], filler(40, 2)));
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 });
+    ops(t, [{ op: 'special_summon', card: 'a1', controller: 0, position: 'attack', zone: 1, banish_when_leaves: false }]);
+    const top = deckTop(t.state, { from: 'deck_top', player: 'opponent', count: 5 }, 0);
+    expect(top).toEqual(t.state.players[1].deck.slice(0, 5));
+    ops(t, [{ op: 'look', cards: top }]);
+    expect(t.events.at(-1)).toEqual({ type: 'looked', player: 0, cards: top });
+    expect(applyOp(t.state, { op: 'declare_targets', cards: ['a1'] }, { ...ctx, stage: 'activation' })).toMatchObject({ ok: false, error: /can't be targeted/ });
   });
 
   it('shields a player from battle damage and their monsters from destruction by battle for the turn (Waboku)', () => {

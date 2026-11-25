@@ -1,0 +1,57 @@
+{
+  "code": 6285791,
+  "textHash": "3776c6779de6d9940028af1efe44d0fcce6a5c3a86a8d013f2d1d2b517e17c16",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "During the End Phase of your turn, while this card is face-up on the field",
+      "cost": "",
+      "effect": "Return this card to its owner's hand.",
+      "targets": null,
+      "when": {
+        "event": "end_phase",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [
+          {
+            "if": "turn",
+            "whose": "you"
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "self"
+                },
+                "to": "hand"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

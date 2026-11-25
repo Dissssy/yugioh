@@ -1,0 +1,133 @@
+{
+  "code": 43973174,
+  "textHash": "8c6dbcfad8630d434a69a272bfd12441a4296d58f4d32d81d794a9468c2d1130",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase, while \"Lord of D.\" is on the field",
+      "cost": "",
+      "effect": "Special Summon up to 2 Dragon monsters from your hand.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "either",
+              "places": [
+                "monsters"
+              ],
+              "kinds": [
+                "monster"
+              ],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Lord of D.",
+              "except": null,
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null,
+              "original": false
+            },
+            "min": 1,
+            "max": null,
+            "distinct": false
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "count",
+                    "filter": {
+                      "side": "either",
+                      "places": [
+                        "monsters"
+                      ],
+                      "kinds": [
+                        "monster"
+                      ],
+                      "types": [],
+                      "races": [],
+                      "attributes": [],
+                      "named": "Lord of D.",
+                      "except": null,
+                      "extraDeck": null,
+                      "faceUp": true,
+                      "position": null,
+                      "level": null,
+                      "atk": null,
+                      "def": null,
+                      "original": false
+                    },
+                    "min": 1,
+                    "max": null,
+                    "distinct": false
+                  }
+                ]
+              },
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "hand"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [
+                      "Dragon"
+                    ],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": 2,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -35,6 +35,7 @@ describe('card data', () => {
       ['Starter Deck: Duelist Toolbox', 38, 4],
       ['Structure Deck: Freezing Chains', 41, 5],
       ['Starter Deck: Yugi (2002)', 50, 0],
+      ['Starter Deck: Kaiba (2002)', 50, 0],
     ]);
     const { body: xyz } = await admin.json<DeckDetail>(`${h.baseUrl}/api/decks/${decks[1]!.id}`);
     expect(xyz.main[0]!.name).toBe('Spirit of the Harp');
