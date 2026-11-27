@@ -134,7 +134,8 @@ describe('a duel with chains', () => {
     const mine = await stream(admin);
     const theirs = await stream(guest);
     expect((await send(admin, { type: 'normalSummon', card: ids.magnaDrago, tributes: [], zone: 0 })).status).toBe(204);
-    const offered = await until(theirs, (v) => v.waiting?.player === 1);
+    // The window while the Summon could be negated closes by itself; Trap Hole answers the Summon once it is done.
+    const offered = await until(theirs, (v) => v.waiting?.player === 1 && v.actions.some((a) => a.type === 'activate'));
     expect(offered.waiting?.cause).toBe('the Normal Summon of Magna Drago');
     expect((await send(guest, { type: 'activate', card: ids.trapHole, effect: 0, zone: null })).status).toBe(204);
     const view = await until(mine, (v) => v.players[0].graveyard.some((c) => 'id' in c && c.id === ids.magnaDrago) && v.chain.length === 0);
@@ -148,7 +149,7 @@ describe('a duel with chains', () => {
     const mine = await stream(admin);
     const theirs = await stream(guest);
     expect((await send(admin, { type: 'normalSummon', card: ids.magnaDrago, tributes: [], zone: 0 })).status).toBe(204);
-    await until(theirs, (v) => v.waiting?.player === 1 && v.actions.some((a) => a.type === 'pass'));
+    await until(theirs, (v) => v.waiting?.player === 1 && v.actions.some((a) => a.type === 'activate'));
     expect((await send(guest, { type: 'pass' })).status).toBe(204);
     const view = await until(mine, (v) => v.players[0].monsters[0] !== null && v.waiting === null && v.actions.length > 1);
     expect(view.chain).toEqual([]);

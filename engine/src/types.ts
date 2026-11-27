@@ -282,6 +282,7 @@ export type Step =
   | { do: 'link'; cards: Selection }
   /** Negates the activation this effect answers ("negate the activation"); `destroy`: "and if you do, destroy it". */
   | { do: 'negate_activation'; destroy: boolean }
+  | { do: 'negate_summon' }
   /** The monsters the selection picks have their effects negated while they stay face-up on the field. */
   | { do: 'negate_effects'; cards: Selection }
   /** This card is Set face-down again instead of going to the GY when it resolves (Scrap-Iron Scarecrow). */
@@ -748,7 +749,11 @@ export type DuelStep =
   | { at: 'order'; chooser: Seat; hands: [Hand, Hand] }
   | { at: 'open' }
   | { at: 'triggers'; cause: Happening | null; then: Then; handled: string[]; passed: Seat[] }
-  | { at: 'respond'; cause: Happening | null; then: Then; priority: Seat; actor: Seat; passed: boolean }
+  /**
+   * `summoning`: a monster is being Summoned by a player and the Summon isn't done yet. Only effects that answer
+   * `summoning` (Solemn Judgment) may be activated; once both players pass, its triggers come up.
+   */
+  | { at: 'respond'; cause: Happening | null; then: Then; priority: Seat; actor: Seat; passed: boolean; summoning: boolean }
   | { at: 'resolve'; then: Then }
   | { at: 'continue'; then: Then }
   /** `card` would be destroyed by battle; `player`, its controller, decides whether to detach materials instead. */
@@ -980,6 +985,8 @@ export type Op =
   | { op: 'link'; card: string }
   /** Negates the activation of this card's link on the chain, below the one resolving. */
   | { op: 'negate_activation'; card: string }
+  /** Negates the Summon of this monster, which is being Summoned: it goes to the GY, never having been on the field. */
+  | { op: 'negate_summon'; card: string }
   | { op: 'negate_effects'; card: string }
   /** Sets the card being resolved face-down again instead of sending it to the GY. */
   | { op: 'set_again' }
@@ -1214,6 +1221,7 @@ export type DuelEvent =
   | { type: 'tokenSummoned'; player: Seat; card: string; token: CardData; zone: number; position: Position }
   | { type: 'linked'; card: string; to: string }
   | { type: 'activationNegated'; link: number; card: string }
+  | { type: 'summonNegated'; card: string }
   | { type: 'effectsNegated'; card: string }
   | { type: 'setAgain' }
   | { type: 'countersChanged'; card: string; counter: Counter; delta: number }

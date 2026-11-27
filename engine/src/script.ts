@@ -197,6 +197,7 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, fre
   if (step.do === 'normal_summon') return state.players[seat].hand.some((id) => summonPlan(state, seat, id)) ? null : 'You have no monster in your hand you could Normal Summon or Set now.';
   if (step.do === 'fusion_summon') return fusionMonsters(state, seat, step.from).length > 0 ? null : 'No Fusion Monster in your Extra Deck can be Fusion Summoned with your monsters.';
   if (step.do === 'negate_activation') return state.chain.length > 0 ? null : 'There is no activation to negate.';
+  if (step.do === 'negate_summon') return state.step.at === 'respond' && state.step.summoning ? null : 'No monster is being Summoned.';
   if (step.do === 'detach') return detachFrom(state, step, seat, card).length > 0 ? null : `No ${step.cards.from === 'self' ? 'this card has' : 'monster here has'} ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`;
   if (step.do === 'forbid' && step.wholeTurn) {
     const player = step.player === 'you' ? seat : other(seat);

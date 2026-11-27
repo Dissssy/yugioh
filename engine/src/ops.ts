@@ -237,6 +237,12 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'activationNegated', link: index, card: op.card });
       return;
     }
+    case 'negate_summon': {
+      check(locate(state, op.card)?.zone === 'monsters', `${cardOf(state, op.card).name} isn't being Summoned.`);
+      check(state.happened.some((h) => h.event === 'summoned' && h.card === op.card && !h.byEffect), `${cardOf(state, op.card).name}'s Summon is already done, or wasn't made by a player.`);
+      run.emit({ type: 'summonNegated', card: op.card });
+      return;
+    }
     case 'negate_effects': {
       const target = onField(state, op.card);
       check(target.at.zone === 'monsters' && target.card.faceUp, 'Only a face-up monster has its effects negated this way.');

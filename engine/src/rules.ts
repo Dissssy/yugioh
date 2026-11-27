@@ -514,6 +514,9 @@ function checkEffects(state: DuelState, seat: Seat, id: string): EffectCheck[] {
     } else {
       return no('This effect is not activated.');
     }
+    // While a monster is being Summoned, only an effect that negates the Summon; such an effect, only then.
+    if (window?.summoning && effect.when?.event !== 'summoning') return no('While a monster is being Summoned, only an effect that negates the Summon can be activated.');
+    if (!window?.summoning && effect.when?.event === 'summoning') return no('Only while a monster is being Summoned.');
     const locked = lockProblem(state, seat, id, index);
     if (locked) return no(locked);
     if (timing) return no(timing);

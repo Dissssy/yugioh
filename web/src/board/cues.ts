@@ -60,6 +60,7 @@ const baseMs: Record<LogEvent['type'], number> = {
   equippedFromHand: 400,
   linked: 400,
   activationNegated: 500,
+  summonNegated: 500,
   effectsNegated: 300,
   setAgain: 0,
   countersChanged: 300,
