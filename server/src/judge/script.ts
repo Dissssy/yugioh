@@ -483,6 +483,12 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         if (destroyed) apply({ op: 'destroy', cards: [cause.card] });
         return `The activation of ${shown(cause.card, before)} was negated${destroyed ? ', and it was destroyed' : ''}.`;
       }
+      case 'negate_summon': {
+        const cause = link.cause?.event === 'summoned' ? link.cause.card : null;
+        if (!cause || locate(state, cause)?.zone !== 'monsters') return null;
+        apply({ op: 'negate_summon', card: cause });
+        return `The Summon of ${shown(cause, before)} was negated, and it was destroyed.`;
+      }
       case 'negate_effects': {
         const cards = (await select(step.cards, 'negate the effects of')).filter((id) => {
           const at = locate(state, id);

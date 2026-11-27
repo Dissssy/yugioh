@@ -396,6 +396,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `${who(event.player)} may Normal Summon again this turn`;
     case 'activationNegated':
       return `${name(event.card)}'s activation was negated`;
+    case 'summonNegated':
+      return `${name(event.card)}'s Summon was negated, and it was destroyed`;
     case 'effectsNegated':
       return `${name(event.card)} has its effects negated`;
     case 'setAgain':

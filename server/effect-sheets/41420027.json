@@ -43,10 +43,7 @@
             "cost": [],
             "steps": [
               {
-                "do": "destroy",
-                "cards": {
-                  "from": "event"
-                }
+                "do": "negate_summon"
               }
             ]
           }

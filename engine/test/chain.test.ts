@@ -351,7 +351,8 @@ describe('responding to a summon', () => {
     const t = setup(2);
     expect(t.state.step).toEqual({ at: 'open' });
     const summon = t.events.findIndex((e) => e.type === 'normalSummoned');
-    expect(t.events.slice(summon).filter((e) => e.type === 'passed').map((e) => (e as { player: Seat }).player)).toEqual([0, 1]);
+    // First the window while the Summon could still be negated, then the one after it.
+    expect(t.events.slice(summon).filter((e) => e.type === 'passed').map((e) => (e as { player: Seat }).player)).toEqual([0, 1, 0, 1]);
   });
 
   it("isn't offered in the open game", () => {

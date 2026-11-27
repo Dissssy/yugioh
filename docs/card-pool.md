@@ -193,8 +193,12 @@ Built for it:
 - **Coin tosses.** `toss_coins {count}` tosses and stores the results in `state.coins`; an `only_if` with a `coins`
   condition then reads how many came up heads (Barrel Dragon, Jirai Gumo, Time Wizard). Calling a coin is the same as
   needing heads. Steps after a toss aren't checked on activation, since any result may do nothing.
-- **New "when" events.** `summoning` (a monster "would be Summoned", by a player and not by an effect: Solemn
-  Judgment, Horn of Heaven), `position_changed` (a face-up monster changes battle position; the filter's position is
+- **Negating Summons.** A player's Summon now opens a window before it is done, ahead of anything it triggers. Only
+  effects whose "when" is `summoning` can be activated in it (Solemn Judgment, Horn of Heaven), and they can't be
+  activated at any other time. The step `negate_summon` sends the monster to the GY as a monster that was never on the
+  field: its Summon triggers nothing, and nothing that waits for a card leaving the field or being destroyed fires
+  (a negated Sangan searches nothing). The Normal Summon stays used.
+- **New "when" events.** `summoning`, `position_changed` (a face-up monster changes battle position; the filter's position is
   the new one: Crass Clown, Dream Clown, Tainted Wisdom, Yado Karu) and `standby_phase`. Changing a monster's position
   by hand now opens a window, so its triggers can go on the chain.
 - **Standby counters.** The counter kind `standby`, and a stats effect's `per: "counters"` (the counters on the card
@@ -215,8 +219,6 @@ Built for it:
 
 Known differences from the official rulings:
 
-- Solemn Judgment and Horn of Heaven answer the window after the Summon, so the monster's own summon triggers are
-  already waiting. The Summon isn't negated, only the monster destroyed.
 - Catapult Turtle reads the Tributed monster's printed ATK, not its ATK on the field.
 - Time Wizard counts a face-down monster's printed ATK.
 - A name lock (Sangan) and a name filter (Thunder Dragon) match any name that contains the given one.

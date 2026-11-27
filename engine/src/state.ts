@@ -141,6 +141,8 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
           if (!step.passed) Object.assign(step, { passed: true, priority: other(step.priority) });
           // Two passes in a row: the chain resolves, or the sequence is over.
           else if (s.chain.length > 0) s.step = { at: 'resolve', then: step.then };
+          // Nobody negated the Summon: it is done, and its triggers come up.
+          else if (step.summoning) s.step = { at: 'triggers', cause: step.cause, then: step.then, handled: [], passed: [] };
           else s.step = next(step.then);
         }
         return;
@@ -190,6 +192,11 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
     const group = s.resolvedLinks;
     switch (event.type) {
       case 'checkpoint':
+        // A player's Summon can be negated before it is done, ahead of anything it triggers.
+        if (event.cause?.event === 'summoned' && !event.cause.byEffect) {
+          s.step = { at: 'respond', cause: event.cause, then: event.then, priority: s.turnPlayer, actor: s.turnPlayer, passed: false, summoning: true };
+          return;
+        }
         s.step = { at: 'triggers', cause: event.cause, then: event.then, handled: [], passed: [] };
         // A phase starting is something triggers can wait for too ("During the End Phase").
         if (event.cause?.event === 'phase') s.happened.push(event.cause);
@@ -202,7 +209,7 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         // or the opponent of whoever activated the last link.
         if (s.chain.length > 0 || step.cause) {
           const actor = s.chain.at(-1)?.player ?? s.turnPlayer;
-          s.step = { at: 'respond', cause: step.cause, then: step.then, priority: s.chain.length > 0 ? other(actor) : actor, actor, passed: false };
+          s.step = { at: 'respond', cause: step.cause, then: step.then, priority: s.chain.length > 0 ? other(actor) : actor, actor, passed: false, summoning: false };
         } else s.step = next(step.then);
         return;
       }
@@ -363,8 +370,8 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         const step = s.step;
         // A trigger joins the chain with the others; any other activation hands the opponent priority.
         if (step.at === 'triggers') step.handled.push(`${event.card}:${event.effect}`);
-        else if (step.at === 'respond') Object.assign(step, { priority: other(event.player), actor: event.player, passed: false });
-        else s.step = { at: 'respond', cause: null, then: { do: 'open' }, priority: other(event.player), actor: event.player, passed: false };
+        else if (step.at === 'respond') Object.assign(step, { priority: other(event.player), actor: event.player, passed: false, summoning: false });
+        else s.step = { at: 'respond', cause: null, then: { do: 'open' }, priority: other(event.player), actor: event.player, passed: false, summoning: false };
         return;
       }
       case 'targeted':
@@ -535,6 +542,15 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
       case 'activationNegated':
         s.chain[event.link]!.negated = true;
         return;
+      case 'summonNegated': {
+        // It was never Summoned: nothing waits on its Summon, and it never was on the field (no "sent from the field").
+        s.happened = s.happened.filter((h) => !(h.event === 'summoned' && h.card === event.card));
+        s.didThisTurn = s.didThisTurn.filter((d) => d.card !== event.card);
+        s.properlySummoned = s.properlySummoned.filter((id) => id !== event.card);
+        removeFromPlay(s, event.card);
+        toGraveyard(s, event.card);
+        return;
+      }
       case 'effectsNegated':
         onField(s, event.card).effectsNegated = true;
         return;

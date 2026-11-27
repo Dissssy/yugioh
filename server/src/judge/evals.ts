@@ -1627,6 +1627,15 @@ export const CASES: EvalCase[] = [
     check: (b) => all(expectAt(b, 'Axe Raider', '0:gy'), b.lp(1) === 4000 ? null : `LP is ${b.lp(1)}`),
   },
   {
+    name: 'solemn judgment negates a summon before it is done, so a negated sangan was never on the field',
+    board: [{ hand: ['Sangan'], deck: ['Celtic Guardian'] }, { set: ['Solemn Judgment'] }],
+    before: (id) => [[0, { type: 'normalSummon', card: id('Sangan'), tributes: [], zone: 0 }]],
+    seat: 1,
+    activate: 'Solemn Judgment',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Sangan', '0:gy'), expectAt(b, 'Celtic Guardian', '0:deck'), b.state.normalSummons === 1 ? null : 'the Normal Summon was given back'),
+  },
+  {
     name: 'solemn judgment negates a spell activation for half its player lp',
     board: [{ hand: ['Tremendous Fire'] }, { set: ['Solemn Judgment'] }],
     before: () => [[0, { type: 'activate', card: 'a0', effect: 0, zone: 0 }]],

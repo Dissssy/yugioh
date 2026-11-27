@@ -580,7 +580,9 @@ describe('Synchro Summons', () => {
     const t = board([13, 14]);
     const before = { ...t.state, sheets: { ...t.state.sheets, 7: { ...t.state.sheets[7]!, effects: [trigger(['synchro']), trigger(['special']), trigger(['normal'])] } } };
     const events = decide(before, 0, { type: 'extraSummon', card: 'ax0', materials: ['a0', 'a1'], zone: 0, position: 'attack' });
-    const state = events.ok ? events.events.slice(1).reduce(evolve, before) : before;
+    const summoned = events.ok ? events.events.slice(1).reduce(evolve, before) : before;
+    // Nobody negates the Summon, so its triggers come up.
+    const state = ([{ type: 'passed', player: 0 }, { type: 'passed', player: 1 }] as DuelEvent[]).reduce(evolve, summoned);
     expect(pendingTriggers(state).map((p) => p.effect)).toEqual([0, 1]);
   });
 });
