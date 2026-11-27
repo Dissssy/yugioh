@@ -1,4 +1,4 @@
-# Builds the production image. Pushes to ghcr.io/dissssy/yugioh on main (tags: latest, sha-<commit>); pull requests only check that it builds.
+# Builds the production image. Pushes to ghcr.io/dissssy/yugioh on main (tags: latest, sha-<commit>) and then calls the home server's deploy webhook; pull requests only check that it builds.
 name: Docker image
 
 on:
@@ -43,3 +43,7 @@ jobs:
           build-args: GIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # Tells the home server's Arcane to pull and redeploy. It only redeploys when the image is newer, so a call without a new build does nothing.
+      - name: Deploy on home server
+        if: github.event_name != 'pull_request'
+        run: curl -fsS -X POST "${{ secrets.ARCANE_YUGIOH_WEBHOOK }}"
