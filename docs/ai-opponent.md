@@ -132,7 +132,12 @@ The AI plays every turn through the same code a person does, so it finds bugs fo
 - **Contested rulings** go through the appeal, and an overturned scripted ruling already flags the script.
 - **Its reasons** are in the admin Full log, so a strange move is easy to read back.
 
-A later step could let the admin start a duel where Claude plays both seats, to run many duels unattended and collect these. The server already supports it (any two `ai:` seat keys, as the test does); only an admin button is missing.
+To try out a deck before people play it, Claude can play both seats with the real models:
+`ANTHROPIC_API_KEY=... npm run self-play -w server -- yugi-2002 kaiba-2002 4` plays 4 duels between two premade
+decks, with the seats swapping decks each duel. It needs the server's usual config and a database with the cards
+synced. Each duel's full report goes to `server/eval-runs/self-play/<duel id>.txt`, and the script prints what each
+duel cost. Four Yugi v Kaiba duels (2026-11-27) cost $0.10 in all: 55 to 105 opponent calls each, and every ruling
+was scripted.
 
 ## Build order
 

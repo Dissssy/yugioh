@@ -674,7 +674,8 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     }
     const option = script.options.find((o) => o.label === link.choice) ?? script.options[0]!;
     const said = await runSteps(option.steps);
-    if (said.length === 0) said.push(`${name} resolved, but there was nothing left for it to affect.`);
+    // An activation with no steps (a Field or Continuous Spell, whose effect is continuous) just resolves.
+    if (said.length === 0) said.push(option.steps.length ? `${name} resolved, but there was nothing left for it to affect.` : `${name} resolved.`);
     if (script.unapplied) said.push(`Not applied in this version: ${script.unapplied}`);
     return { record: record({ legal: true, summary: said.join(' '), error: null }), events };
   } catch (e) {
