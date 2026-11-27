@@ -1,0 +1,42 @@
+{
+  "code": 16768387,
+  "textHash": "c7437aba2934fc6c8ba0abc9ac80cecf4ef9e1509741bf90c14dd0d363c710f3",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "flip",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card is flipped face-up",
+      "cost": "",
+      "effect": "Look at up to 5 cards from the top of your Deck, then place them on the top of the Deck in any order.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "arrange_top",
+                "count": 5,
+                "bottom": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -1,0 +1,101 @@
+{
+  "code": 90219263,
+  "textHash": "98e97092169893bdd544bd4db76eeb653d2d4b8be1876271765f158188a0d607",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase, if \"Harpie Lady\" is on the field",
+      "cost": "",
+      "effect": "Special Summon 1 \"Harpie Lady\" or \"Harpie Lady Sisters\" from your hand or Deck.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "either",
+              "places": [
+                "monsters"
+              ],
+              "kinds": [],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Harpie Lady",
+              "except": null,
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": {
+                "min": null,
+                "max": 4
+              },
+              "atk": null,
+              "def": null,
+              "original": false
+            },
+            "min": 1,
+            "max": null,
+            "distinct": false
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "hand",
+                      "deck"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Harpie Lady",
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -15,8 +15,9 @@ export function whenMatches(state: DuelState, when: When, h: Happening, card: st
   if (when.event === 'attacked' && h.event === 'attack_declared' && h.target) {
     return whenMatches(state, when, { event: 'attacked', card: h.target, player: h.player === 0 ? 1 : 0, attacker: h.card, group: h.group }, card, seat);
   }
-  if (h.event === 'phase') return when.event === 'end_phase' && h.phase === 'end';
+  if (h.event === 'phase') return (when.event === 'end_phase' && h.phase === 'end') || (when.event === 'standby_phase' && h.phase === 'standby');
   if (h.event === 'activated' && when.targeting && !(state.chain[h.link]?.targets ?? []).some((id) => fits(state, id, when.targeting!, seat))) return false;
+  if (when.event === 'summoning') return h.event === 'summoned' && !h.byEffect && whenMatches(state, { ...when, event: 'summoned' }, h, card, seat);
   if (when.event === 'direct_attack_damage') return h.event === 'battle_damage' && h.direct && whenMatches(state, { ...when, event: 'battle_damage' }, h, card, seat);
   // "Destroyed" by battle or by an effect: in battle, by the other monster's controller.
   if (when.event === 'destroyed') {
@@ -191,6 +192,8 @@ export function describeCause(state: DuelState, cause: Happening | null): string
       return `${name(cause.card)} going to the GY`;
     case 'flipped':
       return `${name(cause.card)} being flipped face-up`;
+    case 'position_changed':
+      return `${name(cause.card)} changing its battle position`;
   }
 }
 

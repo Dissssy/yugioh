@@ -51,8 +51,13 @@ function shield(run: Run, op: Op, ctx: OpContext): Op | null {
     if (f?.effect.once) run.emit({ type: 'protectionUsed', player: f.seat, card: f.source, effect: f.index });
     return f !== null;
   };
+  // Fake Trap: a player's Traps can't be destroyed by card effects this turn.
+  const trapShielded = (id: string) => {
+    const at = locate(state, id);
+    return at?.zone === 'spellTraps' && cardOf(state, id).kind === 'trap' && state.shields.some((s) => s.player === at.seat && s.what === 'trap_destruction');
+  };
   if (op.op === 'destroy') {
-    const cards = op.cards.filter((id) => !spared(id, 'be_affected') && !spared(id, 'be_destroyed_by_effect'));
+    const cards = op.cards.filter((id) => !spared(id, 'be_affected') && !spared(id, 'be_destroyed_by_effect') && !trapShielded(id));
     return cards.length ? { ...op, cards } : null;
   }
   return AFFECTING.includes(op.op) && 'card' in op && spared(op.card, 'be_affected') ? null : op;
@@ -313,6 +318,22 @@ function apply(run: Run, op: Op, ctx: OpContext) {
       run.emit({ type: 'tributeAllowed', player: op.player, card: op.card });
       return;
     }
+    case 'toss_coins':
+      check(op.results.length > 0, 'Toss at least one coin.');
+      run.emit({ type: 'coinsTossed', player: ctx.player, results: op.results });
+      return;
+    case 'equip_from_hand': {
+      check(ctx.stage === 'resolution', 'A card is equipped to its monster as it resolves.');
+      const source = state.chain.at(-1)?.card;
+      check(source && state.players[ctx.player].hand.includes(source), 'Only a card in its controller\'s hand can be equipped from the hand.');
+      check(onField(state, op.to).at.zone === 'monsters' && onField(state, op.to).card.faceUp, 'A card can only be equipped to a face-up monster.');
+      check(spellTrapZonesFor(state, ctx.player, cardOf(state, source!)).includes(op.zone), 'Choose an empty Spell & Trap Zone.');
+      run.emit({ type: 'equippedFromHand', player: ctx.player, card: source!, to: op.to, zone: op.zone });
+      return;
+    }
+    case 'shuffle_deck':
+      shuffle(run, op.player, ctx, null);
+      return;
     case 'look':
       check(op.cards.length > 0 && op.cards.every((id) => locate(state, id)), 'Name the cards to look at.');
       run.emit({ type: 'looked', player: ctx.player, cards: op.cards });

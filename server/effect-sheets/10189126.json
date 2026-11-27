@@ -1,0 +1,51 @@
+{
+  "code": 10189126,
+  "textHash": "fc6fc3fdd47c423d62563d31222771d0fe1e353e9805cb3721916fc6698dd9bb",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card inflicts Battle Damage to your opponent's Life Points",
+      "cost": "",
+      "effect": "Draw 1 card from your Deck.",
+      "targets": null,
+      "when": {
+        "event": "battle_damage",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "draw",
+                "player": "you",
+                "count": 1,
+                "per": null
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

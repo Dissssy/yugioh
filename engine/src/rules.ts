@@ -2,7 +2,7 @@
 
 import { pendingTriggers, triggerEvent, whenMatches } from './chain.ts';
 import { fits, identityFits, scriptOf, scriptProblem, specialSummonForbidden } from './script.ts';
-import { attacksAllowed, attacksDirectly, continuousOnField, inForce, type InForce, type Restrict, levelNow, lockProblem, nameOf, negated, synchroMaterialRules, piercing, replacement, restricted, restriction, shieldsBattleDamage, statsOf, tributeSummonLocked } from './continuous.ts';
+import { attackCost, lures, marksFor, attacksAllowed, attacksDirectly, continuousOnField, inForce, type InForce, type Restrict, levelNow, lockProblem, nameOf, negated, synchroMaterialRules, piercing, replacement, restricted, restriction, shieldsBattleDamage, statsOf, tributeSummonLocked } from './continuous.ts';
 import { evolve, isToken, locate, monsterZoneFree, monsterZonesFor, onField, other } from './state.ts';
 import {
   HAND_LIMIT,
@@ -24,6 +24,7 @@ import {
   type Intent,
   type LegalAction,
   type Materials,
+  type Opt,
   type Seat,
   type Then,
 } from './types.ts';
@@ -240,7 +241,7 @@ function standbyCards(state: DuelState): boolean {
   return Object.entries(state.instances).some(([id, { code }]) => {
     const zone = locate(state, id)?.zone;
     if (zone === 'deck' || zone === 'extra' || zone === 'banished' || zone === 'materials') return false;
-    return (state.sheets[code]?.effects ?? []).some((e) => e.script?.conditions.some((c) => c.if === 'phase' && c.phases.includes('standby')));
+    return (state.sheets[code]?.effects ?? []).some((e) => e.when?.event === 'standby_phase' || e.script?.conditions.some((c) => c.if === 'phase' && c.phases.includes('standby')));
   });
 }
 
@@ -650,7 +651,11 @@ const speedOf = (state: DuelState, link: { card: string; effect: number }) => st
 export const ruledIllegal = (state: DuelState, seat: Seat, id: string, effect: number) =>
   state.rulings.find((r) => !r.legal && r.player === seat && r.card === id && r.effect === effect);
 
-export function onceOk(state: DuelState, id: string, code: number, effect: number, opt: 'none' | 'soft' | 'hard') {
+export function onceOk(state: DuelState, id: string, code: number, effect: number, opt: Opt) {
+  if (opt === 'face_up') {
+    const at = locate(state, id);
+    return !(at && (at.zone === 'monsters' || at.zone === 'spellTraps') && state.players[at.seat][at.zone][at.index]!.usedEffects.includes(effect));
+  }
   if (opt === 'soft') return !state.usedThisTurn.some((u) => u.card === id && u.effect === effect);
   if (opt === 'hard') return !state.usedThisTurn.some((u) => u.code === code && u.effect === effect);
   return true;
@@ -686,18 +691,33 @@ const forbidden = (state: DuelState, seat: Seat, what: Forbidden, card: string |
 
 function canAttack(state: DuelState, m: FieldCard) {
   const seat = locate(state, m.id)!.seat;
-  return m.faceUp && m.position === 'attack' && attackLeft(state, m) && !restricted(state, m.id, 'attack') && !forbidden(state, seat, 'declare_attack', m.id);
+  const marked = state.marks.some((k) => k.card === m.id && k.placedTurn === m.placedTurn && k.mark === 'no_attack' && k.turn === state.turn);
+  return (
+    m.faceUp &&
+    m.position === 'attack' &&
+    attackLeft(state, m) &&
+    !marked &&
+    // Paying an attack's cost can't take the player's last LP.
+    (attackCost(state, m.id) === 0 || state.players[seat].lp > attackCost(state, m.id)) &&
+    !restricted(state, m.id, 'attack') &&
+    !forbidden(state, seat, 'declare_attack', m.id)
+  );
 }
 
-/** Whether this monster can attack the opponent directly: they control no monster, or an effect lets it anyway (Rapid Warrior). */
-const canAttackDirectly = (state: DuelState, seat: Seat, id: string) => state.players[other(seat)].monsters.every((m) => m === null) || attacksDirectly(state, id);
+/**
+ * Whether this monster can attack the opponent directly: they control no monster, or an effect lets it anyway (Rapid
+ * Warrior), unless a monster of theirs lures every attack (Ring of Magnetism).
+ */
+const canAttackDirectly = (state: DuelState, seat: Seat, id: string) =>
+  lures(state, seat).length === 0 && (state.players[other(seat)].monsters.every((m) => m === null) || attacksDirectly(state, id));
 
 /** Whether a monster has an attack left this turn: most have one, some more (Hayabusa Knight). */
 const attackLeft = (state: DuelState, m: FieldCard) => m.attacks?.turn !== state.turn || m.attacks.count < attacksAllowed(state, m.id);
 
 /** The opponent's Monster Zones the player's monsters may attack: every monster there that can be targeted for an attack. */
 function attackTargets(state: DuelState, seat: Seat): number[] {
-  return state.players[other(seat)].monsters.flatMap((m, i) => (m && !restricted(state, m.id, 'be_attacked') ? [i] : []));
+  const lured = lures(state, seat);
+  return state.players[other(seat)].monsters.flatMap((m, i) => (m && !restricted(state, m.id, 'be_attacked') && (lured.length === 0 || lured.includes(m.id)) ? [i] : []));
 }
 
 // ---------------------------------------------------------------------------
@@ -798,6 +818,8 @@ function apply(run: Run, seat: Seat, intent: Exclude<Intent, { type: 'surrender'
       const m = ownMonster(state, seat, intent.card);
       check(canChangePosition(state, m), "That monster's position can't be changed now.");
       run.emit({ type: 'positionChanged', player: seat, card: m.id, position: m.position === 'attack' ? 'defense' : 'attack' });
+      // Its own triggers (Crass Clown), and a chance to respond.
+      run.emit({ type: 'checkpoint', cause: run.state.happened.at(-1)!, then: { do: 'open' } });
       return;
     }
     case 'enterBattle':
@@ -864,6 +886,9 @@ function attack(run: Run, seat: Seat, attackerId: string, target: number | 'dire
     check(foeMonsters[target], 'There is no monster in that zone.');
     check(attackTargets(state, seat).includes(target), "That monster can't be targeted for an attack.");
   }
+  // "This card requires a cost of 1000 of your own Life Points to attack" (Dark Elf).
+  const cost = attackCost(state, attacker.id);
+  if (cost > 0) run.emit({ type: 'lpChanged', player: seat, amount: -cost, kind: 'cost' });
   run.emit({ type: 'attackDeclared', player: seat, attacker: attacker.id, target: target === 'direct' ? null : foeMonsters[target]!.id });
   // Triggers and responses to the attack come first (Mirror Force); damage follows once they are done (damage below).
   run.emit({ type: 'checkpoint', cause: run.state.happened.find((h) => h.event === 'attack_declared')!, then: { do: 'damage_step' } });
@@ -934,6 +959,8 @@ function damage(run: Run) {
   }
   else {
     if (!onField(state, target).faceUp) run.emit({ type: 'flipped', card: target });
+    // The attacked monster marks its attacker (Electric Lizard, Steel Scorpion), counting the attacker's controller's turns.
+    for (const m of marksFor(run.state, target, attackerId)) run.emit({ type: 'attackerMarked', card: attackerId, mark: m.mark, turn: state.turn + 2 * (m.mark === 'no_attack' ? 1 : m.turns) });
     const result = battle(run.state, attackerId, target);
     // A monster that would be destroyed but can detach materials instead waits for its controller to decide.
     const replaced = run.state.attack!.replaced;
@@ -1012,6 +1039,12 @@ function endTurn(run: Run, chosen: string[]) {
   const discard = [...kept, ...hand.filter((id) => !kept.includes(id)).reverse()].slice(0, excess);
   const expiring = selfDestructing(state);
   for (const id of expiring) run.emit({ type: 'destroyed', cards: [id], by: locate(state, id)!.seat });
+  // Monsters marked to be destroyed this End Phase (Steel Scorpion), if they never left the field since.
+  for (const k of run.state.marks) {
+    const at = locate(run.state, k.card);
+    const m = at?.zone === 'monsters' ? run.state.players[at.seat].monsters[at.index]! : null;
+    if (k.mark === 'destroy' && k.turn === state.turn && m?.placedTurn === k.placedTurn) run.emit({ type: 'destroyed', cards: [k.card], by: other(at!.seat) });
+  }
   // A pledge not kept: "take 2000 damage if you did not Normal Summon the added monster" (Where Arf Thou?).
   for (const pl of state.pledges) run.emit({ type: 'lpChanged', player: pl.player, amount: -pl.damage, kind: 'damage' });
   endIfLpGone(run);

@@ -1,0 +1,141 @@
+{
+  "code": 40240595,
+  "textHash": "cf3d8d4f4ef0cf6c6309acc065de419c88c183da90c1c185ea5076abb6bc576b",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "hand",
+      "opt": "none",
+      "window": "Your Main Phase, while this card is in your hand",
+      "cost": "",
+      "effect": "Equip this card from your hand to that target.",
+      "targets": "1 \"Petit Moth\" you control",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "you",
+            "places": [
+              "monsters"
+            ],
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": "Petit Moth",
+            "except": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "equip_self",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is equipped to a monster",
+      "cost": "",
+      "effect": "While equipped by this effect, the original ATK/DEF of that \"Petit Moth\" becomes the ATK/DEF of \"Cocoon of Evolution\" (0/2000).",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "linked",
+        "atk": -300,
+        "def": 1800,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "During each of your Standby Phases",
+      "cost": "",
+      "effect": "Place a counter on this card, counting your turns since the equip.",
+      "targets": null,
+      "when": {
+        "event": "standby_phase",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [
+          {
+            "if": "turn",
+            "whose": "you"
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "add_counters",
+                "cards": {
+                  "from": "self"
+                },
+                "counter": "standby",
+                "count": 1,
+                "max": null
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -1,0 +1,164 @@
+{
+  "code": 62121,
+  "textHash": "d09b04d2beaadda019cac7611044223c6d0a221138d323fbfbc94c82c67400b7",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "flip",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card is flipped face-up",
+      "cost": "",
+      "effect": "All Zombie-Type monsters gain 200 ATK and DEF while this card is face-up on the field.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "add_counters",
+                "cards": {
+                  "from": "self"
+                },
+                "counter": "standby",
+                "count": 1,
+                "max": 5
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "During each of your Standby Phases",
+      "cost": "",
+      "effect": "During each of your next 4 Standby Phases, Zombie-Type monsters gain 200 more ATK and DEF.",
+      "targets": null,
+      "when": {
+        "event": "standby_phase",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [
+          {
+            "if": "turn",
+            "whose": "you"
+          },
+          {
+            "if": "counters",
+            "filter": {
+              "side": "you",
+              "places": [
+                "monsters"
+              ],
+              "kinds": [],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Castle of Dark Illusions",
+              "except": null,
+              "extraDeck": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null,
+              "original": false
+            },
+            "counter": "standby",
+            "min": 1
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "add_counters",
+                "cards": {
+                  "from": "self"
+                },
+                "counter": "standby",
+                "count": 1,
+                "max": 5
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "Zombie-Type monsters gain 200 ATK and DEF for each counter on this card.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": {
+          "side": "either",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [],
+          "types": [],
+          "races": [
+            "Zombie"
+          ],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "atk": 200,
+        "def": 200,
+        "per": "counters",
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -1604,6 +1604,230 @@ export const CASES: EvalCase[] = [
         b.state.normalSummons === 1 && b.state.normalSummonLimit === 2 ? null : 'the usual Normal Summon was used up',
       ),
   },
+  {
+    name: 'sangan searches a monster with 1500 or less atk and locks its name for the turn',
+    board: [{ monsters: ['Cannon Soldier', 'Sangan'], deck: ['Celtic Guardian', 'Summoned Skull'] }, {}],
+    before: (id) => [[0, { type: 'activate', card: id('Cannon Soldier'), effect: 0, zone: null }]],
+    picks: [['Sangan'], ['Celtic Guardian']],
+    legal: true,
+    check: (b) =>
+      all(
+        expectAt(b, 'Sangan', '0:gy'),
+        expectAt(b, 'Celtic Guardian', '0:hand'),
+        b.state.lingering.some((l) => l.filter?.named === 'Celtic Guardian' && l.untilTurn === b.state.turn) ? null : 'Celtic Guardian is not locked',
+      ),
+  },
+  {
+    name: 'solemn judgment negates a normal summon for half its player lp',
+    board: [{ hand: ['Axe Raider'] }, { set: ['Solemn Judgment'] }],
+    before: (id) => [[0, { type: 'normalSummon', card: id('Axe Raider'), tributes: [], zone: 0 }]],
+    seat: 1,
+    activate: 'Solemn Judgment',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Axe Raider', '0:gy'), b.lp(1) === 4000 ? null : `LP is ${b.lp(1)}`),
+  },
+  {
+    name: 'solemn judgment negates a spell activation for half its player lp',
+    board: [{ hand: ['Tremendous Fire'] }, { set: ['Solemn Judgment'] }],
+    before: () => [[0, { type: 'activate', card: 'a0', effect: 0, zone: 0 }]],
+    seat: 1,
+    activate: 'Solemn Judgment',
+    effect: 1,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Tremendous Fire', '0:gy'), b.lp(1) === 4000 ? null : `LP is ${b.lp(1)}`),
+  },
+  {
+    name: 'horn of heaven tributes a monster to negate a summon',
+    board: [{ hand: ['Axe Raider'] }, { set: ['Horn of Heaven'], monsters: ['Celtic Guardian'] }],
+    before: (id) => [[0, { type: 'normalSummon', card: id('Axe Raider'), tributes: [], zone: 0 }]],
+    seat: 1,
+    activate: 'Horn of Heaven',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Axe Raider', '0:gy'), expectAt(b, 'Celtic Guardian', '1:gy')),
+  },
+  {
+    name: 'barrel dragon destroys its target on 2 or more heads of 3',
+    board: [{ monsters: ['Barrel Dragon'] }, { monsters: ['Celtic Guardian'] }],
+    activate: 'Barrel Dragon',
+    legal: true,
+    check: (b) => {
+      const heads = b.state.coins.filter(Boolean).length;
+      if (b.state.coins.length !== 3) return `${b.state.coins.length} coins tossed`;
+      return expectAt(b, 'Celtic Guardian', heads >= 2 ? '1:gy' : '1:monsters');
+    },
+  },
+  {
+    name: 'time wizard destroys the opponent monsters on heads, else its own and half their atk as damage',
+    board: [{ monsters: ['Time Wizard'] }, { monsters: ['Celtic Guardian'] }],
+    activate: 'Time Wizard',
+    legal: true,
+    check: (b) =>
+      b.state.coins[0]
+        ? all(expectAt(b, 'Celtic Guardian', '1:gy'), expectAt(b, 'Time Wizard', '0:monsters'))
+        : all(expectAt(b, 'Time Wizard', '0:gy'), expectAt(b, 'Celtic Guardian', '1:monsters'), b.lp(0) === 7750 ? null : `LP is ${b.lp(0)}`),
+  },
+  {
+    name: 'catapult turtle deals half the tributed monster atk',
+    board: [{ monsters: ['Catapult Turtle', 'Celtic Guardian'] }, {}],
+    activate: 'Catapult Turtle',
+    picks: [['Celtic Guardian']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Celtic Guardian', '0:gy'), b.lp(1) === 7300 ? null : `LP is ${b.lp(1)}`),
+  },
+  {
+    name: 'jirai gumo halves its player lp when the coin comes up tails',
+    board: [{ monsters: ['Jirai Gumo'] }, {}],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Jirai Gumo'), target: 'direct' }],
+    ],
+    legal: true,
+    check: (b) => (b.state.coins.length !== 1 ? 'no coin tossed' : b.lp(0) === (b.state.coins[0] ? 8000 : 4000) ? null : `LP is ${b.lp(0)}`),
+  },
+  {
+    name: 'crass clown returns an opponent monster when changed to attack position',
+    board: [{ defense: ['Crass Clown'] }, { monsters: ['Celtic Guardian'] }],
+    before: (id) => [[0, { type: 'changePosition', card: id('Crass Clown') }]],
+    legal: true,
+    check: (b) => expectAt(b, 'Celtic Guardian', '1:hand'),
+  },
+  {
+    name: 'dream clown destroys an opponent monster when changed to defense position',
+    board: [{ monsters: ['Dream Clown'] }, { monsters: ['Celtic Guardian'] }],
+    before: (id) => [[0, { type: 'changePosition', card: id('Dream Clown') }]],
+    legal: true,
+    check: (b) => expectAt(b, 'Celtic Guardian', '1:gy'),
+  },
+  {
+    name: 'yado karu puts cards from the hand on the bottom of the deck',
+    board: [{ monsters: ['Yado Karu'], hand: ['Celtic Guardian', 'Axe Raider'] }, {}],
+    before: (id) => [[0, { type: 'changePosition', card: id('Yado Karu') }]],
+    activate: 'Yado Karu',
+    picks: [['Celtic Guardian', 'Axe Raider']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Celtic Guardian', '0:deck'), expectAt(b, 'Axe Raider', '0:deck')),
+  },
+  {
+    name: 'stim-pack gives 700 atk and takes 200 back each of its player standby phases',
+    board: [{ hand: ['Stim-Pack'], monsters: ['Celtic Guardian'] }, {}],
+    before: (id) => [
+      [0, { type: 'activate', card: id('Stim-Pack'), effect: 0, zone: 0 }],
+      [0, { type: 'endTurn', discard: [] }],
+      [1, { type: 'endTurn', discard: [] }],
+    ],
+    legal: true,
+    check: (b) => (b.monster('Celtic Guardian')?.atk === 1900 ? null : `ATK ${b.monster('Celtic Guardian')?.atk}`),
+  },
+  {
+    name: 'mushroom man 2 passes to the opponent for 500 lp and costs its controller 300 each standby phase',
+    board: [{ monsters: ['Mushroom Man #2'] }, {}],
+    before: () => [[0, { type: 'endTurn', discard: [] }]],
+    activate: 'Mushroom Man #2',
+    effect: 1,
+    legal: true,
+    check: (b) => all(expectAt(b, 'Mushroom Man #2', '1:monsters'), b.lp(0) === 7500 ? null : `player 0 LP is ${b.lp(0)}`, b.lp(1) === 7700 ? null : `player 1 LP is ${b.lp(1)}`),
+  },
+  {
+    name: 'castle of dark illusions and pumpking grow zombies each standby phase',
+    board: [{ setMonsters: ['Castle of Dark Illusions'], monsters: ['Pumpking the King of Ghosts'] }, {}],
+    before: (id) => [
+      [0, { type: 'flipSummon', card: id('Castle of Dark Illusions') }],
+      [0, { type: 'endTurn', discard: [] }],
+      [1, { type: 'endTurn', discard: [] }],
+    ],
+    legal: true,
+    // 1800, +400 for the Castle's 2 counters, +100 while the Castle is there, +100 for Pumpking's counter.
+    check: (b) => (b.monster('Pumpking the King of Ghosts')?.atk === 2400 ? null : `ATK ${b.monster('Pumpking the King of Ghosts')?.atk}`),
+  },
+  {
+    name: 'cocoon of evolution equips itself from the hand to petit moth',
+    board: [{ hand: ['Cocoon of Evolution'], monsters: ['Petit Moth'] }, {}],
+    activate: 'Cocoon of Evolution',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Cocoon of Evolution', '0:spellTraps'), b.monster('Petit Moth')?.atk === 0 && b.monster('Petit Moth')?.def === 2000 ? null : `Petit Moth is ${b.monster('Petit Moth')?.atk}/${b.monster('Petit Moth')?.def}`),
+  },
+  {
+    name: 'larvae moth needs a cocoon of evolution that has been equipped for 2 turns',
+    board: [{ hand: ['Larvae Moth'], monsters: ['Petit Moth'] }, {}],
+    activate: 'Larvae Moth',
+    legal: false,
+  },
+  {
+    name: 'kazejin makes the attacker atk 0 during damage calculation',
+    board: [{ monsters: ['Summoned Skull'] }, { monsters: ['Kazejin'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Summoned Skull'), target: 0 }],
+    ],
+    seat: 1,
+    activate: 'Kazejin',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Summoned Skull', '0:gy'), b.lp(0) === 5600 ? null : `LP is ${b.lp(0)}`),
+  },
+  {
+    name: 'dark elf pays 1000 lp to attack',
+    board: [{ monsters: ['Dark Elf'] }, {}],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Dark Elf'), target: 'direct' }],
+    ],
+    legal: true,
+    check: (b) => all(b.lp(0) === 7000 ? null : `player 0 LP is ${b.lp(0)}`, b.lp(1) === 6000 ? null : `player 1 LP is ${b.lp(1)}`),
+  },
+  {
+    name: 'electric lizard marks a non-zombie attacker so it cannot attack next turn',
+    board: [{ monsters: ['Celtic Guardian'] }, { monsters: ['Electric Lizard'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Celtic Guardian'), target: 0 }],
+    ],
+    legal: true,
+    check: (b) => (b.state.marks.some((m) => cardOf(b.state, m.card).name === 'Celtic Guardian' && m.mark === 'no_attack' && m.turn === b.state.turn + 2) ? null : `marks: ${JSON.stringify(b.state.marks)}`),
+  },
+  {
+    name: 'insect soldiers of the sky gain 1000 atk attacking a wind monster',
+    board: [{ monsters: ['Insect Soldiers of the Sky'] }, { monsters: ['Harpie Lady'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Insect Soldiers of the Sky'), target: 0 }],
+    ],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Harpie Lady', '1:gy'), b.lp(1) === 7300 ? null : `LP is ${b.lp(1)}`),
+  },
+  {
+    name: 'share the pain makes the opponent tribute a monster of their choice',
+    board: [{ hand: ['Share the Pain'], monsters: ['Axe Raider'] }, { monsters: ['Celtic Guardian', 'Summoned Skull'] }],
+    activate: 'Share the Pain',
+    picks: [['Axe Raider'], ['Celtic Guardian']],
+    legal: true,
+    check: (b) => all(expectAt(b, 'Axe Raider', '0:gy'), expectAt(b, 'Celtic Guardian', '1:gy'), expectAt(b, 'Summoned Skull', '1:monsters')),
+  },
+  {
+    name: 'the unhappy maiden ends the battle phase when destroyed by battle',
+    board: [{ monsters: ['Celtic Guardian', 'Axe Raider'] }, { monsters: ['The Unhappy Maiden'] }],
+    before: (id) => [
+      [0, { type: 'enterBattle' }],
+      [0, { type: 'attack', attacker: id('Celtic Guardian'), target: 0 }],
+    ],
+    legal: true,
+    check: (b) => all(expectAt(b, 'The Unhappy Maiden', '1:gy'), b.state.forbidden.some((f) => f.player === 0 && f.what === 'declare_attack') ? null : 'player 0 can still attack'),
+  },
+  {
+    name: 'fake trap is destroyed instead of the other traps',
+    board: [{ hand: ['Heavy Storm'] }, { set: ['Fake Trap', 'Horn of Heaven'] }],
+    before: () => [[0, { type: 'activate', card: 'a0', effect: 0, zone: 0 }]],
+    seat: 1,
+    activate: 'Fake Trap',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Fake Trap', '1:gy'), b.state.shields.some((s) => s.player === 1 && s.what === 'trap_destruction') ? null : 'no shield for Traps'),
+  },
+  {
+    name: 'gate guardian is summoned by tributing sanga, kazejin and suijin',
+    board: [{ hand: ['Gate Guardian'], monsters: ['Sanga of the Thunder', 'Kazejin', 'Suijin'] }, {}],
+    activate: 'Gate Guardian',
+    legal: true,
+    check: (b) => all(expectAt(b, 'Gate Guardian', '0:monsters'), expectAt(b, 'Sanga of the Thunder', '0:gy'), expectAt(b, 'Kazejin', '0:gy'), expectAt(b, 'Suijin', '0:gy')),
+  },
 ];
 
 /** Builds a case's board: every listed card is put in place from its owner's Deck. */

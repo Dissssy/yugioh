@@ -1,0 +1,73 @@
+{
+  "code": 3027001,
+  "textHash": "5168ed4c0a092037c7bdb28980baa5c823c538ca2d333aa3cb08acd86cdc6d66",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "When your opponent activates a card or effect that would destroy a Trap Card(s) you control",
+      "cost": "",
+      "effect": "Destroy this card instead: your Traps are not destroyed by card effects this turn.",
+      "targets": null,
+      "when": {
+        "event": "activated",
+        "self": false,
+        "filter": {
+          "side": "opponent",
+          "places": [],
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "self"
+                }
+              },
+              {
+                "do": "shield",
+                "what": [
+                  "trap_destruction"
+                ]
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

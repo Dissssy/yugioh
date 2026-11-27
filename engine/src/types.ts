@@ -22,6 +22,8 @@ export interface CardData {
   race: string;
 }
 
+export type Opt = 'none' | 'soft' | 'hard' | 'face_up';
+
 /** How one effect of a card works, read once from its text by a strong model (see docs/effects.md). */
 export interface SheetEffect {
   /**
@@ -40,8 +42,11 @@ export interface SheetEffect {
    * activated ("You can banish this card from your GY; ..." is "graveyard"). "field" means face-up on the field.
    */
   from: 'field' | 'hand' | 'graveyard';
-  /** `soft`: once per turn for each copy. `hard`: once per turn for all copies by card name. */
-  opt: 'none' | 'soft' | 'hard';
+  /**
+   * `soft`: once per turn for each copy. `hard`: once per turn for all copies by card name. `face_up`: once while this
+   * card is face-up on the field ("This effect can only be used once while this card is face-up on the field").
+   */
+  opt: Opt;
   /** When it can be used, in plain words. */
   window: string;
   /** The cost, as worded on the card, or empty. */
@@ -104,6 +109,11 @@ export interface When {
    * was attacked). `end_phase`: the End Phase starts. `sent_to_graveyard`: a card is sent from the field
    * to the GY, by any means (destroyed, Tributed, used as Synchro Material, sent). `flipped`: a face-down monster is
    * flipped face-up (Flip Summoned, attacked, or changed by an effect); code gives every FLIP effect this `when`.
+   * `position_changed`: a face-up monster changes its battle position (the filter's `position` is the new one: "When
+   * this card is changed from Defense Position to Attack Position" is position attack). `standby_phase`: a Standby
+   * Phase starts ("During each of your Standby Phases" adds a turn condition). `summoning`: a monster "would be Summoned"
+   * by a player, not by a resolving effect (Solemn Judgment), answered in the response window after the Summon;
+   * destroying the event's card negates it.
    */
   event:
     | 'summoned'
@@ -120,7 +130,10 @@ export interface When {
     | 'damage_step_end'
     | 'end_phase'
     | 'sent_to_graveyard'
-    | 'flipped';
+    | 'flipped'
+    | 'position_changed'
+    | 'standby_phase'
+    | 'summoning';
   /** Only when it happens to this card itself ("When this card is Normal Summoned"). */
   self: boolean;
   /** The card it happens to must fit this as it is after the event ("this face-up Attack Position card"); null for any card. */
@@ -205,7 +218,13 @@ export type Condition =
    * after revealing it; "destroy it if its DEF is 2000 or less"). Only an `only_if` can check it: targets are chosen
    * after the activation's conditions.
    */
-  | { if: 'targets'; filter: CardFilter };
+  | { if: 'targets'; filter: CardFilter }
+  /** Some card that fits `filter` has at least `min` counters of this kind (Larvae Moth: a "Cocoon of Evolution" with 2 Standby Phases counted). */
+  | { if: 'counters'; filter: CardFilter; counter: Counter; min: number }
+  /** The monster this card is battling fits `filter` ("If this card attacks a WIND monster"). */
+  | { if: 'battle_opponent'; filter: CardFilter }
+  /** The effect's last coin toss came up heads at least `min` and at most `max` times (null: no bound). Only in an `only_if`. */
+  | { if: 'coins'; min: number | null; max: number | null };
 
 /** One thing an effect does, to the cards `cards` selects. "You" is the activating player. */
 /** A Token's printed stats ("Ice Barrier Token" (Aqua/WATER/Level 1/ATK 0/DEF 0)). */
@@ -218,8 +237,11 @@ export interface Token {
   def: number;
 }
 
-/** Kinds of counters. The starter decks only use Spell Counters. */
-export type Counter = 'spell';
+/**
+ * Kinds of counters. `standby` counts a card's Standby Phases, for effects that grow each Standby Phase (Stim-Pack,
+ * Castle of Dark Illusions); it is never shown as a counter on the card.
+ */
+export type Counter = 'spell' | 'standby';
 
 export type Step =
   | { do: 'destroy'; cards: Selection }
@@ -241,8 +263,11 @@ export type Step =
   | { do: 'set_stats'; cards: Selection; atk: StatValue | number | null; def: StatValue | number | null; level: StatValue | number | null; until: Until }
   /** ATK and/or DEF gain a value read when the step resolves ("it gains ATK equal to the Tributed monster's original ATK"). */
   | { do: 'gain_stats'; cards: Selection; atk: StatValue | null; def: StatValue | null; until: Until }
-  /** `per` multiplies `amount` ("200 damage for each card in their hand"). */
-  | { do: 'change_lp'; player: 'you' | 'opponent'; amount: number; per: Per | null; kind: 'cost' | 'damage' | 'gain' }
+  /**
+   * `per` multiplies `amount` ("200 damage for each card in their hand"). The amount is a number, a stat read as for
+   * `set_stats` ("damage equal to half the Tributed monster's ATK"), or a share of that player's LP ("Pay half your LP").
+   */
+  | { do: 'change_lp'; player: 'you' | 'opponent'; amount: number | StatValue | LpShare; per: Per | null; kind: 'cost' | 'damage' | 'gain' }
   /** `per` multiplies `count`; `moved` counts only the moved cards the drawing player owns (Card Destruction). */
   | { do: 'draw'; player: 'you' | 'opponent'; count: number; per: Per | null }
   | { do: 'extra_normal_summon' }
@@ -273,6 +298,20 @@ export type Step =
   | { do: 'remove_counters'; cards: Selection; counter: Counter; count: number }
   /** The selected monsters' control passes to the activating player, until the End Phase or (null) for good. */
   | { do: 'take_control'; cards: Selection; until: 'end_phase' | null }
+  /** The activating player gives control of the selected monsters they control to their opponent, for good (Mushroom Man #2). */
+  | { do: 'give_control'; cards: Selection }
+  /**
+   * Equips this card, a monster in the hand, to the monster the selection picks: it goes face-up to a Spell & Trap Zone,
+   * linked to that monster ("equip this card from your hand to that target", Cocoon of Evolution).
+   */
+  | { do: 'equip_self'; cards: Selection }
+  /** The activating player shuffles their Deck. */
+  | { do: 'shuffle_deck' }
+  /**
+   * The activating player tosses `count` coins; an `only_if` with a `coins` condition then reads how many came up heads.
+   * A coin "called" right is heads: a call wins half the time either way.
+   */
+  | { do: 'toss_coins'; count: number }
   /**
    * Changes the battle position of the monsters selected; `switch` turns Attack to Defense and Defense to Attack. A
    * face-down monster turns face-up. `face_down`: to face-down Defense Position ("return it face-down").
@@ -298,6 +337,12 @@ export type Step =
    * of your next turn, and with `whileFaceUp` only as long as this card stays face-up on the field (Spellbreaker).
    */
   | { do: 'lock'; player: 'you' | 'opponent' | 'both'; filter: CardFilter | null; until: LockUntil; whileFaceUp: boolean }
+  /**
+   * For the rest of this turn the activating player can't activate cards, or their effects, with the names of the
+   * cards the selection picks ("but you cannot activate cards, or the effects of cards, with that name for the rest of
+   * this turn", Sangan). A name matches any card whose name contains it.
+   */
+  | { do: 'lock_names'; cards: Selection }
   /**
    * Shows the cards the selection picks from the activating player's hand to both players, usually as a cost ("reveal
    * any number of "Ice Barrier" monsters in your hand"), or Set cards on the field, which stay Set ("If the target is
@@ -339,7 +384,7 @@ export type Step =
   /** The activating player looks at the selected cards; only they see them, and the cards stay where they are ("Select and see 1 card in your opponent's hand"). */
   | { do: 'look'; cards: Selection };
 
-export const SHIELDS = ['battle_damage', 'battle_destruction'] as const;
+export const SHIELDS = ['battle_damage', 'battle_destruction', 'trap_destruction'] as const;
 /** What a `shield` step keeps from a player for the turn: battle damage, or their monsters being destroyed by battle. */
 export type Shield = (typeof SHIELDS)[number];
 
@@ -388,9 +433,15 @@ export type Forbidden = (typeof FORBIDDEN)[number];
  * - `tie`: more about this card's tie to its linked monster (every linked card is destroyed when its monster leaves the
  *   field). `destroyLinked`: when this card leaves the field, the monster is destroyed (Birthright). `defenseBreaks`: if
  *   the monster is changed to Defense Position, both are destroyed (Limit Reverse).
+ * - `attack_cost`: this card can attack only by paying `lp` of its controller's LP each time (Dark Elf).
+ * - `lure`: the controller's opponent's monsters can attack only the monsters this applies to, and not directly
+ *   (Ring of Magnetism: "linked").
+ * - `mark_attackers`: a monster that fits `filter` and attacks this card is marked once the battle is fought.
+ *   `no_attack`: it can't attack on its controller's next turn (Electric Lizard). `destroy`: it is destroyed in the End
+ *   Phase of its controller's `turns`th turn after the attack (Steel Scorpion).
  */
 export type Continuous =
-  | { apply: 'stats'; to: Affected; atk: number; def: number; per: CardFilter | 'materials' | null; levelDelta: number; levelSet: number | null; while: Condition[] }
+  | { apply: 'stats'; to: Affected; atk: number; def: number; per: CardFilter | 'materials' | 'counters' | null; levelDelta: number; levelSet: number | null; while: Condition[] }
   | {
       apply: 'restrict';
       to: Affected;
@@ -439,7 +490,12 @@ export type Continuous =
    * Works from the hand, not the field: a player with every card named in `names` in their hand (this card's own name
    * among them) wins the Duel (Exodia the Forbidden One).
    */
-  | { apply: 'win_with_hand'; names: string[] };
+  | { apply: 'win_with_hand'; names: string[] }
+  | { apply: 'attack_cost'; lp: number }
+  | { apply: 'lure'; to: 'self' | 'linked' }
+  | { apply: 'mark_attackers'; filter: CardFilter; mark: AttackerMark; turns: number };
+
+export type AttackerMark = 'no_attack' | 'destroy';
 
 export const RESTRICTIONS = ['attack', 'change_position', 'be_attacked', 'be_destroyed_by_battle', 'be_destroyed_by_effect', 'be_affected', 'activate_effects', 'be_targeted'] as const;
 /**
@@ -467,13 +523,20 @@ export type Per = CardFilter | 'moved' | 'materials';
  * you do, this card's Level becomes that monster's"). `original` is the printed value, else the current one (a card
  * off the field has only its printed one). `times` multiplies it ("double its original ATK" is 2).
  */
+/** A share of the LP of the player whose LP change ("half your LP" is times 0.5), rounded up. */
+export interface LpShare {
+  of: 'lp';
+  times: number;
+}
+
 export interface StatValue {
   /**
    * `sum`: the total of the stat over the face-up cards that fit `filter` ("the total ATK of all Level 2 or lower
    * monsters you control"). `each`: each card the step applies to, its own stat ("halve the ATK of all face-up
-   * monsters your opponent controls").
+   * monsters your opponent controls"). `moved_total`: the total over every card the last move or destroy step took
+   * ("half the total ATK those destroyed monsters had"). A card that left the field gives the value it had there.
    */
-  of: 'self' | 'targets' | 'cost' | 'moved' | 'sum' | 'each';
+  of: 'self' | 'targets' | 'cost' | 'moved' | 'sum' | 'each' | 'moved_total';
   stat: 'atk' | 'def' | 'level';
   /** For `sum`, the cards it adds up; else null. */
   filter: CardFilter | null;
@@ -505,12 +568,15 @@ export type Selection =
       /** This card itself may be picked too, when it fits ("Select 1 monster on the field", Hane-Hane). */
       includeSelf: boolean;
     }
-  | { from: 'all'; filter: CardFilter }
+  /** includeSelf: this card counts too ("destroy as many monsters you control as possible" on a monster). */
+  | { from: 'all'; filter: CardFilter; includeSelf: boolean }
   /**
    * `count` cards that fit, picked at random by code ("discard 2 random cards from your opponent's hand"); fewer if
    * fewer fit. The effect needs at least `min` to fit (0 for "up to").
    */
   | { from: 'random'; filter: CardFilter; min: number; count: number }
+  /** `count` of the opponent's cards that fit, picked by the opponent ("make your opponent Tribute 1 monster"); the effect needs that many. */
+  | { from: 'their_choice'; filter: CardFilter; count: number }
   /** The monster battling this card, if it fits ("At the start of the Damage Step, if this card attacks a face-up Defense Position monster: destroy that monster"). */
   | { from: 'battling'; filter: CardFilter }
   /**
@@ -608,7 +674,7 @@ export interface Modifier {
   turn: number;
 }
 
-export const UNTIL = ['end_of_turn', 'end_of_battle_phase', 'next_standby_phase', 'while_on_field'] as const;
+export const UNTIL = ['end_of_turn', 'end_of_battle_phase', 'end_of_damage_step', 'next_standby_phase', 'while_on_field'] as const;
 export type Until = (typeof UNTIL)[number];
 
 /** An activated effect waiting to resolve. */
@@ -636,7 +702,8 @@ export interface ChainLink {
  * phase, the turn player). `group` counts resolved chain links, so code can tell what happened last.
  */
 export type Happening =
-  | { event: 'summoned'; card: string; player: Seat; how: SummonKind; group: number }
+  /** `byEffect`: made while a chain link resolved, which no Summon negation can answer. */
+  | { event: 'summoned'; card: string; player: Seat; how: SummonKind; byEffect: boolean; group: number }
   | { event: 'attack_declared'; card: string; player: Seat; target: string | null; group: number }
   | { event: 'attacked'; card: string; player: Seat; attacker: string; group: number }
   | { event: 'destroyed_by_battle'; card: string; player: Seat; group: number }
@@ -655,7 +722,9 @@ export type Happening =
   /** A card left the field for the GY, by any means; `player` controlled it. */
   | { event: 'sent_to_graveyard'; card: string; player: Seat; group: number }
   /** A face-down monster turned face-up: Flip Summoned, attacked, or changed to a position by an effect. */
-  | { event: 'flipped'; card: string; player: Seat; group: number };
+  | { event: 'flipped'; card: string; player: Seat; group: number }
+  /** A face-up monster changed its battle position, by its controller or an effect. */
+  | { event: 'position_changed'; card: string; player: Seat; group: number };
 
 /** What happens once a sequence of triggers, responses and chains is over. */
 /** `main1`: the Standby Phase is over and Main Phase 1 starts. `damage_step`: the attack's Damage Step starts; `damage`: its damage calculation. */
@@ -714,6 +783,8 @@ export interface FieldCard {
   returnsAtEndPhase: boolean;
   /** Banished, not sent anywhere else, when it leaves the field ("but banish it when it leaves the field"). */
   banishWhenLeaves: boolean;
+  /** The effects of its own it activated while on the field, by index, for an `opt` of `face_up`. */
+  usedEffects: number[];
 }
 
 export type Zones = (FieldCard | null)[];
@@ -762,6 +833,8 @@ export interface DuelState {
   sentThisTurn: string[];
   /** Players a monster of whose went from their field to their GY this turn (Last Will). */
   monsterSentThisTurn: Seat[];
+  /** The last coin toss: true is heads. */
+  coins: boolean[];
   /** What `shield` steps keep from each player this turn. */
   shields: { player: Seat; what: Shield }[];
   /** Whether ATK/DEF additions and subtractions are reversed until the End Phase (Reverse Trap). */
@@ -770,6 +843,8 @@ export interface DuelState {
   tributable: { player: Seat; card: string }[];
   /** Damage each player takes in this turn's End Phase unless they Normal Summon a card with one of these names first. */
   pledges: { player: Seat; names: string[]; damage: number }[];
+  /** Monsters marked by `mark_attackers` (`placedTurn` tells their stay on the field apart): on `turn` they can't attack, or are destroyed in its End Phase. */
+  marks: { card: string; placedTurn: number; mark: AttackerMark; turn: number }[];
   /**
    * Locks effects left behind (Spellbreaker): `seat` controls `source`; the lock holds until the End Phase of turn
    * `untilTurn` starts, and with `whileFaceUp` only while `source` stays face-up on the field.
@@ -929,7 +1004,12 @@ export type Op =
   /** `player` Normal Summons (`set`: Sets) this monster from their hand now with these tributes, into `zone`, outside their usual Normal Summon. */
   | { op: 'normal_summon'; player: Seat; card: string; tributes: string[]; zone: number; set: boolean }
   /** The effect's controller looks at these cards; only they see them. */
-  | { op: 'look'; cards: string[] };
+  | { op: 'look'; cards: string[] }
+  /** Equips the monster being resolved, from its controller's hand, to `to` (the `equip_self` step). */
+  | { op: 'equip_from_hand'; to: string; zone: number }
+  | { op: 'shuffle_deck'; player: Seat }
+  /** Coins the activating player tossed, each heads (true) or tails. */
+  | { op: 'toss_coins'; results: boolean[] };
 
 /** The tokens one Messages API call used, as the API reported them; the server prices them. */
 export interface ModelUsage {
@@ -1115,8 +1195,14 @@ export type DuelEvent =
   | { type: 'granted'; card: string; effect: Grant }
   | { type: 'battleDamageZeroed'; player: Seat }
   | { type: 'shielded'; player: Seat; what: Shield[] }
+  /** A monster that attacked a `mark_attackers` card was marked. */
+  | { type: 'attackerMarked'; card: string; mark: AttackerMark; turn: number }
+  /** `card`, a monster, was equipped from the hand to `to` and put face-up in Spell & Trap Zone `zone` (Cocoon of Evolution). */
+  | { type: 'equippedFromHand'; player: Seat; card: string; to: string; zone: number }
   | { type: 'statChangesReversed' }
   | { type: 'tributeAllowed'; player: Seat; card: string }
+  /** `player` tossed coins: true is heads. */
+  | { type: 'coinsTossed'; player: Seat; results: boolean[] }
   /** `player` looked at these cards; only they learn which cards they are. */
   | { type: 'looked'; player: Seat; cards: string[] }
   | { type: 'pledged'; player: Seat; names: string[]; damage: number }

@@ -1,0 +1,93 @@
+{
+  "code": 13215230,
+  "textHash": "032bfa9d02a5ff852bf8c503dab46362527b51c6d687327f042e2012d4e7acfd",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card is changed from Attack Position to face-up Defense Position",
+      "cost": "",
+      "effect": "Select 1 monster your opponent controls and destroy it.",
+      "targets": null,
+      "when": {
+        "event": "position_changed",
+        "self": true,
+        "filter": {
+          "side": "you",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": "defense",
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

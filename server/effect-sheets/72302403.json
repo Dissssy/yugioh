@@ -97,7 +97,8 @@
                     "atk": null,
                     "def": null,
                     "original": false
-                  }
+                  },
+                  "includeSelf": false
                 },
                 "position": "defense"
               }

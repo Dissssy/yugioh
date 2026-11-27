@@ -1,0 +1,99 @@
+{
+  "code": 77414722,
+  "textHash": "bc3e829a03e5e65569014852985437c48b9340ce6372e769fb7e7fa8bbe6b435",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 3,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "When a Spell Card is activated",
+      "cost": "Discard 1 card",
+      "effect": "Negate the activation, and if you do, destroy it.",
+      "targets": null,
+      "when": {
+        "event": "activated",
+        "self": false,
+        "filter": {
+          "side": "either",
+          "places": [],
+          "kinds": [
+            "spell"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "places": [
+                  "hand"
+                ],
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null,
+                "original": false
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null,
+              "distinct": false,
+              "includeSelf": false
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "negate_activation",
+                "destroy": true
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

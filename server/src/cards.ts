@@ -45,7 +45,7 @@ export interface CardSet {
  * The card pool grows down the set list, oldest first: every card printed in the sets up to and including this one
  * (by list code) is in the pool, along with the premade decks' cards. Pool cards get effect sheets and images.
  */
-export const POOL_THROUGH = 'SDK';
+export const POOL_THROUGH = 'MRD';
 
 /**
  * Cards that need no written sheet (Normal Monsters, and cards `simpleSheet` covers) join the pool ahead of their set

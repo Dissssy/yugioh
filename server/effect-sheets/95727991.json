@@ -1,0 +1,82 @@
+{
+  "code": 95727991,
+  "textHash": "d6982f0ec1863e4b044f0d6f6eda8850aa34f9b59a18b95ff66e20b1c5b1a566",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "soft",
+      "window": "Once per turn, your Main Phase",
+      "cost": "Tribute 1 monster",
+      "effect": "Inflict damage to your opponent equal to half the Tributed monster's ATK on the field.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "places": [
+                  "monsters"
+                ],
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null,
+                "original": false
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null,
+              "distinct": false,
+              "includeSelf": true
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": {
+                  "of": "cost",
+                  "stat": "atk",
+                  "filter": null,
+                  "original": false,
+                  "times": 0.5
+                },
+                "per": null,
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

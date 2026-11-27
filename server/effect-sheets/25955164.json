@@ -1,0 +1,79 @@
+{
+  "code": 25955164,
+  "textHash": "7c15e08b5c15322961050e01edb925eba1f0ccbc169e94d547c3eac3db781d48",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "quick",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "face_up",
+      "window": "During damage calculation in your opponent's turn, if this card is being attacked",
+      "cost": "",
+      "effect": "Make the attacking monster's ATK 0 during damage calculation only.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "damage_calculation"
+          },
+          {
+            "if": "turn",
+            "whose": "opponent"
+          },
+          {
+            "if": "battling",
+            "as": "target",
+            "damageStep": true
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "set_stats",
+                "cards": {
+                  "from": "battling",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  }
+                },
+                "atk": 0,
+                "def": null,
+                "level": null,
+                "until": "end_of_damage_step"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

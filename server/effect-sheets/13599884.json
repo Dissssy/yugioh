@@ -1,0 +1,73 @@
+{
+  "code": 13599884,
+  "textHash": "2f72261f938a9df56bb281e0887b84e2db6729106faea2573e274e7c5366208b",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "A non Machine-Type monster attacking this card is destroyed at the End Phase of your opponent's 2nd turn after the attack.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "mark_attackers",
+        "filter": {
+          "side": "either",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [],
+          "types": [],
+          "races": [
+            "Aqua",
+            "Beast",
+            "Beast-Warrior",
+            "Creator-God",
+            "Cyberse",
+            "Dinosaur",
+            "Divine-Beast",
+            "Dragon",
+            "Fairy",
+            "Fiend",
+            "Fish",
+            "Illusion",
+            "Insect",
+            "Plant",
+            "Psychic",
+            "Pyro",
+            "Reptile",
+            "Rock",
+            "Sea Serpent",
+            "Spellcaster",
+            "Thunder",
+            "Warrior",
+            "Winged Beast",
+            "Wyrm",
+            "Zombie"
+          ],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "mark": "destroy",
+        "turns": 2
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

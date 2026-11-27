@@ -1,0 +1,112 @@
+{
+  "code": 93900406,
+  "textHash": "cb54bbf2b155d801afda1ca10818d6998a426d16f522993dedd3d665e8c84ad1",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "During each of your Standby Phases",
+      "cost": "",
+      "effect": "The player controlling this monster loses 300 Life Points.",
+      "targets": null,
+      "when": {
+        "event": "standby_phase",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [
+          {
+            "if": "turn",
+            "whose": "you"
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "you",
+                "amount": 300,
+                "per": null,
+                "kind": "cost"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "At your End Phase",
+      "cost": "Pay 500 Life Points",
+      "effect": "Shift control of this card to your opponent.",
+      "targets": null,
+      "when": {
+        "event": "end_phase",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [
+          {
+            "if": "turn",
+            "whose": "you"
+          }
+        ],
+        "cost": [
+          {
+            "do": "change_lp",
+            "player": "you",
+            "amount": 500,
+            "per": null,
+            "kind": "cost"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "give_control",
+                "cards": {
+                  "from": "self"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

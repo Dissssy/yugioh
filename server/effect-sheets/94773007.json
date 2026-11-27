@@ -1,0 +1,69 @@
+{
+  "code": 94773007,
+  "textHash": "4e015d03d7eb73b48f90ff136d56a4c6a5d5b5a1ee29993492e7d37f07c93bbe",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card declares an attack",
+      "cost": "",
+      "effect": "Toss a coin and call it. If you call it wrong, lose half your Life Points.",
+      "targets": null,
+      "when": {
+        "event": "attack_declared",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "toss_coins",
+                "count": 1
+              },
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "coins",
+                    "min": null,
+                    "max": 0
+                  }
+                ]
+              },
+              {
+                "do": "change_lp",
+                "player": "you",
+                "amount": {
+                  "of": "lp",
+                  "times": 0.5
+                },
+                "per": null,
+                "kind": "cost"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

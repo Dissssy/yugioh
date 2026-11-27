@@ -1,0 +1,102 @@
+{
+  "code": 14141448,
+  "textHash": "905f30217c845413759cbbbd3c8e7270e1c40f483be9ac21ab2a55fb44a63469",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "condition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase, while this card is in your hand",
+      "cost": "Tribute 1 \"Petit Moth\"",
+      "effect": "Cannot be Normal Summoned or Set. Must be Special Summoned by Tributing \"Petit Moth\" during your 4th turn after \"Petit Moth\" has been equipped with \"Cocoon of Evolution\".",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "counters",
+            "filter": {
+              "side": "you",
+              "places": [
+                "spellTraps"
+              ],
+              "kinds": [],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Cocoon of Evolution",
+              "except": null,
+              "extraDeck": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null,
+              "original": false
+            },
+            "counter": "standby",
+            "min": 4
+          }
+        ],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "places": [
+                  "monsters"
+                ],
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": "Petit Moth",
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null,
+                "original": false
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null,
+              "distinct": false,
+              "includeSelf": false
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "special_summon",
+                "cards": {
+                  "from": "self"
+                },
+                "position": "choice",
+                "banishWhenLeaves": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": false
+}

@@ -1,0 +1,81 @@
+{
+  "code": 81480461,
+  "textHash": "9ade322a428f0c7603545f605f83011198406bf8842a0436194514634cfee962",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "soft",
+      "window": "Once per turn, your Main Phase",
+      "cost": "",
+      "effect": "Toss a coin 3 times and destroy that target if at least 2 of the results are heads.",
+      "targets": "1 monster your opponent controls",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "places": [
+              "monsters"
+            ],
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "toss_coins",
+                "count": 3
+              },
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "coins",
+                    "min": 2,
+                    "max": null
+                  }
+                ]
+              },
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -1,0 +1,83 @@
+{
+  "code": 98069388,
+  "textHash": "4b1d886bbed59ca12fad0385338afa620ae3befe54e0db2d7a14362039449b71",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 3,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "When a monster(s) would be Summoned",
+      "cost": "Tribute 1 monster",
+      "effect": "Negate the Summon, and if you do, destroy that monster(s).",
+      "targets": null,
+      "when": {
+        "event": "summoning",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "places": [
+                  "monsters"
+                ],
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null,
+                "original": false
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null,
+              "distinct": false,
+              "includeSelf": false
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "event"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

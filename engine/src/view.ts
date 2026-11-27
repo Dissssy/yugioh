@@ -361,6 +361,8 @@ function describe(state: DuelState, event: LogEvent): string | null {
       return `Chose: ${event.choice}`;
     case 'revealed':
       return `${who(event.player)} revealed ${names(event.cards)}`;
+    case 'coinsTossed':
+      return `${who(event.player)} tossed ${event.results.length === 1 ? 'a coin' : `${event.results.length} coins`}: ${event.results.map((h) => (h ? 'heads' : 'tails')).join(', ')}`;
     case 'looked':
       return event.cards ? `${who(event.player)} looked at ${names(event.cards)}` : `${who(event.player)} looked at ${event.count} card${event.count === 1 ? '' : 's'}`;
     case 'moved': {
@@ -399,7 +401,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'setAgain':
       return null;
     case 'countersChanged':
-      return `${name(event.card)} ${event.delta > 0 ? 'gets' : 'loses'} ${Math.abs(event.delta)} ${event.counter === 'spell' ? 'Spell Counter' : 'counter'}${Math.abs(event.delta) === 1 ? '' : 's'}`;
+      return `${name(event.card)} ${event.delta > 0 ? 'gets' : 'loses'} ${Math.abs(event.delta)} ${event.counter === 'spell' ? 'Spell Counter' : 'Standby Phase counter'}${Math.abs(event.delta) === 1 ? '' : 's'}`;
     case 'damageStepStarted':
     case 'replacementOffered':
     case 'rollbackOffered':
@@ -424,7 +426,11 @@ function describe(state: DuelState, event: LogEvent): string | null {
     case 'battleDamageZeroed':
       return `${who(event.player)} takes no battle damage from this battle`;
     case 'shielded':
-      return `${who(event.player)} ${event.what.map((w) => (w === 'battle_damage' ? 'takes no battle damage' : "can't have monsters destroyed by battle")).join(' and ')} this turn`;
+      return `${who(event.player)} ${event.what.map((w) => ({ battle_damage: 'takes no battle damage', battle_destruction: "can't have monsters destroyed by battle", trap_destruction: "can't have Traps destroyed by card effects" })[w]).join(' and ')} this turn`;
+    case 'attackerMarked':
+      return event.mark === 'no_attack' ? `${name(event.card)} can't attack next turn` : `${name(event.card)} will be destroyed in the End Phase of turn ${event.turn}`;
+    case 'equippedFromHand':
+      return `${who(event.player)} equipped ${name(event.card)} to ${name(event.to)}`;
     case 'statChangesReversed':
       return 'ATK and DEF gains and losses are reversed until the End Phase';
     case 'tributeAllowed':

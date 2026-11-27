@@ -1,0 +1,66 @@
+{
+  "code": 28725004,
+  "textHash": "1d4b836ff222c379090fc961febc11826e292bd99ee9211a77c0b8d181d68b21",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "If this Attack Position card is changed to face-up Defense Position",
+      "cost": "",
+      "effect": "Shuffle your Deck.",
+      "targets": null,
+      "when": {
+        "event": "position_changed",
+        "self": true,
+        "filter": {
+          "side": "you",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": "defense",
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "shuffle_deck"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

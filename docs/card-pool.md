@@ -182,3 +182,55 @@ Built for it:
 
 New eval cases cover Just Desserts, The Flute of Summoning Dragon (with and without Lord of D.), Lord of D., Ancient
 Telescope and The Inexperienced Spy.
+
+### Metal Raiders (MRD)
+
+144 cards: 51 Normal Monsters, 16 written by code and 77 scripted (74 of them new sheets written in the thread), none
+left to the judge.
+
+Built for it:
+
+- **Coin tosses.** `toss_coins {count}` tosses and stores the results in `state.coins`; an `only_if` with a `coins`
+  condition then reads how many came up heads (Barrel Dragon, Jirai Gumo, Time Wizard). Calling a coin is the same as
+  needing heads. Steps after a toss aren't checked on activation, since any result may do nothing.
+- **New "when" events.** `summoning` (a monster "would be Summoned", by a player and not by an effect: Solemn
+  Judgment, Horn of Heaven), `position_changed` (a face-up monster changes battle position; the filter's position is
+  the new one: Crass Clown, Dream Clown, Tainted Wisdom, Yado Karu) and `standby_phase`. Changing a monster's position
+  by hand now opens a window, so its triggers can go on the chain.
+- **Standby counters.** The counter kind `standby`, and a stats effect's `per: "counters"` (the counters on the card
+  itself), count each of a player's Standby Phases: Stim-Pack, Germ Infection, Castle of Dark Illusions, Pumpking and
+  Cocoon of Evolution. The `counters` condition reads them (Larvae Moth, Great Moth).
+- **Halving LP and totals.** `change_lp` takes `{"of": "lp", "times": 0.5}` (Solemn Judgment, Jirai Gumo), and a stat
+  value `of: "moved_total"` sums the ATK the destroyed cards had (Time Wizard). The selection `all` has `includeSelf`.
+- **Other steps.** `give_control` (Mushroom Man #2), `shuffle_deck`, `lock_names` ("you cannot activate cards with
+  that name for the rest of this turn": Sangan, Witch of the Black Forest) and `equip_self` (a monster equipped from the
+  hand, Cocoon of Evolution).
+- **Selections and conditions.** `their_choice` (the opponent picks: Share the Pain), `battle_opponent` (Insect
+  Soldiers of the Sky), and `until: "end_of_damage_step"` for "during damage calculation only" (Kazejin, Sanga of the
+  Thunder, Suijin). `opt: "face_up"` is "once while this card is face-up on the field".
+- **Attack conditions.** The continuous effects `attack_cost` (Dark Elf), `lure` (Ring of Magnetism: the opponent's
+  monsters may only attack the equipped one) and `mark_attackers` (Electric Lizard: the attacker can't attack on its
+  next turn; Steel Scorpion: it is destroyed in the End Phase of its controller's 2nd turn after).
+- **The `trap_destruction` shield** (Fake Trap): the player's Traps aren't destroyed by card effects this turn.
+
+Known differences from the official rulings:
+
+- Solemn Judgment and Horn of Heaven answer the window after the Summon, so the monster's own summon triggers are
+  already waiting. The Summon isn't negated, only the monster destroyed.
+- Catapult Turtle reads the Tributed monster's printed ATK, not its ATK on the field.
+- Time Wizard counts a face-down monster's printed ATK.
+- A name lock (Sangan) and a name filter (Thunder Dragon) match any name that contains the given one.
+- Fake Trap answers any activation of the opponent's and shields all of the player's Traps for the whole turn.
+- Germ Infection counts the Standby Phases of the player who activated it, not the equipped monster's controller.
+- Castle of Dark Illusions boosts every Zombie monster, not only those on the field when it flipped. Pumpking's
+  counters don't reset when the Castle leaves.
+- Kazejin, Sanga and Suijin affect the attacker without targeting it.
+- Larvae Moth and Great Moth check that a Cocoon of Evolution you control has enough counters, not that the Tributed
+  Petit Moth is the one it equips.
+- The Unhappy Maiden stops further attacks that turn, but the Battle Phase itself goes on.
+- Elegant Egotist tells "Harpie Lady" from "Harpie Lady Sisters" by Level (4 or less).
+
+New eval cases cover Sangan, Solemn Judgment (both effects), Horn of Heaven, Barrel Dragon, Time Wizard, Catapult
+Turtle, Jirai Gumo, Crass Clown, Dream Clown, Yado Karu, Stim-Pack, Mushroom Man #2, Castle of Dark Illusions with
+Pumpking, Cocoon of Evolution, Larvae Moth, Kazejin, Dark Elf, Electric Lizard, Insect Soldiers of the Sky, Share the
+Pain, The Unhappy Maiden, Fake Trap and Gate Guardian. Engine tests cover lures, Steel Scorpion's mark and attack costs.

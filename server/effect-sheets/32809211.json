@@ -1,0 +1,32 @@
+{
+  "code": 32809211,
+  "textHash": "1db41aed14d09820bef9460abf3f030729d90fe00327123e6ec5116a8707ac11",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "This monster can attack your opponent's Life Points directly.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "battle",
+        "to": "self",
+        "attacks": 1,
+        "piercing": false,
+        "noDamageToYou": false,
+        "direct": true,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}
