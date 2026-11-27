@@ -1,0 +1,63 @@
+{
+  "code": 19613556,
+  "textHash": "a04f3bc36fab82dbffe252c9661f5d17fc350127fc9f665a2dfb4ff750cc6625",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Destroy all Spell and Trap Cards on the field.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "either",
+                    "places": [
+                      "spellTraps"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "includeSelf": false
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

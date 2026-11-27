@@ -1,0 +1,51 @@
+{
+  "code": 71107816,
+  "textHash": "21b9fca95356034e1fd744558ebe3c791defa3a56478c9fb90667bdb95d9cbec",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card inflicts Battle Damage to your opponent",
+      "cost": "",
+      "effect": "Your opponent draws 2 cards.",
+      "targets": null,
+      "when": {
+        "event": "battle_damage",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "draw",
+                "player": "opponent",
+                "count": 2,
+                "per": null
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

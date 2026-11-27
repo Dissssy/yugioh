@@ -1,0 +1,78 @@
+{
+  "code": 31786629,
+  "textHash": "6f05433794c2faa3c607d09122049c96ae96699021290b3fc54ee7e0f5a3946e",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "hand",
+      "opt": "none",
+      "window": "Your Main Phase, while this card is in your hand",
+      "cost": "Discard this card",
+      "effect": "Add up to 2 \"Thunder Dragon\" from your Deck to your hand.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "self"
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "deck"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": "Thunder Dragon",
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": 2,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                },
+                "to": "hand"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

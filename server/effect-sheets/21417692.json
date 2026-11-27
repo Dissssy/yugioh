@@ -1,0 +1,27 @@
+{
+  "code": 21417692,
+  "textHash": "cc7cb8aacd188963917be09800a6919d8993e17bebc98593b3d4546c2dcb29b4",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "This card requires a cost of 1000 of your own Life Points to attack.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "attack_cost",
+        "lp": 1000
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -1,0 +1,79 @@
+{
+  "code": 52097679,
+  "textHash": "7d88cc6a34588ccb7c9ae3e2c02d155e5fea98d8b77d1cf43efc08e2d773c984",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Switch the original ATK and DEF of all face-up monsters currently on the field, until the end of this turn.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "set_stats",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "either",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": true,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "includeSelf": false
+                },
+                "atk": {
+                  "of": "each",
+                  "stat": "def",
+                  "filter": null,
+                  "original": true,
+                  "times": 1
+                },
+                "def": {
+                  "of": "each",
+                  "stat": "atk",
+                  "filter": null,
+                  "original": true,
+                  "times": 1
+                },
+                "level": null,
+                "until": "end_of_turn"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

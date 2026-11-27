@@ -11,6 +11,7 @@ import {
   cardOf,
   chooseFrom,
   specialSummonProblem,
+  spellTrapZonesFor,
   cardsFitting,
   deckTop,
   describeFilter,
@@ -33,6 +34,7 @@ import {
   materialsOf,
   monsterZoneFree,
   monsterZonesFor,
+  other,
   scriptOf,
   summonPlan,
   statsOf,
@@ -41,6 +43,8 @@ import {
   costSubstitute,
   fromHandToGraveyard,
   visibleTo,
+  type CardFilter,
+  type Counter,
   type DuelEvent,
   type DuelState,
   type JudgeRecord,
@@ -54,7 +58,7 @@ import {
 import { checkQuestion, judge, placeInto, type JudgeCall, type JudgeDeps, type JudgeOutcome, type ModelCall } from './judge.ts';
 import type { AskPlayer } from './tools.ts';
 
-const counterName = (counter: 'spell', count: number) => `${count} ${counter === 'spell' ? 'Spell Counter' : 'counter'}${count === 1 ? '' : 's'}`;
+const counterName = (counter: Counter, count: number) => `${count} ${counter === 'spell' ? 'Spell Counter' : 'Standby Phase counter'}${count === 1 ? '' : 's'}`;
 
 /** The `model` of a ruling made by a script. */
 export const SCRIPT = 'script';
@@ -63,7 +67,7 @@ export const NO_JUDGE = 'none';
 /** Whether a ruling called a model, which is what counts as a judge call. */
 export const calledModel = (model: string | null) => model !== SCRIPT && model !== NO_JUDGE;
 
-const untilText = { end_of_turn: 'until the end of the turn', end_of_battle_phase: 'until the end of the Battle Phase', next_standby_phase: 'until the next Standby Phase', while_on_field: '' };
+const untilText = { end_of_turn: 'until the end of the turn', end_of_battle_phase: 'until the end of the Battle Phase', end_of_damage_step: 'during this damage calculation', next_standby_phase: 'until the next Standby Phase', while_on_field: '' };
 
 /** Rules on an effect: by its script when it has one, else by the judge (which needs `model`). */
 export function rule(call: JudgeCall, deps: Omit<JudgeDeps, 'model'> & { model: ModelCall | null }): Promise<JudgeOutcome> {
@@ -124,7 +128,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
   const select = async (sel: Selection, verb: string, limit = Infinity, keep: (id: string) => boolean = () => true): Promise<string[]> => {
     if (sel.from === 'self') return locate(state, self) ? [self] : [];
     if (sel.from === 'targets') return link.targets.filter((id) => movedHere.has(id) || (script.targets && fits(state, id, script.targets.filter, seat)));
-    if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, self);
+    if (sel.from === 'all') return cardsFitting(state, sel.filter, seat, sel.includeSelf ? '' : self);
     if (sel.from === 'battling') return battling(state, sel.filter, seat, self);
     if (sel.from === 'moved') return moved.filter((id) => locate(state, id));
     if (sel.from === 'deck_top') return deckTop(state, sel, seat);
@@ -138,6 +142,12 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       while (pool.length > 0 && picked.length < Math.min(sel.count, limit)) picked.push(...pool.splice(Math.floor(deps.random() * pool.length), 1));
       transcript.push({ random: picked });
       return picked;
+    }
+    if (sel.from === 'their_choice') {
+      const options = cardsFitting(state, sel.filter, seat, self).filter(keep);
+      const count = Math.min(sel.count, options.length, limit);
+      if (count === 0) return [];
+      return options.length === count ? options : ask({ prompt: `${name}: choose ${count} ${describeFilter(sel.filter, true)} to ${verb}.`, cards: options, choices: [], min: count, max: count }, other(seat));
     }
     const options = chooseFrom(state, sel, seat, self).filter(keep);
     // "That many": exactly as many as the cards paid as the cost.
@@ -183,8 +193,20 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
    * A stat read when the step resolves: from this card, the first target still on the field (or in a pile, for original
    * stats), the first card paid as the cost, or the first card the last move step moved.
    */
+  /** The stats of face-up monsters as they left the field during this effect, for values read after they left. */
+  const lastSeen = new Map<string, { atk: number | null; def: number | null; level: number | null }>();
+  const remember = (ids: string[]) => {
+    for (const id of ids) {
+      const at = locate(state, id);
+      if (at?.zone === 'monsters' && state.players[at.seat].monsters[at.index]!.faceUp) lastSeen.set(id, { ...statsOf(state, id), level: levelNow(state, id) });
+    }
+  };
   const valueOf = (v: StatValue | number, each: string | null = null): number | null => {
     if (typeof v === 'number') return v;
+    if (v.of === 'moved_total') {
+      const total = moved.reduce((sum, id) => sum + ((v.original ? null : lastSeen.get(id)?.[v.stat]) ?? (v.stat === 'level' ? levelOf(cardOf(state, id)) : cardOf(state, id)[v.stat]) ?? 0), 0);
+      return Math.round(total * v.times);
+    }
     if (v.of === 'sum') {
       // Face-up monsters only: a face-down one has no ATK to add.
       const cards = v.filter ? cardsFitting(state, { ...v.filter, faceUp: true }, seat, '') : [];
@@ -194,6 +216,8 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
     if (!id || !locate(state, id)) return null;
     const at = locate(state, id)!;
     const onField = at.zone === 'monsters' && !v.original;
+    const seen = !onField && !v.original ? lastSeen.get(id) : undefined;
+    if (seen) return seen[v.stat] === null ? null : Math.round(seen[v.stat]! * v.times);
     const base = v.stat === 'level' ? (onField ? levelNow(state, id) : levelOf(cardOf(state, id))) : onField ? statsOf(state, id)[v.stat] : cardOf(state, id)[v.stat];
     return base === null ? null : Math.round(base * v.times);
   };
@@ -232,7 +256,9 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
           kept.push(id);
         }
         const lost = cards.filter((id) => !kept.includes(id));
+        remember(lost);
         if (lost.length) apply({ op: 'destroy', cards: lost });
+        moved = lost;
         const said = kept.map((id) => `${shown(id, before)} detached Xyz Material instead of being destroyed.`);
         if (lost.length) said.unshift(`${list(lost.map((id) => shown(id, before)))} ${lost.length === 1 ? 'was' : 'were'} destroyed.`);
         return said.join(' ');
@@ -256,6 +282,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         // "Discard any number of cards, then target that many": no more than there are cards to target.
         const limit = cost ? costLimit() - (substituted ? 1 : 0) : Infinity;
         const cards = await select(sel, verb, limit);
+        remember(cards);
         for (const id of cards) apply({ op: 'move', card: id, to: step.to });
         moved = cards;
         if (cost) paid.push(...cards);
@@ -401,11 +428,12 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       }
       case 'change_lp': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
-        const amount = step.amount * countOf(step.per, null, null);
+        const base = typeof step.amount === 'number' ? step.amount : step.amount.of === 'lp' ? Math.ceil(state.players[player].lp * step.amount.times) : (valueOf(step.amount) ?? 0);
+        const amount = base * countOf(step.per, null, null);
         if (amount === 0) return null;
         apply({ op: 'change_lp', player, amount, kind: step.kind });
         const who = state.players[player].name;
-        return cost ? null : step.kind === 'gain' ? `${who} gained ${amount} LP.` : `${who} took ${amount} damage.`;
+        return cost ? null : step.kind === 'gain' ? `${who} gained ${amount} LP.` : step.kind === 'cost' ? `${who} lost ${amount} LP.` : `${who} took ${amount} damage.`;
       }
       case 'draw': {
         const player = step.player === 'you' ? seat : seat === 0 ? 1 : 0;
@@ -429,6 +457,13 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
             : await ask({ prompt: `${name}: choose ${step.count} Xyz Material${step.count === 1 ? '' : 's'} to detach.`, cards: attached, choices: [], min: step.count, max: step.count });
         for (const id of picked) apply({ op: 'detach', card: id });
         return cost ? null : `${list(picked.map((id) => shown(id, before)))} ${picked.length === 1 ? 'was' : 'were'} detached from ${shown(xyz!, before)}.`;
+      }
+      case 'equip_self': {
+        const [monster] = (await select(step.cards, 'equip it to')).filter((id) => locate(state, id)?.zone === 'monsters');
+        const zone = spellTrapZonesFor(state, seat, cardOf(state, self))[0];
+        if (!monster || zone === undefined || !state.players[seat].hand.includes(self)) return null;
+        apply({ op: 'equip_from_hand', to: monster, zone });
+        return `${name} was equipped to ${shown(monster, before)}.`;
       }
       case 'link': {
         const [monster] = (await select(step.cards, 'equip it to')).filter((id) => locate(state, id)?.zone === 'monsters');
@@ -512,6 +547,14 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         const what = step.filter ? `${describeFilter(step.filter)}s` : 'cards';
         return `${who} activate ${what} until the End Phase${step.until === 'your_next_end_phase' ? ` of ${state.players[seat]!.name}'s next turn` : ''}.`;
       }
+      case 'lock_names': {
+        const names = [...new Set((await select(step.cards, 'lock')).map((id) => cardOf(state, id).name))];
+        for (const named of names) {
+          const filter: CardFilter = { side: 'either', places: [], kinds: [], types: [], races: [], attributes: [], named, except: null, extraDeck: null, faceUp: null, position: null, level: null, atk: null, def: null, original: false };
+          apply({ op: 'lock', player: 'you', filter, until: 'this_end_phase', while_face_up: false });
+        }
+        return names.length ? `${state.players[seat].name} can't activate ${list(names.map((n) => `"${n}"`))} for the rest of this turn.` : null;
+      }
       case 'pledge_normal_summon': {
         if (!moved.length) return null;
         apply({ op: 'pledge_normal_summon', player: seat, cards: moved, damage: step.damage });
@@ -550,7 +593,7 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
       }
       case 'shield':
         apply({ op: 'shield', player: seat, what: step.what });
-        return `${state.players[seat].name} ${step.what.map((w) => (w === 'battle_damage' ? 'takes no battle damage' : "can't have monsters destroyed by battle")).join(' and ')} this turn.`;
+        return `${state.players[seat].name} ${step.what.map((w) => ({ battle_damage: 'takes no battle damage', battle_destruction: "can't have monsters destroyed by battle", trap_destruction: "can't have Traps destroyed by card effects" })[w]).join(' and ')} this turn.`;
       case 'reverse_stat_changes':
         apply({ op: 'reverse_stat_changes' });
         return 'ATK and DEF gains and losses are reversed until the End Phase.';
@@ -562,6 +605,30 @@ export async function runScript(call: JudgeCall, deps: Pick<JudgeDeps, 'ask' | '
         for (const id of allowed) apply({ op: 'allow_tribute', player: seat, card: id });
         return allowed.length ? `${state.players[seat].name} may Tribute ${list(allowed.map((id) => shown(id, before)))} this turn, and must if they Tribute.` : null;
       }
+      case 'give_control': {
+        const given: string[] = [];
+        for (const id of await select(step.cards, 'give control of', monsterZonesFor(state, other(seat), false).length)) {
+          const at = locate(state, id);
+          if (at?.zone !== 'monsters' || at.seat !== seat) continue;
+          const placed = await placeInto(state, { op: 'take_control', card: id, controller: other(seat), until: null }, { player: seat, source: self, stage, random: deps.random }, deps.ask);
+          if (!placed.ok) throw new Refused(`give_control was refused: ${placed.error}`);
+          if (placed.picks) transcript.push({ question: 'Monster Zone', picks: placed.picks });
+          apply(placed.op);
+          given.push(id);
+        }
+        const to = other(seat);
+        return given.length ? `${state.players[to]!.name} took control of ${list(given.map((id) => shown(id, before)))}.` : null;
+      }
+      case 'toss_coins': {
+        const results = Array.from({ length: step.count }, () => deps.random() < 0.5);
+        transcript.push({ random: results.map((h) => (h ? 'heads' : 'tails')) });
+        apply({ op: 'toss_coins', results });
+        const heads = results.filter(Boolean).length;
+        return step.count === 1 ? `The coin came up ${heads ? 'heads' : 'tails'}.` : `The coins came up heads ${heads} of ${step.count} times.`;
+      }
+      case 'shuffle_deck':
+        apply({ op: 'shuffle_deck', player: seat });
+        return `${state.players[seat].name} shuffled their Deck.`;
       case 'look': {
         const cards = await select(step.cards, 'look at');
         if (!cards.length) return null;

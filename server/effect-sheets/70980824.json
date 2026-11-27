@@ -219,7 +219,8 @@
                     "atk": null,
                     "def": null,
                     "original": false
-                  }
+                  },
+                  "includeSelf": false
                 },
                 "atk": {
                   "of": "each",
@@ -255,7 +256,8 @@
                     "atk": null,
                     "def": null,
                     "original": false
-                  }
+                  },
+                  "includeSelf": false
                 }
               }
             ]

@@ -1,0 +1,121 @@
+{
+  "code": 50152549,
+  "textHash": "a43b0129ae5a9e5770f15ec307f8342726b674e27ba29f5e0ad54f77981c268d",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Equip this card to 1 face-up non Machine-Type monster.",
+      "targets": "1 face-up non Machine-Type monster on the field",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "places": [
+              "monsters"
+            ],
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [
+              "Aqua",
+              "Beast",
+              "Beast-Warrior",
+              "Creator-God",
+              "Cyberse",
+              "Dinosaur",
+              "Divine-Beast",
+              "Dragon",
+              "Fairy",
+              "Fiend",
+              "Fish",
+              "Illusion",
+              "Insect",
+              "Plant",
+              "Psychic",
+              "Pyro",
+              "Reptile",
+              "Rock",
+              "Sea Serpent",
+              "Spellcaster",
+              "Thunder",
+              "Warrior",
+              "Winged Beast",
+              "Wyrm",
+              "Zombie"
+            ],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is equipped to a monster",
+      "cost": "",
+      "effect": "A non Machine-Type monster equipped with this card cannot attack.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "restrict",
+        "to": "linked",
+        "others": false,
+        "cannot": [
+          "attack"
+        ],
+        "by": null,
+        "compare": null,
+        "once": false,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

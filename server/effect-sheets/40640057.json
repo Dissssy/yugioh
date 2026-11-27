@@ -1,0 +1,56 @@
+{
+  "code": 40640057,
+  "textHash": "b099bf49ee553cc61b8a82e036d7d15f6d31230537f3429db082ffe4c62f68ba",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "quick",
+      "speed": 2,
+      "mandatory": false,
+      "from": "hand",
+      "opt": "none",
+      "window": "During damage calculation, if your opponent's monster attacks",
+      "cost": "Discard this card",
+      "effect": "You take no battle damage from that battle.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "damage_calculation"
+          },
+          {
+            "if": "turn",
+            "whose": "opponent"
+          }
+        ],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "self"
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "no_battle_damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

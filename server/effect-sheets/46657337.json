@@ -1,0 +1,51 @@
+{
+  "code": 46657337,
+  "textHash": "2691d0e2e80b2b8916f3c8c224da6f8a81d6e1c2bdac0cf6239344b33b7f68b3",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "This card gains 300 ATK and DEF for each card in your hand.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 300,
+        "def": 300,
+        "per": {
+          "side": "you",
+          "places": [
+            "hand"
+          ],
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

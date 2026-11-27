@@ -75,6 +75,9 @@ const cards: Record<number, CardData> = {
   30: monster(30, 'Revealer', 1100, 1500),
   31: monster(31, 'Ice Caller', 1000, 1000),
   32: card(32, 'Defense Draw', 'trap', 'Normal'),
+  33: monster(33, 'Lure Beast', 1000, 1000),
+  34: monster(34, 'Scorpion', 1000, 1000),
+  35: monster(35, 'Costly Elf', 2000, 800),
 };
 
 const filter = (f: Partial<CardFilter>): CardFilter => ({
@@ -133,7 +136,7 @@ const sheets: Record<number, EffectSheet> = {
       kind: 'activation',
       speed: 2,
       when: when({ event: 'attack_declared', filter: filter({ side: 'opponent' }) }),
-      script: script({ options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'all', filter: filter({ side: 'opponent', position: 'attack' }) } }] }] }),
+      script: script({ options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'all', filter: filter({ side: 'opponent', position: 'attack' }), includeSelf: false } }] }] }),
     }),
   ),
   5: sheet(
@@ -236,6 +239,9 @@ const sheets: Record<number, EffectSheet> = {
       script: script({ targets: { filter: filter({}), min: 1, max: 1, others: false, event: false }, options: [{ label: '', cost: [], steps: [{ do: 'destroy', cards: { from: 'targets' } }] }] }),
     }),
   ),
+  33: sheet(33, effect({ kind: 'continuous', continuous: { apply: 'lure', to: 'self' } })),
+  34: sheet(34, effect({ kind: 'continuous', continuous: { apply: 'mark_attackers', filter: filter({}), mark: 'destroy', turns: 2 } })),
+  35: sheet(35, effect({ kind: 'continuous', continuous: { apply: 'attack_cost', lp: 1000 } })),
 };
 
 /** Seat 0 goes first with `deck0` (top first, IDs a0, a1, ...), seat 1 with `deck1` (b0, b1, ...). */
@@ -798,5 +804,42 @@ describe('Speed Warrior', () => {
     expect(t.activations(0)).toEqual([]);
     t.play(0, { type: 'enterMain2' });
     expect(statsOf(t.state, 'a0').atk).toBe(900);
+  });
+});
+
+describe('attack conditions from continuous effects', () => {
+  it('lets the opponent attack only the luring monster', () => {
+    // Seat 1 summons Weak Knight on turn 2 and Lure Beast on turn 4; seat 0 attacks on turn 5.
+    const t = new Table(stacked(pad([1]), pad([2, 33])));
+    t.endTurn(0);
+    t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 }).endTurn(1);
+    t.endTurn(0);
+    t.play(1, { type: 'normalSummon', card: 'b1', tributes: [], zone: 1 }).endTurn(1);
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).play(0, { type: 'enterBattle' });
+    const attack = legalActions(t.state, 0).find((a) => a.type === 'attack');
+    expect(attack).toMatchObject({ attacker: 'a0', targets: [1], direct: false });
+  });
+
+  it("destroys a monster that attacked Scorpion at the End Phase of its controller's 2nd turn after", () => {
+    const t = new Table(stacked(pad([1]), pad([34])));
+    t.endTurn(0);
+    t.play(1, { type: 'normalSummon', card: 'b0', tributes: [], zone: 0 }).endTurn(1);
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).play(0, { type: 'enterBattle' }).play(0, { type: 'attack', attacker: 'a0', target: 0 });
+    expect(t.state.marks).toMatchObject([{ card: 'a0', mark: 'destroy', turn: 7 }]);
+    // Ends a turn, discarding down to 6 cards.
+    const end = (seat: Seat) => t.play(seat, { type: 'endTurn', discard: t.state.players[seat].hand.slice(6) });
+    end(0), end(1), end(0), end(1);
+    expect(t.state.turn).toBe(7);
+    expect(t.state.players[0].monsters[0]?.id).toBe('a0');
+    end(0);
+    expect(t.state.players[0].graveyard).toContain('a0');
+  });
+
+  it('charges LP to attack', () => {
+    const t = new Table(stacked(pad([35]), pad([2])));
+    t.endTurn(0).endTurn(1);
+    t.play(0, { type: 'normalSummon', card: 'a0', tributes: [], zone: 0 }).play(0, { type: 'enterBattle' }).play(0, { type: 'attack', attacker: 'a0', target: 'direct' });
+    expect(t.state.players[0].lp).toBe(7000);
+    expect(t.state.players[1].lp).toBe(6000);
   });
 });

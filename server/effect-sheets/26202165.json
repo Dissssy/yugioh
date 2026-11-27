@@ -1,0 +1,87 @@
+{
+  "code": 26202165,
+  "textHash": "164cb49bf9ebbeb2d2a11218178de2b76619691505c2be2fc19459b8b39e156f",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "graveyard",
+      "opt": "hard",
+      "window": "If this card is sent from the field to the GY",
+      "cost": "",
+      "effect": "Add 1 monster with 1500 or less ATK from your Deck to your hand, but you cannot activate cards, or the effects of cards, with that name for the rest of this turn.",
+      "targets": null,
+      "when": {
+        "event": "sent_to_graveyard",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "deck"
+                    ],
+                    "kinds": [
+                      "monster"
+                    ],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": {
+                      "min": null,
+                      "max": 1500
+                    },
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 1,
+                  "max": 1,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                },
+                "to": "hand"
+              },
+              {
+                "do": "lock_names",
+                "cards": {
+                  "from": "moved"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

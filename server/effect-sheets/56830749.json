@@ -1,0 +1,96 @@
+{
+  "code": 56830749,
+  "textHash": "753e05e87b2d7a292674460f15bbb2902a5b1b83d3d47653960a074a67436f2d",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "Tribute 1 monster",
+      "effect": "Make your opponent Tribute 1 monster (for no effect).",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "places": [
+                  "monsters"
+                ],
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null,
+                "original": false
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null,
+              "distinct": false,
+              "includeSelf": false
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "their_choice",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "count": 1
+                },
+                "to": "graveyard"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

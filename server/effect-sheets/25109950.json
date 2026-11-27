@@ -1,0 +1,81 @@
+{
+  "code": 25109950,
+  "textHash": "ef31474b9604d73ae89f12150e2f4686d160c22a3f25d119dcf74025d85bfd6c",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "Offer 1 monster on your side of the field as a Tribute",
+      "effect": "Increase this monster's ATK by 700 points until the end of the turn.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "places": [
+                  "monsters"
+                ],
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null,
+                "original": false
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null,
+              "distinct": false,
+              "includeSelf": false
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "modify_stats",
+                "cards": {
+                  "from": "self"
+                },
+                "atk": 700,
+                "def": 0,
+                "per": null,
+                "levelDelta": 0,
+                "levelSet": null,
+                "until": "end_of_turn"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

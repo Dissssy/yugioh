@@ -1,0 +1,79 @@
+{
+  "code": 51275027,
+  "textHash": "608c252ad36817874fb796b464ab5c00f916d277ade2709ef96ba3bb2c75a732",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "graveyard",
+      "opt": "none",
+      "window": "When this card is sent to the Graveyard as a result of battle",
+      "cost": "",
+      "effect": "The Battle Phase for that turn ends immediately (no more attacks can be declared).",
+      "targets": null,
+      "when": {
+        "event": "destroyed_by_battle",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "turn",
+                    "whose": "you"
+                  }
+                ]
+              },
+              {
+                "do": "forbid",
+                "player": "you",
+                "what": "declare_attack",
+                "filter": null,
+                "wholeTurn": false,
+                "others": false
+              },
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "turn",
+                    "whose": "opponent"
+                  }
+                ]
+              },
+              {
+                "do": "forbid",
+                "player": "opponent",
+                "what": "declare_attack",
+                "filter": null,
+                "wholeTurn": false,
+                "others": false
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -1,0 +1,68 @@
+{
+  "code": 25880422,
+  "textHash": "7275ccdeaa9589c77d3cd6759d553b36b51a5808cb886d0e9da9ee2d04496fe5",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Change that target to face-up Defense Position.",
+      "targets": "1 face-up Attack Position monster your opponent controls",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "opponent",
+            "places": [
+              "monsters"
+            ],
+            "kinds": [],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": "attack",
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_position",
+                "cards": {
+                  "from": "targets"
+                },
+                "position": "defense"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

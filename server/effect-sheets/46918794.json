@@ -1,0 +1,51 @@
+{
+  "code": 46918794,
+  "textHash": "644304ad90782aa6245605d54f983c4e02b15066473f380f8e962df4b6c8c5db",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Inflict 1000 points of damage to your opponent's Life Points and 500 points of damage to your Life Points.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": 1000,
+                "per": null,
+                "kind": "damage"
+              },
+              {
+                "do": "change_lp",
+                "player": "you",
+                "amount": 500,
+                "per": null,
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

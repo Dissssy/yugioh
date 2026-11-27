@@ -1,0 +1,132 @@
+{
+  "code": 41420027,
+  "textHash": "954ab80d6721dae3e54db02ce63210b47649b7354644856bb403090eb5c39c73",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 3,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "When a monster(s) would be Summoned",
+      "cost": "Pay half your LP",
+      "effect": "Negate the Summon, and if you do, destroy that card.",
+      "targets": null,
+      "when": {
+        "event": "summoning",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "change_lp",
+            "player": "you",
+            "amount": {
+              "of": "lp",
+              "times": 0.5
+            },
+            "per": null,
+            "kind": "cost"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "event"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "activation",
+      "speed": 3,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "When a Spell/Trap Card is activated",
+      "cost": "Pay half your LP",
+      "effect": "Negate the activation, and if you do, destroy that card.",
+      "targets": null,
+      "when": {
+        "event": "activated",
+        "self": false,
+        "filter": {
+          "side": "either",
+          "places": [],
+          "kinds": [
+            "spell",
+            "trap"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "change_lp",
+            "player": "you",
+            "amount": {
+              "of": "lp",
+              "times": 0.5
+            },
+            "per": null,
+            "kind": "cost"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "negate_activation",
+                "destroy": true
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

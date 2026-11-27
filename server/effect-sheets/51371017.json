@@ -1,0 +1,62 @@
+{
+  "code": 51371017,
+  "textHash": "7915d925e9ba49eb0c6c1f523dd9a8a5586ea64a137d3bc6db3a5ca9f3eece04",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "flip",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card is flipped face-up",
+      "cost": "",
+      "effect": "Inflict 500 damage to your opponent for each Spell and Trap Card on your opponent's side of the field.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "change_lp",
+                "player": "opponent",
+                "amount": 500,
+                "per": {
+                  "side": "opponent",
+                  "places": [
+                    "spellTraps"
+                  ],
+                  "kinds": [],
+                  "types": [],
+                  "races": [],
+                  "attributes": [],
+                  "named": null,
+                  "except": null,
+                  "extraDeck": null,
+                  "faceUp": null,
+                  "position": null,
+                  "level": null,
+                  "atk": null,
+                  "def": null,
+                  "original": false
+                },
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

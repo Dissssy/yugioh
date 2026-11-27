@@ -1,0 +1,214 @@
+{
+  "code": 29155212,
+  "textHash": "c2aa37c38a87ae28f3be7ba66e95bdf28509dda04e966c3763d7b1915b043dd4",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "Gains 100 ATK/DEF while \"Castle of Dark Illusions\" is on the field.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 100,
+        "def": 100,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "either",
+              "places": [
+                "monsters"
+              ],
+              "kinds": [],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Castle of Dark Illusions",
+              "except": null,
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null,
+              "original": false
+            },
+            "min": 1,
+            "max": null,
+            "distinct": false
+          }
+        ]
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "During each of your Standby Phases",
+      "cost": "",
+      "effect": "If \"Castle of Dark Illusions\" is on the field: this card gains 100 ATK/DEF, for four of your Standby Phases.",
+      "targets": null,
+      "when": {
+        "event": "standby_phase",
+        "self": false,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [
+          {
+            "if": "turn",
+            "whose": "you"
+          },
+          {
+            "if": "count",
+            "filter": {
+              "side": "either",
+              "places": [
+                "monsters"
+              ],
+              "kinds": [],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Castle of Dark Illusions",
+              "except": null,
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null,
+              "original": false
+            },
+            "min": 1,
+            "max": null,
+            "distinct": false
+          }
+        ],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "count",
+                    "filter": {
+                      "side": "either",
+                      "places": [
+                        "monsters"
+                      ],
+                      "kinds": [],
+                      "types": [],
+                      "races": [],
+                      "attributes": [],
+                      "named": "Castle of Dark Illusions",
+                      "except": null,
+                      "extraDeck": null,
+                      "faceUp": true,
+                      "position": null,
+                      "level": null,
+                      "atk": null,
+                      "def": null,
+                      "original": false
+                    },
+                    "min": 1,
+                    "max": null,
+                    "distinct": false
+                  }
+                ]
+              },
+              {
+                "do": "add_counters",
+                "cards": {
+                  "from": "self"
+                },
+                "counter": "standby",
+                "count": 1,
+                "max": 4
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "This card gains 100 ATK/DEF for each counter on it while \"Castle of Dark Illusions\" is on the field.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 100,
+        "def": 100,
+        "per": "counters",
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": [
+          {
+            "if": "count",
+            "filter": {
+              "side": "either",
+              "places": [
+                "monsters"
+              ],
+              "kinds": [],
+              "types": [],
+              "races": [],
+              "attributes": [],
+              "named": "Castle of Dark Illusions",
+              "except": null,
+              "extraDeck": null,
+              "faceUp": true,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null,
+              "original": false
+            },
+            "min": 1,
+            "max": null,
+            "distinct": false
+          }
+        ]
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

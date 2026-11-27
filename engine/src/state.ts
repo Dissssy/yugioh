@@ -78,10 +78,12 @@ function initialState(start: Extract<DuelEvent, { type: 'duelStarted' }>): DuelS
     properlySummoned: [],
     sentThisTurn: [],
     monsterSentThisTurn: [],
+    coins: [],
     shields: [],
     statsReversed: false,
     tributable: [],
     pledges: [],
+    marks: [],
     lingering: [],
     chain: [],
     step: { at: 'rps', picks: [null, null], last: null },
@@ -221,6 +223,7 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         s.sentThisTurn = [];
         s.monsterSentThisTurn = [];
         s.shields = [];
+        s.marks = s.marks.filter((m) => m.turn >= event.turn);
         s.statsReversed = false;
         s.tributable = [];
         s.lingering = s.lingering.filter((l) => l.untilTurn >= event.turn);
@@ -292,6 +295,8 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
       }
       case 'positionChanged': {
         const card = onField(s, event.card);
+        // A face-up monster's change of position (a face-down one is flipped instead).
+        if (card.faceUp && card.position !== event.position) s.happened.push({ event: 'position_changed', card: event.card, player: event.player, group });
         card.position = event.position;
         card.positionChangedTurn = s.turn;
         // Limit Reverse: its monster changed to Defense Position takes both cards with it.
@@ -312,6 +317,7 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         return;
       }
       case 'attackEnded': {
+        s.modifiers = s.modifiers.filter((m) => m.until !== 'end_of_damage_step');
         const attacker = s.attack && locate(s, s.attack.attacker);
         // A replay: the attack never happened, so the monster may attack again.
         if (event.replay && attacker?.zone === 'monsters') {
@@ -352,6 +358,8 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         }
         s.chain.push({ player: event.player, card: event.card, effect: event.effect, targets: [], choice: null, paid: [], cause: event.cause, negated: false, setAgain: false, taxed: false });
         s.usedThisTurn.push({ player: event.player, card: event.card, code: s.instances[event.card]!.code, effect: event.effect });
+        const from = locate(s, event.card);
+        if (from?.zone === 'monsters' || from?.zone === 'spellTraps') s.players[from.seat][from.zone][from.index]!.usedEffects.push(event.effect);
         const step = s.step;
         // A trigger joins the chain with the others; any other activation hands the opponent priority.
         if (step.at === 'triggers') step.handled.push(`${event.card}:${event.effect}`);
@@ -364,6 +372,17 @@ function fold(state: DuelState, event: DuelEvent): DuelState {
         return;
       case 'revealed':
       case 'looked':
+        return;
+      case 'attackerMarked':
+        s.marks.push({ card: event.card, placedTurn: onField(s, event.card).placedTurn, mark: event.mark, turn: event.turn });
+        return;
+      case 'equippedFromHand': {
+        take(s.players[event.player].hand, event.card);
+        s.players[event.player].spellTraps[event.zone] = { ...fieldCard(event.card, s.turn, true), position: 'attack', activatedTurn: s.turn, linked: event.to };
+        return;
+      }
+      case 'coinsTossed':
+        s.coins = event.results;
         return;
       case 'effectChosen':
         s.chain.at(-1)!.choice = event.choice;
@@ -559,7 +578,7 @@ const next = (then: Then): DuelState['step'] => (then.do === 'open' ? { at: 'ope
 function summoned(s: DuelState, id: string, player: Seat, how: SummonKind, group: number, materials: string[] = []) {
   onField(s, id).summoned = { how, turn: s.turn, materials };
   if (how !== 'normal' && how !== 'flip') s.didThisTurn.push({ player, what: 'special_summon', card: id });
-  s.happened.push({ event: 'summoned', card: id, player, how, group } satisfies Happening);
+  s.happened.push({ event: 'summoned', card: id, player, how, byEffect: s.chain.length > 0, group } satisfies Happening);
 }
 
 /** Whether a Summon is one of those wanted (empty for any). Synchro and Xyz Summons are Special Summons too. */
@@ -587,6 +606,7 @@ function fieldCard(id: string, turn: number, faceUp: boolean): FieldCard {
     counters: {},
     returnsAtEndPhase: false,
     banishWhenLeaves: false,
+    usedEffects: [],
   };
 }
 

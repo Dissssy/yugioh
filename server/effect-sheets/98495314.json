@@ -1,0 +1,136 @@
+{
+  "code": 98495314,
+  "textHash": "9aab5fb3c650cb08e530c7af6826d701358a9885bdfbc0de4cff84ba7981af80",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "",
+      "effect": "Equip this card to 1 face-up monster.",
+      "targets": "1 face-up monster on the field",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "places": [
+              "monsters"
+            ],
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": true,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "link",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is equipped to a monster",
+      "cost": "",
+      "effect": "The equipped monster gains 500 ATK/DEF.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "linked",
+        "atk": 500,
+        "def": 500,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "graveyard",
+      "opt": "none",
+      "window": "If this card is sent to your GY",
+      "cost": "",
+      "effect": "Place it on top of your Deck.",
+      "targets": null,
+      "when": {
+        "event": "sent_to_graveyard",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "self"
+                },
+                "to": "deck_top"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

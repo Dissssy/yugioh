@@ -1,0 +1,101 @@
+{
+  "code": 79759861,
+  "textHash": "c4902de4607e4bdcb39dfb734672b8f72013358eb221b59a27dead77365c799c",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Your Main Phase",
+      "cost": "Discard 1 card",
+      "effect": "Destroy it.",
+      "targets": "1 monster on the field",
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "choose",
+              "filter": {
+                "side": "you",
+                "places": [
+                  "hand"
+                ],
+                "kinds": [],
+                "types": [],
+                "races": [],
+                "attributes": [],
+                "named": null,
+                "except": null,
+                "extraDeck": null,
+                "faceUp": null,
+                "position": null,
+                "level": null,
+                "atk": null,
+                "def": null,
+                "original": false
+              },
+              "min": 1,
+              "max": 1,
+              "rank": null,
+              "distinct": false,
+              "includeSelf": false
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": {
+          "filter": {
+            "side": "either",
+            "places": [
+              "monsters"
+            ],
+            "kinds": [
+              "monster"
+            ],
+            "types": [],
+            "races": [],
+            "attributes": [],
+            "named": null,
+            "except": null,
+            "extraDeck": null,
+            "faceUp": null,
+            "position": null,
+            "level": null,
+            "atk": null,
+            "def": null,
+            "original": false
+          },
+          "min": 1,
+          "max": 1,
+          "others": true,
+          "event": false
+        },
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "targets"
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

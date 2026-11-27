@@ -187,7 +187,7 @@ function zonesFreedBy(state: DuelState, cost: Step[], card: string): number {
  * need nothing here. `freed` is how many Monster Zones the cost frees first.
  */
 function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, freed = 0, optionalTargets = false): string | null {
-  if (step.do === 'change_lp' && step.kind === 'cost') return step.per === null && state.players[seat].lp < step.amount ? `You can't pay ${step.amount} LP.` : null;
+  if (step.do === 'change_lp' && step.kind === 'cost') return step.per === null && typeof step.amount === 'number' && state.players[seat].lp < step.amount ? `You can't pay ${step.amount} LP.` : null;
   if (step.do === 'summon_token') {
     const player = step.player === 'you' ? seat : other(seat);
     if (freeMonsterZones(state, player) + (player === seat ? freed : 0) < step.count) return `There ${step.count === 1 ? 'is no free Monster Zone' : `aren't ${step.count} free Monster Zones`} for the Token${step.count === 1 ? '' : 's'}.`;
@@ -214,11 +214,12 @@ function stepProblem(state: DuelState, step: Step, seat: Seat, card: string, fre
     if (problem) return problem;
   }
   if (step.do === 'remove_counters' && selected(state, sel, seat, card).every((id) => (onFieldCard(state, id)?.counters[step.counter] ?? 0) < step.count)) {
-    return `There aren't ${step.count} ${step.counter === 'spell' ? 'Spell Counter' : 'counter'}${step.count === 1 ? '' : 's'} to remove.`;
+    return `There aren't ${step.count} ${step.counter === 'spell' ? 'Spell Counter' : 'Standby Phase counter'}${step.count === 1 ? '' : 's'} to remove.`;
   }
   if (sel.from === 'battling' && battling(state, sel.filter, seat, card).length === 0) return `This card isn't battling a ${describeFilter(sel.filter)}.`;
-  if (sel.from === 'all' && cardsFitting(state, sel.filter, seat, card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
+  if (sel.from === 'all' && cardsFitting(state, sel.filter, seat, sel.includeSelf ? '' : card).length === 0) return `There is no ${describeFilter(sel.filter)}.`;
   if (sel.from === 'random' && cardsFitting(state, sel.filter, seat, card).length < sel.min) return `There is no ${describeFilter(sel.filter)}.`;
+  if (sel.from === 'their_choice' && cardsFitting(state, sel.filter, seat, card).length < sel.count) return `There aren't ${sel.count} ${describeFilter(sel.filter)}s.`;
   if (sel.from === 'choose' && distinctCount(state, choosableFor(state, step, seat, card), sel.distinct) < sel.min) {
     return sel.min === 1 ? `There is no ${describeFilter(sel.filter)}.` : `There are fewer than ${sel.min} of: ${describeFilter(sel.filter)}.`;
   }
@@ -247,7 +248,9 @@ function selected(state: DuelState, sel: Selection, seat: Seat, card: string): s
     case 'choose':
       return chooseFrom(state, sel, seat, card);
     case 'all':
+      return cardsFitting(state, sel.filter, seat, sel.includeSelf ? '' : card);
     case 'random':
+    case 'their_choice':
       return cardsFitting(state, sel.filter, seat, card);
     case 'battling':
       return battling(state, sel.filter, seat, card);
@@ -293,6 +296,8 @@ function optionProblem(state: DuelState, script: Script, option: Script['options
   let skipping = false;
   for (const s of option.steps) {
     // Steps after an `only_if` that doesn't hold won't happen, so they need nothing.
+    // What follows a coin toss depends on its result, which isn't known yet: any result may do nothing.
+    if (s.do === 'toss_coins') break;
     if (s.do === 'only_if') skipping = s.conditions.some((c) => conditionProblem(state, c, seat, card));
     if (skipping) continue;
     const problem = stepProblem(state, s, seat, card, freed, optional);
@@ -403,6 +408,19 @@ export function conditionProblem(state: DuelState, c: Condition, seat: Seat, car
       return state.sentThisTurn.includes(card) ? "It can't be used the turn this card was sent to the GY." : null;
     case 'damage_calculation':
       return state.attack?.damageStep ? null : 'It can only be used at damage calculation.';
+    case 'counters': {
+      const enough = cardsFitting(state, c.filter, seat, '').some((id) => (onFieldCard(state, id)?.counters[c.counter] ?? 0) >= c.min);
+      return enough ? null : `It needs a ${describeFilter(c.filter)} with ${c.min} or more counters.`;
+    }
+    case 'battle_opponent': {
+      const a = state.attack;
+      const foe = a?.attacker === card ? a.target : a?.target === card ? a.attacker : null;
+      return foe && locate(state, foe)?.zone === 'monsters' && fits(state, foe, c.filter, seat) ? null : `It needs this card to be battling a ${describeFilter(c.filter)}.`;
+    }
+    case 'coins': {
+      const heads = state.coins.filter(Boolean).length;
+      return (c.min === null || heads >= c.min) && (c.max === null || heads <= c.max) ? null : `The coins came up heads ${heads} time${heads === 1 ? '' : 's'}.`;
+    }
     case 'monster_sent_this_turn':
       return state.monsterSentThisTurn.includes(seat) ? null : 'No monster on your field was sent to your GY this turn.';
     case 'last_attack': {

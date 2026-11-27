@@ -1,0 +1,73 @@
+{
+  "code": 55875323,
+  "textHash": "85e689c91630ab45a1d9f16a935e2801b1554de39c931a2dc97475a6aa1f4409",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "A non Zombie-Type monster attacking this card cannot attack on its following turn.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "mark_attackers",
+        "filter": {
+          "side": "either",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [],
+          "types": [],
+          "races": [
+            "Aqua",
+            "Beast",
+            "Beast-Warrior",
+            "Creator-God",
+            "Cyberse",
+            "Dinosaur",
+            "Divine-Beast",
+            "Dragon",
+            "Fairy",
+            "Fiend",
+            "Fish",
+            "Illusion",
+            "Insect",
+            "Machine",
+            "Plant",
+            "Psychic",
+            "Pyro",
+            "Reptile",
+            "Rock",
+            "Sea Serpent",
+            "Spellcaster",
+            "Thunder",
+            "Warrior",
+            "Winged Beast",
+            "Wyrm"
+          ],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "mark": "no_attack",
+        "turns": 1
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -1,0 +1,118 @@
+{
+  "code": 88279736,
+  "textHash": "09c7f8f56e0641e4d80a97659afc15953481afd56dbf309baafe8c0c8f6aa358",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "activation",
+      "speed": 2,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "Any time you could activate a Trap Card",
+      "cost": "",
+      "effect": "Activate this card; the activation itself does nothing.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": []
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    },
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "Each time a monster you control inflicts Battle Damage to your opponent",
+      "cost": "",
+      "effect": "Your opponent discards 1 random card.",
+      "targets": null,
+      "when": {
+        "event": "battle_damage",
+        "self": false,
+        "filter": {
+          "side": "you",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "random",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "hand"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 0,
+                  "count": 1
+                },
+                "to": "graveyard"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

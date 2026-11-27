@@ -125,9 +125,14 @@ function statsOn(state: DuelState, id: string): InForce<Stats>[] {
   return inForce(state).filter((f): f is InForce<Stats> => f.effect.apply === 'stats' && affects(state, f as InForce<Stats>, id));
 }
 
-/** How many times a stat change applies: once, or once per card that fits `per` or per Xyz Material of its card. */
+/** How many times a stat change applies: once, or once per card that fits `per`, per Xyz Material of its card, or per counter on it. */
 function times(state: DuelState, f: InForce<Stats>): number {
   const per = f.effect.per;
+  if (per === 'counters') {
+    const at = locate(state, f.source);
+    const card = at && (at.zone === 'monsters' || at.zone === 'spellTraps') ? state.players[at.seat][at.zone][at.index] : null;
+    return Object.values(card?.counters ?? {}).reduce((a, b) => a + (b ?? 0), 0);
+  }
   return per === null ? 1 : per === 'materials' ? materialsOf(state, f.source).length : cardsFitting(state, per, f.seat, '').length;
 }
 
@@ -152,6 +157,29 @@ export function restriction(state: DuelState, id: string, what: Restriction, aga
 }
 
 export const restricted = (state: DuelState, id: string, what: Restriction, against: string | null = null) => restriction(state, id, what, against) !== null;
+
+/** The LP a monster's own effect makes it pay to attack (Dark Elf); 0 for most. */
+export const attackCost = (state: DuelState, id: string) =>
+  continuousOnField(state).reduce((sum, f) => sum + (f.source === id && f.effect.apply === 'attack_cost' ? f.effect.lp : 0), 0);
+
+/** The monsters of `seat`'s opponent that `seat`'s monsters may only attack (Ring of Magnetism); empty when none lures them. */
+export function lures(state: DuelState, seat: Seat): string[] {
+  const foe = seat === 0 ? 1 : 0;
+  return continuousOnField(state).flatMap((f) => {
+    if (f.effect.apply !== 'lure' || f.seat !== foe) return [];
+    const at = locate(state, f.source)!;
+    const id = f.effect.to === 'self' ? f.source : at.zone === 'spellTraps' ? state.players[at.seat].spellTraps[at.index]!.linked : null;
+    const there = id ? locate(state, id) : null;
+    return id && there?.zone === 'monsters' && there.seat === foe ? [id] : [];
+  });
+}
+
+/** What this face-up monster's `mark_attackers` effects do to `attacker`, a monster that attacked it. */
+export function marksFor(state: DuelState, target: string, attacker: string): { mark: 'no_attack' | 'destroy'; turns: number }[] {
+  return continuousOnField(state).flatMap((f) =>
+    f.source === target && f.effect.apply === 'mark_attackers' && fits(state, attacker, f.effect.filter, f.seat) ? [{ mark: f.effect.mark, turns: f.effect.turns }] : [],
+  );
+}
 
 /** The battle changes in force on a face-up monster. */
 function battleOn(state: DuelState, id: string): Battle[] {

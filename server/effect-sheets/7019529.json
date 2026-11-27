@@ -1,0 +1,63 @@
+{
+  "code": 7019529,
+  "textHash": "7303070ad087ae54035fc1e2f851fe7bb5d5bb49890146bb01dde4ca9854143d",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "If this card attacks a WIND monster, it gains 1000 ATK during the Damage Step only.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 1000,
+        "def": 0,
+        "per": null,
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": [
+          {
+            "if": "battling",
+            "as": "attacker",
+            "damageStep": true
+          },
+          {
+            "if": "battle_opponent",
+            "filter": {
+              "side": "either",
+              "places": [
+                "monsters"
+              ],
+              "kinds": [],
+              "types": [],
+              "races": [],
+              "attributes": [
+                "WIND"
+              ],
+              "named": null,
+              "except": null,
+              "extraDeck": null,
+              "faceUp": null,
+              "position": null,
+              "level": null,
+              "atk": null,
+              "def": null,
+              "original": false
+            }
+          }
+        ]
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

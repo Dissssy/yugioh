@@ -49,7 +49,8 @@
                     "atk": null,
                     "def": null,
                     "original": false
-                  }
+                  },
+                  "includeSelf": false
                 },
                 "atk": 300,
                 "def": 0,

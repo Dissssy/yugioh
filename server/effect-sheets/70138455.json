@@ -1,0 +1,85 @@
+{
+  "code": 70138455,
+  "textHash": "125754d2199b96cf76fdc5a77b9e621a0231ccf61eaaad599bdb01c5a1e92b45",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "During your Standby Phase",
+      "cost": "Tribute this face-up card",
+      "effect": "Select and destroy 2 face-up monsters with an ATK of 1000 or less.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [
+          {
+            "if": "phase",
+            "phases": [
+              "standby"
+            ]
+          }
+        ],
+        "cost": [
+          {
+            "do": "move",
+            "cards": {
+              "from": "self"
+            },
+            "to": "graveyard"
+          }
+        ],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "choose",
+                  "filter": {
+                    "side": "either",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": true,
+                    "position": null,
+                    "level": null,
+                    "atk": {
+                      "min": null,
+                      "max": 1000
+                    },
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 2,
+                  "max": 2,
+                  "rank": null,
+                  "distinct": false,
+                  "includeSelf": false
+                }
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

@@ -1,0 +1,14 @@
+{
+  "code": 11901678,
+  "textHash": "fa5c612a79a4a486e7ed56c2c661a7fbcb4810ab5d44b0cea01c47a55fb380c4",
+  "model": "claude-code",
+  "effects": [],
+  "materials": {
+    "summon": "fusion",
+    "materials": [
+      "Summoned Skull",
+      "Red-Eyes Black Dragon"
+    ]
+  },
+  "normalSummon": true
+}

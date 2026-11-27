@@ -1,0 +1,73 @@
+{
+  "code": 15150365,
+  "textHash": "fb34fcadc3f4f4f491e338cb92374a68278d2c05ce95a1423dfa9832b366422b",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "trigger",
+      "speed": 1,
+      "mandatory": true,
+      "from": "field",
+      "opt": "none",
+      "window": "When this card inflicts Battle Damage to your opponent's Life Points",
+      "cost": "",
+      "effect": "Your opponent discards 1 card randomly from his/her hand.",
+      "targets": null,
+      "when": {
+        "event": "battle_damage",
+        "self": true,
+        "filter": null,
+        "how": [],
+        "canMiss": false,
+        "by": null,
+        "targeting": null
+      },
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "move",
+                "cards": {
+                  "from": "random",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "hand"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "min": 0,
+                  "count": 1
+                },
+                "to": "graveyard"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

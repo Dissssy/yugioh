@@ -1,0 +1,51 @@
+{
+  "code": 20394040,
+  "textHash": "a6793643ad487944b18376406bab5d8777d25d91cb6d01976276b0c7c70b1c38",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "This card gains 500 ATK for each \"Swamp Battleguard\" you control.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 500,
+        "def": 0,
+        "per": {
+          "side": "you",
+          "places": [
+            "monsters"
+          ],
+          "kinds": [],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": "Swamp Battleguard",
+          "except": null,
+          "extraDeck": null,
+          "faceUp": true,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

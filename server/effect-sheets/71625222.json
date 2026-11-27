@@ -1,0 +1,129 @@
+{
+  "code": 71625222,
+  "textHash": "a9a7c4ebac7ed740efe1413b4c4306b5284c3799ee0d863c664a91c977f81d62",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "ignition",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "soft",
+      "window": "Once per turn, your Main Phase",
+      "cost": "",
+      "effect": "Toss a coin and call it. If you call it right, destroy all monsters your opponent controls. If you call it wrong, destroy as many monsters you control as possible, and if you do, take damage equal to half the total ATK those destroyed monsters had while face-up on the field.",
+      "targets": null,
+      "when": null,
+      "script": {
+        "conditions": [],
+        "cost": [],
+        "targets": null,
+        "options": [
+          {
+            "label": "",
+            "cost": [],
+            "steps": [
+              {
+                "do": "toss_coins",
+                "count": 1
+              },
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "coins",
+                    "min": 1,
+                    "max": null
+                  }
+                ]
+              },
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "opponent",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "includeSelf": false
+                }
+              },
+              {
+                "do": "only_if",
+                "conditions": [
+                  {
+                    "if": "coins",
+                    "min": null,
+                    "max": 0
+                  }
+                ]
+              },
+              {
+                "do": "destroy",
+                "cards": {
+                  "from": "all",
+                  "filter": {
+                    "side": "you",
+                    "places": [
+                      "monsters"
+                    ],
+                    "kinds": [],
+                    "types": [],
+                    "races": [],
+                    "attributes": [],
+                    "named": null,
+                    "except": null,
+                    "extraDeck": null,
+                    "faceUp": null,
+                    "position": null,
+                    "level": null,
+                    "atk": null,
+                    "def": null,
+                    "original": false
+                  },
+                  "includeSelf": true
+                }
+              },
+              {
+                "do": "if_done"
+              },
+              {
+                "do": "change_lp",
+                "player": "you",
+                "amount": {
+                  "of": "moved_total",
+                  "stat": "atk",
+                  "filter": null,
+                  "original": false,
+                  "times": 0.5
+                },
+                "per": null,
+                "kind": "damage"
+              }
+            ]
+          }
+        ],
+        "unapplied": null
+      },
+      "continuous": null,
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}

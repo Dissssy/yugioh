@@ -1,0 +1,53 @@
+{
+  "code": 30778711,
+  "textHash": "1ae3e15347af91fae3e8dfcf95ed04ff0cda213a87e1a5167c490b726fecda41",
+  "model": "claude-code",
+  "effects": [
+    {
+      "kind": "continuous",
+      "speed": 1,
+      "mandatory": false,
+      "from": "field",
+      "opt": "none",
+      "window": "While this card is face-up on the field",
+      "cost": "",
+      "effect": "This card gains 100 ATK for each monster in your Graveyard.",
+      "targets": null,
+      "when": null,
+      "script": null,
+      "continuous": {
+        "apply": "stats",
+        "to": "self",
+        "atk": 100,
+        "def": 0,
+        "per": {
+          "side": "you",
+          "places": [
+            "graveyard"
+          ],
+          "kinds": [
+            "monster"
+          ],
+          "types": [],
+          "races": [],
+          "attributes": [],
+          "named": null,
+          "except": null,
+          "extraDeck": null,
+          "faceUp": null,
+          "position": null,
+          "level": null,
+          "atk": null,
+          "def": null,
+          "original": false
+        },
+        "levelDelta": 0,
+        "levelSet": null,
+        "while": []
+      },
+      "status": "unverified"
+    }
+  ],
+  "materials": null,
+  "normalSummon": true
+}
