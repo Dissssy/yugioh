@@ -732,7 +732,7 @@ export function decide(state: DuelState, seat: Seat, intent: Intent): Decision {
     const run = new Run(state);
     run.emit({ type: 'intent', player: seat, intent });
     if (intent.type === 'surrender') {
-      run.emit({ type: 'duelEnded', result: { winner: other(seat), reason: 'surrender' } });
+      run.emit({ type: 'duelEnded', result: { winner: other(seat), reason: intent.flip ? 'rageQuit' : 'surrender' } });
       return { ok: true, events: run.events };
     }
     if (intent.type === 'pass') {

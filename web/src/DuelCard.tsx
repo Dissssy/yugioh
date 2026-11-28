@@ -93,6 +93,7 @@ export function outcomeText(result: DuelOutcome, players: DuelSummary['players']
     lp: `${loser === yourSeat ? 'your' : `${name(loser)}'s`} LP hit 0`,
     deckOut: `${name(loser)} couldn't draw`,
     surrender: `${name(loser)} surrendered`,
+    rageQuit: `${name(loser)} flipped the table`,
     handWin: `${name(result.winner)} held every piece of a winning hand`,
   }[result.reason];
   return `${head}: ${why} ${on}`;

@@ -117,6 +117,7 @@ One consistent pattern for every "pick some cards" moment: tributes, attack targ
 | Destroyed | Card cracks and fades, then appears on top of the GY |
 | Discard | Card drops from hand to GY |
 | Duel ends | Full-board banner: Victory or Defeat, with the reason underneath |
+| Rage quit | The table flips up from the quitter's edge and its cards slide off (about 2.4 s), for both players, spectators and replays; then the result, over an empty table |
 
 Later layers add: activation (the card enlarges at the centre for a moment with its art, then returns), chain links stacking, effect resolution (a beam from the source card to what it affects), Synchro and Xyz summons, overlay units orbiting under an Xyz monster, ATK/DEF changes shown on the card in green or red.
 
@@ -209,6 +210,8 @@ The UI can leak what the server so carefully hides. Rules:
 - Every card and zone has an accessible label ("Your Main Monster Zone 3, Tenshin, Attack position").
 - Highlights use shape as well as colour (outline style, badges), so they work for colour-blind players.
 - Settings panel: animation speed (normal, fast), reduced motion, sound mute and volume (once there are sounds), auto-pass defaults.
+- **Table at an angle** (per browser, off by default): both fields and the row between them lean back 30 degrees about their near edge, as seen from a chair at the table. The hands, Life Points and popups over the table stay flat. `useBoardSize` works out how far the far edge comes down and gives that space back by growing the zones, so the board still fills the screen. Dropping, aiming and arrows need nothing extra, since the browser hit-tests and measures the leaned zones where they are drawn.
+- **Rage quit**: the menu beside Surrender. It surrenders (`{ type: 'surrender', flip: true }`, result reason `rageQuit`) and plays the table flip above. The flip animates the board's own elements with transforms and opacity, so it shows exactly what was in play and stays cheap on phones.
 
 ## Frontend structure
 

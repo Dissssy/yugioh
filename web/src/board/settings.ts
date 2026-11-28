@@ -11,10 +11,12 @@ export interface DuelSettings {
   notify: boolean;
   /** Emotes read out loud too (sound.ts). */
   speakEmotes: boolean;
+  /** The table seen at an angle, as from a chair, rather than from straight above. */
+  tilt: boolean;
 }
 
 const KEY = 'duel-settings';
-const defaults: DuelSettings = { speed: 'normal', reduceMotion: false, volume: 0.6, muted: false, notify: false, speakEmotes: false };
+const defaults: DuelSettings = { speed: 'normal', reduceMotion: false, volume: 0.6, muted: false, notify: false, speakEmotes: false, tilt: false };
 
 function load(): DuelSettings {
   try {

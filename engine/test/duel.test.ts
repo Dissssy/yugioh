@@ -1430,7 +1430,7 @@ describe('winning', () => {
     }
     expect(t.state.players[1].lp).toBe(0);
     expect(t.state.result).toEqual({ winner: 0, reason: 'lp' });
-    expect(t.refuse(1, { type: 'surrender' })).toMatch(/over/);
+    expect(t.refuse(1, { type: 'surrender', flip: false })).toMatch(/over/);
   });
 
   it('loses when the deck is empty at the draw', () => {
@@ -1455,8 +1455,15 @@ describe('winning', () => {
 
   it('surrender ends the duel', () => {
     const t = new Table(stacked(filler(40), filler(40, 2)));
-    t.play(1, { type: 'surrender' });
+    t.play(1, { type: 'surrender', flip: false });
     expect(t.state.result).toEqual({ winner: 0, reason: 'surrender' });
+  });
+
+  it('rage quitting surrenders and flips the table', () => {
+    const t = new Table(stacked(filler(40), filler(40, 2)));
+    t.play(1, { type: 'surrender', flip: true });
+    expect(t.state.result).toEqual({ winner: 0, reason: 'rageQuit' });
+    expect(logFor(t.events, 0).at(-1)?.text).toBe('Yusei won: Yuma flipped the table');
   });
 });
 

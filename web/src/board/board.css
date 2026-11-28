@@ -36,13 +36,23 @@ main:has(.duel) { max-width: none; padding: 0; }
   min-height: 0;
   padding: 8px 12px;
   display: grid;
-  grid-template-rows: calc(var(--zone) * 0.5) auto var(--zone) auto 1fr;
+  grid-template-rows: calc(var(--zone) * 0.5) auto 1fr;
   grid-template-columns: calc(var(--zone) * 7 + var(--gap) * 6);
   justify-content: center;
   align-content: center;
   gap: var(--gap);
   overflow: hidden;
 }
+/*
+ * Both fields and the row between them, as one surface: it leans back about its near edge when the viewer sees the table
+ * at an angle (useBoardSize's tilt, set inline), and flips over in a rage quit (cues.ts).
+ */
+.surface { display: grid; grid-template-rows: auto var(--zone) auto; gap: var(--gap); transform-origin: 50% 100%; }
+/* After a rage quit the table has gone over: only the Life Points and the result are left. */
+.table.flipped .surface, .table.flipped .hand { visibility: hidden; }
+.split-button { display: inline-flex; }
+.split-button > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.split-button > button:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left-width: 0; padding-inline: 6px; }
 .playmat { display: grid; grid-template-columns: repeat(7, var(--zone)); grid-template-rows: repeat(2, var(--zone)); gap: var(--gap); }
 .zone {
   position: relative;

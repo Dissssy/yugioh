@@ -327,7 +327,7 @@ class Opponent {
   private async withinLimit(board: string): Promise<boolean> {
     if (this.calls < this.c.model.calls) return true;
     await this.c.duels.chat(this.c.id, this.c.seatKey, { text: "I've used all the thinking I'm allowed for this duel, so I surrender." });
-    await this.act(board, { text: 'Surrender', intent: { type: 'surrender' } });
+    await this.act(board, { text: 'Surrender', intent: { type: 'surrender', flip: false } });
     return false;
   }
 
