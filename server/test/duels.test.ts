@@ -255,7 +255,7 @@ describe('a challenge link played by a guest', () => {
     // A spectator follows along without seeing either player's hidden cards.
     const watching = new Stream(await new Browser().fetch(`${h.baseUrl}/api/duels/${duel.id}/stream`));
     await watching.next();
-    expect((await send(second, { type: 'surrender' })).status).toBe(204);
+    expect((await send(second, { type: 'surrender', flip: false })).status).toBe(204);
     let w: PlayerView;
     do w = await watching.next();
     while (!w.result);
@@ -311,7 +311,7 @@ describe('a challenge link played by a guest', () => {
     const text = await (await admin.fetch(report)).text();
     expect(text).toContain(`Duel ${duel.id} (finished)`);
     expect(text).toMatch(/^#\d+ \d\d:\d\d:\d\d T1 \S.* Set .+ \[.+\] in zone 0$/m);
-    expect(text).toMatch(/asked for \{"type":"surrender"\}$/m);
+    expect(text).toMatch(/asked for \{"flip":false,"type":"surrender"\}$/m);
     expect(text).toMatch(/Kaiba \(guest\): gg, Copycat never activated\n.*Ethan: Good game!\n$/);
     const { body } = await admin.json<{ events: { seq: number; event: { type: string } }[] }>(`${report}?format=json`);
     expect(body.events[0]!.event.type).toBe('duelStarted');
@@ -379,7 +379,7 @@ describe('a challenge link played by a guest', () => {
     expect((await guest.json<DuelSummary[]>(`${h.baseUrl}/api/duels`)).body).toHaveLength(2);
     expect(await guestCount()).toBe(1);
     // Finish it, so only finished duels hold the guest.
-    expect((await guest.json(`${h.baseUrl}/api/duels/${second.id}/intents`, { method: 'POST', body: '{"type":"surrender"}' })).status).toBe(204);
+    expect((await guest.json(`${h.baseUrl}/api/duels/${second.id}/intents`, { method: 'POST', body: '{"type":"surrender","flip":false}' })).status).toBe(204);
   });
 
   it('starts a rematch with the same decks once both players ask for it', async () => {
@@ -395,7 +395,7 @@ describe('a challenge link played by a guest', () => {
     expect(accepted.body).toMatchObject({ id: rematch, status: 'active', players: [{ deck: decks[0]!.name }, { deck: decks[1]!.name }] });
     expect((await call<{ error: string }>(admin, '/rematch', {}, 'POST')).status).toBe(201);
     expect((await admin.json<{ error: string }>(`${h.baseUrl}/api/duels/${rematch}/rematch`, { method: 'POST', body: '{}' })).status).toBe(409);
-    expect((await guest.json(`${h.baseUrl}/api/duels/${rematch}/intents`, { method: 'POST', body: '{"type":"surrender"}' })).status).toBe(204);
+    expect((await guest.json(`${h.baseUrl}/api/duels/${rematch}/intents`, { method: 'POST', body: '{"type":"surrender","flip":false}' })).status).toBe(204);
   });
 
   it('deletes the guest a day after their last duel finishes', async () => {
@@ -420,7 +420,7 @@ describe('a challenge link played by a guest', () => {
     await admin.json(`${h.baseUrl}/api/admin/users/${mai.id}/status`, { method: 'POST', body: JSON.stringify({ status: 'approved' }) });
     expect((await visitor.json<DuelSummary[]>(`${h.baseUrl}/api/duels`)).body).toEqual([expect.objectContaining({ id: third.id, yourSeat: 1 })]);
     expect(await guestCount()).toBe(0);
-    expect((await visitor.json(`${h.baseUrl}/api/duels/${third.id}/intents`, { method: 'POST', body: '{"type":"surrender"}' })).status).toBe(204);
+    expect((await visitor.json(`${h.baseUrl}/api/duels/${third.id}/intents`, { method: 'POST', body: '{"type":"surrender","flip":false}' })).status).toBe(204);
   });
 
   it("leaves a guest's seat alone when the account they log in to is the challenger", async () => {

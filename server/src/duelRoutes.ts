@@ -36,7 +36,7 @@ const intent: z.ZodType<Intent> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('replace'), materials: z.array(z.string()) }),
   z.object({ type: z.literal('tax'), discard: id.nullable() }),
   z.object({ type: z.literal('rollback'), accept: z.boolean() }),
-  z.object({ type: z.literal('surrender') }),
+  z.object({ type: z.literal('surrender'), flip: z.boolean() }),
 ]);
 
 const answerBody = z.object({ prompt: z.string(), picks: z.array(z.string()).max(60) });

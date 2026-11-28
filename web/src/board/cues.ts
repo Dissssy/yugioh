@@ -89,17 +89,23 @@ const quietPhase = (event: LogEvent) => event.type === 'phaseChanged' && event.p
  * the more steps are still waiting, so catching up never takes long.
  */
 export function cueMs(event: LogEvent, waiting: number, settings: DuelSettings, reduceMotion: boolean): number {
-  let ms = quietPhase(event) ? 120 : baseMs[event.type];
+  let ms = quietPhase(event) ? 120 : event.type === 'duelEnded' && event.result.reason === 'rageQuit' ? FLIP_MS : baseMs[event.type];
   if (settings.speed === 'fast') ms *= 0.5;
   if (waiting > 3) ms *= 0.5;
   else if (waiting > 0) ms *= 0.75;
   return reduceMotion ? Math.min(ms, 300) : ms;
 }
 
+/** How long a rage quit's table flip is held. */
+const FLIP_MS = 2400;
+
 const other = (seat: Seat): Seat => (seat === 0 ? 1 : 0);
 
-/** Plays the extra animation for one step, on the board's DOM. `ms` is how long the step is held. */
-export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | null, view: PlayerView, ms: number) {
+/**
+ * Plays the extra animation for one step, on the board's DOM. `ms` is how long the step is held. Returns what undoes an
+ * animation that holds its end until the next step.
+ */
+export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | null, view: PlayerView, ms: number): (() => void) | undefined {
   const q = (selector: string) => root.querySelector<HTMLElement>(selector);
   const s = (ms / 1000) * 0.85;
   const e = cue.event;
@@ -188,6 +194,9 @@ export function playCue(root: HTMLElement, cue: LogEntry, prev: PlayerView | nul
     case 'battleDamage':
       shake();
       return;
+    case 'duelEnded':
+      if (e.result.reason !== 'rageQuit' || e.result.winner === null) return;
+      return flipTable(root, other(e.result.winner) === view.you ? 'near' : 'far', ms);
     case 'effectActivated': {
       const el = card(e.card) ?? (e.zone !== null ? slot(e.player, 's', e.zone) : null);
       // The opponent's card from the hand arrives from their hidden hand; a Set card turns face-up.
@@ -279,6 +288,7 @@ export function soundOf(event: LogEvent, view: PlayerView, playing: boolean): So
     case 'turnStarted':
       return playing && event.player === view.you ? 'yourTurn' : null;
     case 'duelEnded':
+      if (event.result.reason === 'rageQuit') return 'tableFlip';
       return !playing || event.result.winner === view.you ? 'win' : 'lose';
     default:
       return null;
@@ -295,4 +305,63 @@ export function awaitsAnswer(view: PlayerView): boolean {
   if (view.actions.some((a) => ANSWERS.includes(a.type))) return true;
   const waiting = view.waiting;
   return waiting?.player === view.you && (waiting.for !== 'respond' || view.actions.some((a) => a.type === 'activate'));
+}
+
+/**
+ * A rage quit: the table flips up from the quitter's edge, `near` (the bottom of the screen) or `far`, over the other
+ * edge, as its cards slide off. It animates the board itself, transforms and opacity only, so it shows exactly what was
+ * in play and stays cheap on phones: a few dozen composited layers for two seconds. The table stays gone after (the
+ * board's `flipped` class); the returned function lets it back, for a replay going back over it.
+ */
+function flipTable(root: HTMLElement, from: 'near' | 'far', ms: number): () => void {
+  const surface = root.querySelector<HTMLElement>('.surface');
+  if (!surface) return () => undefined;
+  const animations: Animation[] = [];
+  const run = (el: Element, frames: Keyframe[], options: KeyframeAnimationOptions) =>
+    animations.push(el.animate(frames, { duration: ms * 0.9, fill: 'forwards', ...options }));
+  const height = surface.offsetHeight;
+  const eye = height * 2.5;
+  const base = getComputedStyle(surface).transform;
+  const start = base === 'none' ? `perspective(${eye}px)` : base;
+  // The surface turns about its bottom edge (board.css), so turning about the top one moves there first and back.
+  const near = from === 'near';
+  const turn = (deg: number, x = 0, y = 0, spin = 0) =>
+    near
+      ? `perspective(${eye}px) translate3d(${x}px, ${y - height}px, 0) rotateZ(${spin}deg) rotateX(${deg}deg) translateY(${height}px)`
+      : `perspective(${eye}px) translate3d(${x}px, ${y}px, 0) rotateZ(${spin}deg) rotateX(${-deg}deg)`;
+  const drift = (Math.random() - 0.5) * height * 0.3;
+  const spin = (Math.random() - 0.5) * 24;
+  // Away over the far edge when you flip it; toward you, and past, when the opponent does.
+  const away = near ? -1 : 1;
+  run(
+    surface,
+    [
+      { transform: start, offset: 0 },
+      { transform: turn(14), offset: 0.12, easing: 'ease-in' },
+      { transform: turn(95, drift * 0.4, away * height * 0.1, spin * 0.4), offset: 0.4 },
+      { transform: turn(170, drift, away * height * 0.5, spin), offset: 0.7, opacity: 1 },
+      { transform: turn(185, drift * 1.3, away * height * 1.4, spin * 1.2), offset: 1, opacity: 0 },
+    ],
+    { easing: 'cubic-bezier(0.3, 0, 0.6, 1)' },
+  );
+  // Each card slides off on its own, a little later than the lift, and tumbles.
+  for (const card of root.querySelectorAll('.surface .slot, .hand .hand-card')) {
+    const x = (Math.random() - 0.5) * height * 0.8;
+    const y = away * (0.3 + Math.random() * 0.7) * height;
+    const r = (Math.random() - 0.5) * 540;
+    const delay = ms * (0.12 + Math.random() * 0.15);
+    run(
+      card,
+      [
+        { transform: 'none', opacity: 1 },
+        { transform: `translate(${x * 0.3}px, ${y * 0.3}px) rotate(${r * 0.3}deg)`, opacity: 1, offset: 0.4 },
+        { transform: `translate(${x}px, ${y}px) rotate(${r}deg)`, opacity: 0 },
+      ],
+      { delay, duration: ms * 0.9 - delay, easing: 'ease-in' },
+    );
+  }
+  // The crash as it lands.
+  const table = root.querySelector('.table');
+  if (table) run(table, [{ transform: 'none' }, { transform: 'translate(-8px, 4px)' }, { transform: 'translate(7px, -3px)' }, { transform: 'none' }], { delay: ms * 0.7, duration: 250, fill: 'none' });
+  return () => animations.forEach((a) => a.cancel());
 }

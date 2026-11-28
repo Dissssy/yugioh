@@ -131,10 +131,13 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
   const swallowClick = useRef(false);
   /** A card sent to a zone, kept over it until the step that moves it arrives. */
   const [sent, setSent] = useState<{ id: string; key: string } | null>(null);
-  const [confirmSurrender, setConfirmSurrender] = useState(false);
+  /** Asking before surrendering: plainly, or by flipping the table (rage quit). */
+  const [confirmSurrender, setConfirmSurrender] = useState<'surrender' | 'flip' | null>(null);
+  /** The menu beside Surrender, by the button it opens from. */
+  const [surrenderMenu, setSurrenderMenu] = useState<HTMLElement | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [table, setTable] = useState<HTMLDivElement | null>(null);
-  const look = useBoardSize(table);
+  const look = useBoardSize(table, settings.tilt);
   const ready = usePreload(shown?.view ?? null, look.imageSize);
   /** A choice in progress, which the arrows keep to: what you're choosing on the board, or the judge's question. */
   const restrict = CHOOSING.includes(mode.kind) || choice !== null;
@@ -182,7 +185,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
   const cue = shown?.cue ?? null;
   useLayoutEffect(() => {
     if (!cue || !shown || !table || reduceMotion) return;
-    playCue(table, cue, shown.prev, shown.view, cueMs(cue.event, 0, settings, reduceMotion) / (controls?.speed ?? 1));
+    return playCue(table, cue, shown.prev, shown.view, cueMs(cue.event, 0, settings, reduceMotion) / (controls?.speed ?? 1));
     // Only a new step should play anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.seq]);
@@ -327,8 +330,9 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
       case 'enterBattle':
       case 'enterMain2':
       case 'pass':
-      case 'surrender':
         return send.mutate({ type: action.type });
+      case 'surrender':
+        return send.mutate({ type: 'surrender', flip: false });
       case 'replace':
         return send.mutate({ type: 'replace', materials: action.materials.slice(0, action.count) });
       case 'tax':
@@ -730,6 +734,8 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
   const endTurn = has('endTurn');
   const canSurrender = !readOnly && !view.result;
   const result = view.result;
+  /** A rage quit's table stays flipped once its animation is over, behind the result; a replay shows the board. */
+  const flipped = result?.reason === 'rageQuit' && cue === null && !replay && !reduceMotion;
   const resultText = log.findLast((e) => e.event.type === 'duelEnded')?.text;
   const turnLabel = <TurnLabel turn={view.turn} label={view.start ? 'Deciding who goes first' : yourTurn && !readOnly ? 'Your turn' : `${view.players[view.turnPlayer].name}'s turn`} />;
   const nextStep = choosing ? undefined : nextPhase(actions);
@@ -829,7 +835,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                   ))}
                 </div>
               )}
-              <div className="table" ref={setTable}>
+              <div className={`table${flipped ? ' flipped' : ''}`} ref={setTable}>
                 {!ready ? (
                   <div className="duel-loading">Loading cards…</div>
                 ) : (
@@ -838,6 +844,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                       <LpPlate seat={foe} name={view.players[foe].name} lp={view.players[foe].lp} cue={cue} active={!view.start && view.turnPlayer === foe} target={lpTarget()} online={onlineOf(foe)} />
                       <ReadOnlyHand seat={foe} name={view.players[foe].name} cards={view.players[foe].hand} side="top" />
                     </div>
+                    <div className="surface" style={look.tilt ? { transform: look.tilt.transform, marginTop: -look.tilt.lift } : undefined}>
                     <Field {...foeField} />
                     <PhaseStrip
                       yours={yourTurn}
@@ -855,6 +862,7 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                       decision={decisionPopup}
                     />
                     <Field {...myField} />
+                    </div>
                     <div className="hand-row own-row">
                       <LpPlate seat={me} name={view.players[me].name} lp={view.players[me].lp} cue={cue} active={!view.start && view.turnPlayer === me} online={watching === 'live' ? onlineOf(me) : undefined} />
                       {watching === 'live' ? (
@@ -942,17 +950,29 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                     Settings
                   </button>
                   {canSurrender && !confirmSurrender && (
-                    <button className="quiet" onClick={() => setConfirmSurrender(true)}>
-                      Surrender
-                    </button>
+                    <span className="split-button">
+                      <button className="quiet" onClick={() => setConfirmSurrender('surrender')}>
+                        Surrender
+                      </button>
+                      <button
+                        className="quiet"
+                        onClick={(e) => setSurrenderMenu(surrenderMenu ? null : e.currentTarget)}
+                        aria-expanded={surrenderMenu !== null}
+                        aria-label="More ways to surrender"
+                      >
+                        ▾
+                      </button>
+                    </span>
                   )}
                 </div>
                 <DuelSwitcher enabled={canPlay} />
                 {canSurrender && confirmSurrender && (
                   <p className="row">
-                    Surrender this duel?
-                    <button onClick={() => send.mutate({ type: 'surrender' })}>Yes, surrender</button>
-                    <button onClick={() => setConfirmSurrender(false)}>No</button>
+                    {confirmSurrender === 'flip' ? 'Flip the table and surrender?' : 'Surrender this duel?'}
+                    <button onClick={() => send.mutate({ type: 'surrender', flip: confirmSurrender === 'flip' })}>
+                      {confirmSurrender === 'flip' ? 'Flip it (╯°□°)╯︵ ┻━┻' : 'Yes, surrender'}
+                    </button>
+                    <button onClick={() => setConfirmSurrender(null)}>No</button>
                   </p>
                 )}
                 {showSettings && (
@@ -963,6 +983,9 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                         <option value="normal">Normal</option>
                         <option value="fast">Fast</option>
                       </select>
+                    </label>
+                    <label>
+                      <input type="checkbox" checked={settings.tilt} onChange={(e) => updateSettings({ tilt: e.target.checked })} /> See the table at an angle
                     </label>
                     <label>
                       <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => updateSettings({ reduceMotion: e.target.checked })} /> Reduce motion
@@ -1032,6 +1055,13 @@ export function Board({ duelId, watching }: { duelId: string; watching?: 'live' 
                   ...(myHand.includes(mode.id) && nav.usingKeyboard() && !readOnly ? [{ label: 'Move in hand', run: () => (setMode(idle), setMoving(mode.id)) }] : [])]}
                   notes={notesFor(mode.id)}
                   onClose={() => setMode(idle)}
+                />
+              )}
+              {surrenderMenu && canSurrender && (
+                <ActionMenu
+                  anchor={surrenderMenu}
+                  items={[{ label: 'Rage quit (flip the table)', run: () => (setSurrenderMenu(null), setConfirmSurrender('flip')) }]}
+                  onClose={() => setSurrenderMenu(null)}
                 />
               )}
               {mode.kind === 'place' && (

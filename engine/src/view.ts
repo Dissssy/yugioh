@@ -346,7 +346,7 @@ function describe(state: DuelState, event: LogEvent): string | null {
       const { winner, reason } = event.result;
       if (winner === null) return 'The duel ended in a draw';
       const loser = who(winner === 0 ? 1 : 0);
-      const why = { lp: `${loser}'s LP reached 0`, deckOut: `${loser} couldn't draw`, surrender: `${loser} surrendered`, handWin: `${who(winner)} held every piece of a winning hand` }[reason];
+      const why = { lp: `${loser}'s LP reached 0`, deckOut: `${loser} couldn't draw`, surrender: `${loser} surrendered`, rageQuit: `${loser} flipped the table`, handWin: `${who(winner)} held every piece of a winning hand` }[reason];
       return `${who(winner)} won: ${why}`;
     }
     case 'judged':

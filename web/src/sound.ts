@@ -40,6 +40,8 @@ const sounds = {
   goodGame: [0.6, 0, 392, 0.02, 0.15, 0.4, 0, 1, 0, 0, 196, 0.1, 0.12],
   win: [0.7, 0, 392, 0.02, 0.25, 0.5, 0, 1, 0, 0, 196, 0.15, 0.15],
   lose: [0.6, 0, 220, 0.02, 0.2, 0.6, 1, 1, -1.5],
+  /** A rage quit: the table going over and crashing down. */
+  tableFlip: [1, 0.1, 70, 0.05, 0.25, 0.9, 4, 2, -2, 0, 0, 0, 0, 0.9, 0, 0.5, 0.1, 0.6],
 } satisfies Record<string, number[]>;
 
 export type Sound = keyof typeof sounds;

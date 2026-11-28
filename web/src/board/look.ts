@@ -23,9 +23,17 @@ export interface BoardLook {
   tight: boolean;
   /** Typing on a portrait screen with the on-screen keyboard up: the log and chat get the screen to themselves. */
   typing: boolean;
+  /** The fields leaning away, as seen from a chair at a real table (`tableTilt`), when the viewer wants that. */
+  tilt: Tilt | null;
 }
 
-const LookContext = createContext<BoardLook>({ zone: 100, imageSize: 'small', stacked: false, compact: false, tight: false, typing: false });
+/** How the fields lean: their CSS transform, and how far the far edge comes down, which the board takes back as space. */
+export interface Tilt {
+  transform: string;
+  lift: number;
+}
+
+const LookContext = createContext<BoardLook>({ zone: 100, imageSize: 'small', stacked: false, compact: false, tight: false, typing: false, tilt: null });
 export const BoardLookProvider = LookContext.Provider;
 export const useBoardLook = () => useContext(LookContext);
 
@@ -47,6 +55,27 @@ const STACKED_PADDING = 8;
 /** The on-screen keyboard counts as up when typing leaves less than this share of the screen's full height. */
 const KEYBOARD_LEAVES = 0.8;
 
+/** The tilted fields: how far they lean back, and the eye's distance from their near edge, in zones. */
+const TILT_DEG = 30;
+const TILT_EYE_ZONES = 14;
+/** The fields' height in zones: two rows each and the middle row. */
+const FIELD_ZONES = 5;
+
+/**
+ * The fields leaned back about their near edge, with the eye in front of it. A point `h` above that edge ends up
+ * h·cos θ · P / (P + h·sin θ) above it on screen, so the far edge comes down by the rest, which is the lift.
+ */
+export function tableTilt(zone: number, gap: number): Tilt {
+  const eye = zone * TILT_EYE_ZONES;
+  const height = zone * FIELD_ZONES + gap * 4;
+  const angle = (TILT_DEG * Math.PI) / 180;
+  const shown = (height * Math.cos(angle) * eye) / (eye + height * Math.sin(angle));
+  return { transform: `perspective(${eye}px) rotateX(${TILT_DEG}deg)`, lift: height - shown };
+}
+
+/** The share of their height the tilted fields take on screen (see `tableTilt`); the same at any zone size. */
+const TILTED_SHARE = 1 - tableTilt(100, 0).lift / (100 * FIELD_ZONES);
+
 const isTextField = (el: Element | null) => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
 
 /**
@@ -55,7 +84,7 @@ const isTextField = (el: Element | null) => el instanceof HTMLInputElement || el
  * columns. Beside the log, the board fills its container. Stacked above the log on a portrait screen, it takes the full
  * width and its height follows from that, up to a share of the screen.
  */
-export function useBoardSize(el: HTMLElement | null): BoardLook {
+export function useBoardSize(el: HTMLElement | null, tilted: boolean): BoardLook {
   const [size, setSize] = useState({ width: 1200, height: 800 });
   const [stacked, setStacked] = useState(() => window.matchMedia(PORTRAIT).matches);
   useEffect(() => {
@@ -99,10 +128,19 @@ export function useBoardSize(el: HTMLElement | null): BoardLook {
 
   const GAP = 6;
   const height = stacked ? screen.full * STACKED_BOARD_SHARE - STACKED_PADDING : size.height;
-  const byHeight = (height - 6 * GAP) / (0.5 + 5 + 1.2);
+  const fields = tilted ? FIELD_ZONES * TILTED_SHARE : FIELD_ZONES;
+  const byHeight = (height - 6 * GAP) / (0.5 + fields + 1.2);
   const byWidth = (size.width - 6 * GAP) / 7;
   const zone = Math.max(40, Math.floor(Math.min(byHeight, byWidth, MAX_ZONE)));
   const cardWidth = zone * CARD_HEIGHT_IN_ZONE * CARD_ASPECT;
   const imageSize: ImageSize = cardWidth * window.devicePixelRatio > SMALL_IMAGE_WIDTH ? 'full' : 'small';
-  return { zone, imageSize, stacked, compact: stacked || zone < COMPACT_BELOW_ZONE, tight: zone < TIGHT_BELOW_ZONE, typing };
+  return {
+    zone,
+    imageSize,
+    stacked,
+    compact: stacked || zone < COMPACT_BELOW_ZONE,
+    tight: zone < TIGHT_BELOW_ZONE,
+    typing,
+    tilt: tilted ? tableTilt(zone, GAP) : null,
+  };
 }

@@ -899,8 +899,8 @@ export interface RollbackOffer {
 
 export interface DuelResult {
   winner: Seat | null;
-  /** `handWin`: a `win_with_hand` effect (Exodia). */
-  reason: 'lp' | 'deckOut' | 'surrender' | 'handWin';
+  /** `handWin`: a `win_with_hand` effect (Exodia). `rageQuit`: a surrender that flips the table, shown to everyone. */
+  reason: 'lp' | 'deckOut' | 'surrender' | 'rageQuit' | 'handWin';
 }
 
 /**
@@ -944,7 +944,8 @@ export type Intent =
   | { type: 'rps'; hand: Hand }
   /** The rock-paper-scissors winner goes first, or lets the opponent go first. */
   | { type: 'chooseOrder'; goFirst: boolean }
-  | { type: 'surrender' };
+  /** `flip`: rage quit, flipping the table on the way out. */
+  | { type: 'surrender'; flip: boolean };
 
 /** Where an op sends a card. Deck places shuffle the Deck, except the top and bottom. */
 export const DESTINATIONS = ['hand', 'deck_top', 'deck_bottom', 'deck_shuffled', 'graveyard', 'banished'] as const;
